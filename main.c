@@ -58,8 +58,11 @@ void draw_view(CeView_t* view, int64_t tab_width){
           }
      }
 
+     int64_t visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->buffer->cursor.y],
+                                                                      view->buffer->cursor.x, tab_width);
+
      move(view->buffer->cursor.y - view->scroll.y + view->rect.top,
-          view->buffer->cursor.x - view->scroll.x + view->rect.left);
+          visible_cursor_x - view->scroll.x + view->rect.left);
 }
 
 void* draw_thread(void* thread_data){
