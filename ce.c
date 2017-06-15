@@ -25,8 +25,7 @@ bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name){
      return true;
 }
 
-void ce_buffer_free(CeBuffer_t* buffer)
-{
+void ce_buffer_free(CeBuffer_t* buffer){
      for(int64_t i = 0; i < buffer->line_count; i++){
           free(buffer->lines[i]);
      }
@@ -37,8 +36,7 @@ void ce_buffer_free(CeBuffer_t* buffer)
      memset(buffer, 0, sizeof(*buffer));
 }
 
-bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename)
-{
+bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      // read the entire file
      size_t content_size;
      char* contents = NULL;
@@ -76,8 +74,7 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename)
      return true;
 }
 
-bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* name)
-{
+bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* name){
      if(buffer->lines) ce_buffer_free(buffer);
 
      int64_t line_count = ce_util_count_string_lines(string);
@@ -112,8 +109,7 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
      return true;
 }
 
-bool ce_buffer_empty(CeBuffer_t* buffer)
-{
+bool ce_buffer_empty(CeBuffer_t* buffer){
      if(buffer->lines == NULL) return false;
 
      // re allocate it down to a single blank line
@@ -125,23 +121,80 @@ bool ce_buffer_empty(CeBuffer_t* buffer)
      return true;
 }
 
-int64_t ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point)
-{
+int64_t ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point){
      if(point.y < 0 || point.y >= buffer->line_count || point.x < 0) return false;
-     if(point.x >= ce_utf8_strlen(buffer->lines[point.y])) return false;
+     int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
+     if(point.x >= line_len){
+          if(line_len == 0 && point.x == 0){
+               return true;
+          }
+          return false;
+     }
 
      return true;
 }
 
-int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line)
-{
+int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line){
      if(line < 0 || line > buffer->line_count) return -1;
 
      return ce_utf8_strlen(buffer->lines[line]);
 }
 
-int64_t ce_utf8_strlen(const char* string)
-{
+CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end){
+     if(!ce_buffer_contains_point(buffer, point)) return point;
+
+     if(delta.y){
+          // figure out where we are visibly (due to tabs being variable length)
+          int64_t cur_visible_index = ce_util_string_index_to_visible_index(buffer->lines[point.y], point.x, tab_width);
+
+          // move to the new line
+          point.y += delta.y;
+          CE_CLAMP(point.y, 0, (buffer->line_count - 1));
+
+          // convert the x from visible index to a string index
+          point.x = ce_util_visible_index_to_string_index(buffer->lines[point.y], cur_visible_index, tab_width);
+     }
+
+     point.x += delta.x;
+     int64_t line_len = ce_buffer_line_len(buffer, point.y);
+
+     if(allow_passed_end){
+          CE_CLAMP(point.x, 0, line_len);
+     }else{
+          if(line_len == 0){
+               point.x = 0;
+          }else{
+               CE_CLAMP(point.x, 0, (line_len - 1));
+          }
+     }
+
+     return point;
+}
+
+void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off){
+     if(!view->buffer) return;
+
+     int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
+     int64_t scroll_top = view->scroll.y + vertical_scroll_off;
+     int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;
+     int64_t scroll_bottom = view->scroll.y + (view->rect.bottom - view->rect.top) - vertical_scroll_off;
+
+     if(view->buffer->cursor.x < scroll_left){
+          view->scroll.x -= (scroll_left - view->buffer->cursor.x);
+          if(view->scroll.x < 0) view->scroll.x = 0;
+     }else if(view->buffer->cursor.x > scroll_right){
+          view->scroll.x += (view->buffer->cursor.x - scroll_right);
+     }
+
+     if(view->buffer->cursor.y < scroll_top){
+          view->scroll.y -= (scroll_top - view->buffer->cursor.y);
+          if(view->scroll.y < 0) view->scroll.y = 0;
+     }else if(view->buffer->cursor.y > scroll_bottom){
+          view->scroll.y += (view->buffer->cursor.y - scroll_bottom);
+     }
+}
+
+int64_t ce_utf8_strlen(const char* string){
      int64_t len = 0;
      int64_t byte_count = 0;
 
@@ -170,8 +223,7 @@ int64_t ce_utf8_strlen(const char* string)
      return len;
 }
 
-CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed)
-{
+CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
      CeRune_t rune;
 
      // 0xxxxxxx is just ascii
@@ -209,8 +261,7 @@ CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed)
      return rune;
 }
 
-int64_t ce_util_count_string_lines(const char* string)
-{
+int64_t ce_util_count_string_lines(const char* string){
      int64_t string_length = strlen(string);
      int64_t line_count = 0;
      for(int64_t i = 0; i <= string_length; ++i){
@@ -223,4 +274,54 @@ int64_t ce_util_count_string_lines(const char* string)
      }
 
      return line_count;
+}
+
+int64_t ce_util_string_index_to_visible_index(const char* string, int64_t index, int64_t tab_width){
+     int64_t x = 0;
+     int64_t rune_len = 0;
+     CeRune_t rune = 1;
+
+     while(rune > 0 && index > 0){
+          rune = ce_utf8_decode(string, &rune_len);
+
+          if(rune > 0){
+               if(rune == CE_TAB){
+                    x += tab_width;
+               }else{
+                    x++;
+               }
+          }else{
+               x++;
+          }
+
+          string += rune_len;
+          index--;
+     }
+
+     return x;
+}
+
+int64_t ce_util_visible_index_to_string_index(const char* string, int64_t index, int64_t tab_width){
+     int64_t x = 0;
+     int64_t rune_len = 0;
+     CeRune_t rune = 1;
+
+     while(rune > 0 && index > 0){
+          rune = ce_utf8_decode(string, &rune_len);
+
+          if(rune > 0){
+               if(rune == CE_TAB){
+                    index -= tab_width;
+               }else{
+                    index--;
+               }
+          }else{
+               index--;
+          }
+
+          string += rune_len;
+          x++;
+     }
+
+     return x;
 }
