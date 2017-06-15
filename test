@@ -1,0 +1,9 @@
+#!/bin/bash
+set -x
+set -e
+SOURCES=(test_ce.c ce.c)
+FLAGS='-Wall -Werror -Wshadow -Wextra -std=gnu11 -ggdb3'
+EXE='test_ce'
+LINK=''
+gcc $FLAGS ${SOURCES[*]} -o $EXE $LINK
+./test_ce
