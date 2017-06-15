@@ -41,10 +41,19 @@ void draw_view(CeView_t* view, int64_t tab_width){
                          for(int64_t t = 0; t < tab_width; t++){
                               mvaddch(draw_y, draw_x + t, ' ');
                          }
+                    }else if(rune >= 0x80){
+                         char utf8_string[CE_UTF8_SIZE + 1];
+                         int bytes_written = 0;
+                         ce_utf8_encode(rune, utf8_string, CE_UTF8_SIZE, &bytes_written);
+                         utf8_string[bytes_written] = 0;
+                         mvaddstr(draw_y, draw_x, utf8_string);
+                         x++;
                     }else{
                          mvaddch(draw_y, draw_x, rune);
                          x++;
                     }
+               }else if(rune == CE_TAB){
+                    x += tab_width;
                }else{
                     x++;
                }
@@ -112,13 +121,17 @@ int main(int argc, char** argv){
      int64_t horizontal_scroll_off = 10;
      int64_t vertical_scroll_off = 5;
 
+     int terminal_width;
+     int terminal_height;
+     getmaxyx(stdscr, terminal_height, terminal_width);
+
      CeBuffer_t buffer = {};
      CeView_t view = {};
      view.buffer = &buffer;
-     view.rect.left = 10;
-     view.rect.right = 90;
-     view.rect.top = 15;
-     view.rect.bottom = 50;
+     view.rect.left = 0;
+     view.rect.right = terminal_width - 1;
+     view.rect.top = 0;
+     view.rect.bottom = terminal_height;
      view.scroll.x = 0;
      view.scroll.y = 0;
 
@@ -144,19 +157,19 @@ int main(int argc, char** argv){
                break;
           case 'h':
                buffer.cursor = ce_buffer_move_point(&buffer, buffer.cursor, (CePoint_t){-1, 0}, tab_width, false);
-               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off);
+               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case 'j':
                buffer.cursor = ce_buffer_move_point(&buffer, buffer.cursor, (CePoint_t){0, 1}, tab_width, false);
-               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off);
+               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case 'k':
                buffer.cursor = ce_buffer_move_point(&buffer, buffer.cursor, (CePoint_t){0, -1}, tab_width, false);
-               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off);
+               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case 'l':
                buffer.cursor = ce_buffer_move_point(&buffer, buffer.cursor, (CePoint_t){1, 0}, tab_width, false);
-               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off);
+               ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           }
      }

@@ -6,6 +6,7 @@
 #define CE_NEWLINE '\n'
 #define CE_TAB '\t'
 #define CE_UTF8_INVALID -1
+#define CE_UTF8_SIZE 4
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
@@ -85,10 +86,11 @@ int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end);
 int64_t ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 
-void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off);
+void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 
 int64_t ce_utf8_strlen(const char* string);
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
+bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int* bytes_written);
 
 int64_t ce_util_count_string_lines(const char* string);
 int64_t ce_util_string_index_to_visible_index(const char* string, int64_t character, int64_t tab_width);

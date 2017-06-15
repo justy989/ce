@@ -171,7 +171,7 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
      return point;
 }
 
-void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off){
+void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
      if(!view->buffer) return;
 
      int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
@@ -179,11 +179,14 @@ void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_
      int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;
      int64_t scroll_bottom = view->scroll.y + (view->rect.bottom - view->rect.top) - vertical_scroll_off;
 
-     if(view->buffer->cursor.x < scroll_left){
-          view->scroll.x -= (scroll_left - view->buffer->cursor.x);
+     int64_t visible_index = ce_util_string_index_to_visible_index(view->buffer->lines[view->buffer->cursor.y],
+                                                                   view->buffer->cursor.x, tab_width);
+
+     if(visible_index < scroll_left){
+          view->scroll.x -= (scroll_left - visible_index);
           if(view->scroll.x < 0) view->scroll.x = 0;
-     }else if(view->buffer->cursor.x > scroll_right){
-          view->scroll.x += (view->buffer->cursor.x - scroll_right);
+     }else if(visible_index > scroll_right){
+          view->scroll.x += (visible_index - scroll_right);
      }
 
      if(view->buffer->cursor.y < scroll_top){
@@ -259,6 +262,60 @@ CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
      }
 
      return rune;
+}
+
+bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int* bytes_written){
+     if(u < 0x80){
+          if(string_len < 1) return false;
+          *bytes_written = 1;
+
+          // leave as-is
+          string[0] = u;
+     }else if(u < 0x0800){
+          if(string_len < 2) return false;
+          *bytes_written = 2;
+
+          // u = 00000000 00000000 00000abc defghijk
+
+          // 2 bytes
+          // first byte:  110abcde
+          string[0] = 0xC0 | ((u >> 6) & 0x1f);
+
+          // second byte: 10fghijk
+          string[1] = 0x80 | (u & 0x3f);
+     }else if(u < 0x10000){
+          if(string_len < 3) return false;
+          *bytes_written = 3;
+
+          // u = 00000000 00000000 abcdefgh ijklmnop
+
+          // 3 bytes
+          // first byte:  1110abcd
+          string[0] = 0xE0 | ((u >> 12) & 0x0F);
+
+          // second byte: 10efghij
+          string[1] = 0x80 | ((u >> 6) & 0x3F);
+
+          // third byte:  10klmnop
+          string[2] = 0x80 | (u & 0x3F);
+     }else if(u < 0x110000){
+          if(string_len < 4) return false;
+          *bytes_written = 4;
+
+          // u = 00000000 000abcde fghijklm nopqrstu
+
+          // 4 bytes
+          // first byte:  11110abc
+          string[0] = 0xF0 | ((u >> 18) & 0x07);
+          // second byte: 10defghi
+          string[1] = 0x80 | ((u >> 12) & 0x3F);
+          // third byte:  10jklmno
+          string[2] = 0x80 | ((u >> 6) & 0x3F);
+          // fourth byte: 10pqrstu
+          string[3] = 0x80 | (u & 0x3F);
+     }
+
+     return true;
 }
 
 int64_t ce_util_count_string_lines(const char* string){
