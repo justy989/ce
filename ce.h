@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #define CE_NEWLINE '\n'
 #define CE_TAB '\t'
@@ -51,12 +52,15 @@ typedef struct{
      int64_t line_count;
 
      char* name;
-     void* user_data;
 
      CeBufferStatus_t status;
      CeBufferFileType_t type;
 
      CePoint_t cursor;
+
+     pthread_mutex_t lock;
+
+     void* user_data;
 }CeBuffer_t;
 
 typedef struct{
@@ -72,25 +76,29 @@ typedef struct{
 
 typedef int32_t CeRune_t;
 
+bool ce_log_init(const char* filename);
+void ce_log(const char* fmt, ...);
+
 bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name);
 void ce_buffer_free(CeBuffer_t* buffer);
 bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename);
 bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* name);
 bool ce_buffer_empty(CeBuffer_t* buffer);
 
-//bool ce_insert_string(CeBuffer_t* buffer, CePoint_t point, const char* string);
-//bool ce_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
-
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
 int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end);
 int64_t ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 
-void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
+bool ce_buffer_insert_string(CeBuffer_t* buffer, CePoint_t point, const char* string);
+//bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
+
+CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 
 int64_t ce_utf8_strlen(const char* string);
+char* ce_utf8_find_index(char* string, int64_t index);
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
-bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int* bytes_written);
+bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes_written);
 
 int64_t ce_util_count_string_lines(const char* string);
 int64_t ce_util_string_index_to_visible_index(const char* string, int64_t character, int64_t tab_width);

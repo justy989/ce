@@ -2,18 +2,74 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <time.h>
+
+FILE* g_ce_log = NULL;
+
+bool ce_log_init(const char* filename){
+     g_ce_log = fopen(filename, "wa");
+     if(!g_ce_log){
+          fprintf(stderr, "error: unable to create ce log: fopen(\"%s\", \"wa\") failed: '%s'\n", filename, strerror(errno));
+          return false;
+     }
+
+     static const char* greetings [] = {
+          "Thank you for flying ce",
+          "There's nothing like a fresh cup of ce in the morning",
+          "Why do kids love the taste of C Editor?\n\nIt's the taste you can ce",
+          "ce is for C Editor, that's good enough for me",
+          "I missed you.",
+          "Hope you're having a great day! -ce",
+          "You're a special person -- or robot. I don't judge.",
+          "I missed you... in a creepy way.",
+          "I'm a potato",
+          "At least this isn't emacs? Am I right!",
+          "TACOCAT is the best palindrome",
+          "Found a bug? It's a feature.",
+          "Yo.",
+          "Slurp'n up whitespace since 2016",
+          "Welcome to GNU Emacs, one component of the GNU/Linux operating system.",
+          "ce, the world's only editor with a Michelin star.",
+          "Oy! ce's a beaut!",
+          "The default config has a great vimplementation!",
+          "They see me slurpin' They hatin'",
+          "'Days of pain are worth the years of upcoming prosperity' -confucius, probably",
+          "ce, aka, 'the cache miss king'",
+          "All the terminal you want with none of the illness",
+          "I used ce before it was cool",
+          "'Where has this been all my life' -emacs enthusiast",
+     };
+
+     srand(time(NULL));
+     ce_log("%s\n", greetings[rand() % (sizeof(greetings) / sizeof(greetings[0]))]);
+     return true;
+}
+
+void ce_log(const char* fmt, ...){
+     va_list args;
+     va_start(args, fmt);
+     vfprintf(g_ce_log, fmt, args);
+     va_end(args);
+}
 
 bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name){
      if(buffer->lines) ce_buffer_free(buffer);
 
      if(line_count <= 0){
-          // print error
+          ce_log("%s() error: 0 line_count specified.\n", __FUNCTION__);
           return false;
      }
 
      buffer->lines = (char**)malloc(line_count * sizeof(*buffer->lines));
+     if(!buffer->lines){
+          ce_log("%s() failed to malloc() %ld lines.\n", __FUNCTION__, line_count);
+          return false;
+     }
+
      buffer->line_count = line_count;
      buffer->name = strdup(name);
 
@@ -22,6 +78,7 @@ bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name){
      }
 
      buffer->status = CE_BUFFER_STATUS_MODIFIED;
+     pthread_mutex_init(&buffer->lock, NULL);
      return true;
 }
 
@@ -33,6 +90,8 @@ void ce_buffer_free(CeBuffer_t* buffer){
      free(buffer->lines);
      free(buffer->name);
 
+     pthread_mutex_destroy(&buffer->lock);
+
      memset(buffer, 0, sizeof(*buffer));
 }
 
@@ -43,7 +102,7 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
 
      FILE* file = fopen(filename, "rb");
      if(!file){
-          //ce_message("%s() fopen('%s', 'rb') failed: %s", __FUNCTION__, filename, strerror(errno));
+          ce_log("%s() fopen('%s', 'rb') failed: '%s'\n", __FUNCTION__, filename, strerror(errno));
           return true;
      }
 
@@ -71,6 +130,7 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      }
 
      free(contents);
+     ce_log("%s() loaded '%s'\n", __FUNCTION__, filename);
      return true;
 }
 
@@ -81,6 +141,11 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
 
      // allocate for the number of lines contained in the string
      buffer->lines = (char**)malloc(line_count * sizeof(*buffer->lines));
+     if(!buffer->lines){
+          ce_log("%s() failed to allocate %ld lines\n", __FUNCTION__, line_count);
+          return false;
+     }
+
      buffer->line_count = line_count;
      buffer->name = strdup(name);
 
@@ -106,6 +171,7 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
           }
      }
 
+     pthread_mutex_init(&buffer->lock, NULL);
      return true;
 }
 
@@ -171,16 +237,53 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
      return point;
 }
 
-void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
-     if(!view->buffer) return;
+bool ce_buffer_insert_string(CeBuffer_t* buffer, CePoint_t point, const char* string){
+     if(!ce_buffer_contains_point(buffer, point)) return false;
+
+     int64_t string_lines = ce_util_count_string_lines(string);
+     if(string_lines == 1){
+          pthread_mutex_lock(&buffer->lock);
+
+          size_t insert_len = strlen(string);
+          size_t existing_len = strlen(buffer->lines[point.y]);
+          size_t total_len = insert_len + existing_len;
+
+          char* line = buffer->lines[point.y];
+          line = realloc(line, total_len + 1);
+          if(!line){
+               pthread_mutex_unlock(&buffer->lock);
+               return false;
+          }
+
+          char* src = ce_utf8_find_index(line, point.x);
+          char* dst = src + insert_len;
+          size_t src_len = strlen(src);
+          memmove(dst, src, src_len);
+          memcpy(src, string, insert_len);
+          line[total_len] = 0;
+          buffer->lines[point.y] = line;
+
+          pthread_mutex_unlock(&buffer->lock);
+          return true;
+     }
+
+     return true;
+}
+
+CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
+     CePoint_t delta = view->scroll;
+
+     if(!view->buffer) return delta;
 
      int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
      int64_t scroll_top = view->scroll.y + vertical_scroll_off;
      int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;
      int64_t scroll_bottom = view->scroll.y + (view->rect.bottom - view->rect.top) - vertical_scroll_off;
 
-     int64_t visible_index = ce_util_string_index_to_visible_index(view->buffer->lines[view->buffer->cursor.y],
-                                                                   view->buffer->cursor.x, tab_width);
+     int64_t visible_index = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
+                                                                   view->cursor.x, tab_width);
+
+     pthread_mutex_lock(&view->buffer->lock);
 
      if(visible_index < scroll_left){
           view->scroll.x -= (scroll_left - visible_index);
@@ -189,12 +292,19 @@ void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_
           view->scroll.x += (visible_index - scroll_right);
      }
 
-     if(view->buffer->cursor.y < scroll_top){
-          view->scroll.y -= (scroll_top - view->buffer->cursor.y);
+     if(view->cursor.y < scroll_top){
+          view->scroll.y -= (scroll_top - view->cursor.y);
           if(view->scroll.y < 0) view->scroll.y = 0;
-     }else if(view->buffer->cursor.y > scroll_bottom){
-          view->scroll.y += (view->buffer->cursor.y - scroll_bottom);
+     }else if(view->cursor.y > scroll_bottom){
+          view->scroll.y += (view->cursor.y - scroll_bottom);
      }
+
+     pthread_mutex_unlock(&view->buffer->lock);
+
+     delta.x = view->scroll.x - delta.x;
+     delta.y = view->scroll.y - delta.y;
+
+     return delta;
 }
 
 int64_t ce_utf8_strlen(const char* string){
@@ -226,11 +336,37 @@ int64_t ce_utf8_strlen(const char* string){
      return len;
 }
 
+char* ce_utf8_find_index(char* string, int64_t index){
+     int64_t bytes = 0;
+     while(index){
+          if((*string & 0x80) == 0){
+               bytes = 1;
+          }else if((*string & 0xE0) == 0xC0){
+               bytes = 2;
+          }else if((*string & 0xF0) == 0xE0){
+               bytes = 3;
+          }else if((*string & 0xF8) == 0xF0){
+               bytes = 4;
+          }else{
+               return NULL;
+          }
+
+          for(int64_t i = 0; i < bytes; ++i){
+               if(*string == 0) return NULL;
+               string++;
+          }
+
+          index--;
+     }
+
+     return string;
+}
+
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
      CeRune_t rune;
 
      // 0xxxxxxx is just ascii
-     if((string[0] & 0x80) == 0){
+     if((*string & 0x80) == 0){
           *bytes_consumed = 1;
           rune = string[0];
      // 110xxxxx is a 2 byte utf8 string
@@ -264,7 +400,7 @@ CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
      return rune;
 }
 
-bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int* bytes_written){
+bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes_written){
      if(u < 0x80){
           if(string_len < 1) return false;
           *bytes_written = 1;
@@ -325,10 +461,11 @@ int64_t ce_util_count_string_lines(const char* string){
           if(string[i] == CE_NEWLINE || string[i] == 0) line_count++;
      }
 
+     // TODO: do we need this?
      // one line files usually contain newlines at the end
-     if(line_count == 2 && string[string_length-1] == CE_NEWLINE){
-          line_count--;
-     }
+     // if(line_count == 2 && string[string_length-1] == CE_NEWLINE){
+          // line_count--;
+     // }
 
      return line_count;
 }

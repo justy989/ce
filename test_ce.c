@@ -4,8 +4,7 @@
 #include <string.h>
 #include <locale.h>
 
-TEST(buffer_alloc_and_free)
-{
+TEST(buffer_alloc_and_free){
      int line_count = 10;
      const char* name = "test.txt";
 
@@ -23,8 +22,7 @@ TEST(buffer_alloc_and_free)
      EXPECT(buffer.name == NULL);
 }
 
-TEST(buffer_load_string)
-{
+TEST(buffer_load_string){
      const char* name = "test.txt";
      const char* string = "hello, this is\na plain text\nstring of doom.";
      CeBuffer_t buffer = {};
@@ -37,8 +35,7 @@ TEST(buffer_load_string)
      EXPECT(strcmp(buffer.lines[2], "string of doom.") == 0);
 }
 
-TEST(buffer_load_file)
-{
+TEST(buffer_load_file){
      const char* filename = "test.txt";
      CeBuffer_t buffer = {};
      EXPECT(ce_buffer_load_file(&buffer, filename));
@@ -51,8 +48,7 @@ TEST(buffer_load_file)
      EXPECT(strcmp(buffer.lines[3], "isn't that neato?") == 0);
 }
 
-TEST(buffer_empty)
-{
+TEST(buffer_empty){
      const char* name = "test.txt";
      const char* string = "hello, this is\na plain text\nstring of doom.";
      CeBuffer_t buffer = {};
@@ -63,8 +59,7 @@ TEST(buffer_empty)
      EXPECT(buffer.line_count == 1);
 }
 
-TEST(buffer_contains_point)
-{
+TEST(buffer_contains_point){
      const char* name = "test.txt";
      const char* string = "hello, this is\na plain text\nstring of doom.";
      CeBuffer_t buffer = {};
@@ -82,6 +77,120 @@ TEST(buffer_contains_point)
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){0, 0}));
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){3, 0}));
      EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){4, 0}));
+}
+
+TEST(view_follow_cursor){
+     int64_t tab_width = 2;
+     int64_t horizontal_scroll_off = 2;
+     int64_t vertical_scroll_off = 3;
+
+     const char* string = "int main(int argc, char** argv){\n" \
+                          "\tif(argc != 3){\n"                 \
+                          "\t\tprint_help(argv[0]);\n"         \
+                          "\t}\n"                              \
+                          "\treturn 0;\n"                      \
+                          "}";
+
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, string, "test.c");
+
+     CeView_t view = {};
+     view.rect.right = 5;
+     view.rect.bottom = 4;
+     view.buffer = &buffer;
+
+     // do nothing
+     ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+     EXPECT(view.scroll.x == 0);
+     EXPECT(view.scroll.y == 0);
+
+     // scroll right
+     view.cursor.x = 6;
+     ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+     EXPECT(view.scroll.x == 3);
+     EXPECT(view.scroll.y == 0);
+
+     // scroll down, accounting for tabs
+     view.cursor.y = 2;
+     ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+     EXPECT(view.scroll.x == 5);
+     EXPECT(view.scroll.y == 0);
+
+     // scroll down again, accounting for tabs
+     view.cursor.x = 1;
+     view.cursor.y = 3;
+     ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+     EXPECT(view.scroll.x == 0);
+     EXPECT(view.scroll.y == 2);
+
+     // scroll back to origin
+     view.cursor.x = 0;
+     view.cursor.y = 0;
+     ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+     EXPECT(view.scroll.x == 0);
+     EXPECT(view.scroll.y == 0);
+}
+
+TEST(utf8_strlen){
+     const char* ascii_only = "tacos";
+     const char* mix = "ta¢𐍈s";
+     const char* ut8_only = "¢€𐍈";
+
+     EXPECT(ce_utf8_strlen(ascii_only) == 5);
+     EXPECT(ce_utf8_strlen(mix) == 5);
+     EXPECT(ce_utf8_strlen(ut8_only) == 3);
+}
+
+TEST(utf8_find_index){
+
+}
+
+#if 0
+TEST(utf8_encode){
+     char utf8[CE_UTF8_SIZE + 1];
+     int64_t written = 0;
+     EXPECT(ce_utf8_encode(0x20AC, utf8, CE_UTF8_SIZE, &written));
+     EXPECT(written == 3);
+     EXPECT(utf8[0] == (char)(0x93));
+     EXPECT(utf8[1] == (char)(0xab));
+     EXPECT(utf8[2] == (char)(0x3f));
+}
+#endif
+
+TEST(util_count_string_lines){
+     const char* one_line = "pot belly's";
+     const char* two_lines = "meatball subs are\nmediocre";
+     const char* three_lines = "is that\na mean thing\nto say?";
+
+     EXPECT(ce_util_count_string_lines(one_line) == 1);
+     EXPECT(ce_util_count_string_lines(two_lines) == 2);
+     EXPECT(ce_util_count_string_lines(three_lines) == 3);
+}
+
+TEST(util_string_index_to_visible_index){
+     int64_t tab_width = 8;
+     const char* normal_string = "hello world";
+     const char* tabbed_string = "\t\tgoodbye\t world";
+
+     EXPECT(ce_util_string_index_to_visible_index(normal_string, 4, tab_width) == 4);
+     EXPECT(ce_util_string_index_to_visible_index(normal_string, 8, tab_width) == 8);
+
+     EXPECT(ce_util_string_index_to_visible_index(tabbed_string, 4, tab_width) == 18);
+     EXPECT(ce_util_string_index_to_visible_index(tabbed_string, 8, tab_width) == 22);
+     EXPECT(ce_util_string_index_to_visible_index(tabbed_string, 12, tab_width) == 33);
+}
+
+TEST(util_visible_index_to_string_index){
+     int64_t tab_width = 8;
+     const char* normal_string = "hello world";
+     const char* tabbed_string = "\t\tgoodbye\t world";
+
+     EXPECT(ce_util_visible_index_to_string_index(normal_string, 4, tab_width) == 4);
+     EXPECT(ce_util_visible_index_to_string_index(normal_string, 8, tab_width) == 8);
+
+     EXPECT(ce_util_visible_index_to_string_index(tabbed_string, 18, tab_width) == 4);
+     EXPECT(ce_util_visible_index_to_string_index(tabbed_string, 22, tab_width) == 8);
+     EXPECT(ce_util_visible_index_to_string_index(tabbed_string, 33, tab_width) == 12);
 }
 
 int main()
