@@ -193,6 +193,9 @@ int main(int argc, char** argv){
           case 'i':
                ce_buffer_insert_string(&buffer, view.cursor, "'tacos'");
                break;
+          case 's':
+               ce_buffer_insert_string(&buffer, view.cursor, "|first\nsecond\nthird\nfourth|");
+               break;
           }
 
           draw_thread_data->ready_to_draw = true;

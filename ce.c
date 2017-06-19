@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
+#include <assert.h>
 
 FILE* g_ce_log = NULL;
 
@@ -54,6 +55,14 @@ void ce_log(const char* fmt, ...){
      va_start(args, fmt);
      vfprintf(g_ce_log, fmt, args);
      va_end(args);
+}
+
+static bool buffer_realloc_lines(CeBuffer_t* buffer, int64_t new_line_count){
+     char** old_ptr = buffer->lines;
+     buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
+     if(buffer->lines == old_ptr) return false;
+     buffer->line_count = new_line_count;
+     return true;
 }
 
 bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name){
@@ -237,17 +246,20 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
      return point;
 }
 
-bool ce_buffer_insert_string(CeBuffer_t* buffer, CePoint_t point, const char* string){
+bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point){
      if(!ce_buffer_contains_point(buffer, point)) return false;
 
      int64_t string_lines = ce_util_count_string_lines(string);
-     if(string_lines == 1){
+     if(string_lines == 0){
+          return true; // sure, yeah, we inserted that empty string
+     }else if(string_lines == 1){
           pthread_mutex_lock(&buffer->lock);
 
           size_t insert_len = strlen(string);
           size_t existing_len = strlen(buffer->lines[point.y]);
           size_t total_len = insert_len + existing_len;
 
+          // re-alloc the new size
           char* line = buffer->lines[point.y];
           line = realloc(line, total_len + 1);
           if(!line){
@@ -255,17 +267,74 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, CePoint_t point, const char* st
                return false;
           }
 
+          // figure out where to move from and to
           char* src = ce_utf8_find_index(line, point.x);
           char* dst = src + insert_len;
           size_t src_len = strlen(src);
           memmove(dst, src, src_len);
+
+          // insert the string
           memcpy(src, string, insert_len);
+
+          // tidy up
           line[total_len] = 0;
           buffer->lines[point.y] = line;
-
           pthread_mutex_unlock(&buffer->lock);
           return true;
      }
+
+     int64_t shift_lines = string_lines - 1;
+     int64_t old_line_count = buffer->line_count;
+
+     // allocate space to fit the buffer plus the new multiline string
+     if(!buffer_realloc_lines(buffer, buffer->line_count + shift_lines)){
+          return false;
+     }
+
+     // shift down all the line pointers
+     int64_t first_new_line = point.y + 1;
+     char** src_line = buffer->lines + first_new_line;
+     char** dst_line = src_line + shift_lines;
+     size_t move_count = old_line_count - first_new_line;
+     memmove(dst_line, src_line, move_count * sizeof(src_line));
+
+     // save the last part of the first line to stick on the end of the multiline string
+     char* end_string = NULL;
+     int64_t end_string_len = strlen(buffer->lines[point.y] + point.x);
+     if(end_string_len) end_string = strdup(buffer->lines[point.y] + point.x);
+
+     // insert the first line of the string at the point specified
+     const char* next_newline = strchr(string, '\n');
+     assert(next_newline);
+     size_t first_line_len = next_newline - string;
+     size_t new_line_len = point.x + first_line_len;
+     buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len);
+     memcpy(buffer->lines[point.y] + point.x, string, first_line_len);
+     buffer->lines[point.y][new_line_len] = 0;
+
+     // copy in each of the new lines
+     string = next_newline + 1;
+     next_newline = strchr(string, '\n');
+     int64_t next_line = point.y + 1;
+     while(next_newline){
+          new_line_len = next_newline - string;
+          buffer->lines[next_line] = calloc(1, new_line_len + 1);
+          memcpy(buffer->lines[next_line], string, new_line_len);
+          buffer->lines[next_line][new_line_len] = 0;
+          string = next_newline + 1;
+          next_newline = strchr(string, '\n');
+          next_line++;
+     }
+
+     // copy in the last line
+     new_line_len = strlen(string);
+     int64_t last_line_len = new_line_len + end_string_len;
+     buffer->lines[next_line] = calloc(1, last_line_len);
+     memcpy(buffer->lines[next_line], string, new_line_len);
+
+     // attach the end part of the line we inserted into at the end of the last line
+     if(end_string) memcpy(buffer->lines[next_line] + new_line_len, end_string, end_string_len);
+     buffer->lines[next_line][last_line_len] = 0;
 
      return true;
 }

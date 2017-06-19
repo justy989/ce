@@ -4,6 +4,8 @@
 #include <string.h>
 #include <locale.h>
 
+const char* g_multiline_string = "first line\nsecond line\nthird line";
+
 TEST(buffer_alloc_and_free){
      int line_count = 10;
      const char* name = "test.txt";
@@ -24,15 +26,14 @@ TEST(buffer_alloc_and_free){
 
 TEST(buffer_load_string){
      const char* name = "test.txt";
-     const char* string = "hello, this is\na plain text\nstring of doom.";
      CeBuffer_t buffer = {};
-     EXPECT(ce_buffer_load_string(&buffer, string, name));
+     EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, name));
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 3);
-     EXPECT(strcmp(buffer.lines[0], "hello, this is") == 0);
-     EXPECT(strcmp(buffer.lines[1], "a plain text") == 0);
-     EXPECT(strcmp(buffer.lines[2], "string of doom.") == 0);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "second line") == 0);
+     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
 }
 
 TEST(buffer_load_file){
@@ -50,9 +51,8 @@ TEST(buffer_load_file){
 
 TEST(buffer_empty){
      const char* name = "test.txt";
-     const char* string = "hello, this is\na plain text\nstring of doom.";
      CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
 
      ce_buffer_empty(&buffer);
      EXPECT(buffer.lines != NULL);
@@ -61,14 +61,13 @@ TEST(buffer_empty){
 
 TEST(buffer_contains_point){
      const char* name = "test.txt";
-     const char* string = "hello, this is\na plain text\nstring of doom.";
      CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
 
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){0, 0}));
-     EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){13, 0}));
-     EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){14, 0}));
-     EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){14, 2}));
+     EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){9, 0}));
+     EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){11, 0}));
+     EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){5, 2}));
      EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){0, 3}));
 
      const char* utf8_string = "$¢€𐍈";
@@ -77,6 +76,51 @@ TEST(buffer_contains_point){
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){0, 0}));
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){3, 0}));
      EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){4, 0}));
+}
+
+TEST(buffer_insert_string_one_line){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     const char* string = "simple";
+     ce_buffer_insert_string(&buffer, string, (CePoint_t){2, 1});
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "sesimplecond line") == 0);
+     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+}
+
+TEST(buffer_insert_string_two_lines){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     const char* string = "inserted first line\ninserted second line";
+     ce_buffer_insert_string(&buffer, string, (CePoint_t){6, 0});
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 4);
+     EXPECT(strcmp(buffer.lines[0], "first inserted first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "inserted second lineline") == 0);
+     EXPECT(strcmp(buffer.lines[2], "second line") == 0);
+     EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+}
+
+TEST(buffer_insert_string_three_lines){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     const char* string = "one\ntwo\nthree";
+     ce_buffer_insert_string(&buffer, string, (CePoint_t){7, 1});
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 5);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "second one") == 0);
+     EXPECT(strcmp(buffer.lines[2], "two") == 0);
+     EXPECT(strcmp(buffer.lines[3], "threeline") == 0);
+     EXPECT(strcmp(buffer.lines[4], "third line") == 0);
 }
 
 TEST(view_follow_cursor){
@@ -141,11 +185,11 @@ TEST(utf8_strlen){
      EXPECT(ce_utf8_strlen(ut8_only) == 3);
 }
 
+#if 0
 TEST(utf8_find_index){
 
 }
 
-#if 0
 TEST(utf8_encode){
      char utf8[CE_UTF8_SIZE + 1];
      int64_t written = 0;
@@ -195,6 +239,7 @@ TEST(util_visible_index_to_string_index){
 
 int main()
 {
+     ce_log_init("ce_test.log");
      setlocale(LC_ALL, "");
      RUN_TESTS();
 }
