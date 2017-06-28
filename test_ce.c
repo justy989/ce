@@ -123,6 +123,58 @@ TEST(buffer_insert_string_three_lines){
      EXPECT(strcmp(buffer.lines[4], "third line") == 0);
 }
 
+TEST(buffer_remove_string_partial_line){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+
+     ce_buffer_remove_string(&buffer, (CePoint_t){2, 1}, 4, false);
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "se line") == 0);
+     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+}
+
+TEST(buffer_remove_string_entire_line){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 11, false);
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "") == 0);
+     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+}
+
+TEST(buffer_remove_string_entire_line_and_remove_line){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 11, true);
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 2);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "third line") == 0);
+}
+
+TEST(buffer_remove_string_across_two_lines){
+     CeBuffer_t buffer = {};
+     const char* name = "test.txt";
+     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_remove_string(&buffer, (CePoint_t){6, 0}, 5, false);
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 2);
+     printf("%s\n", buffer.lines[0]);
+     printf("%s\n", buffer.lines[1]);
+     EXPECT(strcmp(buffer.lines[0], "first econd line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "third line") == 0);
+}
+
 TEST(view_follow_cursor){
      int64_t tab_width = 2;
      int64_t horizontal_scroll_off = 2;

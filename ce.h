@@ -91,7 +91,7 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
 int64_t ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
-//bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
+bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 

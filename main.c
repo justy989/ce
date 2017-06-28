@@ -191,10 +191,13 @@ int main(int argc, char** argv){
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case 'i':
-               ce_buffer_insert_string(&buffer, view.cursor, "'tacos'");
+               ce_buffer_insert_string(&buffer, "'tacos'", view.cursor);
                break;
           case 's':
-               ce_buffer_insert_string(&buffer, view.cursor, "|first\nsecond\nthird\nfourth|");
+               ce_buffer_insert_string(&buffer, "|first\nsecond\nthird\nfourth|", view.cursor);
+               break;
+          case 'r':
+               ce_buffer_remove_string(&buffer, view.cursor, 30, true);
                break;
           }
 

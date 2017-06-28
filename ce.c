@@ -60,7 +60,7 @@ void ce_log(const char* fmt, ...){
 static bool buffer_realloc_lines(CeBuffer_t* buffer, int64_t new_line_count){
      char** old_ptr = buffer->lines;
      buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
-     if(buffer->lines == old_ptr) return false;
+     if(buffer->lines == old_ptr && new_line_count > buffer->line_count) return false;
      buffer->line_count = new_line_count;
      return true;
 }
@@ -337,6 +337,83 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      buffer->lines[next_line][last_line_len] = 0;
 
      return true;
+}
+
+bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty){
+     (void)(remove_line_if_empty);
+     if(!ce_buffer_contains_point(buffer, point)) return false;
+
+     int64_t len_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
+     if(len_left_on_line > length){
+          char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
+          assert(end_of_start);
+          char* beginning_of_end = ce_utf8_find_index(buffer->lines[point.y], point.x + length);
+          assert(beginning_of_end);
+
+          // figure out how big of a line to allocate
+          size_t start_line_len = end_of_start - buffer->lines[point.y];
+          size_t end_line_len = strlen(beginning_of_end);
+          size_t full_line_len = start_line_len + end_line_len;
+          char* new_line = calloc(full_line_len + 1, sizeof(*new_line));
+          if(!new_line) return false;
+
+          // copy over the data to our new line
+          memcpy(new_line, buffer->lines[point.y], start_line_len);
+          memcpy(new_line + start_line_len, beginning_of_end, end_line_len);
+          new_line[full_line_len] = 0;
+
+          // free and overwrite our new line
+          free(buffer->lines[point.y]);
+          buffer->lines[point.y] = new_line;
+
+          return true;
+     }else if(len_left_on_line == length){
+          if(point.x == 0 && remove_line_if_empty){
+               // remove the empty line from the buffer lines
+               char** dst_line = buffer->lines + point.y;
+               char** src_line = dst_line + 1;
+               int64_t lines_to_shift = buffer->line_count - (point.y + 1);
+               free(buffer->lines[point.y]);
+               memmove(dst_line, src_line, lines_to_shift);
+               if(!buffer_realloc_lines(buffer, buffer->line_count - 1)){
+                    return false;
+               }
+          }else{
+               // re-alloc for just the first part of the line, even if it is 0 len
+               buffer->lines[point.y] = realloc(buffer->lines[point.y], point.x + 1);
+               buffer->lines[point.y][point.x] = 0;
+          }
+
+          return true;
+     }
+
+     // how many lines do we have to delete?
+     int64_t length_itr = length - len_left_on_line;
+     int64_t current_line;
+     int64_t line_len = 0;
+
+     for(current_line = point.y + 1; length_itr > 0 && current_line < buffer->line_count; current_line++){
+          line_len = ce_utf8_strlen(buffer->lines[current_line]);
+          length_itr -= line_len;
+     }
+
+     // int64_t lines_to_delete = current_line - point.y;
+
+     current_line--;
+
+     char* beginning_of_end = ce_utf8_find_index(buffer->lines[current_line], line_len + length_itr);
+     assert(beginning_of_end);
+     char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
+     assert(end_of_start);
+     int64_t start_len = end_of_start - buffer->lines[point.y];
+     int64_t end_len = strlen(beginning_of_end);
+     int64_t new_first_line_len = start_len + end_len;
+     char* new_first_line = malloc(new_first_line_len + 1);
+     memcpy(new_first_line, buffer->lines[point.y], start_len);
+     memcpy(new_first_line + start_len, beginning_of_end, end_len);
+     new_first_line[new_first_line_len] = 0;
+
+     return false;
 }
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
