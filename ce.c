@@ -308,7 +308,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      assert(next_newline);
      size_t first_line_len = next_newline - string;
      size_t new_line_len = point.x + first_line_len;
-     buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len);
+     buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
      memcpy(buffer->lines[point.y] + point.x, string, first_line_len);
      buffer->lines[point.y][new_line_len] = 0;
 
@@ -329,7 +329,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      // copy in the last line
      new_line_len = strlen(string);
      int64_t last_line_len = new_line_len + end_string_len;
-     buffer->lines[next_line] = calloc(1, last_line_len);
+     buffer->lines[next_line] = calloc(1, last_line_len + 1);
      memcpy(buffer->lines[next_line], string, new_line_len);
 
      // attach the end part of the line we inserted into at the end of the last line
