@@ -5,17 +5,17 @@
 #include <locale.h>
 
 const char* g_multiline_string = "first line\nsecond line\nthird line";
+const char* g_name = "test.txt";
 
 TEST(buffer_alloc_and_free){
      int line_count = 10;
-     const char* name = "test.txt";
 
      CeBuffer_t buffer = {};
-     EXPECT(ce_buffer_alloc(&buffer, line_count, name));
+     EXPECT(ce_buffer_alloc(&buffer, line_count, g_name));
 
      EXPECT(buffer.line_count == line_count);
      EXPECT(buffer.lines);
-     EXPECT(strcmp(buffer.name, name) == 0);
+     EXPECT(strcmp(buffer.name, g_name) == 0);
 
      ce_buffer_free(&buffer);
 
@@ -25,9 +25,8 @@ TEST(buffer_alloc_and_free){
 }
 
 TEST(buffer_load_string){
-     const char* name = "test.txt";
      CeBuffer_t buffer = {};
-     EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, name));
+     EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, g_name));
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 3);
@@ -50,9 +49,8 @@ TEST(buffer_load_file){
 }
 
 TEST(buffer_empty){
-     const char* name = "test.txt";
      CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
 
      ce_buffer_empty(&buffer);
      EXPECT(buffer.lines != NULL);
@@ -60,9 +58,8 @@ TEST(buffer_empty){
 }
 
 TEST(buffer_contains_point){
-     const char* name = "test.txt";
      CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
 
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){0, 0}));
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){9, 0}));
@@ -71,7 +68,7 @@ TEST(buffer_contains_point){
      EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){0, 3}));
 
      const char* utf8_string = "$¢€𐍈";
-     ce_buffer_load_string(&buffer, utf8_string, name);
+     ce_buffer_load_string(&buffer, utf8_string, g_name);
 
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){0, 0}));
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){3, 0}));
@@ -80,8 +77,7 @@ TEST(buffer_contains_point){
 
 TEST(buffer_insert_string_one_line){
      CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      const char* string = "simple";
      ce_buffer_insert_string(&buffer, string, (CePoint_t){2, 1});
 
@@ -94,8 +90,7 @@ TEST(buffer_insert_string_one_line){
 
 TEST(buffer_insert_string_two_lines){
      CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      const char* string = "inserted first line\ninserted second line";
      ce_buffer_insert_string(&buffer, string, (CePoint_t){6, 0});
 
@@ -109,8 +104,7 @@ TEST(buffer_insert_string_two_lines){
 
 TEST(buffer_insert_string_three_lines){
      CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      const char* string = "one\ntwo\nthree";
      ce_buffer_insert_string(&buffer, string, (CePoint_t){7, 1});
 
@@ -125,8 +119,7 @@ TEST(buffer_insert_string_three_lines){
 
 TEST(buffer_remove_string_partial_line){
      CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
 
      ce_buffer_remove_string(&buffer, (CePoint_t){2, 1}, 4, false);
      EXPECT(buffer.lines);
@@ -138,8 +131,7 @@ TEST(buffer_remove_string_partial_line){
 
 TEST(buffer_remove_string_entire_line){
      CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 11, false);
 
      EXPECT(buffer.lines);
@@ -151,8 +143,7 @@ TEST(buffer_remove_string_entire_line){
 
 TEST(buffer_remove_string_entire_line_and_remove_line){
      CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 11, true);
 
      EXPECT(buffer.lines);
@@ -161,18 +152,47 @@ TEST(buffer_remove_string_entire_line_and_remove_line){
      EXPECT(strcmp(buffer.lines[1], "third line") == 0);
 }
 
-TEST(buffer_remove_string_across_two_lines){
+TEST(buffer_remove_lines_single){
+     CeBuffer_t buffer = {};
+     EXPECT(!ce_buffer_remove_lines(&buffer, 0, 1));
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     EXPECT(ce_buffer_remove_lines(&buffer, 1, 1));
+
+     EXPECT(buffer.line_count == 2);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "third line") == 0);
+}
+
+TEST(buffer_remove_lines_multiple){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     EXPECT(ce_buffer_remove_lines(&buffer, 0, 2));
+
+     EXPECT(buffer.line_count == 1);
+     EXPECT(strcmp(buffer.lines[0], "third line") == 0);
+
+}
+
+TEST(buffer_remove_lines_invalid){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+
+     EXPECT(!ce_buffer_remove_lines(&buffer, 0, 4));
+     EXPECT(!ce_buffer_remove_lines(&buffer, 0, 0));
+     EXPECT(!ce_buffer_remove_lines(&buffer, -1, 1));
+     EXPECT(!ce_buffer_remove_lines(&buffer, 0, -1));
+}
+
+TEST(buffer_remove_string_four_lines){
      CeBuffer_t buffer = {};
      const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, g_multiline_string, name);
-     ce_buffer_remove_string(&buffer, (CePoint_t){6, 0}, 5, false);
+     ce_buffer_load_string(&buffer, "0123456789\n0123456789\n0123456789\n0123456789\n0123456789", name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 1}, 27, false));
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 2);
-     printf("%s\n", buffer.lines[0]);
-     printf("%s\n", buffer.lines[1]);
-     EXPECT(strcmp(buffer.lines[0], "first econd line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "0123423456789") == 0);
 }
 
 TEST(view_follow_cursor){

@@ -339,8 +339,29 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      return true;
 }
 
+bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove){
+     // check invalid input
+     if(line_start < 0) return false;
+     if(line_start >= buffer->line_count) return false;
+     if(lines_to_remove <= 0) return false;
+     if(line_start + lines_to_remove > buffer->line_count) return false;
+
+     // shift lines down, overwriting lines we want to remove
+     for(int64_t i = 0; i < lines_to_remove; i++){
+          int64_t src = line_start + lines_to_remove + i;
+          int64_t dst = line_start + i;
+          free(buffer->lines[dst]);
+          buffer->lines[dst] = buffer->lines[src];
+     }
+
+     // update line count, and shrink our allocation
+     buffer->line_count -= lines_to_remove;
+     buffer->lines = realloc(buffer->lines, buffer->line_count * sizeof(*buffer->lines));
+
+     return buffer->lines != NULL;
+}
+
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty){
-     (void)(remove_line_if_empty);
      if(!ce_buffer_contains_point(buffer, point)) return false;
 
      int64_t len_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
@@ -387,33 +408,44 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
           return true;
      }
 
-     // how many lines do we have to delete?
-     int64_t length_itr = length - len_left_on_line;
-     int64_t current_line;
+     int64_t length_left = length - len_left_on_line;
+     int64_t current_line = point.y + 1;
+     int64_t save_current_line = current_line;
      int64_t line_len = 0;
+     int64_t last_line_offset = 0;
 
-     for(current_line = point.y + 1; length_itr > 0 && current_line < buffer->line_count; current_line++){
+     // how many lines do we have to delete?
+     for(; current_line < buffer->line_count; current_line++){
           line_len = ce_utf8_strlen(buffer->lines[current_line]);
-          length_itr -= line_len;
+
+          if(length_left > line_len){
+               length_left -= line_len;
+          }else{
+               last_line_offset = length_left;
+               length_left = 0;
+               break;
+          }
      }
 
-     // int64_t lines_to_delete = current_line - point.y;
-
+     int64_t lines_to_delete = current_line - point.y;
      current_line--;
 
-     char* beginning_of_end = ce_utf8_find_index(buffer->lines[current_line], line_len + length_itr);
-     assert(beginning_of_end);
-     char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
-     assert(end_of_start);
-     int64_t start_len = end_of_start - buffer->lines[point.y];
-     int64_t end_len = strlen(beginning_of_end);
-     int64_t new_first_line_len = start_len + end_len;
-     char* new_first_line = malloc(new_first_line_len + 1);
-     memcpy(new_first_line, buffer->lines[point.y], start_len);
-     memcpy(new_first_line + start_len, beginning_of_end, end_len);
-     new_first_line[new_first_line_len] = 0;
+     // join the rest of the last line in the deletion, to the first line
+     if(last_line_offset){
+          char* end_to_join = ce_utf8_find_index(buffer->lines[current_line], last_line_offset);
+          int64_t join_len = strlen(end_to_join);
+          int64_t new_len = point.x + join_len;
+          buffer->lines[point.y] = realloc(buffer->lines[point.y], new_len + 1);
+          memcpy(buffer->lines[point.y] + point.x, end_to_join, join_len);
+          buffer->lines[point.y][new_len] = 0;
+     }
 
-     return false;
+     // remove the intermediate lines
+     if(!ce_buffer_remove_lines(buffer, save_current_line, lines_to_delete)){
+          return false;
+     }
+
+     return true;
 }
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
