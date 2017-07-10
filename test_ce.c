@@ -33,6 +33,8 @@ TEST(buffer_load_string){
      EXPECT(strcmp(buffer.lines[0], "first line") == 0);
      EXPECT(strcmp(buffer.lines[1], "second line") == 0);
      EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_load_file){
@@ -46,6 +48,8 @@ TEST(buffer_load_file){
      EXPECT(strcmp(buffer.lines[1], "a file used") == 0);
      EXPECT(strcmp(buffer.lines[2], "for unittesting") == 0);
      EXPECT(strcmp(buffer.lines[3], "isn't that neato?") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_empty){
@@ -55,6 +59,8 @@ TEST(buffer_empty){
      ce_buffer_empty(&buffer);
      EXPECT(buffer.lines != NULL);
      EXPECT(buffer.line_count == 1);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_contains_point){
@@ -73,6 +79,8 @@ TEST(buffer_contains_point){
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){0, 0}));
      EXPECT(ce_buffer_contains_point(&buffer, (CePoint_t){3, 0}));
      EXPECT(!ce_buffer_contains_point(&buffer, (CePoint_t){4, 0}));
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_insert_string_one_line){
@@ -86,6 +94,8 @@ TEST(buffer_insert_string_one_line){
      EXPECT(strcmp(buffer.lines[0], "first line") == 0);
      EXPECT(strcmp(buffer.lines[1], "sesimplecond line") == 0);
      EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_insert_string_two_lines){
@@ -100,6 +110,8 @@ TEST(buffer_insert_string_two_lines){
      EXPECT(strcmp(buffer.lines[1], "inserted second lineline") == 0);
      EXPECT(strcmp(buffer.lines[2], "second line") == 0);
      EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_insert_string_three_lines){
@@ -115,6 +127,8 @@ TEST(buffer_insert_string_three_lines){
      EXPECT(strcmp(buffer.lines[2], "two") == 0);
      EXPECT(strcmp(buffer.lines[3], "threeline") == 0);
      EXPECT(strcmp(buffer.lines[4], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_string_partial_line){
@@ -127,6 +141,8 @@ TEST(buffer_remove_string_partial_line){
      EXPECT(strcmp(buffer.lines[0], "first line") == 0);
      EXPECT(strcmp(buffer.lines[1], "se line") == 0);
      EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_string_entire_line){
@@ -139,6 +155,8 @@ TEST(buffer_remove_string_entire_line){
      EXPECT(strcmp(buffer.lines[0], "first line") == 0);
      EXPECT(strcmp(buffer.lines[1], "") == 0);
      EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_string_entire_line_and_remove_line){
@@ -150,6 +168,8 @@ TEST(buffer_remove_string_entire_line_and_remove_line){
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "first line") == 0);
      EXPECT(strcmp(buffer.lines[1], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_lines_single){
@@ -161,6 +181,8 @@ TEST(buffer_remove_lines_single){
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "first line") == 0);
      EXPECT(strcmp(buffer.lines[1], "third line") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_lines_multiple){
@@ -171,6 +193,7 @@ TEST(buffer_remove_lines_multiple){
      EXPECT(buffer.line_count == 1);
      EXPECT(strcmp(buffer.lines[0], "third line") == 0);
 
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_lines_invalid){
@@ -181,6 +204,8 @@ TEST(buffer_remove_lines_invalid){
      EXPECT(!ce_buffer_remove_lines(&buffer, 0, 0));
      EXPECT(!ce_buffer_remove_lines(&buffer, -1, 1));
      EXPECT(!ce_buffer_remove_lines(&buffer, 0, -1));
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(buffer_remove_string_four_lines){
@@ -193,6 +218,8 @@ TEST(buffer_remove_string_four_lines){
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
      EXPECT(strcmp(buffer.lines[1], "0123423456789") == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(view_follow_cursor){

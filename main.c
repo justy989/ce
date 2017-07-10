@@ -197,7 +197,7 @@ int main(int argc, char** argv){
                ce_buffer_insert_string(&buffer, "|first\nsecond\nthird\nfourth|", view.cursor);
                break;
           case 'r':
-               ce_buffer_remove_string(&buffer, view.cursor, 30, true);
+               ce_buffer_remove_string(&buffer, view.cursor, 5, true);
                break;
           }
 
