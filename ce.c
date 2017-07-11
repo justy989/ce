@@ -58,9 +58,8 @@ void ce_log(const char* fmt, ...){
 }
 
 static bool buffer_realloc_lines(CeBuffer_t* buffer, int64_t new_line_count){
-     char** old_ptr = buffer->lines;
      buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
-     if(buffer->lines == old_ptr && new_line_count > buffer->line_count) return false;
+     if(buffer->lines == NULL) return false;
      buffer->line_count = new_line_count;
      return true;
 }
@@ -201,13 +200,23 @@ bool ce_buffer_empty(CeBuffer_t* buffer){
      return true;
 }
 
-int64_t ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point){
+bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point){
      if(point.y < 0 || point.y >= buffer->line_count || point.x < 0) return false;
      int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
      if(point.x >= line_len){
           if(line_len == 0 && point.x == 0){
                return true;
           }
+          return false;
+     }
+
+     return true;
+}
+
+int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point){
+     if(point.y < 0 || point.y >= buffer->line_count || point.x < 0) return false;
+     int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
+     if(point.x > line_len){
           return false;
      }
 
@@ -245,6 +254,31 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
                point.x = 0;
           }else{
                CE_CLAMP(point.x, 0, (line_len - 1));
+          }
+     }
+
+     return point;
+}
+
+CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta){
+     if(!ce_buffer_point_is_valid(buffer, point)) return (CePoint_t){-1, -1};
+
+     // TODO: handle negative delta
+     while(delta != 0){
+          int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
+          int64_t destination = point.x + delta;
+          if(destination >= line_len){
+               // end of the buffer, get out
+               int64_t new_line = point.y + 1;
+               if(new_line >= buffer->line_count) break;
+
+               // move to the next line, and subtract from the delta
+               delta -= (line_len - point.x) + 1;
+               point.x = 0;
+               point.y = new_line;
+          }else{
+               point.x += delta;
+               break;
           }
      }
 
@@ -309,17 +343,19 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      if(end_string_len) end_string = strdup(buffer->lines[point.y] + point.x);
 
      // insert the first line of the string at the point specified
-     const char* next_newline = strchr(string, '\n');
+     const char* next_newline = strchr(string, CE_NEWLINE);
      assert(next_newline);
      size_t first_line_len = next_newline - string;
      size_t new_line_len = point.x + first_line_len;
      buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
-     memcpy(buffer->lines[point.y] + point.x, string, first_line_len);
+     if(*string != CE_NEWLINE){ // if the first character is a newline, there is no first line of the string
+          memcpy(buffer->lines[point.y] + point.x, string, first_line_len);
+     }
      buffer->lines[point.y][new_line_len] = 0;
 
      // copy in each of the new lines
      string = next_newline + 1;
-     next_newline = strchr(string, '\n');
+     next_newline = strchr(string, CE_NEWLINE);
      int64_t next_line = point.y + 1;
      while(next_newline){
           new_line_len = next_newline - string;
@@ -327,7 +363,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           memcpy(buffer->lines[next_line], string, new_line_len);
           buffer->lines[next_line][new_line_len] = 0;
           string = next_newline + 1;
-          next_newline = strchr(string, '\n');
+          next_newline = strchr(string, CE_NEWLINE);
           next_line++;
      }
 
@@ -459,6 +495,11 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      }
 
      return true;
+}
+
+bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point){
+     const char str[2] = {ch, 0};
+     return ce_buffer_insert_string(buffer, str, point);
 }
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){

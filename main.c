@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <ncurses.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "ce.h"
 
@@ -157,6 +158,7 @@ int main(int argc, char** argv){
           draw_thread_data->view = &view;
           draw_thread_data->tab_width = tab_width;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
+          draw_thread_data->ready_to_draw = true;
      }
 
      bool done = false;
@@ -170,34 +172,30 @@ int main(int argc, char** argv){
           int key = getch();
           switch(key){
           default:
+               if(isprint(key) || key == CE_NEWLINE){
+                    if(ce_buffer_insert_char(&buffer, key, view.cursor)){
+                         view.cursor = ce_buffer_advance_point(&buffer, view.cursor, 1);
+                    }
+               }
                break;
-          case 'q':
+          case 27: // KEY_ESCAPE
                done = true;
                break;
-          case 'h':
+          case KEY_LEFT:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){-1, 0}, tab_width, false);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
-          case 'j':
+          case KEY_DOWN:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, 1}, tab_width, false);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
-          case 'k':
+          case KEY_UP:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, -1}, tab_width, false);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
-          case 'l':
+          case KEY_RIGHT:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){1, 0}, tab_width, false);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               break;
-          case 'i':
-               ce_buffer_insert_string(&buffer, "'tacos'", view.cursor);
-               break;
-          case 's':
-               ce_buffer_insert_string(&buffer, "|first\nsecond\nthird\nfourth|", view.cursor);
-               break;
-          case 'r':
-               ce_buffer_remove_string(&buffer, view.cursor, 5, true);
                break;
           }
 

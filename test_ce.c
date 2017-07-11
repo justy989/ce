@@ -131,6 +131,22 @@ TEST(buffer_insert_string_three_lines){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_insert_string_newline){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     const char* string = "\n";
+     ce_buffer_insert_string(&buffer, string, (CePoint_t){7, 1});
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 4);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "second ") == 0);
+     EXPECT(strcmp(buffer.lines[2], "line") == 0);
+     EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+
+     ce_buffer_free(&buffer);
+}
+
 TEST(buffer_remove_string_partial_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
@@ -208,7 +224,7 @@ TEST(buffer_remove_lines_invalid){
      ce_buffer_free(&buffer);
 }
 
-TEST(buffer_remove_string_four_lines){
+TEST(buffer_remove_string_across_multiple_lines){
      CeBuffer_t buffer = {};
      const char* name = "test.txt";
      ce_buffer_load_string(&buffer, "0123456789\n0123456789\n0123456789\n0123456789\n0123456789", name);
