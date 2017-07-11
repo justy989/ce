@@ -78,7 +78,7 @@ void draw_view(CeView_t* view, int64_t tab_width){
      int64_t visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
                                                                       view->cursor.x, tab_width);
 
-     mvprintw(view->rect.bottom - 1, 0, "%ld, %ld", view->cursor.x, view->cursor.y);
+     mvprintw(view->rect.bottom, 0, "%ld, %ld", view->cursor.x, view->cursor.y);
      move(view->cursor.y - view->scroll.y + view->rect.top,
           visible_cursor_x - view->scroll.x + view->rect.left);
      pthread_mutex_unlock(&view->buffer->lock);

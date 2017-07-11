@@ -466,10 +466,11 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
 
      if(!view->buffer) return delta;
 
+     int64_t view_height = (view->rect.bottom - view->rect.top);
      int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
      int64_t scroll_top = view->scroll.y + vertical_scroll_off;
      int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;
-     int64_t scroll_bottom = view->scroll.y + (view->rect.bottom - view->rect.top) - vertical_scroll_off;
+     int64_t scroll_bottom = view->scroll.y + view_height - vertical_scroll_off;
 
      int64_t visible_index = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
                                                                    view->cursor.x, tab_width);
@@ -489,6 +490,9 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
      }else if(view->cursor.y > scroll_bottom){
           view->scroll.y += (view->cursor.y - scroll_bottom);
      }
+
+     int64_t max_scroll_y = (view->buffer->line_count - view_height);
+     CE_CLAMP(view->scroll.y, 0, max_scroll_y);
 
      pthread_mutex_unlock(&view->buffer->lock);
 
