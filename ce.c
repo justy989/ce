@@ -187,6 +187,11 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
 bool ce_buffer_empty(CeBuffer_t* buffer){
      if(buffer->lines == NULL) return false;
 
+     // free all lines after the first
+     for(int64_t i = 1; i < buffer->line_count; ++i){
+          free(buffer->lines[i]);
+     }
+
      // re allocate it down to a single blank line
      buffer->lines = realloc(buffer->lines, sizeof(*buffer->lines));
      buffer->lines[0] = realloc(buffer->lines[0], sizeof(buffer->lines[0]));
@@ -333,7 +338,10 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      memcpy(buffer->lines[next_line], string, new_line_len);
 
      // attach the end part of the line we inserted into at the end of the last line
-     if(end_string) memcpy(buffer->lines[next_line] + new_line_len, end_string, end_string_len);
+     if(end_string){
+          memcpy(buffer->lines[next_line] + new_line_len, end_string, end_string_len);
+          free(end_string);
+     }
      buffer->lines[next_line][last_line_len] = 0;
 
      return true;
@@ -401,7 +409,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                char** src_line = dst_line + 1;
                int64_t lines_to_shift = buffer->line_count - (point.y + 1);
                free(buffer->lines[point.y]);
-               memmove(dst_line, src_line, lines_to_shift);
+               memmove(dst_line, src_line, lines_to_shift * sizeof(dst_line));
                if(!buffer_realloc_lines(buffer, buffer->line_count - 1)){
                     return false;
                }

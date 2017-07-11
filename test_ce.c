@@ -272,6 +272,8 @@ TEST(view_follow_cursor){
      ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
      EXPECT(view.scroll.x == 0);
      EXPECT(view.scroll.y == 0);
+
+     ce_buffer_free(&buffer);
 }
 
 TEST(utf8_strlen){
