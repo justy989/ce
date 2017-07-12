@@ -113,6 +113,8 @@ CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t d
 bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid
 
+char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
+
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
 bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point);
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);

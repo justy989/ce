@@ -562,6 +562,16 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
      return buffer->lines != NULL;
 }
 
+char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length){
+     if(ce_buffer_point_is_valid(buffer, point)) return NULL;
+
+     char* start = ce_utf8_find_index(buffer->lines[point.y], point.x);
+     int64_t start_len = ce_utf8_strlen(start);
+     if(start_len > length) return strndup(start, length);
+
+     return NULL;
+}
+
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
      CeBufferChangeNode_t* node = calloc(1, sizeof(*node));
      node->change = *change;

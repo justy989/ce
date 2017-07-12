@@ -246,6 +246,13 @@ TEST(buffer_remove_string_across_multiple_lines){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_dupe_portion_of_line){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){3, 0}, 5);
+     EXPECT(strcmp(dupe, "st li") == 0);
+}
+
 TEST(view_follow_cursor){
      int64_t tab_width = 2;
      int64_t horizontal_scroll_off = 2;
