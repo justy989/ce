@@ -111,7 +111,7 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      FILE* file = fopen(filename, "rb");
      if(!file){
           ce_log("%s() fopen('%s', 'rb') failed: '%s'\n", __FUNCTION__, filename, strerror(errno));
-          return true;
+          return false;
      }
 
      fseek(file, 0, SEEK_END);
@@ -183,6 +183,24 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
      return true;
 }
 
+bool ce_buffer_save(CeBuffer_t* buffer){
+     FILE* file = fopen(buffer->name, "wb");
+     if(!file){
+          ce_log("%s() fopen('%s', 'wb') failed: '%s'\n", __FUNCTION__, buffer->name, strerror(errno));
+          return false;
+     }
+
+     char newline = CE_NEWLINE;
+     for(int64_t i = 0; i < buffer->line_count; ++i){
+          int64_t line_len = strlen(buffer->lines[i]);
+          fwrite(buffer->lines[i], 1, line_len, file);
+          fwrite(&newline, 1, 1, file);
+     }
+
+     fclose(file);
+     return true;
+}
+
 bool ce_buffer_empty(CeBuffer_t* buffer){
      if(buffer->lines == NULL) return false;
 
@@ -230,7 +248,7 @@ int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line){
 }
 
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end){
-     if(!ce_buffer_contains_point(buffer, point)) return point;
+     if(!ce_buffer_point_is_valid(buffer, point)) return point;
 
      if(delta.y){
           // figure out where we are visibly (due to tabs being variable length)
@@ -267,7 +285,7 @@ CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t d
      while(delta != 0){
           int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
           int64_t destination = point.x + delta;
-          if(destination >= line_len){
+          if(destination > line_len){
                // end of the buffer, get out
                int64_t new_line = point.y + 1;
                if(new_line >= buffer->line_count) break;
@@ -286,7 +304,7 @@ CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t d
 }
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point){
-     if(!ce_buffer_contains_point(buffer, point)) return false;
+     if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
      int64_t string_lines = ce_util_count_string_lines(string);
      if(string_lines == 0){
@@ -533,6 +551,7 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
      }
 
      int64_t max_scroll_y = (view->buffer->line_count - view_height);
+     if(max_scroll_y < 0) max_scroll_y = 0;
      CE_CLAMP(view->scroll.y, 0, max_scroll_y);
 
      pthread_mutex_unlock(&view->buffer->lock);

@@ -39,8 +39,11 @@ void draw_view(CeView_t* view, int64_t tab_width){
           for(int64_t y = 0; y < view_height; y++){
                int64_t x = 0;
                int64_t rune_len = 0;
-               const char* line = view->buffer->lines[y + row_min];
+               int64_t line_index = y + row_min;
                CeRune_t rune = 1;
+               if(line_index >= view->buffer->line_count) break;
+
+               const char* line = view->buffer->lines[y + row_min];
                move(view->rect.top + y, view->rect.left);
 
                while(rune > 0){
@@ -181,20 +184,23 @@ int main(int argc, char** argv){
           case 27: // KEY_ESCAPE
                done = true;
                break;
+          case 23: // Ctrl + W
+               ce_buffer_save(&buffer);
+               break;
           case KEY_LEFT:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){-1, 0}, tab_width, false);
+               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){-1, 0}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case KEY_DOWN:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, 1}, tab_width, false);
+               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, 1}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case KEY_UP:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, -1}, tab_width, false);
+               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, -1}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           case KEY_RIGHT:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){1, 0}, tab_width, false);
+               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){1, 0}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
                break;
           }

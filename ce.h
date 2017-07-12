@@ -83,6 +83,7 @@ bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name);
 void ce_buffer_free(CeBuffer_t* buffer);
 bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename);
 bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* name);
+bool ce_buffer_save(CeBuffer_t* buffer);
 bool ce_buffer_empty(CeBuffer_t* buffer);
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
