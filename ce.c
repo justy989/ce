@@ -58,6 +58,14 @@ void ce_log(const char* fmt, ...){
 }
 
 static bool buffer_realloc_lines(CeBuffer_t* buffer, int64_t new_line_count){
+     // if we want to realloc 0 lines, clear everything
+     if(new_line_count == 0){
+          free(buffer->lines);
+          buffer->lines = NULL;
+          buffer->line_count = 0;
+          return true;
+     }
+
      buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
      if(buffer->lines == NULL) return false;
      buffer->line_count = new_line_count;
@@ -281,22 +289,43 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
 CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta){
      if(!ce_buffer_point_is_valid(buffer, point)) return (CePoint_t){-1, -1};
 
-     // TODO: handle negative delta
-     while(delta != 0){
-          int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
-          int64_t destination = point.x + delta;
-          if(destination > line_len){
-               // end of the buffer, get out
-               int64_t new_line = point.y + 1;
-               if(new_line >= buffer->line_count) break;
+     if(delta < 0){
+          while(delta < 0){
+               int64_t destination = point.x + delta;
+               if(destination < 0){
+                    // if we are already at the beginning of the buffer, get out
+                    int64_t new_line = point.y - 1;
+                    if(new_line < 0){
+                         point.x = 0;
+                         break;
+                    }
 
-               // move to the next line, and subtract from the delta
-               delta -= (line_len - point.x) + 1;
-               point.x = 0;
-               point.y = new_line;
-          }else{
-               point.x += delta;
-               break;
+                    // move to the previous line, add to the delta
+                    delta += point.x;
+                    point.y = new_line;
+                    point.x = ce_utf8_strlen(buffer->lines[point.y]);
+               }else{
+                    point.x = destination;
+                    break;
+               }
+          }
+     }else if(delta > 0){
+          while(delta > 0){
+               int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
+               int64_t destination = point.x + delta;
+               if(destination > line_len){
+                    // if we are already at the end of the buffer, get out
+                    int64_t new_line = point.y + 1;
+                    if(new_line >= buffer->line_count) break;
+
+                    // move to the next line, and subtract from the delta
+                    delta -= (line_len - point.x) + 1;
+                    point.x = 0;
+                    point.y = new_line;
+               }else{
+                    point.x = destination;
+                    break;
+               }
           }
      }
 
@@ -304,7 +333,19 @@ CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t d
 }
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point){
-     if(!ce_buffer_point_is_valid(buffer, point)) return false;
+     if(!ce_buffer_point_is_valid(buffer, point)){
+          if(buffer->line_count == 0 && ce_points_equal(point, (CePoint_t){0, 0})){
+               int64_t string_len = strlen(string);
+               buffer->lines = malloc(sizeof(*buffer->lines));
+               buffer->lines[0] = malloc(string_len + 1);
+               strcpy(buffer->lines[0], string);
+               buffer->lines[0][string_len] = 0;
+               buffer->line_count = 1;
+               return true;
+          }else{
+               return false;
+          }
+     }
 
      int64_t string_lines = ce_util_count_string_lines(string);
      if(string_lines == 0){
@@ -531,8 +572,11 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
      int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;
      int64_t scroll_bottom = view->scroll.y + view_height - vertical_scroll_off;
 
-     int64_t visible_index = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
-                                                                   view->cursor.x, tab_width);
+     int64_t visible_index = 0;
+     if(ce_buffer_point_is_valid(view->buffer, view->cursor)){
+          visible_index = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
+                                                                view->cursor.x, tab_width);
+     }
 
      pthread_mutex_lock(&view->buffer->lock);
 
@@ -773,4 +817,12 @@ int64_t ce_util_visible_index_to_string_index(const char* string, int64_t index,
      }
 
      return x;
+}
+
+bool ce_point_after(CePoint_t a, CePoint_t b){
+     return b.y < a.y || (b.y == a.y && b.x < a.x);
+}
+
+bool ce_points_equal(CePoint_t a, CePoint_t b){
+     return (a.x == b.x) && (a.y == b.y);
 }

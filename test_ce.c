@@ -188,6 +188,14 @@ TEST(buffer_remove_string_entire_line_and_remove_line){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_remove_string_to_empty){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, "taco", g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 0}, 4, true));
+
+     EXPECT(buffer.line_count == 0);
+}
+
 TEST(buffer_remove_lines_single){
      CeBuffer_t buffer = {};
      EXPECT(!ce_buffer_remove_lines(&buffer, 0, 1));

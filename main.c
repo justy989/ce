@@ -41,36 +41,38 @@ void draw_view(CeView_t* view, int64_t tab_width){
                int64_t rune_len = 0;
                int64_t line_index = y + row_min;
                CeRune_t rune = 1;
-               if(line_index >= view->buffer->line_count) break;
 
-               const char* line = view->buffer->lines[y + row_min];
                move(view->rect.top + y, view->rect.left);
 
-               while(rune > 0){
-                    rune = ce_utf8_decode(line, &rune_len);
+               if(line_index < view->buffer->line_count){
+                    const char* line = view->buffer->lines[y + row_min];
 
-                    if(x >= col_min && x <= col_max && rune > 0){
-                         if(rune == CE_TAB){
+                    while(rune > 0){
+                         rune = ce_utf8_decode(line, &rune_len);
+
+                         if(x >= col_min && x <= col_max && rune > 0){
+                              if(rune == CE_TAB){
+                                   x += tab_width;
+                                   addstr(tab_str);
+                              }else if(rune >= 0x80){
+                                   char utf8_string[CE_UTF8_SIZE + 1];
+                                   int64_t bytes_written = 0;
+                                   ce_utf8_encode(rune, utf8_string, CE_UTF8_SIZE, &bytes_written);
+                                   utf8_string[bytes_written] = 0;
+                                   addstr(utf8_string);
+                                   x++;
+                              }else{
+                                   addch(rune);
+                                   x++;
+                              }
+                         }else if(rune == CE_TAB){
                               x += tab_width;
-                              addstr(tab_str);
-                         }else if(rune >= 0x80){
-                              char utf8_string[CE_UTF8_SIZE + 1];
-                              int64_t bytes_written = 0;
-                              ce_utf8_encode(rune, utf8_string, CE_UTF8_SIZE, &bytes_written);
-                              utf8_string[bytes_written] = 0;
-                              addstr(utf8_string);
-                              x++;
                          }else{
-                              addch(rune);
                               x++;
                          }
-                    }else if(rune == CE_TAB){
-                         x += tab_width;
-                    }else{
-                         x++;
-                    }
 
-                    line += rune_len;
+                         line += rune_len;
+                    }
                }
 
                for(; x < col_max; x++){
@@ -79,8 +81,11 @@ void draw_view(CeView_t* view, int64_t tab_width){
           }
      }
 
-     int64_t visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
-                                                                      view->cursor.x, tab_width);
+     int64_t visible_cursor_x = 0;
+     if(ce_buffer_point_is_valid(view->buffer, view->cursor)){
+          visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
+                                                                   view->cursor.x, tab_width);
+     }
 
      mvprintw(view->rect.bottom, 0, "%ld, %ld", view->cursor.x, view->cursor.y);
      move(view->cursor.y - view->scroll.y + view->rect.top,
@@ -186,6 +191,14 @@ int main(int argc, char** argv){
                break;
           case 23: // Ctrl + W
                ce_buffer_save(&buffer);
+               break;
+          case KEY_BACKSPACE:
+               if(!ce_points_equal(view.cursor, (CePoint_t){0, 0})){
+                    CePoint_t remove_point = ce_buffer_advance_point(&buffer, view.cursor, -1);
+                    if(ce_buffer_remove_string(&buffer, remove_point, 1, true)){
+                         view.cursor = remove_point;
+                    }
+               }
                break;
           case KEY_LEFT:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){-1, 0}, tab_width, true);

@@ -110,3 +110,6 @@ bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes
 int64_t ce_util_count_string_lines(const char* string);
 int64_t ce_util_string_index_to_visible_index(const char* string, int64_t character, int64_t tab_width);
 int64_t ce_util_visible_index_to_string_index(const char* string, int64_t character, int64_t tab_width);
+
+bool ce_point_after(CePoint_t a, CePoint_t b);
+bool ce_points_equal(CePoint_t a, CePoint_t b);
