@@ -48,6 +48,24 @@ typedef struct{
 }CeRect_t;
 
 typedef struct{
+     bool chain;
+
+     bool insertion; // opposite is deletion
+     bool remove_line_if_empty;
+     char* string;
+     CePoint_t location;
+     CePoint_t cursor_before;
+     CePoint_t cursor_after;
+
+}CeBufferChange_t;
+
+typedef struct CeBufferChangeNode_t{
+     CeBufferChange_t change;
+     struct CeBufferChangeNode_t* next;
+     struct CeBufferChangeNode_t* prev;
+}CeBufferChangeNode_t;
+
+typedef struct{
      char** lines;
      int64_t line_count;
 
@@ -59,6 +77,8 @@ typedef struct{
      CePoint_t cursor;
 
      pthread_mutex_t lock;
+
+     CeBufferChangeNode_t* change_node;
 
      void* user_data;
 }CeBuffer_t;
@@ -94,11 +114,13 @@ bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
-bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
-
 bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point);
-
+bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
 bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove);
+
+bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change);
+bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor);
+bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor);
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 

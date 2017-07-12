@@ -142,6 +142,9 @@ int main(int argc, char** argv){
 
           start_color();
           use_default_colors();
+
+          define_key("\x11", KEY_CLOSE);
+          define_key("\x12", KEY_REDO);
      }
 
      int64_t tab_width = 8;
@@ -169,6 +172,8 @@ int main(int argc, char** argv){
           draw_thread_data->ready_to_draw = true;
      }
 
+     bool chain_undo = false;
+
      bool done = false;
      while(!done){
           getmaxyx(stdscr, terminal_height, terminal_width);
@@ -182,15 +187,35 @@ int main(int argc, char** argv){
           default:
                if(isprint(key) || key == CE_NEWLINE){
                     if(ce_buffer_insert_char(&buffer, key, view.cursor)){
-                         view.cursor = ce_buffer_advance_point(&buffer, view.cursor, 1);
+                         const char str[2] = {key, 0};
+                         CePoint_t new_cursor = ce_buffer_advance_point(&buffer, view.cursor, 1);
+
+                         CeBufferChange_t change = {};
+                         change.chain = chain_undo;
+                         change.insertion = true;
+                         change.remove_line_if_empty = true;
+                         change.string = strdup(str);
+                         change.location = view.cursor;
+                         change.cursor_before = view.cursor;
+                         change.cursor_after = new_cursor;
+                         ce_buffer_change(&buffer, &change);
+
+                         view.cursor = new_cursor;
+                         chain_undo = true;
                     }
                }
                break;
-          case 27: // KEY_ESCAPE
+          case KEY_CLOSE:
                done = true;
                break;
-          case 23: // Ctrl + W
+          case 23: // Ctrl + w
                ce_buffer_save(&buffer);
+               break;
+          case 14: // Ctrl + n
+               ce_buffer_undo(&buffer, &view.cursor);
+               break;
+          case KEY_REDO:
+               ce_buffer_redo(&buffer, &view.cursor);
                break;
           case KEY_BACKSPACE:
                if(!ce_points_equal(view.cursor, (CePoint_t){0, 0})){
@@ -203,18 +228,22 @@ int main(int argc, char** argv){
           case KEY_LEFT:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){-1, 0}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+               chain_undo = false;
                break;
           case KEY_DOWN:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, 1}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+               chain_undo = false;
                break;
           case KEY_UP:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, -1}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+               chain_undo = false;
                break;
           case KEY_RIGHT:
                view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){1, 0}, tab_width, true);
                draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+               chain_undo = false;
                break;
           }
 

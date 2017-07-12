@@ -57,6 +57,7 @@ void ce_log(const char* fmt, ...){
      va_end(args);
 }
 
+// NOTE: we expect that if we are downsizing, the lines that will be overwritten are freed prior to calling this func
 static bool buffer_realloc_lines(CeBuffer_t* buffer, int64_t new_line_count){
      // if we want to realloc 0 lines, clear everything
      if(new_line_count == 0){
@@ -442,30 +443,9 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      return true;
 }
 
-bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove){
-     // check invalid input
-     if(line_start < 0) return false;
-     if(line_start >= buffer->line_count) return false;
-     if(lines_to_remove <= 0) return false;
-     if(line_start + lines_to_remove > buffer->line_count) return false;
-
-     // free lines we are going to remove and overwrite
-     for(int64_t i = line_start; i < line_start + lines_to_remove; i++){
-          free(buffer->lines[i]);
-     }
-
-     // shift lines down, overwriting lines we want to remove
-     int64_t last_line_to_shift = buffer->line_count - lines_to_remove;
-     for(int64_t dst = line_start; dst < last_line_to_shift; dst++){
-          int64_t src = dst + lines_to_remove;
-          buffer->lines[dst] = buffer->lines[src];
-     }
-
-     // update line count, and shrink our allocation
-     buffer->line_count -= lines_to_remove;
-     buffer->lines = realloc(buffer->lines, buffer->line_count * sizeof(*buffer->lines));
-
-     return buffer->lines != NULL;
+bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point){
+     const char str[2] = {ch, 0};
+     return ce_buffer_insert_string(buffer, str, point);
 }
 
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty){
@@ -556,9 +536,99 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      return true;
 }
 
-bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point){
-     const char str[2] = {ch, 0};
-     return ce_buffer_insert_string(buffer, str, point);
+bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove){
+     // check invalid input
+     if(line_start < 0) return false;
+     if(line_start >= buffer->line_count) return false;
+     if(lines_to_remove <= 0) return false;
+     if(line_start + lines_to_remove > buffer->line_count) return false;
+
+     // free lines we are going to remove and overwrite
+     for(int64_t i = line_start; i < line_start + lines_to_remove; i++){
+          free(buffer->lines[i]);
+     }
+
+     // shift lines down, overwriting lines we want to remove
+     int64_t last_line_to_shift = buffer->line_count - lines_to_remove;
+     for(int64_t dst = line_start; dst < last_line_to_shift; dst++){
+          int64_t src = dst + lines_to_remove;
+          buffer->lines[dst] = buffer->lines[src];
+     }
+
+     // update line count, and shrink our allocation
+     buffer->line_count -= lines_to_remove;
+     buffer->lines = realloc(buffer->lines, buffer->line_count * sizeof(*buffer->lines));
+
+     return buffer->lines != NULL;
+}
+
+bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
+     CeBufferChangeNode_t* node = calloc(1, sizeof(*node));
+     node->change = *change;
+     node->next = NULL;
+
+     if(buffer->change_node){
+          if(buffer->change_node->next){
+               // TODO: create ce_change_node_free()
+               CeBufferChangeNode_t* itr = buffer->change_node->next;
+               while(itr){
+                    CeBufferChangeNode_t* tmp = itr;
+                    itr = itr->next;
+                    free(tmp->change.string);
+                    free(tmp);
+               }
+          }
+
+          node->prev = buffer->change_node;
+          buffer->change_node->next = node;
+     }else{
+          CeBufferChangeNode_t* first_empty_node = calloc(1, sizeof(*node));
+          first_empty_node->next = node;
+          node->prev = first_empty_node;
+     }
+
+     buffer->change_node = node;
+     return true;
+}
+
+bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor){
+     // nothing to undo
+     if(!buffer->change_node) return true;
+     if(!buffer->change_node->prev) return true;
+
+     CeBufferChange_t* change = &buffer->change_node->change;
+     if(change->insertion){
+          ce_buffer_remove_string(buffer, change->location, ce_utf8_strlen(change->string), change->remove_line_if_empty);
+     }else{
+          ce_buffer_insert_string(buffer, change->string, change->location);
+     }
+
+     *cursor = change->cursor_before;
+     buffer->change_node = buffer->change_node->prev;
+
+     if(change->chain) return ce_buffer_undo(buffer, cursor);
+
+     return true;
+}
+
+bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
+     // nothing to redo
+     if(!buffer->change_node->next) return false;
+
+     buffer->change_node = buffer->change_node->next;
+
+     CeBufferChange_t* change = &buffer->change_node->change;
+     if(change->insertion){
+          ce_buffer_insert_string(buffer, change->string, change->location);
+     }else{
+          ce_buffer_remove_string(buffer, change->location, ce_utf8_strlen(change->string), change->remove_line_if_empty);
+     }
+
+     *cursor = change->cursor_after;
+
+     if(buffer->change_node->next && buffer->change_node->next->change.chain) return ce_buffer_redo(buffer, cursor);
+
+     return true;
 }
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
