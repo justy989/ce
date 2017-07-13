@@ -107,22 +107,22 @@ bool ce_buffer_save(CeBuffer_t* buffer);
 bool ce_buffer_empty(CeBuffer_t* buffer);
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
-int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
-CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end);
-CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta);
+int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line); // TODO: unittest
+CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end); // TODO: unittest
+CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta); // TODO: unittest
 bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
-int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid
+int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid // TODO: unittest
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
-bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point);
+bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point); // TODO: unittest
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
 bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove);
 
-bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change);
-bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor);
-bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor);
+bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change); // TODO: unittest
+bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
+bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 

@@ -186,7 +186,7 @@ int main(int argc, char** argv){
           switch(key){
           default:
                if(isprint(key) || key == CE_NEWLINE){
-                    if(ce_buffer_insert_char(&buffer, key, view.cursor)){
+                    if(ce_buffer_insert_rune(&buffer, key, view.cursor)){
                          const char str[2] = {key, 0};
                          CePoint_t new_cursor = ce_buffer_advance_point(&buffer, view.cursor, 1);
 

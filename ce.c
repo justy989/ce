@@ -443,8 +443,11 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      return true;
 }
 
-bool ce_buffer_insert_char(CeBuffer_t* buffer, char ch, CePoint_t point){
-     const char str[2] = {ch, 0};
+bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point){
+     char str[5];
+     int64_t written = 0;
+     ce_utf8_encode(rune, str, 5, &written);
+     str[written] = 0;
      return ce_buffer_insert_string(buffer, str, point);
 }
 
