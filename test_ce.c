@@ -147,6 +147,21 @@ TEST(buffer_insert_string_newline){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_insert_string_on_empty_line){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, "first line\n\nthird line", g_name);
+     const char* string = "inserted";
+     ce_buffer_insert_string(&buffer, string, (CePoint_t){0, 1});
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "inserted") == 0);
+     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+
+     ce_buffer_free(&buffer);
+}
+
 TEST(buffer_remove_string_partial_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
@@ -251,6 +266,27 @@ TEST(buffer_dupe_portion_of_line){
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){3, 0}, 5);
      EXPECT(strcmp(dupe, "st li") == 0);
+}
+
+TEST(buffer_dupe_two_lines){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){6, 0}, 10);
+     EXPECT(strcmp(dupe, "line\nsecond") == 0);
+}
+
+TEST(buffer_dupe_three_lines){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){6, 0}, 20);
+     EXPECT(strcmp(dupe, "line\nsecond line\nthird") == 0);
+}
+
+TEST(buffer_dupe_entire_buffer){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 31);
+     EXPECT(strcmp(dupe, g_multiline_string) == 0);
 }
 
 TEST(view_follow_cursor){

@@ -220,8 +220,20 @@ int main(int argc, char** argv){
           case KEY_BACKSPACE:
                if(!ce_points_equal(view.cursor, (CePoint_t){0, 0})){
                     CePoint_t remove_point = ce_buffer_advance_point(&buffer, view.cursor, -1);
+                    char* removed_string = ce_buffer_dupe_string(&buffer, remove_point, 1);
                     if(ce_buffer_remove_string(&buffer, remove_point, 1, true)){
+                         CeBufferChange_t change = {};
+                         change.chain = chain_undo;
+                         change.insertion = false;
+                         change.remove_line_if_empty = true;
+                         change.string = removed_string;
+                         change.location = remove_point;
+                         change.cursor_before = view.cursor;
+                         change.cursor_after = remove_point;
+                         ce_buffer_change(&buffer, &change);
+
                          view.cursor = remove_point;
+                         chain_undo = true;
                     }
                }
                break;

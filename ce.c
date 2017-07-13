@@ -563,13 +563,71 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
 }
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length){
-     if(ce_buffer_point_is_valid(buffer, point)) return NULL;
+     if(!ce_buffer_point_is_valid(buffer, point)) return NULL;
 
      char* start = ce_utf8_find_index(buffer->lines[point.y], point.x);
-     int64_t start_len = ce_utf8_strlen(start);
-     if(start_len > length) return strndup(start, length);
+     // NOTE: would a function that returns both utf8 len and byte len be helpful here?
+     int64_t buffer_utf8_length = ce_utf8_strlen(start);
+     int64_t real_length = strlen(start);
+     // exit early if the whole string is just on this line
+     if(buffer_utf8_length > length) return strndup(start, length);
 
-     return NULL;
+     // calculate how big of an array we need to allocate for the dupe
+     int64_t current_line = point.y + 1;
+     while(true){
+          int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
+          buffer_utf8_length += line_utf8_length;
+          if(buffer_utf8_length > length){
+               char* end_of_dupe = ce_utf8_find_index(buffer->lines[current_line], line_utf8_length - (buffer_utf8_length - length));
+               real_length += (end_of_dupe - buffer->lines[current_line]) + 1; // inclusive
+               break;
+          }
+
+          real_length += strlen(buffer->lines[current_line]) + 1; // account for newline
+          if(buffer_utf8_length == length) break;
+          current_line++;
+          if(current_line > buffer->line_count) return NULL; // not enough length in the buffer
+     }
+
+     // alloc
+     char* dupe = malloc(real_length + 1);
+     char* itr = dupe;
+
+     // copy in the first line
+     int64_t copy_length = strlen(start);
+     memcpy(itr, start, copy_length);
+     itr += copy_length;
+
+     // append newline
+     *itr = CE_NEWLINE;
+     itr++;
+
+     // loop over each line again from the beginning
+     current_line = point.y + 1;
+     while(true){
+          int64_t line_length = strlen(buffer->lines[current_line]);
+          copy_length += line_length;
+
+          // are we over the real length?
+          if(copy_length > real_length){
+               memcpy(itr, buffer->lines[current_line], line_length - (copy_length - real_length));
+               break;
+          }
+
+          // copy in the whole line
+          memcpy(itr, buffer->lines[current_line], line_length);
+          itr += line_length;
+
+          // append a newline
+          *itr = CE_NEWLINE;
+          itr++;
+          copy_length++;
+          if(copy_length == real_length) break;
+          current_line++;
+     }
+
+     dupe[real_length] = 0;
+     return dupe;
 }
 
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
