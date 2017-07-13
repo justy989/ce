@@ -94,6 +94,12 @@ typedef struct{
      void* user_data;
 }CeView_t;
 
+typedef struct{
+     int64_t tab_width;
+     int64_t horizontal_scroll_off;
+     int64_t vertical_scroll_off;
+}CeConfigOptions_t;
+
 typedef int32_t CeRune_t;
 
 bool ce_log_init(const char* filename);
