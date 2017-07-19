@@ -5,7 +5,7 @@
 #include <ncurses.h>
 
 bool ce_vim_init(CeVim_t* vim){
-     (void)(vim);
+     vim->chain_undo = false;
      return true;
 }
 
@@ -30,12 +30,10 @@ bool ce_vim_bind_key(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function){
      return true;
 }
 
-bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key){
-     bool chain_undo = false;
-
+bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeConfigOptions_t* config_options){
      switch(vim->mode){
      default:
-          return false;
+          return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
           switch(key){
           default:
@@ -46,7 +44,7 @@ bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key){
 
                          // TODO: convenience function
                          CeBufferChange_t change = {};
-                         change.chain = chain_undo;
+                         change.chain = vim->chain_undo;
                          change.insertion = true;
                          change.remove_line_if_empty = true;
                          change.string = strdup(str);
@@ -56,7 +54,7 @@ bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key){
                          ce_buffer_change(view->buffer, &change);
 
                          view->cursor = new_cursor;
-                         chain_undo = true;
+                         vim->chain_undo = true;
                     }
                }
                break;
@@ -68,7 +66,7 @@ bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key){
 
                          // TODO: convenience function
                          CeBufferChange_t change = {};
-                         change.chain = chain_undo;
+                         change.chain = vim->chain_undo;
                          change.insertion = false;
                          change.remove_line_if_empty = true;
                          change.string = removed_string;
@@ -78,38 +76,61 @@ bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key){
                          ce_buffer_change(view->buffer, &change);
 
                          view->cursor = remove_point;
-                         chain_undo = true;
+                         vim->chain_undo = true;
                     }
                }
                break;
           case KEY_LEFT:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0}, config_options->tab_width, true);
+               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+               vim->chain_undo = false;
                break;
           case KEY_DOWN:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1}, config_options->tab_width, true);
+               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+               vim->chain_undo = false;
                break;
           case KEY_UP:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1}, config_options->tab_width, true);
+               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+               vim->chain_undo = false;
                break;
           case KEY_RIGHT:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0}, config_options->tab_width, true);
+               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+               vim->chain_undo = false;
                break;
-          case KEY_ESCAPE:
+          case 27: // escape
                vim->mode = CE_VIM_MODE_NORMAL;
                break;
           }
           break;
      case CE_VIM_MODE_NORMAL:
-          break;
+     {
+          CeVimAction_t action = {};
+          CeVimParseActionResult_t result = ce_vim_parse_action(vim->current_command, &action);
+
+          if(result == CE_VIM_PARSE_COMPLETE){
+               ce_vim_apply_action(view->buffer, &view->cursor, );
+          }
+
+          return result;
+     } break;
      }
 
-     return true;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_action(const CeRune_t* keys, CeVimAction_t* action){
+     CeVimAction_t action = {};
+
+     // parse multiplier if it exists
+
+     // parse verb
+
+     // parse multiplier
+
+     // parse motion
+
+     return CE_VIM_PARSE_COMPLETE
 }

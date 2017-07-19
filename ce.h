@@ -56,7 +56,6 @@ typedef struct{
      CePoint_t location;
      CePoint_t cursor_before;
      CePoint_t cursor_after;
-
 }CeBufferChange_t;
 
 typedef struct CeBufferChangeNode_t{
@@ -113,7 +112,7 @@ bool ce_buffer_save(CeBuffer_t* buffer);
 bool ce_buffer_empty(CeBuffer_t* buffer);
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
-int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line); // TODO: unittest
+int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end); // TODO: unittest
 CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta); // TODO: unittest
 bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);

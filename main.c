@@ -8,6 +8,7 @@
 #include <ctype.h>
 
 #include "ce.h"
+#include "ce_vim.h"
 
 // 60 fps
 #define DRAW_USEC_LIMIT 16666
@@ -147,9 +148,10 @@ int main(int argc, char** argv){
           define_key("\x12", KEY_REDO);
      }
 
-     int64_t tab_width = 8;
-     int64_t horizontal_scroll_off = 10;
-     int64_t vertical_scroll_off = 5;
+     CeConfigOptions_t config_options = {};
+     config_options.tab_width = 8;
+     config_options.horizontal_scroll_off = 10;
+     config_options.vertical_scroll_off = 5;
 
      int terminal_width;
      int terminal_height;
@@ -162,17 +164,17 @@ int main(int argc, char** argv){
 
      if(argc > 1) ce_buffer_load_file(&buffer, argv[1]);
 
+     CeVim_t vim = {};
+
      // init draw thread
      pthread_t thread_draw;
      DrawThreadData_t* draw_thread_data = calloc(1, sizeof(*draw_thread_data));
      {
           draw_thread_data->view = &view;
-          draw_thread_data->tab_width = tab_width;
+          draw_thread_data->tab_width = config_options.tab_width;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
           draw_thread_data->ready_to_draw = true;
      }
-
-     bool chain_undo = false;
 
      bool done = false;
      while(!done){
@@ -185,77 +187,19 @@ int main(int argc, char** argv){
           int key = getch();
           switch(key){
           default:
-               if(isprint(key) || key == CE_NEWLINE){
-                    if(ce_buffer_insert_rune(&buffer, key, view.cursor)){
-                         const char str[2] = {key, 0};
-                         CePoint_t new_cursor = ce_buffer_advance_point(&buffer, view.cursor, 1);
-
-                         CeBufferChange_t change = {};
-                         change.chain = chain_undo;
-                         change.insertion = true;
-                         change.remove_line_if_empty = true;
-                         change.string = strdup(str);
-                         change.location = view.cursor;
-                         change.cursor_before = view.cursor;
-                         change.cursor_after = new_cursor;
-                         ce_buffer_change(&buffer, &change);
-
-                         view.cursor = new_cursor;
-                         chain_undo = true;
-                    }
-               }
+               ce_vim_handle_key(&vim, &view, key, &config_options);
                break;
           case KEY_CLOSE:
                done = true;
                break;
           case 23: // Ctrl + w
-               ce_buffer_save(&buffer);
+               ce_buffer_save(view.buffer);
                break;
           case 14: // Ctrl + n
-               ce_buffer_undo(&buffer, &view.cursor);
+               ce_buffer_undo(view.buffer, &view.cursor);
                break;
           case KEY_REDO:
-               ce_buffer_redo(&buffer, &view.cursor);
-               break;
-          case KEY_BACKSPACE:
-               if(!ce_points_equal(view.cursor, (CePoint_t){0, 0})){
-                    CePoint_t remove_point = ce_buffer_advance_point(&buffer, view.cursor, -1);
-                    char* removed_string = ce_buffer_dupe_string(&buffer, remove_point, 1);
-                    if(ce_buffer_remove_string(&buffer, remove_point, 1, true)){
-                         CeBufferChange_t change = {};
-                         change.chain = chain_undo;
-                         change.insertion = false;
-                         change.remove_line_if_empty = true;
-                         change.string = removed_string;
-                         change.location = remove_point;
-                         change.cursor_before = view.cursor;
-                         change.cursor_after = remove_point;
-                         ce_buffer_change(&buffer, &change);
-
-                         view.cursor = remove_point;
-                         chain_undo = true;
-                    }
-               }
-               break;
-          case KEY_LEFT:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){-1, 0}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
-               break;
-          case KEY_DOWN:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, 1}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
-               break;
-          case KEY_UP:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){0, -1}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
-               break;
-          case KEY_RIGHT:
-               view.cursor = ce_buffer_move_point(&buffer, view.cursor, (CePoint_t){1, 0}, tab_width, true);
-               draw_thread_data->scroll = ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-               chain_undo = false;
+               ce_buffer_redo(view.buffer, &view.cursor);
                break;
           }
 

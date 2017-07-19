@@ -243,15 +243,13 @@ bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point){
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point){
      if(point.y < 0 || point.y >= buffer->line_count || point.x < 0) return false;
      int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
-     if(point.x > line_len){
-          return false;
-     }
+     if(point.x > line_len) return false;
 
      return true;
 }
 
 int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line){
-     if(line < 0 || line > buffer->line_count) return -1;
+     if(line < 0 || line >= buffer->line_count) return -1;
 
      return ce_utf8_strlen(buffer->lines[line]);
 }

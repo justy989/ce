@@ -11,14 +11,14 @@ enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*);
 typedef void CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, CeBuffer_t*);
-typedef void CeVimVerbFunc_t();
+typedef void CeVimVerbFunc_t(struct CeVim_t*, struct CeVimAction_t*, CeBuffer_t*);
 
 typedef enum{
-     CE_VIM_PARSE_RESULT_INVALID,
-     CE_VIM_PARSE_RESULT_KEY_NOT_HANDLED,
-     CE_VIM_PARSE_RESULT_CONSUME_ADDITIONAL_KEY,
-     CE_VIM_PARSE_RESULT_IN_PROGRESS,
-     CE_VIM_PARSE_RESULT_COMPLETE,
+     CE_VIM_PARSE_INVALID,
+     CE_VIM_PARSE_KEY_NOT_HANDLED,
+     CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY,
+     CE_VIM_PARSE_IN_PROGRESS,
+     CE_VIM_PARSE_COMPLETE,
 }CeVimParseResult_t;
 
 typedef enum{
@@ -68,10 +68,12 @@ typedef struct{
      CeVimMode_t mode;
      CeVimKeyBind_t key_binds[CE_VIM_MAX_KEY_BINDS];
      int64_t key_bind_count;
-     char current_command[CE_VIM_MAX_COMMAND_LEN];
+     CeRune_t current_command[CE_VIM_MAX_COMMAND_LEN];
+     bool chain_undo;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
 bool ce_vim_free(CeVim_t* vim);
 bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
-bool ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key);
+CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeConfigOptions_t* config_options);
+CeVimParseResult_t ce_vim_parse_action(const CeRune_t* keys, CeVimAction_t* action);

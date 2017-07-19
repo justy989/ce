@@ -63,6 +63,37 @@ TEST(buffer_empty){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_line_len){
+     CeBuffer_t buffer = {};
+     EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, g_name));
+
+     EXPECT(ce_buffer_line_len(&buffer, 0) == 10);
+     EXPECT(ce_buffer_line_len(&buffer, 1) == 11);
+     EXPECT(ce_buffer_line_len(&buffer, 2) == 10);
+     EXPECT(ce_buffer_line_len(&buffer, 3) == -1);
+
+     ce_buffer_free(&buffer);
+}
+
+TEST(buffer_move_point){
+     CePoint_t res;
+     CeBuffer_t buffer = {};
+     EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, g_name));
+
+     res = ce_buffer_move_point(&buffer, (CePoint_t){0, 0}, (CePoint_t){1, 0}, 1, true);
+     EXPECT(res.x == 1 && res.y == 0);
+     res = ce_buffer_move_point(&buffer, (CePoint_t){0, 0}, (CePoint_t){0, 1}, 1, true);
+     EXPECT(res.x == 0 && res.y == 1);
+
+     // too far, clamp
+     res = ce_buffer_move_point(&buffer, (CePoint_t){0, 0}, (CePoint_t){0, 5}, 1, true);
+     EXPECT(res.x == 0 && res.y == 2);
+     res = ce_buffer_move_point(&buffer, (CePoint_t){0, 0}, (CePoint_t){100, 0}, 1, true);
+     EXPECT(res.x == 10 && res.y == 0);
+
+     ce_buffer_free(&buffer);
+}
+
 TEST(buffer_contains_point){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
