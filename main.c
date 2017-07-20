@@ -165,6 +165,7 @@ int main(int argc, char** argv){
      if(argc > 1) ce_buffer_load_file(&buffer, argv[1]);
 
      CeVim_t vim = {};
+     ce_vim_init(&vim);
 
      // init draw thread
      pthread_t thread_draw;
