@@ -196,12 +196,6 @@ int main(int argc, char** argv){
           case 23: // Ctrl + w
                ce_buffer_save(view.buffer);
                break;
-          case 14: // Ctrl + n
-               ce_buffer_undo(view.buffer, &view.cursor);
-               break;
-          case KEY_REDO:
-               ce_buffer_redo(view.buffer, &view.cursor);
-               break;
           }
 
           draw_thread_data->ready_to_draw = true;

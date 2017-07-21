@@ -248,6 +248,31 @@ int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point){
      return true;
 }
 
+int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
+     if(!ce_buffer_point_is_valid(buffer, start)) return -1;
+     if(!ce_buffer_point_is_valid(buffer, end)) return -1;
+     if(ce_point_after(start, end)) return -1; // TODO: calculate negative value?
+
+     // easy case where they are on the same line
+     if(start.y == end.y) return (end.x - start.x) + 1;
+
+     int64_t length = 0;
+     for(int64_t y = start.y; y <= end.y; ++y){
+          if(y == start.y){
+               // count from the star to the end of the line
+               length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x));
+          }else if(y == end.y){
+               // count up until the end
+               length += end.x;
+          }else{
+               // count entire line
+               length += ce_utf8_strlen(buffer->lines[y]);
+          }
+     }
+
+     return length;
+}
+
 int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line){
      if(line < 0 || line >= buffer->line_count) return -1;
 

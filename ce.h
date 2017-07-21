@@ -109,6 +109,7 @@ typedef int32_t CeRune_t;
 
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);
+// lol we should have a ce_log_free() but honestly, whatever
 
 bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name);
 void ce_buffer_free(CeBuffer_t* buffer);
@@ -117,7 +118,7 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
 bool ce_buffer_save(CeBuffer_t* buffer);
 bool ce_buffer_empty(CeBuffer_t* buffer);
 
-int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
+int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end); // inclusive
 int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, CeClampX_t clamp_x); // TODO: unittest
 CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta); // TODO: unittest
