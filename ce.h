@@ -17,6 +17,12 @@ typedef enum{
 }CeDirection_t;
 
 typedef enum{
+     CE_CLAMP_X_NONE,
+     CE_CLAMP_X_ON, // allows point at line length
+     CE_CLAMP_X_INSIDE, // only allows point at (line length - 1)
+}CeClampX_t;
+
+typedef enum{
      CE_BUFFER_STATUS_NONE,
      CE_BUFFER_STATUS_MODIFIED,
      CE_BUFFER_STATUS_READONLY,
@@ -113,8 +119,9 @@ bool ce_buffer_empty(CeBuffer_t* buffer);
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
 int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
-CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end); // TODO: unittest
+CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, CeClampX_t clamp_x); // TODO: unittest
 CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t delta); // TODO: unittest
+CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t clamp_x); // TODO: unittest
 bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid // TODO: unittest
 

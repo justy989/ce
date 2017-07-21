@@ -13,7 +13,7 @@ enum CeVimParseResult_t;
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*);
 typedef struct CeVimMotionRange_t CeVimMotionFunc_t(const struct CeVim_t*, const struct CeVimAction_t*, const CeView_t*,
                                                     const CeConfigOptions_t*);
-typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, const struct CeVimMotionRange_t*, CeView_t*,
+typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struct CeVimMotionRange_t, CeView_t*,
                              const CeConfigOptions_t*);
 
 typedef enum CeVimParseResult_t{
@@ -78,7 +78,7 @@ typedef struct CeVim_t{
      int64_t key_bind_count;
      CeRune_t current_command[CE_VIM_MAX_COMMAND_LEN];
      bool chain_undo;
-     //int64_t motion_column;
+     int64_t motion_column;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
@@ -115,5 +115,5 @@ CeVimMotionRange_t ce_vim_motion_little_word(const CeVim_t* vim, const CeVimActi
                                              const CeConfigOptions_t* config_options);
 
 // verb functions
-bool ce_vim_motion_verb(CeVim_t* vim, const CeVimAction_t* action, const CeVimMotionRange_t* motion_range, CeView_t* view,
+bool ce_vim_motion_verb(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options);

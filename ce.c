@@ -254,7 +254,7 @@ int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line){
      return ce_utf8_strlen(buffer->lines[line]);
 }
 
-CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, bool allow_passed_end){
+CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, CeClampX_t clamp_x){
      if(!ce_buffer_point_is_valid(buffer, point)) return point;
 
      if(delta.y){
@@ -263,6 +263,8 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
 
           // move to the new line
           point.y += delta.y;
+
+          // always clamp y
           CE_CLAMP(point.y, 0, (buffer->line_count - 1));
 
           // convert the x from visible index to a string index
@@ -272,14 +274,19 @@ CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t de
      point.x += delta.x;
      int64_t line_len = ce_buffer_line_len(buffer, point.y);
 
-     if(allow_passed_end){
+     switch(clamp_x){
+     case CE_CLAMP_X_NONE:
+          break;
+     case CE_CLAMP_X_ON:
           CE_CLAMP(point.x, 0, line_len);
-     }else{
+          break;
+     case CE_CLAMP_X_INSIDE:
           if(line_len == 0){
                point.x = 0;
           }else{
                CE_CLAMP(point.x, 0, (line_len - 1));
           }
+          break;
      }
 
      return point;
@@ -326,6 +333,39 @@ CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t d
                     break;
                }
           }
+     }
+
+     return point;
+}
+
+CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t clamp_x){
+     switch(clamp_x){
+     case CE_CLAMP_X_NONE:
+          return point;
+     case CE_CLAMP_X_ON:
+          if(buffer->line_count){
+               CE_CLAMP(point.y, 0, (buffer->line_count - 1));
+               int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
+               if(line_len){
+                    CE_CLAMP(point.x, 0, (line_len - 1));
+               }else{
+                    point.x = 0;
+               }
+          }else{
+               point.x = 0;
+               point.y = 0;
+          }
+          break;
+     case CE_CLAMP_X_INSIDE:
+          if(buffer->line_count){
+               CE_CLAMP(point.y, 0, (buffer->line_count - 1));
+               int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
+               CE_CLAMP(point.x, 0, line_len);
+          }else{
+               point.x = 0;
+               point.y = 0;
+          }
+          break;
      }
 
      return point;

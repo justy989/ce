@@ -123,22 +123,22 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                }
                break;
           case KEY_LEFT:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0}, config_options->tab_width, true);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0}, config_options->tab_width, CE_CLAMP_X_ON);
                view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
                vim->chain_undo = false;
                break;
           case KEY_DOWN:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1}, config_options->tab_width, true);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1}, config_options->tab_width, CE_CLAMP_X_ON);
                view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
                vim->chain_undo = false;
                break;
           case KEY_UP:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1}, config_options->tab_width, true);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1}, config_options->tab_width, CE_CLAMP_X_ON);
                view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
                vim->chain_undo = false;
                break;
           case KEY_RIGHT:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0}, config_options->tab_width, true);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0}, config_options->tab_width, CE_CLAMP_X_ON);
                view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
                vim->chain_undo = false;
                break;
@@ -223,7 +223,7 @@ bool ce_vim_apply_action(CeVim_t* vim, const CeVimAction_t* action, CeView_t* vi
      CeVimMotionRange_t motion_range = {view->cursor, view->cursor};
      bool success = true;
      if(action->motion.function) motion_range = action->motion.function(vim, action, view, config_options);
-     if(action->verb.function) success = action->verb.function(vim, action, &motion_range, view, config_options);
+     if(action->verb.function) success = action->verb.function(vim, action, motion_range, view, config_options);
      vim->mode = action->end_in_mode;
      return success;
 }
@@ -329,7 +329,7 @@ CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action){
 }
 
 static CeVimMotionRange_t motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options){
-     CePoint_t destination = ce_buffer_move_point(view->buffer, view->cursor, delta, config_options->tab_width, false);
+     CePoint_t destination = ce_buffer_move_point(view->buffer, view->cursor, delta, config_options->tab_width, CE_CLAMP_X_NONE);
      if(destination.x < 0) return (CeVimMotionRange_t){view->cursor, view->cursor};
      return (CeVimMotionRange_t){view->cursor, destination};
 }
@@ -361,9 +361,13 @@ CeVimMotionRange_t ce_vim_motion_little_word(const CeVim_t* vim, const CeVimActi
      return (CeVimMotionRange_t){view->cursor, destination};
 }
 
-bool ce_vim_motion_verb(CeVim_t* vim, const CeVimAction_t* action, const CeVimMotionRange_t* motion_range, CeView_t* view,
+bool ce_vim_motion_verb(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options){
-     view->cursor = motion_range->end;
+     if(action->motion.function == ce_vim_motion_up || action->motion.function == ce_vim_motion_down){
+          motion_range.end.x = vim->motion_column;
+     }
+     view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_ON);
+     if(ce_points_equal(motion_range.end, view->cursor)) vim->motion_column = view->cursor.x;
      view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
      return true;
 }
