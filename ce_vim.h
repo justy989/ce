@@ -11,8 +11,8 @@ struct CeMotionRange_t;
 enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*);
-typedef struct CeMotionRange_t CeVimMotionFunc_t(const struct CeVimAction_t*, struct CeVim_t*,CeBuffer_t*, CePoint_t*);
-typedef bool CeVimVerbFunc_t(const struct CeVimAction_t*, struct CeMotionRange_t*, struct CeVim_t*, CeBuffer_t*);
+typedef struct CeMotionRange_t CeVimMotionFunc_t(const struct CeVimAction_t*, struct CeVim_t*, CeBuffer_t*, CePoint_t*);
+typedef bool CeVimVerbFunc_t(const struct CeVimAction_t*, struct CeMotionRange_t*, struct CeVim_t*, CeBuffer_t*, CePoint_t*);
 
 typedef enum CeVimParseResult_t{
      CE_VIM_PARSE_INVALID,
@@ -84,13 +84,26 @@ bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overr
 bool ce_vim_free(CeVim_t* vim);
 bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeConfigOptions_t* config_options);
+
+// action
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* keys, CeVimKeyBind_t* key_binds,
                                        int64_t key_bind_count);
 bool ce_vim_apply_action(const CeVimAction_t* action, CeBuffer_t* buffer, CePoint_t* cursor, CeVim_t* vim);
 
+// util
+CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
+
 // parse functions
-CeVimParseResult_t ce_vim_parse_set_insert_mode(struct CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action);
 
 // motion functions
+CeMotionRange_t ce_vim_motion_left(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor);
+CeMotionRange_t ce_vim_motion_right(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor);
+CeMotionRange_t ce_vim_motion_up(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor);
+CeMotionRange_t ce_vim_motion_down(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor);
+CeMotionRange_t ce_vim_motion_little_word(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor);
 
 // verb functions
+bool ce_vim_motion_verb(const CeVimAction_t* action, CeMotionRange_t* motion_range, CeVim_t* vim,
+                        CeBuffer_t* buffer, CePoint_t* cursor);

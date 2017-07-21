@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <ncurses.h>
+#include <assert.h>
 
 // TODO: move these to utils somewhere?
 static int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers){
@@ -35,7 +36,9 @@ bool ce_vim_init(CeVim_t* vim){
 
      vim->key_binds[0].key = 'i';
      vim->key_binds[0].function = &ce_vim_parse_set_insert_mode;
-     vim->key_bind_count = 1;
+     vim->key_binds[1].key = 'w';
+     vim->key_binds[1].function = &ce_vim_parse_motion_little_word;
+     vim->key_bind_count = 2;
 
      return true;
 }
@@ -219,9 +222,65 @@ bool ce_vim_apply_action(const CeVimAction_t* action, CeBuffer_t* buffer, CePoin
           motion_range.first = &motion_range.a;
           motion_range.last = &motion_range.b;
      }
-     if(action->verb.function) success = action->verb.function(action, &motion_range, vim, buffer);
+     if(action->verb.function) success = action->verb.function(action, &motion_range, vim, buffer, cursor);
      vim->mode = action->end_in_mode;
      return success;
+}
+
+static bool is_little_word_character(int c){
+     return isalnum(c) || c == '_';
+}
+
+typedef enum{
+     LITTLE_WORD_INSIDE_WORD,
+     LITTLE_WORD_INSIDE_SPACE,
+     LITTLE_WORD_INSIDE_OTHER,
+}LittleWordState_t;
+
+CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
+     if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
+
+     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+
+     int64_t rune_len = 0;
+     CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+     LittleWordState_t state = LITTLE_WORD_INSIDE_OTHER;
+
+     if(is_little_word_character(rune)){
+          state = LITTLE_WORD_INSIDE_WORD;
+     }else if(isspace(rune)){
+          state = LITTLE_WORD_INSIDE_SPACE;
+     }
+
+     itr += rune_len;
+     start.x++;
+
+     while(*itr){
+          rune = ce_utf8_decode(itr, &rune_len);
+
+          switch(state){
+          default:
+               assert(0);
+               break;
+          case LITTLE_WORD_INSIDE_WORD:
+               if(isspace(rune)) state = LITTLE_WORD_INSIDE_SPACE;
+               else if(!is_little_word_character(rune)) state = LITTLE_WORD_INSIDE_OTHER;
+               break;
+          case LITTLE_WORD_INSIDE_SPACE:
+               if(is_little_word_character(rune) || !isspace(rune)) goto END_LOOP;
+               break;
+          case LITTLE_WORD_INSIDE_OTHER:
+               if(isspace(rune)) state = LITTLE_WORD_INSIDE_SPACE;
+               else if(is_little_word_character(rune)) goto END_LOOP;
+               break;
+          }
+
+          itr += rune_len;
+          start.x++;
+     }
+END_LOOP:
+
+     return start;
 }
 
 CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action){
@@ -230,4 +289,46 @@ CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action){
 
      action->end_in_mode = CE_VIM_MODE_INSERT;
      return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action){
+     if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+     action->motion.function = ce_vim_motion_little_word;
+
+     if(action->verb.function) return CE_VIM_PARSE_COMPLETE;
+     action->verb.function = ce_vim_motion_verb;
+
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+#if 0
+CeMotionRange_t ce_vim_motion_left(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor){
+}
+
+CeMotionRange_t ce_vim_motion_right(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor){
+}
+
+CeMotionRange_t ce_vim_motion_up(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor){
+}
+
+CeMotionRange_t ce_vim_motion_down(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor){
+}
+#endif
+
+CeMotionRange_t ce_vim_motion_little_word(const CeVimAction_t* action, CeVim_t* vim, CeBuffer_t* buffer, CePoint_t* cursor){
+     (void)(action);
+     (void)(vim);
+     CePoint_t destination = ce_vim_move_little_word(buffer, *cursor);
+     if(destination.x < 0) return (CeMotionRange_t){*cursor, *cursor, NULL, NULL};
+
+     return (CeMotionRange_t){*cursor, destination, NULL, NULL};
+}
+
+bool ce_vim_motion_verb(const CeVimAction_t* action, CeMotionRange_t* motion_range, CeVim_t* vim,
+                        CeBuffer_t* buffer, CePoint_t* cursor){
+     (void)(action);
+     (void)(vim);
+     (void)(buffer);
+     *cursor = motion_range->b;
+     return true;
 }
