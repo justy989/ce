@@ -871,6 +871,23 @@ CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
      return rune;
 }
 
+CeRune_t ce_utf8_decode_reverse(const char* string, const char* string_start, int64_t* bytes_consumed){
+     if((*string & 0x80) == 0){
+          *bytes_consumed = 1;
+          return string[0];
+     }
+
+     while(string >= string_start){
+          if((*string & 0x80) == 0x80){
+               string--;
+          }else{
+               return ce_utf8_decode(string, bytes_consumed);
+          }
+     }
+
+     return CE_UTF8_INVALID;
+}
+
 bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes_written){
      if(u < 0x80){
           if(string_len < 1) return false;

@@ -141,6 +141,7 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
 int64_t ce_utf8_strlen(const char* string);
 char* ce_utf8_find_index(char* string, int64_t index);
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
+CeRune_t ce_utf8_decode_reverse(const char* string, const char* string_start, int64_t* bytes_consumed);
 bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes_written);
 
 int64_t ce_util_count_string_lines(const char* string);

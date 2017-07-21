@@ -48,10 +48,15 @@ bool ce_vim_init(CeVim_t* vim){
 
      add_key_bind(vim, 'i', &ce_vim_parse_set_insert_mode);
      add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
+     add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
+     add_key_bind(vim, 'b', &ce_vim_parse_motion_begin_little_word);
      add_key_bind(vim, 'h', &ce_vim_parse_motion_left);
      add_key_bind(vim, 'l', &ce_vim_parse_motion_right);
      add_key_bind(vim, 'k', &ce_vim_parse_motion_up);
      add_key_bind(vim, 'j', &ce_vim_parse_motion_down);
+     add_key_bind(vim, '^', &ce_vim_parse_motion_soft_begin_line);
+     add_key_bind(vim, '0', &ce_vim_parse_motion_hard_begin_line);
+     add_key_bind(vim, '$', &ce_vim_parse_motion_end_line);
 
      return true;
 }
@@ -255,10 +260,10 @@ static bool is_little_word_character(int c){
 }
 
 typedef enum{
-     LITTLE_WORD_INSIDE_WORD,
-     LITTLE_WORD_INSIDE_SPACE,
-     LITTLE_WORD_INSIDE_OTHER,
-}LittleWordState_t;
+     WORD_INSIDE_WORD,
+     WORD_INSIDE_SPACE,
+     WORD_INSIDE_OTHER,
+}WordState_t;
 
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
      if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
@@ -267,17 +272,18 @@ CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
 
      int64_t rune_len = 0;
      CeRune_t rune = ce_utf8_decode(itr, &rune_len);
-     LittleWordState_t state = LITTLE_WORD_INSIDE_OTHER;
+     WordState_t state = WORD_INSIDE_OTHER;
 
      if(is_little_word_character(rune)){
-          state = LITTLE_WORD_INSIDE_WORD;
+          state = WORD_INSIDE_WORD;
      }else if(isspace(rune)){
-          state = LITTLE_WORD_INSIDE_SPACE;
+          state = WORD_INSIDE_SPACE;
      }
 
      itr += rune_len;
      start.x++;
 
+     // TODO: handle multiple lines
      while(*itr){
           rune = ce_utf8_decode(itr, &rune_len);
 
@@ -285,15 +291,15 @@ CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
           default:
                assert(0);
                break;
-          case LITTLE_WORD_INSIDE_WORD:
-               if(isspace(rune)) state = LITTLE_WORD_INSIDE_SPACE;
-               else if(!is_little_word_character(rune)) state = LITTLE_WORD_INSIDE_OTHER;
+          case WORD_INSIDE_WORD:
+               if(isspace(rune)) state = WORD_INSIDE_SPACE;
+               else if(!is_little_word_character(rune)) goto END_LOOP;
                break;
-          case LITTLE_WORD_INSIDE_SPACE:
+          case WORD_INSIDE_SPACE:
                if(is_little_word_character(rune) || !isspace(rune)) goto END_LOOP;
                break;
-          case LITTLE_WORD_INSIDE_OTHER:
-               if(isspace(rune)) state = LITTLE_WORD_INSIDE_SPACE;
+          case WORD_INSIDE_OTHER:
+               if(isspace(rune)) state = WORD_INSIDE_SPACE;
                else if(is_little_word_character(rune)) goto END_LOOP;
                break;
           }
@@ -301,6 +307,100 @@ CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
           itr += rune_len;
           start.x++;
      }
+
+END_LOOP:
+
+     return start;
+}
+
+CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start){
+     if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
+
+     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+
+     int64_t rune_len = 0;
+     CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+     WordState_t state = WORD_INSIDE_OTHER;
+
+     if(isspace(rune)){
+          state = WORD_INSIDE_SPACE;
+     }else{
+          state = WORD_INSIDE_WORD;
+     }
+
+     itr += rune_len;
+     start.x++;
+
+     // TODO: handle multiple lines
+     while(*itr){
+          rune = ce_utf8_decode(itr, &rune_len);
+
+          switch(state){
+          default:
+               assert(0);
+               break;
+          case WORD_INSIDE_WORD:
+               if(isspace(rune)) state = WORD_INSIDE_SPACE;
+               break;
+          case WORD_INSIDE_SPACE:
+               if(!isspace(rune)) goto END_LOOP;
+               break;
+          }
+
+          itr += rune_len;
+          start.x++;
+     }
+
+END_LOOP:
+
+     return start;
+}
+
+CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
+     if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
+
+     char* line_start = buffer->lines[start.y];
+     char* itr = ce_utf8_find_index(line_start, start.x) - 1; // start one character back
+
+     int64_t rune_len = 0;
+     CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
+     WordState_t state = WORD_INSIDE_OTHER;
+
+     if(is_little_word_character(rune)){
+          state = WORD_INSIDE_WORD;
+     }else if(isspace(rune)){
+          state = WORD_INSIDE_SPACE;
+     }
+
+     itr -= rune_len;
+     start.x--;
+
+     // TODO: handle multiple lines
+     while(*itr){
+          rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
+
+          switch(state){
+          default:
+               assert(0);
+               break;
+          case WORD_INSIDE_WORD:
+               if(isspace(rune)) goto END_LOOP;
+               else if(!is_little_word_character(rune)) goto END_LOOP;
+               break;
+          case WORD_INSIDE_SPACE:
+               if(is_little_word_character(rune)) state = WORD_INSIDE_WORD;
+               else if(!isspace(rune)) goto END_LOOP;
+               break;
+          case WORD_INSIDE_OTHER:
+               if(isspace(rune)) goto END_LOOP;
+               else if(is_little_word_character(rune)) goto END_LOOP;
+               break;
+          }
+
+          itr -= rune_len;
+          start.x--;
+     }
+
 END_LOOP:
 
      return start;
@@ -341,13 +441,27 @@ CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action){
 }
 
 CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action){
-     if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
-     action->motion.function = ce_vim_motion_little_word;
+     return parse_motion_direction(action, ce_vim_motion_little_word);
+}
 
-     if(action->verb.function) return CE_VIM_PARSE_COMPLETE;
-     action->verb.function = ce_vim_motion_verb;
+CeVimParseResult_t ce_vim_parse_motion_big_word(CeVimAction_t* action){
+     return parse_motion_direction(action, ce_vim_motion_big_word);
+}
 
-     return CE_VIM_PARSE_COMPLETE;
+CeVimParseResult_t ce_vim_parse_motion_begin_little_word(CeVimAction_t* action){
+     return parse_motion_direction(action, ce_vim_motion_begin_little_word);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action){
+     return parse_motion_direction(action, ce_vim_motion_soft_begin_line);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action){
+     return parse_motion_direction(action, ce_vim_motion_hard_begin_line);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_end_line(CeVimAction_t* action){
+     return parse_motion_direction(action, ce_vim_motion_end_line);
 }
 
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
@@ -383,6 +497,54 @@ bool ce_vim_motion_little_word(const CeVim_t* vim, const CeVimAction_t* action, 
      CePoint_t destination = ce_vim_move_little_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
      motion_range->end = destination;
+     return true;
+}
+
+bool ce_vim_motion_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                            const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     CePoint_t destination = ce_vim_move_big_word(view->buffer, motion_range->end);
+     if(destination.x < 0) return false;
+     motion_range->end = destination;
+     return true;
+}
+
+bool ce_vim_motion_begin_little_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                     const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     CePoint_t destination = ce_vim_move_begin_little_word(view->buffer, motion_range->end);
+     if(destination.x < 0) return false;
+     motion_range->end = destination;
+     return true;
+}
+
+bool ce_vim_motion_soft_begin_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                   const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     if(!ce_buffer_point_is_valid(view->buffer, motion_range->end)) return false;
+     const char* itr = view->buffer->lines[motion_range->end.y];
+     int64_t index = 0;
+     int64_t rune_len = 0;
+     CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+
+     while(true){
+          rune = ce_utf8_decode(itr, &rune_len);
+          itr += rune_len;
+          if(isspace(rune)) index++;
+          else break;
+     }
+
+     motion_range->end = (CePoint_t){index, motion_range->end.y};
+     return true;
+}
+
+bool ce_vim_motion_hard_begin_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                   const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     motion_range->end = (CePoint_t){0, motion_range->end.y};
+     return true;
+}
+
+bool ce_vim_motion_end_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                            const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     int64_t len = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
+     motion_range->end = (CePoint_t){len - 1, motion_range->end.y};
      return true;
 }
 
