@@ -15,6 +15,7 @@
 
 typedef struct{
      CeView_t* view;
+     CeVim_t* vim;
      int64_t tab_width;
      CePoint_t scroll;
      volatile bool ready_to_draw;
@@ -82,16 +83,43 @@ void draw_view(CeView_t* view, int64_t tab_width){
           }
      }
 
-     int64_t visible_cursor_x = 0;
-     if(ce_buffer_point_is_valid(view->buffer, view->cursor)){
-          visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
-                                                                   view->cursor.x, tab_width);
+     mvprintw(view->rect.bottom, 0, "%ld, %ld", view->cursor.x, view->cursor.y);
+     pthread_mutex_unlock(&view->buffer->lock);
+}
+
+void draw_view_status(CeView_t* view, CeVim_t* vim){
+     const char* vim_mode_string = "UNKNOWN";
+
+     switch(vim->mode){
+     default:
+          break;
+     case CE_VIM_MODE_NORMAL:
+          vim_mode_string = "N";
+          break;
+     case CE_VIM_MODE_INSERT:
+          vim_mode_string = "I";
+          break;
+     case CE_VIM_MODE_VISUAL:
+          vim_mode_string = "V";
+          break;
+     case CE_VIM_MODE_VISUAL_LINE:
+          vim_mode_string = "VL";
+          break;
+     case CE_VIM_MODE_VISUAL_BLOCK:
+          vim_mode_string = "VB";
+          break;
+     case CE_VIM_MODE_REPLACE:
+          vim_mode_string = "R";
+          break;
      }
 
-     mvprintw(view->rect.bottom, 0, "%ld, %ld", view->cursor.x, view->cursor.y);
-     move(view->cursor.y - view->scroll.y + view->rect.top,
-          visible_cursor_x - view->scroll.x + view->rect.left);
-     pthread_mutex_unlock(&view->buffer->lock);
+     int64_t width = (view->rect.right - view->rect.left) + 1;
+     move(view->rect.bottom, view->rect.left);
+     for(int64_t i = 0; i < width; ++i){
+          addch(ACS_HLINE);
+     }
+
+     mvprintw(view->rect.bottom, view->rect.left + 1, " %s %s ", vim_mode_string, view->buffer->name);
 }
 
 void* draw_thread(void* thread_data){
@@ -113,6 +141,17 @@ void* draw_thread(void* thread_data){
 
           standend();
           draw_view(data->view, data->tab_width);
+          draw_view_status(data->view, data->vim);
+
+          // move the visual cursor to the right location
+          int64_t visible_cursor_x = 0;
+          if(ce_buffer_point_is_valid(data->view->buffer, data->view->cursor)){
+               visible_cursor_x = ce_util_string_index_to_visible_index(data->view->buffer->lines[data->view->cursor.y],
+                                                                        data->view->cursor.x, data->tab_width);
+          }
+          move(data->view->cursor.y - data->view->scroll.y + data->view->rect.top,
+               visible_cursor_x - data->view->scroll.x + data->view->rect.left);
+
           refresh();
 
           data->ready_to_draw = false;
@@ -172,6 +211,7 @@ int main(int argc, char** argv){
      DrawThreadData_t* draw_thread_data = calloc(1, sizeof(*draw_thread_data));
      {
           draw_thread_data->view = &view;
+          draw_thread_data->vim = &vim;
           draw_thread_data->tab_width = config_options.tab_width;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
           draw_thread_data->ready_to_draw = true;

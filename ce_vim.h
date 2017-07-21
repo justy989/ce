@@ -27,7 +27,7 @@ typedef enum CeVimParseResult_t{
 typedef enum{
      CE_VIM_MODE_NORMAL,
      CE_VIM_MODE_INSERT,
-     CE_VIM_MODE_VISUAL_RANGE,
+     CE_VIM_MODE_VISUAL,
      CE_VIM_MODE_VISUAL_LINE,
      CE_VIM_MODE_VISUAL_BLOCK,
      CE_VIM_MODE_REPLACE,
@@ -94,8 +94,11 @@ bool ce_vim_apply_action(CeVim_t* vim, const CeVimAction_t* action, CeView_t* vi
 
 // util
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
-CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
-CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
+CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start);
+CePoint_t ce_vim_move_end_little_word(CeBuffer_t* buffer, CePoint_t start);
+CePoint_t ce_vim_move_end_big_word(CeBuffer_t* buffer, CePoint_t start);
+CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start);
+CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
 
 // parse functions
 CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action);
@@ -105,6 +108,8 @@ CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_big_word(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_end_little_word(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_end_big_word(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_begin_little_word(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action);
@@ -128,6 +133,10 @@ bool ce_vim_motion_little_word(const CeVim_t* vim, const CeVimAction_t* action, 
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 bool ce_vim_motion_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
+bool ce_vim_motion_end_little_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                   const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
+bool ce_vim_motion_end_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 bool ce_vim_motion_begin_little_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
                                      const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 bool ce_vim_motion_begin_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
