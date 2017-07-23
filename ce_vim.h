@@ -115,6 +115,10 @@ CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_motion_end_line(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_page_down(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_page_up(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_motion_half_page_up(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action);
 CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action);
@@ -149,6 +153,14 @@ bool ce_vim_motion_end_line(const CeVim_t* vim, const CeVimAction_t* action, con
                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 bool ce_vim_motion_entire_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
+bool ce_vim_motion_page_up(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                           const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
+bool ce_vim_motion_page_down(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
+bool ce_vim_motion_half_page_up(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
+bool ce_vim_motion_half_page_down(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+                                  const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 
 // verb functions
 bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
