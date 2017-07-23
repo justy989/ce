@@ -1032,9 +1032,22 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
                        const CeConfigOptions_t* config_options, bool after){
      CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
      CePoint_t insertion_point = motion_range.end;
-     if(after) insertion_point.x++;
+
+     if(yank->line){
+          insertion_point.x = 0;
+          if(after) insertion_point.y++;
+     }else{
+          if(after) insertion_point.x++;
+     }
+
      if(!ce_buffer_insert_string(view->buffer, yank->text, insertion_point)) return false;
-     CePoint_t cursor_end = ce_buffer_advance_point(view->buffer, view->cursor, ce_utf8_insertion_strlen(yank->text));
+
+     CePoint_t cursor_end;
+     if(yank->line){
+          cursor_end = insertion_point;
+     }else{
+          cursor_end = ce_buffer_advance_point(view->buffer, view->cursor, ce_utf8_insertion_strlen(yank->text));
+     }
 
      // commit the change
      CeBufferChange_t change = {};
@@ -1048,6 +1061,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      ce_buffer_change(view->buffer, &change);
 
      view->cursor = cursor_end;
+
      return true;
 }
 
