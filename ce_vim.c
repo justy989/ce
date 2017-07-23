@@ -534,26 +534,41 @@ END_LOOP:
 }
 
 CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
+     WordState_t state = WORD_INSIDE_OTHER;
+
      start.x--;
-     if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
+     if(!ce_buffer_point_is_valid(buffer, start)){
+          if(start.x == -1){
+               start.y--;
+               if(start.y < 0) return (CePoint_t){0, 0};
+               start.x = ce_utf8_strlen(buffer->lines[start.y]);
+               if(start.x > 0) start.x--;
+               else return start;
+               state = WORD_NEW_LINE;
+          }else{
+               return (CePoint_t){-1, -1};
+          }
+     }
+
 
      char* line_start = buffer->lines[start.y];
      char* itr = ce_utf8_find_index(line_start, start.x); // start one character back
 
      int64_t rune_len = 0;
      CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
-     WordState_t state = WORD_INSIDE_OTHER;
 
      if(is_little_word_character(rune)){
+          if(start.x == 0) return start;
           state = WORD_INSIDE_WORD;
      }else if(isspace(rune)){
           state = WORD_INSIDE_SPACE;
+     }else{
+          if(start.x == 0) return start;
      }
 
      itr -= rune_len;
 
-     // TODO: handle multiple lines
-     while(*itr){
+     while(true){
           rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
 
           switch(state){
@@ -572,10 +587,27 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
                if(isspace(rune)) goto END_LOOP;
                else if(is_little_word_character(rune)) goto END_LOOP;
                break;
+          case WORD_NEW_LINE:
+               if(is_little_word_character(rune)) state = WORD_INSIDE_WORD;
+               if(isspace(rune)) state = WORD_INSIDE_SPACE;
+               goto END_LOOP;
           }
 
           itr -= rune_len;
           start.x--;
+
+          if(itr <= line_start){
+               if(state == WORD_INSIDE_WORD || state == WORD_INSIDE_OTHER) break;
+
+               start.y--;
+               if(start.y < 0) return (CePoint_t){0, 0};
+               start.x = ce_utf8_strlen(buffer->lines[start.y]);
+               if(start.x > 0) start.x--;
+               else break;
+               line_start = buffer->lines[start.y];
+               itr = ce_utf8_find_index(line_start, start.x); // start one character back
+               state = WORD_NEW_LINE;
+          }
      }
 
 END_LOOP:
@@ -584,7 +616,17 @@ END_LOOP:
 
 CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start){
      start.x--;
-     if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
+     if(!ce_buffer_point_is_valid(buffer, start)){
+          if(start.x == -1){
+               start.y--;
+               if(start.y < 0) return (CePoint_t){0, 0};
+               start.x = ce_utf8_strlen(buffer->lines[start.y]);
+               if(start.x > 0) start.x--;
+               else return start;
+          }else{
+               return (CePoint_t){-1, -1};
+          }
+     }
 
      char* line_start = buffer->lines[start.y];
      char* itr = ce_utf8_find_index(line_start, start.x); // start one character back
@@ -596,13 +638,13 @@ CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start){
      if(isspace(rune)){
           state = WORD_INSIDE_SPACE;
      }else{
+          if(start.x == 0) return start;
           state = WORD_INSIDE_WORD;
      }
 
      itr -= rune_len;
 
-     // TODO: handle multiple lines
-     while(*itr){
+     while(true){
           rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
 
           switch(state){
@@ -615,10 +657,27 @@ CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start){
           case WORD_INSIDE_SPACE:
                if(!isspace(rune)) state = WORD_INSIDE_WORD;
                break;
+          case WORD_NEW_LINE:
+               if(isspace(rune)) state = WORD_INSIDE_SPACE;
+               else state = WORD_INSIDE_WORD;
+               break;
           }
 
           itr -= rune_len;
           start.x--;
+
+          if(itr <= line_start){
+               if(state == WORD_INSIDE_WORD) break;
+
+               start.y--;
+               if(start.y < 0) return (CePoint_t){0, 0};
+               start.x = ce_utf8_strlen(buffer->lines[start.y]);
+               if(start.x == 0) break;
+               line_start = buffer->lines[start.y];
+               itr = ce_utf8_find_index(line_start, start.x);
+               state = WORD_NEW_LINE;
+               start.x++;
+          }
      }
 
 END_LOOP:
