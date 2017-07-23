@@ -63,6 +63,9 @@ bool ce_vim_init(CeVim_t* vim){
      add_key_bind(vim, '$', &ce_vim_parse_motion_end_line);
      add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
      add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
+     add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
+     add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
+     add_key_bind(vim, 'p', &ce_vim_parse_verb_paste_after);
      add_key_bind(vim, 'u', &ce_vim_parse_verb_undo);
      add_key_bind(vim, KEY_REDO, &ce_vim_parse_verb_redo);
      add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
@@ -774,10 +777,10 @@ CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action){
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action){
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
-     }else{
-          action->verb.function = &ce_vim_verb_delete;
+          return CE_VIM_PARSE_COMPLETE;
      }
 
+     action->verb.function = &ce_vim_verb_delete;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
@@ -786,6 +789,30 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action){
      action->end_in_mode = CE_VIM_MODE_INSERT;
      action->chain_undo = true;
      return result;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action){
+     if(action->verb.function == &ce_vim_verb_yank){
+          action->motion.function = &ce_vim_motion_entire_line;
+          action->yank_line = true;
+          return CE_VIM_PARSE_COMPLETE;
+     }
+
+     action->verb.function = &ce_vim_verb_yank;
+     if(action->verb.character == 0) action->verb.character = '"';
+     return CE_VIM_PARSE_IN_PROGRESS;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action){
+     action->verb.function = &ce_vim_verb_paste_before;
+     if(action->verb.character == 0) action->verb.character = '"';
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action){
+     action->verb.function = &ce_vim_verb_paste_after;
+     if(action->verb.character == 0) action->verb.character = '"';
+     return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action){
@@ -984,6 +1011,54 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      view->cursor = motion_range.start;
      vim->chain_undo = action->chain_undo;
      return true;
+}
+
+static int64_t yank_register_index(CeRune_t character){
+     if(character >= 33 && character < 177) return -1;
+     return character - '!';
+}
+
+bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                      const CeConfigOptions_t* config_options){
+     CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
+     if(yank->text) free(yank->text);
+     int64_t yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
+     yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
+     yank->line = action->yank_line;
+     return true;
+}
+
+static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                       const CeConfigOptions_t* config_options, bool after){
+     CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
+     CePoint_t insertion_point = motion_range.end;
+     if(after) insertion_point.x++;
+     if(!ce_buffer_insert_string(view->buffer, yank->text, insertion_point)) return false;
+     CePoint_t cursor_end = ce_buffer_advance_point(view->buffer, view->cursor, ce_utf8_insertion_strlen(yank->text));
+
+     // commit the change
+     CeBufferChange_t change = {};
+     change.chain = action->chain_undo;
+     change.insertion = true;
+     change.remove_line_if_empty = true;
+     change.string = strdup(yank->text);
+     change.location = insertion_point;
+     change.cursor_before = view->cursor;
+     change.cursor_after = cursor_end;
+     ce_buffer_change(view->buffer, &change);
+
+     view->cursor = cursor_end;
+     return true;
+}
+
+bool ce_vim_verb_paste_before(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                              const CeConfigOptions_t* config_options){
+     return paste_text(vim, action, motion_range, view, config_options, false);
+}
+
+bool ce_vim_verb_paste_after(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                             const CeConfigOptions_t* config_options){
+     return paste_text(vim, action, motion_range, view, config_options, true);
 }
 
 bool ce_vim_verb_undo(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,

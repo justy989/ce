@@ -140,6 +140,7 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 
 int64_t ce_utf8_strlen(const char* string);
+int64_t ce_utf8_insertion_strlen(const char* string);
 char* ce_utf8_find_index(char* string, int64_t index);
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
 CeRune_t ce_utf8_decode_reverse(const char* string, const char* string_start, int64_t* bytes_consumed);
