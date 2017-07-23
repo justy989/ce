@@ -63,6 +63,7 @@ bool ce_vim_init(CeVim_t* vim){
      add_key_bind(vim, '$', &ce_vim_parse_motion_end_line);
      add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
      add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
+     add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
      add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
      add_key_bind(vim, '"', &ce_vim_parse_select_yank_register);
      add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
@@ -230,8 +231,10 @@ VIM_PARSE_CONTINUE:
                result = key_bind->function(&build_action, *keys);
                if(result != CE_VIM_PARSE_KEY_NOT_HANDLED){
                     keys++;
+
                     // TODO: trust functions to no infinite loop ?
                     while(result == CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY){
+                         if(*keys == 0) return result;
                          result = key_bind->function(&build_action, *keys);
                          keys++;
                          if(result == CE_VIM_PARSE_CONTINUE) goto VIM_PARSE_CONTINUE;
@@ -800,6 +803,18 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key)
      return result;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key){
+     if(action->verb.function == NULL){
+          action->verb.function = &ce_vim_verb_set_character;
+          return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
+     }else{
+          action->verb.integer = key;
+          return CE_VIM_PARSE_COMPLETE;
+     }
+
+     return CE_VIM_PARSE_INVALID;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == &ce_vim_verb_yank){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1043,19 +1058,57 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
                                const CeConfigOptions_t* config_options){
      motion_range_sort(&motion_range);
 
-     while(ce_point_after(motion_range.end, motion_range.start)){
+     while(!ce_point_after(motion_range.start, motion_range.end)){
+          // dupe previous rune
+          int64_t rune_len = 0;
+          char* str = ce_utf8_find_index(view->buffer->lines[view->cursor.y], motion_range.start.x);
+          char* previous_string = malloc(5);
+          CeRune_t previous_rune = ce_utf8_decode(str, &rune_len);
+          ce_utf8_encode(previous_rune, previous_string, 5, &rune_len);
+          previous_string[rune_len] = 0;
+
+          // delete
+          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1, false)) return false; // NOTE: leak previous_string
+
+          // commit the deletion
+          CeBufferChange_t change = {};
+          change.chain = false;
+          change.insertion = false;
+          change.remove_line_if_empty = false;
+          change.string = previous_string;
+          change.location = view->cursor;
+          change.cursor_before = view->cursor;
+          change.cursor_after = view->cursor;
+          ce_buffer_change(view->buffer, &change);
+
+          // dupe current rune
+          char* current_string = malloc(5);
+          ce_utf8_encode(action->verb.integer, current_string, 5, &rune_len);
+          current_string[rune_len] = 0;
+
+          // insert
+          if(!ce_buffer_insert_string(view->buffer, current_string, motion_range.start)) return false; // NOTE: leak previous_string
+
+          // commit the insertion
+          change.chain = true;
+          change.insertion = true;
+          change.remove_line_if_empty = false;
+          change.string = current_string;
+          change.location = view->cursor;
+          change.cursor_before = view->cursor;
+          change.cursor_after = view->cursor;
+          ce_buffer_change(view->buffer, &change);
+
           motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
           if(motion_range.start.x == -1) return false;
-          char* str = ce_utf8_find_index(view->buffer->lines[view->cursor.y], motion_range.start.x);
-          *str = action->verb.character;
      }
 
      return true;
 }
 
-static int64_t yank_register_index(CeRune_t character){
-     if(character < 33 || character >= 177) return -1;
-     return character - '!';
+static int64_t yank_register_index(CeRune_t rune){
+     if(rune < 33 || rune >= 177) return -1; // ascii printable character range
+     return rune - '!';
 }
 
 bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
@@ -1065,7 +1118,6 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
      int64_t yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
      yank->line = action->yank_line;
-     ce_log("yank to '%c' : '%s'\n", action->verb.character, yank->text);
      return true;
 }
 
@@ -1074,7 +1126,6 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
      if(!yank->text) return false;
 
-     ce_log("paste from '%c' : '%s'\n", action->verb.character, yank->text);
      CePoint_t insertion_point = motion_range.end;
 
      if(yank->line){
@@ -1082,8 +1133,11 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
           // TODO: insert line if at end of buffer
           if(after) insertion_point.y++;
      }else{
-          // TODO: ignore after is insertion point after end of line
-          if(after) insertion_point.x++;
+          if(after){
+               insertion_point.x++;
+               int64_t line_len = ce_utf8_strlen(view->buffer->lines[insertion_point.y]);
+               if(insertion_point.x >= line_len) insertion_point.x = line_len - 1;
+          }
      }
 
      if(!ce_buffer_insert_string(view->buffer, yank->text, insertion_point)) return false;
