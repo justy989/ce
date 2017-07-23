@@ -21,7 +21,7 @@ struct CeVim_t;
 struct CeVimMotionRange_t;
 enum CeVimParseResult_t;
 
-typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*);
+typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, CeRune_t key);
 typedef bool CeVimMotionFunc_t(const struct CeVim_t*, const struct CeVimAction_t*, const CeView_t*,
                                const CeConfigOptions_t*, struct CeVimMotionRange_t*);
 typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struct CeVimMotionRange_t, CeView_t*,
@@ -30,7 +30,8 @@ typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struc
 typedef enum CeVimParseResult_t{
      CE_VIM_PARSE_INVALID,
      CE_VIM_PARSE_KEY_NOT_HANDLED,
-     CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY,
+     CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY, // send the next key to the same key bind
+     CE_VIM_PARSE_CONTINUE,
      CE_VIM_PARSE_IN_PROGRESS,
      CE_VIM_PARSE_COMPLETE,
 }CeVimParseResult_t;
@@ -118,31 +119,33 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
 
 // parse functions
-CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_big_word(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_end_little_word(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_end_big_word(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_begin_little_word(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_end_line(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_page_down(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_page_up(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_motion_half_page_up(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action);
-CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action);
+CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_big_word(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_end_little_word(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_end_big_word(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_begin_little_word(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_end_line(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_page_down(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_page_up(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_half_page_up(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key);
 
 // motion functions
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_left);
@@ -167,6 +170,7 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_half_page_down);
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_delete);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_character);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_yank);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_before);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_after);
