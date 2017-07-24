@@ -89,7 +89,15 @@ bool ce_vim_init(CeVim_t* vim){
 }
 
 bool ce_vim_free(CeVim_t* vim){
-     (void)(vim);
+     for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
+          CeVimYank_t* yank = vim->yanks + i;
+          if(yank->text){
+               free(yank->text);
+               yank->text = NULL;
+          }
+
+          yank->line = false;
+     }
      return true;
 }
 

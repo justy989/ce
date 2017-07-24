@@ -94,12 +94,12 @@ typedef struct CeVim_t{
      CeVimKeyBind_t key_binds[CE_VIM_MAX_KEY_BINDS];
      int64_t key_bind_count;
      CeRune_t current_command[CE_VIM_MAX_COMMAND_LEN];
-     bool chain_undo;
-     int64_t motion_column;
      CeVimYank_t yanks[ASCII_PRINTABLE_CHARACTERS];
+     int64_t motion_column;
      CePoint_t visual;
      CeVimAction_t last_action;
      CeRuneNode_t* insert_rune_head;
+     bool chain_undo;
      bool verb_last_action; // flag whether or not we are repeating our last action
 }CeVim_t;
 

@@ -247,6 +247,8 @@ int main(int argc, char** argv){
 
      // cleanup
      ce_buffer_free(&buffer);
+     ce_vim_free(&vim);
+     free(draw_thread_data);
      endwin();
      return 0;
 }

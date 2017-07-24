@@ -11,6 +11,18 @@
 
 FILE* g_ce_log = NULL;
 
+static void ce_buffer_change_node_free(CeBufferChangeNode_t** head){
+     CeBufferChangeNode_t* itr = *head;
+     while(itr){
+          CeBufferChangeNode_t* tmp = itr;
+          itr = itr->next;
+          free(tmp->change.string);
+          free(tmp);
+     }
+
+     *head = NULL;
+}
+
 bool ce_log_init(const char* filename){
      g_ce_log = fopen(filename, "wa");
      if(!g_ce_log){
@@ -106,6 +118,7 @@ void ce_buffer_free(CeBuffer_t* buffer){
 
      free(buffer->lines);
      free(buffer->name);
+     if(buffer->change_node) ce_buffer_change_node_free(&buffer->change_node);
 
      pthread_mutex_destroy(&buffer->lock);
 
@@ -680,7 +693,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
                // just copy in the rest of the characters
                if(copy_length > real_length){
                     int64_t diff = copy_length - real_length;
-                    assert(diff < line_length);
+                    assert(diff <= line_length);
                     memcpy(itr, buffer->lines[current_line], line_length - diff);
                     break;
                }
@@ -711,16 +724,7 @@ bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
 
      if(buffer->change_node){
           if(buffer->change_node->next){
-               // TODO: create ce_change_node_free()
-               CeBufferChangeNode_t* itr = buffer->change_node->next;
-               while(itr){
-                    CeBufferChangeNode_t* tmp = itr;
-                    itr = itr->next;
-                    free(tmp->change.string);
-                    free(tmp);
-               }
-
-               buffer->change_node->next = NULL;
+               ce_buffer_change_node_free(&buffer->change_node->next);
           }
 
           node->prev = buffer->change_node;
