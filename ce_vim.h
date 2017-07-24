@@ -98,6 +98,7 @@ typedef struct CeVim_t{
      int64_t motion_column;
      CeVimYank_t yanks[ASCII_PRINTABLE_CHARACTERS];
      CePoint_t visual;
+     CeVimAction_t last_action;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
@@ -148,6 +149,7 @@ CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_
 CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key);
 
 // motion functions
@@ -184,3 +186,4 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_redo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_insert);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_visual);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_normal);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_last_action);

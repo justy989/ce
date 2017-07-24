@@ -71,6 +71,7 @@ bool ce_vim_init(CeVim_t* vim){
      add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
      add_key_bind(vim, 'p', &ce_vim_parse_verb_paste_after);
      add_key_bind(vim, 'u', &ce_vim_parse_verb_undo);
+     add_key_bind(vim, '.', &ce_vim_parse_verb_last_action);
      add_key_bind(vim, KEY_REDO, &ce_vim_parse_verb_redo);
      add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
      add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
@@ -198,6 +199,15 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
           if(result == CE_VIM_PARSE_COMPLETE){
                ce_vim_apply_action(vim, &action, view, config_options);
                vim->current_command[0] = 0;
+
+               if((action.verb.function != ce_vim_verb_motion &&
+                   action.verb.function != ce_vim_verb_yank &&
+                   action.verb.function != ce_vim_verb_last_action &&
+                   action.verb.function != ce_vim_verb_undo &&
+                   action.verb.function != ce_vim_verb_redo) ||
+                  vim->mode == CE_VIM_MODE_INSERT){
+                    vim->last_action = action;
+               }
           }else if(result == CE_VIM_PARSE_INVALID){
                vim->current_command[0] = 0;
           }
@@ -888,7 +898,11 @@ CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRu
      }
 
      return CE_VIM_PARSE_INVALID;
+}
 
+CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_last_action;
+     return CE_VIM_PARSE_COMPLETE;
 }
 
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
@@ -1281,4 +1295,9 @@ bool ce_vim_verb_set_normal(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
                             const CeConfigOptions_t* config_options){
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
+}
+
+bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                             const CeConfigOptions_t* config_options){
+     return ce_vim_apply_action(vim, &vim->last_action, view, config_options);
 }
