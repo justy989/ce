@@ -1267,7 +1267,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
           if(after){
                insertion_point.x++;
                int64_t line_len = ce_utf8_strlen(view->buffer->lines[insertion_point.y]);
-               if(insertion_point.x >= line_len) insertion_point.x = line_len - 1;
+               if(insertion_point.x > line_len) insertion_point.x = line_len - 1;
           }
      }
 

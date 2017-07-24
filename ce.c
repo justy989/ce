@@ -655,9 +655,22 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
      // NOTE: would a function that returns both utf8 len and byte len be helpful here?
      int64_t buffer_utf8_length = ce_utf8_strlen(start);
      int64_t real_length = strlen(start);
+
      // exit early if the whole string is just on this line
-     if(buffer_utf8_length > length) return strndup(start, length);
-     if(length > buffer_utf8_length || (length == buffer_utf8_length && newline_if_entire_line)) real_length++;
+     if(buffer_utf8_length > length){
+          return strndup(start, real_length);
+     }else if(buffer_utf8_length == length){
+          if(newline_if_entire_line){
+               // copy the entire line, with a newline at the end
+               char* line = malloc(real_length + 2);
+               strncpy(line, start, real_length);
+               line[real_length - 2] = CE_NEWLINE;
+               line[real_length - 1] = 0;
+               return line;
+          }
+
+          return strndup(start, real_length);
+     }
 
      // calculate how big of an array we need to allocate for the dupe
      int64_t current_line = point.y + 1;
@@ -666,7 +679,9 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
           if(line_utf8_length == 0) buffer_utf8_length++;
           else buffer_utf8_length += line_utf8_length;
           if(buffer_utf8_length > length){
-               char* end_of_dupe = ce_utf8_find_index(buffer->lines[current_line], line_utf8_length - (buffer_utf8_length - length));
+               int64_t diff = (buffer_utf8_length - length);
+               assert(diff < line_utf8_length);
+               char* end_of_dupe = ce_utf8_find_index(buffer->lines[current_line], line_utf8_length - diff);
                real_length += end_of_dupe - buffer->lines[current_line];
                break;
           }
