@@ -276,10 +276,14 @@ int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
                length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x));
           }else if(y == end.y){
                // count up until the end
-               length += end.x + 1;
+               int64_t line_length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x));
+               if(line_length == 0) length++;
+               else length += end.x + 1;
           }else{
                // count entire line
-               length += ce_utf8_strlen(buffer->lines[y]);
+               int64_t line_length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x));
+               if(line_length == 0) length++;
+               length += line_length;
           }
      }
 
@@ -529,6 +533,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
      int64_t length_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
+     if(length_left_on_line == 0) length_left_on_line = 1;
      if(length_left_on_line > length){
           // case: glue together left and right sides and cut out the middle
           char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
@@ -578,13 +583,15 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      //       line, and join the remaining characters in the last line to the initial line
      int64_t length_left = length - length_left_on_line;
      int64_t current_line = point.y + 1;
-     int64_t save_current_line = current_line;
+     // check whether we should delete the whole first line, or start at the next line
+     int64_t save_current_line = (point.x == 0) ? point.y : current_line;
      int64_t line_len = 0;
      int64_t last_line_offset = 0;
 
      // how many lines do we have to delete?
      for(; current_line < buffer->line_count; current_line++){
           line_len = ce_utf8_strlen(buffer->lines[current_line]);
+          if(line_len == 0) line_len = 1;
 
           if(length_left >= line_len){
                length_left -= line_len;
@@ -656,7 +663,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
      int64_t current_line = point.y + 1;
      while(true){
           int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
-          buffer_utf8_length += line_utf8_length;
+          if(line_utf8_length == 0) buffer_utf8_length++;
+          else buffer_utf8_length += line_utf8_length;
           if(buffer_utf8_length > length){
                char* end_of_dupe = ce_utf8_find_index(buffer->lines[current_line], line_utf8_length - (buffer_utf8_length - length));
                real_length += end_of_dupe - buffer->lines[current_line];
@@ -851,6 +859,7 @@ int64_t ce_utf8_strlen(const char* string){
 int64_t ce_utf8_insertion_strlen(const char* string){
      int64_t len = 0;
      int64_t byte_count = 0;
+     char last_char = 0;;
 
      while(*string){
           if((*string & 0x80) == 0){
@@ -865,7 +874,10 @@ int64_t ce_utf8_insertion_strlen(const char* string){
                return -1;
           }
 
-          if(*string != CE_NEWLINE) len++;
+          // if we see a newline, don't count it, but if we see 2 newlins in a row, count it
+          if(*string != CE_NEWLINE ||
+             (*string == CE_NEWLINE && last_char == CE_NEWLINE)) len++;
+          last_char = *string;
 
           // validate string doesn't early terminate
           for(int64_t i = 0; i < byte_count; i++){
