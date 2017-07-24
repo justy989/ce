@@ -1089,15 +1089,49 @@ bool ce_points_equal(CePoint_t a, CePoint_t b){
 }
 
 bool ce_rune_node_insert(CeRuneNode_t** head, CeRune_t rune){
+     CeRuneNode_t* node = malloc(sizeof(*node));
+     if(!node) return false;
+
+     // always insert at head
+     node->rune = rune;
+     node->next = *head;
+     *head = node;
+
      return true;
 }
 
 CeRune_t* ce_rune_node_string(CeRuneNode_t* head){
-     CeRune_t* runes = malloc(sizeof(*runes));
-     runes[0] = 0;
+     // count nodes
+     CeRuneNode_t* itr = head;
+     int64_t len = 0;
+     while(itr){
+          itr = itr->next;
+          len++;
+     }
+
+     CeRune_t* runes = malloc((len + 1) * sizeof(*runes));
+
+     // copy into string
+     int64_t save_len = len;
+     itr = head;
+     while(itr){
+          runes[len - 1] = itr->rune;
+          itr = itr->next;
+          len--;
+     }
+
+     // null terminate
+     runes[save_len] = 0;
      return runes;
 }
 
 void ce_rune_node_free(CeRuneNode_t** head){
+     CeRuneNode_t* itr = *head;
+     while(itr){
+          CeRuneNode_t* tmp = itr;
+          itr = itr->next;
+          free(tmp);
+     }
 
+     *head = NULL;
 }

@@ -99,12 +99,13 @@ typedef struct CeVim_t{
      CeVimYank_t yanks[ASCII_PRINTABLE_CHARACTERS];
      CePoint_t visual;
      CeVimAction_t last_action;
+     CeRuneNode_t* insert_rune_head;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
 bool ce_vim_free(CeVim_t* vim);
 bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
-CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeConfigOptions_t* config_options);
+CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, const CeConfigOptions_t* config_options);
 
 // action
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* keys, CeVimKeyBind_t* key_binds,
