@@ -664,8 +664,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
                // copy the entire line, with a newline at the end
                char* line = malloc(real_length + 2);
                strncpy(line, start, real_length);
-               line[real_length - 2] = CE_NEWLINE;
-               line[real_length - 1] = 0;
+               line[real_length] = CE_NEWLINE;
+               line[real_length + 1] = 0;
                return line;
           }
 
