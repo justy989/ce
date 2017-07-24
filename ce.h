@@ -11,6 +11,8 @@
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
+typedef int32_t CeRune_t;
+
 typedef enum{
      CE_UP = -1,
      CE_DOWN = 1
@@ -105,7 +107,10 @@ typedef struct{
      int64_t vertical_scroll_off;
 }CeConfigOptions_t;
 
-typedef int32_t CeRune_t;
+typedef struct CeRuneNode_t{
+     CeRune_t rune;
+     struct CeRuneNode_t* next;
+}CeRuneNode_t;
 
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);

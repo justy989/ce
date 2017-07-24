@@ -513,7 +513,7 @@ bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point){
 }
 
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty){
-     if(!ce_buffer_contains_point(buffer, point)) return false;
+     if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
      int64_t length_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
      if(length_left_on_line > length){
@@ -861,13 +861,13 @@ int64_t ce_utf8_insertion_strlen(const char* string){
                return -1;
           }
 
+          if(*string != CE_NEWLINE) len++;
+
           // validate string doesn't early terminate
           for(int64_t i = 0; i < byte_count; i++){
                if(*string == 0) return -1;
                string++;
           }
-
-          if(*string != CE_NEWLINE) len++;
      }
 
      return len;
@@ -1086,4 +1086,18 @@ bool ce_point_after(CePoint_t a, CePoint_t b){
 
 bool ce_points_equal(CePoint_t a, CePoint_t b){
      return (a.x == b.x) && (a.y == b.y);
+}
+
+bool ce_rune_node_insert(CeRuneNode_t** head, CeRune_t rune){
+     return true;
+}
+
+CeRune_t* ce_rune_node_string(CeRuneNode_t* head){
+     CeRune_t* runes = malloc(sizeof(*runes));
+     runes[0] = 0;
+     return runes;
+}
+
+void ce_rune_node_free(CeRuneNode_t** head){
+
 }

@@ -71,8 +71,10 @@ bool ce_vim_init(CeVim_t* vim){
      add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
      add_key_bind(vim, 'p', &ce_vim_parse_verb_paste_after);
      add_key_bind(vim, 'u', &ce_vim_parse_verb_undo);
-     add_key_bind(vim, '.', &ce_vim_parse_verb_last_action);
      add_key_bind(vim, KEY_REDO, &ce_vim_parse_verb_redo);
+     add_key_bind(vim, 'O', &ce_vim_parse_verb_open_above);
+     add_key_bind(vim, 'o', &ce_vim_parse_verb_open_below);
+     add_key_bind(vim, '.', &ce_vim_parse_verb_last_action);
      add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
      add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
      add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
@@ -883,6 +885,16 @@ CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_open_above(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_open_above;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_open_below(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_open_below;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, CeRune_t key){
      action->verb.function = &ce_vim_verb_undo;
      return CE_VIM_PARSE_COMPLETE;
@@ -1275,6 +1287,60 @@ bool ce_vim_verb_paste_before(CeVim_t* vim, const CeVimAction_t* action, CeVimMo
 bool ce_vim_verb_paste_after(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                              const CeConfigOptions_t* config_options){
      return paste_text(vim, action, motion_range, view, config_options, true);
+}
+
+bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                            const CeConfigOptions_t* config_options){
+     // TODO: insert whitespace for indentation
+     // insert newline on next line
+     char* insert_string = strdup("\n");
+     motion_range.start.x = 0;
+     if(!ce_buffer_insert_string(view->buffer, insert_string, motion_range.start)) return false;
+
+     int64_t indentation = 0;
+     CePoint_t cursor_end = {indentation, motion_range.start.y};
+
+     // commit the change
+     CeBufferChange_t change = {};
+     change.chain = action->chain_undo;
+     change.insertion = true;
+     change.remove_line_if_empty = true;
+     change.string = insert_string;
+     change.location = (CePoint_t){0, cursor_end.y}; // lie about where we inserted the newline so we remove the complete line
+     change.cursor_before = view->cursor;
+     change.cursor_after = cursor_end;
+     ce_buffer_change(view->buffer, &change);
+
+     view->cursor = cursor_end;
+     vim->mode = CE_VIM_MODE_INSERT;
+     return true;
+}
+
+bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                            const CeConfigOptions_t* config_options){
+     // TODO: insert whitespace for indentation
+     // insert newline on next line
+     char* insert_string = strdup("\n");
+     motion_range.start.x = ce_utf8_strlen(view->buffer->lines[motion_range.start.y]);
+     if(!ce_buffer_insert_string(view->buffer, insert_string, motion_range.start)) return false;
+
+     int64_t indentation = 0;
+     CePoint_t cursor_end = {indentation, motion_range.start.y + 1};
+
+     // commit the change
+     CeBufferChange_t change = {};
+     change.chain = action->chain_undo;
+     change.insertion = true;
+     change.remove_line_if_empty = true;
+     change.string = insert_string;
+     change.location = (CePoint_t){0, cursor_end.y}; // lie about where we inserted the newline so we remove the complete line
+     change.cursor_before = view->cursor;
+     change.cursor_after = cursor_end;
+     ce_buffer_change(view->buffer, &change);
+
+     view->cursor = cursor_end;
+     vim->mode = CE_VIM_MODE_INSERT;
+     return true;
 }
 
 bool ce_vim_verb_undo(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,

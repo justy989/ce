@@ -147,6 +147,8 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_open_above(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_open_below(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, CeRune_t key);
@@ -181,6 +183,8 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_character);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_yank);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_before);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_after);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_open_above);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_open_below);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_undo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_redo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_insert);
