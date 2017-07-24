@@ -120,6 +120,8 @@ CePoint_t ce_vim_move_end_little_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_end_big_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
+CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
+CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
 
 // parse functions
 CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key);
@@ -140,6 +142,10 @@ CeVimParseResult_t ce_vim_parse_motion_page_up(CeVimAction_t* action, CeRune_t k
 CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_half_page_up(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_visual(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_find_forward(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_find_backward(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);
@@ -176,6 +182,10 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_page_down);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_half_page_up);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_half_page_down);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_visual);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_find_forward);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_find_backward);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_forward);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_backward);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);

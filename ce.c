@@ -658,7 +658,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 
      // exit early if the whole string is just on this line
      if(buffer_utf8_length > length){
-          return strndup(start, real_length);
+          char* end = ce_utf8_find_index(start, length);
+          return strndup(start, end - start);
      }else if(buffer_utf8_length == length){
           if(newline_if_entire_line){
                // copy the entire line, with a newline at the end
@@ -672,22 +673,27 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
           return strndup(start, real_length);
      }
 
+     real_length++; // account for newline
+
      // calculate how big of an array we need to allocate for the dupe
      int64_t current_line = point.y + 1;
      while(true){
           int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
-          if(line_utf8_length == 0) buffer_utf8_length++;
-          else buffer_utf8_length += line_utf8_length;
+          if(line_utf8_length == 0) line_utf8_length = 1; // treat empty lines as taking up 1 character
+          buffer_utf8_length += line_utf8_length;
           if(buffer_utf8_length > length){
-               int64_t diff = (buffer_utf8_length - length);
-               assert(diff < line_utf8_length);
+               int64_t diff = buffer_utf8_length - length;
                char* end_of_dupe = ce_utf8_find_index(buffer->lines[current_line], line_utf8_length - diff);
                real_length += end_of_dupe - buffer->lines[current_line];
                break;
           }
 
-          real_length += strlen(buffer->lines[current_line]) + 1; // account for newline
-          if(buffer_utf8_length == length) break;
+          real_length += strlen(buffer->lines[current_line]);
+          if(buffer_utf8_length == length){
+               if(newline_if_entire_line) real_length++; // account for newline
+               break;
+          }
+          real_length++; // account for newline
           current_line++;
           if(current_line > buffer->line_count) return NULL; // not enough length in the buffer
      }
@@ -716,7 +722,6 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
                // just copy in the rest of the characters
                if(copy_length > real_length){
                     int64_t diff = copy_length - real_length;
-                    assert(diff <= line_length);
                     memcpy(itr, buffer->lines[current_line], line_length - diff);
                     break;
                }
