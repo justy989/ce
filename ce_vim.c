@@ -46,15 +46,15 @@ static void add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function)
 
 static void insert_mode(CeVim_t* vim){
      vim->mode = CE_VIM_MODE_INSERT;
-     ce_rune_node_free(&vim->insert_rune_head);
+     if(!vim->verb_last_action) ce_rune_node_free(&vim->insert_rune_head);
 }
 
 bool ce_vim_init(CeVim_t* vim){
      vim->chain_undo = false;
 
-     add_key_bind(vim, 'i', &ce_vim_parse_set_insert_mode);
-     add_key_bind(vim, 'v', &ce_vim_parse_set_visual_mode);
-     add_key_bind(vim, 27, &ce_vim_parse_set_normal_mode);
+     add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
+     add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
+     add_key_bind(vim, 27, &ce_vim_parse_verb_normal_mode);
      add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
      add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
      add_key_bind(vim, 'e', &ce_vim_parse_motion_end_little_word);
@@ -114,7 +114,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
      default:
           return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
-          ce_rune_node_insert(&vim->insert_rune_head, key);
+          if(!vim->verb_last_action) ce_rune_node_insert(&vim->insert_rune_head, key);
 
           switch(key){
           default:
@@ -213,7 +213,9 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                    action.verb.function != ce_vim_verb_yank &&
                    action.verb.function != ce_vim_verb_last_action &&
                    action.verb.function != ce_vim_verb_undo &&
-                   action.verb.function != ce_vim_verb_redo) ||
+                   action.verb.function != ce_vim_verb_redo &&
+                   action.verb.function != ce_vim_verb_normal_mode &&
+                   action.verb.function != ce_vim_verb_visual_mode) ||
                   vim->mode == CE_VIM_MODE_INSERT){
                     vim->last_action = action;
                }
@@ -732,27 +734,27 @@ END_LOOP:
      return start;
 }
 
-CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
-     action->verb.function = &ce_vim_verb_set_insert;
+     action->verb.function = &ce_vim_verb_insert_mode;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_set_visual_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
-     action->verb.function = &ce_vim_verb_set_visual;
+     action->verb.function = &ce_vim_verb_visual_mode;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_set_normal_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
-     action->verb.function = &ce_vim_verb_set_normal;
+     action->verb.function = &ce_vim_verb_normal_mode;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1361,29 +1363,34 @@ bool ce_vim_verb_redo(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
      return ce_buffer_redo(view->buffer, &view->cursor);
 }
 
-bool ce_vim_verb_set_insert(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
-                            const CeConfigOptions_t* config_options){
+bool ce_vim_verb_insert_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                             const CeConfigOptions_t* config_options){
      insert_mode(vim);
      return true;
 }
 
-bool ce_vim_verb_set_visual(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
-                            const CeConfigOptions_t* config_options){
+bool ce_vim_verb_visual_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                             const CeConfigOptions_t* config_options){
      vim->visual = view->cursor;
      vim->mode = CE_VIM_MODE_VISUAL;
      return true;
 }
 
-bool ce_vim_verb_set_normal(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
-                            const CeConfigOptions_t* config_options){
+bool ce_vim_verb_normal_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                             const CeConfigOptions_t* config_options){
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }
 
 bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                              const CeConfigOptions_t* config_options){
-     bool success = ce_vim_apply_action(vim, &vim->last_action, view, config_options);
-     if(!success) return false;
+     vim->verb_last_action = true;
+     if(!ce_vim_apply_action(vim, &vim->last_action, view, config_options)){
+          vim->verb_last_action = false;
+          return false;
+     }
+
+     view->buffer->change_node->change.chain = false;
 
      if(vim->insert_rune_head){
           CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
@@ -1397,5 +1404,6 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
           free(rune_string);
      }
 
+     vim->verb_last_action = false;
      return true;
 }

@@ -100,6 +100,7 @@ typedef struct CeVim_t{
      CePoint_t visual;
      CeVimAction_t last_action;
      CeRuneNode_t* insert_rune_head;
+     bool verb_last_action; // flag whether or not we are repeating our last action
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
@@ -121,9 +122,6 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
 
 // parse functions
-CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action, CeRune_t key);
-CeVimParseResult_t ce_vim_parse_set_visual_mode(CeVimAction_t* action, CeRune_t key);
-CeVimParseResult_t ce_vim_parse_set_normal_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, CeRune_t key);
@@ -153,6 +151,9 @@ CeVimParseResult_t ce_vim_parse_verb_open_below(CeVimAction_t* action, CeRune_t 
 CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key);
 
 // motion functions
@@ -188,7 +189,7 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_open_above);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_open_below);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_undo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_redo);
-CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_insert);
-CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_visual);
-CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_normal);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_insert_mode);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_visual_mode);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_normal_mode);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_last_action);
