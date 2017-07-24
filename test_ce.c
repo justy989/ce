@@ -295,28 +295,42 @@ TEST(buffer_remove_string_across_multiple_lines){
 TEST(buffer_dupe_portion_of_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){3, 0}, 5);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){3, 0}, 5, false);
      EXPECT(strcmp(dupe, "st li") == 0);
 }
 
 TEST(buffer_dupe_two_lines){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){6, 0}, 10);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){6, 0}, 10, false);
      EXPECT(strcmp(dupe, "line\nsecond") == 0);
+}
+
+TEST(buffer_dupe_entire_lines){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 21, false);
+     EXPECT(strcmp(dupe, "first line\nsecond line") == 0);
+}
+
+TEST(buffer_dupe_entire_lines_with_newline){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 21, true);
+     EXPECT(strcmp(dupe, "first line\nsecond line\n") == 0);
 }
 
 TEST(buffer_dupe_three_lines){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){6, 0}, 20);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){6, 0}, 20, false);
      EXPECT(strcmp(dupe, "line\nsecond line\nthird") == 0);
 }
 
 TEST(buffer_dupe_entire_buffer){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 31);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 31, false);
      EXPECT(strcmp(dupe, g_multiline_string) == 0);
 }
 

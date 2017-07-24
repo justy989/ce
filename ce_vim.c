@@ -49,6 +49,7 @@ bool ce_vim_init(CeVim_t* vim){
 
      add_key_bind(vim, 'i', &ce_vim_parse_set_insert_mode);
      add_key_bind(vim, 'v', &ce_vim_parse_set_visual_mode);
+     add_key_bind(vim, 27, &ce_vim_parse_set_normal_mode);
      add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
      add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
      add_key_bind(vim, 'e', &ce_vim_parse_motion_end_little_word);
@@ -131,7 +132,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
           case KEY_BACKSPACE:
                if(!ce_points_equal(view->cursor, (CePoint_t){0, 0})){
                     CePoint_t remove_point = ce_buffer_advance_point(view->buffer, view->cursor, -1);
-                    char* removed_string = ce_buffer_dupe_string(view->buffer, remove_point, 1);
+                    char* removed_string = ce_buffer_dupe_string(view->buffer, remove_point, 1, false);
                     if(ce_buffer_remove_string(view->buffer, remove_point, 1, true)){
 
                          // TODO: convenience function
@@ -275,7 +276,7 @@ VIM_PARSE_CONTINUE:
      return result;
 }
 
-bool ce_vim_apply_action(CeVim_t* vim, const CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options){
+bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options){
      CeVimMotionRange_t motion_range = {view->cursor, view->cursor};
      if(action->motion.function){
           int64_t total_multiplier = action->multiplier * action->motion.multiplier;
@@ -723,6 +724,14 @@ CeVimParseResult_t ce_vim_parse_set_visual_mode(CeVimAction_t* action, CeRune_t 
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_set_normal_mode(CeVimAction_t* action, CeRune_t key){
+     if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+     if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
+     action->verb.function = &ce_vim_verb_set_normal;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 static CeVimParseResult_t parse_motion_direction(CeVimAction_t* action, CeVimMotionFunc_t* func){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      action->motion.function = func;
@@ -804,6 +813,7 @@ CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, CeR
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
+          action->yank_line = true;
           return CE_VIM_PARSE_COMPLETE;
      }
 
@@ -900,27 +910,50 @@ static bool motion_range_sort(CeVimMotionRange_t* motion_range){
      return false;
 }
 
-bool ce_vim_motion_left(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_left(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                         const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      return motion_direction(view, (CePoint_t){-1, 0}, config_options, motion_range);
 }
 
-bool ce_vim_motion_right(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_right(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                          const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      return motion_direction(view, (CePoint_t){1, 0}, config_options, motion_range);
 }
 
-bool ce_vim_motion_up(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_up(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                       const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     if(action->verb.function != ce_vim_verb_motion){
+          if(motion_range->end.y > 0){
+               motion_range->end.y--;
+               motion_range->end.x = 0;
+               motion_range->start.x = ce_utf8_last_index(view->buffer->lines[motion_range->start.y]);
+               action->yank_line = true;
+               motion_range_sort(motion_range);
+          }
+
+          return true;
+     }
+
      return motion_direction(view, (CePoint_t){0, -1}, config_options, motion_range);
 }
 
-bool ce_vim_motion_down(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_down(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                         const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     if(action->verb.function){
+          if(motion_range->end.y < view->buffer->line_count - 1){
+               motion_range->end.y++;
+               motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+               motion_range->start.x = 0;
+               action->yank_line = true;
+               motion_range_sort(motion_range);
+          }
+          return true;
+     }
+
      return motion_direction(view, (CePoint_t){0, 1}, config_options, motion_range);
 }
 
-bool ce_vim_motion_little_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_little_word(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_vim_move_little_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
@@ -928,7 +961,7 @@ bool ce_vim_motion_little_word(const CeVim_t* vim, const CeVimAction_t* action, 
      return true;
 }
 
-bool ce_vim_motion_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_big_word(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_vim_move_big_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
@@ -936,7 +969,7 @@ bool ce_vim_motion_big_word(const CeVim_t* vim, const CeVimAction_t* action, con
      return true;
 }
 
-bool ce_vim_motion_end_little_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_end_little_word(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                    const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_vim_move_end_little_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
@@ -944,7 +977,7 @@ bool ce_vim_motion_end_little_word(const CeVim_t* vim, const CeVimAction_t* acti
      return true;
 }
 
-bool ce_vim_motion_end_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_end_big_word(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                 const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_vim_move_end_big_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
@@ -952,7 +985,7 @@ bool ce_vim_motion_end_big_word(const CeVim_t* vim, const CeVimAction_t* action,
      return true;
 }
 
-bool ce_vim_motion_begin_little_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_begin_little_word(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                      const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_vim_move_begin_little_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
@@ -960,7 +993,7 @@ bool ce_vim_motion_begin_little_word(const CeVim_t* vim, const CeVimAction_t* ac
      return true;
 }
 
-bool ce_vim_motion_begin_big_word(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_begin_big_word(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                      const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_vim_move_begin_big_word(view->buffer, motion_range->end);
      if(destination.x < 0) return false;
@@ -968,7 +1001,7 @@ bool ce_vim_motion_begin_big_word(const CeVim_t* vim, const CeVimAction_t* actio
      return true;
 }
 
-bool ce_vim_motion_soft_begin_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_soft_begin_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                    const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      if(!ce_buffer_point_is_valid(view->buffer, motion_range->end)) return false;
      const char* itr = view->buffer->lines[motion_range->end.y];
@@ -987,20 +1020,20 @@ bool ce_vim_motion_soft_begin_line(const CeVim_t* vim, const CeVimAction_t* acti
      return true;
 }
 
-bool ce_vim_motion_hard_begin_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_hard_begin_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                    const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->end = (CePoint_t){0, motion_range->end.y};
      return true;
 }
 
-bool ce_vim_motion_end_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_end_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      int64_t len = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
      motion_range->end = (CePoint_t){len - 1, motion_range->end.y};
      return true;
 }
 
-bool ce_vim_motion_entire_line(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_entire_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      int64_t len = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
      motion_range->start = (CePoint_t){0, motion_range->end.y};
@@ -1008,31 +1041,31 @@ bool ce_vim_motion_entire_line(const CeVim_t* vim, const CeVimAction_t* action, 
      return true;
 }
 
-bool ce_vim_motion_page_up(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_page_up(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                            const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->end.y -= (view->rect.bottom - view->rect.top);
      return true;
 }
 
-bool ce_vim_motion_page_down(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_page_down(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                              const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->end.y += (view->rect.bottom - view->rect.top);
      return true;
 }
 
-bool ce_vim_motion_half_page_up(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_half_page_up(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                 const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->end.y -= (view->rect.bottom - view->rect.top) / 2;
      return true;
 }
 
-bool ce_vim_motion_half_page_down(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_half_page_down(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                   const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->end.y += (view->rect.bottom - view->rect.top) / 2;
      return true;
 }
 
-bool ce_vim_motion_visual(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,
+bool ce_vim_motion_visual(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                           const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->start = view->cursor;
      motion_range->end = vim->visual;
@@ -1055,13 +1088,20 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
 
 bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options){
-     bool delete_backwards = motion_range_sort(&motion_range);
+     bool do_not_include_end = motion_range_sort(&motion_range);
+
+     if(action->motion.function == ce_vim_motion_little_word ||
+        action->motion.function == ce_vim_motion_big_word ||
+        action->motion.function == ce_vim_motion_begin_little_word ||
+        action->motion.function == ce_vim_motion_begin_big_word){
+          do_not_include_end = true;
+     }
 
      // delete the range
-     if(delete_backwards) motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
+     if(do_not_include_end) motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
-     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, true)){
+     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len, action->yank_line);
+     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, action->yank_line)){
           free(removed_string);
           return false;
      }
@@ -1070,7 +1110,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
      change.insertion = false;
-     change.remove_line_if_empty = true;
+     change.remove_line_if_empty = action->yank_line;
      change.string = removed_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -1131,7 +1171,7 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
           // commit the insertion
           change.chain = true;
           change.insertion = true;
-          change.remove_line_if_empty = false;
+          change.remove_line_if_empty = true;
           change.string = current_string;
           change.location = view->cursor;
           change.cursor_before = view->cursor;
@@ -1155,7 +1195,7 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
      CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
      if(yank->text) free(yank->text);
      int64_t yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
+     yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len, action->yank_line);
      yank->line = action->yank_line;
      return true;
 }
@@ -1234,5 +1274,11 @@ bool ce_vim_verb_set_visual(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
                             const CeConfigOptions_t* config_options){
      vim->visual = view->cursor;
      vim->mode = CE_VIM_MODE_VISUAL;
+     return true;
+}
+
+bool ce_vim_verb_set_normal(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                            const CeConfigOptions_t* config_options){
+     vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }

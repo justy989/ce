@@ -126,7 +126,7 @@ CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t 
 bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid // TODO: unittest
 
-char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
+char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool newline_if_entire_line);
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
 bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point); // TODO: unittest
@@ -141,6 +141,7 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
 
 int64_t ce_utf8_strlen(const char* string);
 int64_t ce_utf8_insertion_strlen(const char* string);
+int64_t ce_utf8_last_index(const char* string);
 char* ce_utf8_find_index(char* string, int64_t index);
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
 CeRune_t ce_utf8_decode_reverse(const char* string, const char* string_start, int64_t* bytes_consumed);

@@ -8,7 +8,7 @@
 #define CE_VIM_MAX_KEY_BINDS 256
 
 #define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                              \
-bool function_name(const CeVim_t* vim, const CeVimAction_t* action, const CeView_t* view,      \
+bool function_name(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,            \
                    const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 
 #define CE_VIM_DECLARE_VERB_FUNC(function_name)                                                                \
@@ -22,7 +22,7 @@ struct CeVimMotionRange_t;
 enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, CeRune_t key);
-typedef bool CeVimMotionFunc_t(const struct CeVim_t*, const struct CeVimAction_t*, const CeView_t*,
+typedef bool CeVimMotionFunc_t(const struct CeVim_t*, struct CeVimAction_t*, const CeView_t*,
                                const CeConfigOptions_t*, struct CeVimMotionRange_t*);
 typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struct CeVimMotionRange_t, CeView_t*,
                              const CeConfigOptions_t*);
@@ -75,7 +75,7 @@ typedef struct CeVimAction_t{
      int64_t multiplier;
      CeVimMotion_t motion;
      CeVimVerb_t verb;
-     bool yank_line;
+     bool yank_line; // TODO: consider rename as more than just yanking looks at this
      bool chain_undo;
 }CeVimAction_t;
 
@@ -108,7 +108,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
 // action
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* keys, CeVimKeyBind_t* key_binds,
                                        int64_t key_bind_count, CeVimMode_t vim_mode);
-bool ce_vim_apply_action(CeVim_t* vim, const CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options);
+bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options);
 
 // util
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
@@ -121,6 +121,7 @@ CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
 // parse functions
 CeVimParseResult_t ce_vim_parse_set_insert_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_set_visual_mode(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_set_normal_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, CeRune_t key);
@@ -182,3 +183,4 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_undo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_redo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_insert);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_visual);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_normal);
