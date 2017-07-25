@@ -131,7 +131,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
 
           switch(key){
           default:
-               if(isprint(key) || key == CE_NEWLINE){
+               if(isprint(key) || key == CE_NEWLINE || key == '\t'){
                     if(ce_buffer_insert_rune(view->buffer, key, view->cursor)){
                          const char str[2] = {key, 0};
                          CePoint_t new_cursor = ce_buffer_advance_point(view->buffer, view->cursor, 1);

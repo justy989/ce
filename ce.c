@@ -533,7 +533,13 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
      int64_t length_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
-     if(length_left_on_line == 0) length_left_on_line = 1;
+     if(length_left_on_line == 0){
+          if(length == 0 && remove_line_if_empty){
+               return ce_buffer_remove_lines(buffer, point.y, 1);
+          }
+
+          length_left_on_line = 1;
+     }
      if(length_left_on_line > length){
           // case: glue together left and right sides and cut out the middle
           char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
@@ -615,11 +621,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      }
 
      // remove the intermediate lines
-     if(!ce_buffer_remove_lines(buffer, save_current_line, lines_to_delete)){
-          return false;
-     }
-
-     return true;
+     return ce_buffer_remove_lines(buffer, save_current_line, lines_to_delete);
 }
 
 bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove){
