@@ -61,6 +61,12 @@ void draw_color_list_free(DrawColorList_t* list){
      list->tail = NULL;
 }
 
+int draw_color_list_last_color(DrawColorList_t* draw_color_list){
+     int fg = COLOR_DEFAULT;
+     if(draw_color_list->tail) fg = draw_color_list->tail->fg;
+     return fg;
+}
+
 typedef struct{
      int fg;
      int bg;
@@ -123,11 +129,13 @@ void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
 
 void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer){
      // save the cursor on the old buffer
-     view->buffer->cursor = view->cursor;
+     view->buffer->cursor_save = view->cursor;
+     view->buffer->scroll_save = view->scroll;
 
      // update new buffer, using the buffer's cursor
      view->buffer = buffer;
-     view->cursor = buffer->cursor;
+     view->cursor = buffer->cursor_save;
+     view->scroll = buffer->scroll_save;
 }
 
 // 60 fps
@@ -467,52 +475,116 @@ static int64_t match_c_literal(const char* str, const char* beginning_of_line)
      return count;
 }
 
-void syntax_highlight(CeView_t* view, DrawColorList_t* draw_color_list){
+void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_list){
      int64_t min = view->scroll.y;
      int64_t max = min + (view->rect.bottom - view->rect.top);
      CE_CLAMP(min, 0, (view->buffer->line_count - 1));
      CE_CLAMP(max, 0, (view->buffer->line_count - 1));
      int64_t match_len = 0;
      bool multiline_comment = false;
+     int bg_color = COLOR_DEFAULT;
+     CePoint_t visual_start;
+     CePoint_t visual_end;
+
+     if(vim->mode == CE_VIM_MODE_VISUAL ||
+        vim->mode == CE_VIM_MODE_VISUAL_LINE){
+          if(ce_point_after(view->cursor, vim->visual)){
+               visual_start = vim->visual;
+               visual_end = view->cursor;
+          }else{
+               visual_start = view->cursor;
+               visual_end = vim->visual;
+          }
+     }
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
           int64_t line_len = strlen(line);
+          int64_t current_match_len = 1;
+          CePoint_t match_point = {0, y};
+
+          if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
+               if(match_point.y >= visual_start.y &&
+                  match_point.y <= visual_end.y){
+                    bg_color = COLOR_WHITE;
+               }else{
+                    // if the line is empty, reset the colors
+                    if(line_len == 0 && bg_color == COLOR_WHITE){
+                         draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, match_point);
+                    }
+
+                    bg_color = COLOR_DEFAULT;
+               }
+          }
+
           for(int64_t x = 0; x < line_len; ++x){
                char* str = line + x;
+               match_point.x = x;
 
-               if(multiline_comment){
-                    if((match_len = match_c_multiline_comment_end(str))){
-                         multiline_comment = false;
-                    }
-               }else{
-                    if((match_len = match_c_type(str, line))){
-                         draw_color_list_insert(draw_color_list, COLOR_BRIGHT_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_keyword(str, line))){
-                         draw_color_list_insert(draw_color_list, COLOR_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_control(str, line))){
-                         draw_color_list_insert(draw_color_list, COLOR_YELLOW, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_caps_var(str))){
-                         draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_comment(str))){
-                         draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_string(str))){
-                         draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_character_literal(str))){
-                         draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_literal(str, line))){
-                         draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_preproc(str))){
-                         draw_color_list_insert(draw_color_list, COLOR_BRIGHT_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_multiline_comment(str))){
-                         draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
-                         multiline_comment = true;
-                    }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
-                         draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, (CePoint_t){x, y});
+               if(vim->mode == CE_VIM_MODE_VISUAL){
+                    // BUG: when cursor is on the first character in a word in a visual selection is has the wrong foreground color
+                    if(ce_points_equal(match_point, visual_start) ||
+                       ce_points_equal(match_point, visual_end) ||
+                       (ce_point_after(match_point, visual_start) &&
+                        !ce_point_after(match_point, visual_end))){
+                         if(bg_color == COLOR_DEFAULT && current_match_len > 1){
+                              bg_color = COLOR_WHITE;
+                              draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+                         }else{
+                              bg_color = COLOR_WHITE;
+                         }
+                    }else{
+                         if(bg_color == COLOR_WHITE && current_match_len > 1){
+                              bg_color = COLOR_DEFAULT;
+                              draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+                         }else{
+                              bg_color = COLOR_DEFAULT;
+                         }
                     }
                }
 
-               if(match_len) x += (match_len - 1);
+               if(current_match_len <= 1){
+                    if(multiline_comment){
+                         if((match_len = match_c_multiline_comment_end(str))){
+                              multiline_comment = false;
+                         }
+                    }else{
+                         if((match_len = match_c_type(str, line))){
+                              draw_color_list_insert(draw_color_list, COLOR_BRIGHT_BLUE, bg_color, match_point);
+                         }else if((match_len = match_c_keyword(str, line))){
+                              draw_color_list_insert(draw_color_list, COLOR_BLUE, bg_color, match_point);
+                         }else if((match_len = match_c_control(str, line))){
+                              draw_color_list_insert(draw_color_list, COLOR_YELLOW, bg_color, match_point);
+                         }else if((match_len = match_caps_var(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_MAGENTA, bg_color, match_point);
+                         }else if((match_len = match_c_comment(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_GREEN, bg_color, match_point);
+                         }else if((match_len = match_c_string(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_RED, bg_color, match_point);
+                         }else if((match_len = match_c_character_literal(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_RED, bg_color, match_point);
+                         }else if((match_len = match_c_literal(str, line))){
+                              draw_color_list_insert(draw_color_list, COLOR_MAGENTA, bg_color, match_point);
+                         }else if((match_len = match_c_preproc(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_BRIGHT_MAGENTA, bg_color, match_point);
+                         }else if((match_len = match_c_multiline_comment(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_GREEN, bg_color, match_point);
+                              multiline_comment = true;
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != bg_color)){
+                              draw_color_list_insert(draw_color_list, COLOR_DEFAULT, bg_color, match_point);
+                         }
+                    }
+
+                    if(match_len) current_match_len = match_len;
+               }else{
+                    current_match_len--;
+               }
+          }
+
+          match_point.x = line_len;
+          if(vim->mode == CE_VIM_MODE_VISUAL && bg_color == COLOR_WHITE && ce_point_after(match_point, visual_end)){
+               bg_color = COLOR_DEFAULT;
+               draw_color_list_insert(draw_color_list, COLOR_DEFAULT, bg_color, match_point);
           }
      }
 }
@@ -558,13 +630,14 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                     while(rune > 0){
                          rune = ce_utf8_decode(line, &rune_len);
 
-                         if(x >= col_min && x <= col_max && rune > 0){
-                              if(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){x, y + view->scroll.y})){
-                                   int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
-                                   attron(COLOR_PAIR(change_color_pair));
-                                   draw_color_node = draw_color_node->next;
-                              }
+                         // check if we need to move to the next color
+                         if(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){x + view->scroll.x, y + view->scroll.y})){
+                              int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
+                              attron(COLOR_PAIR(change_color_pair));
+                              draw_color_node = draw_color_node->next;
+                         }
 
+                         if(x >= col_min && x <= col_max && rune > 0){
                               if(rune == CE_TAB){
                                    x += tab_width;
                                    addstr(tab_str);
@@ -589,7 +662,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                     }
                }
 
-               for(; x < col_max; x++){
+               for(; x <= col_max; x++){
                     addch(' ');
                }
           }
@@ -656,7 +729,7 @@ void* draw_thread(void* thread_data){
 
           standend();
           draw_color_list_free(&draw_color_list);
-          syntax_highlight(data->view, &draw_color_list);
+          syntax_highlight(data->view, data->vim, &draw_color_list);
           draw_view(data->view, data->tab_width, &draw_color_list, &color_defs);
           draw_view_status(data->view, data->vim);
 

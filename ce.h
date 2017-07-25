@@ -91,7 +91,8 @@ typedef struct{
      CeBufferStatus_t status;
      CeBufferFileType_t type;
 
-     CePoint_t cursor;
+     CePoint_t cursor_save;
+     CePoint_t scroll_save;
 
      pthread_mutex_t lock;
 
