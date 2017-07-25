@@ -159,6 +159,7 @@ CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_visual_line_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key);
 
@@ -201,5 +202,6 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_undo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_redo);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_insert_mode);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_visual_mode);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_visual_line_mode);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_normal_mode);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_last_action);

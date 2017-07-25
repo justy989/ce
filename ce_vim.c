@@ -54,6 +54,7 @@ bool ce_vim_init(CeVim_t* vim){
 
      add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
      add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
+     add_key_bind(vim, 'V', &ce_vim_parse_verb_visual_line_mode);
      add_key_bind(vim, 27, &ce_vim_parse_verb_normal_mode);
      add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
      add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
@@ -204,6 +205,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
           break;
      case CE_VIM_MODE_NORMAL:
      case CE_VIM_MODE_VISUAL:
+     case CE_VIM_MODE_VISUAL_LINE:
      {
           CeVimAction_t action = {};
 
@@ -285,7 +287,7 @@ VIM_PARSE_CONTINUE:
 
      // parse multiplier
      if(result != CE_VIM_PARSE_COMPLETE){
-          if(vim_mode == CE_VIM_MODE_VISUAL){
+          if(vim_mode == CE_VIM_MODE_VISUAL || vim_mode == CE_VIM_MODE_VISUAL_LINE){
                build_action.motion.function = &ce_vim_motion_visual;
                result = CE_VIM_PARSE_COMPLETE;
           }else{
@@ -818,6 +820,14 @@ CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, CeRune_t
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_visual_line_mode(CeVimAction_t* action, CeRune_t key){
+     if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+     if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
+     action->verb.function = &ce_vim_verb_visual_line_mode;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
@@ -1168,16 +1178,16 @@ bool ce_vim_motion_hard_begin_line(const CeVim_t* vim, CeVimAction_t* action, co
 
 bool ce_vim_motion_end_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     int64_t len = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
-     motion_range->end = (CePoint_t){len - 1, motion_range->end.y};
+     int64_t last_index = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+     motion_range->end = (CePoint_t){last_index, motion_range->end.y};
      return true;
 }
 
 bool ce_vim_motion_entire_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     int64_t len = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
+     int64_t last_index = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
      motion_range->start = (CePoint_t){0, motion_range->end.y};
-     motion_range->end   = (CePoint_t){len - 1, motion_range->end.y};
+     motion_range->end = (CePoint_t){last_index, motion_range->end.y};
      return true;
 }
 
@@ -1210,7 +1220,13 @@ bool ce_vim_motion_visual(const CeVim_t* vim, CeVimAction_t* action, const CeVie
      motion_range->start = view->cursor;
      motion_range->end = vim->visual;
      motion_range_sort(motion_range);
-     // BUG: doesn't seem to be inclusive across lines?
+
+     if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
+          motion_range->start.x = 0;;
+          motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+          action->yank_line = true;
+     }
+
      return true;
 }
 
@@ -1504,6 +1520,13 @@ bool ce_vim_verb_visual_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
                              const CeConfigOptions_t* config_options){
      vim->visual = view->cursor;
      vim->mode = CE_VIM_MODE_VISUAL;
+     return true;
+}
+
+bool ce_vim_verb_visual_line_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                             const CeConfigOptions_t* config_options){
+     vim->visual = view->cursor;
+     vim->mode = CE_VIM_MODE_VISUAL_LINE;
      return true;
 }
 
