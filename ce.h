@@ -136,7 +136,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
 bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point); // TODO: unittest
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty);
-bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove);
+bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove); // TODO: remove from view?
+bool ce_buffer_append_on_new_line(CeBuffer_t* buffer, const char* string); // TODO: make user function? unsure about how to connect to undo
 
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change); // TODO: unittest
 bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest

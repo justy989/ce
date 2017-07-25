@@ -10,6 +10,41 @@
 #include "ce.h"
 #include "ce_vim.h"
 
+typedef struct BufferNode_t{
+     CeBuffer_t* buffer;
+     struct BufferNode_t* next;
+}BufferNode_t;
+
+bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
+     BufferNode_t* node = malloc(sizeof(*node));
+     if(!node) return false;
+     node->buffer = buffer;
+     node->next = *head;
+     *head = node;
+     return true;
+}
+
+void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
+     int64_t index = 1;
+     char line[256];
+     ce_buffer_empty(buffer);
+     while(head){
+          snprintf(line, 256, "%ld %s %ld", index, head->buffer->name, head->buffer->line_count);
+          ce_buffer_append_on_new_line(buffer, line);
+          head = head->next;
+          index++;
+     }
+}
+
+void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer){
+     // save the cursor on the old buffer
+     view->buffer->cursor = view->cursor;
+
+     // update new buffer, using the buffer's cursor
+     view->buffer = buffer;
+     view->cursor = buffer->cursor;
+}
+
 // 60 fps
 #define DRAW_USEC_LIMIT 16666
 
@@ -257,13 +292,27 @@ int main(int argc, char** argv){
      int terminal_width;
      int terminal_height;
 
-     CeBuffer_t buffer = {};
+     BufferNode_t* buffer_node_head = NULL;
+
+     CeBuffer_t* buffer_list_buffer = calloc(1, sizeof(*buffer_list_buffer));
+     ce_buffer_alloc(buffer_list_buffer, 1, "buffers");
+     buffer_node_insert(&buffer_node_head, buffer_list_buffer);
+
      CeView_t view = {};
-     view.buffer = &buffer;
      view.scroll.x = 0;
      view.scroll.y = 0;
 
-     if(argc > 1) ce_buffer_load_file(&buffer, argv[1]);
+     if(argc > 1){
+          for(int64_t i = 1; i < argc; i++){
+               CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+               ce_buffer_load_file(buffer, argv[i]);
+               buffer_node_insert(&buffer_node_head, buffer);
+               view.buffer = buffer;
+          }
+     }else{
+          CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+          ce_buffer_alloc(buffer, 1, "unnamed");
+     }
 
      CeVim_t vim = {};
      ce_vim_init(&vim);
@@ -292,6 +341,19 @@ int main(int argc, char** argv){
           int key = getch();
           switch(key){
           default:
+               if(key == CE_NEWLINE && view.buffer == buffer_list_buffer){
+                    BufferNode_t* itr = buffer_node_head;
+                    int64_t index = 0;
+                    while(itr){
+                         if(index == view.cursor.y){
+                              view_switch_buffer(&view, itr->buffer);
+                              break;
+                         }
+                         itr = itr->next;
+                         index++;
+                    }
+               }
+
                ce_vim_handle_key(&vim, &view, key, &config_options);
                break;
           case KEY_CLOSE:
@@ -299,6 +361,10 @@ int main(int argc, char** argv){
                break;
           case 23: // Ctrl + w
                ce_buffer_save(view.buffer);
+               break;
+          case 2: // Ctrl + b
+               build_buffer_list(buffer_list_buffer, buffer_node_head);
+               view_switch_buffer(&view, buffer_list_buffer);
                break;
           }
 
@@ -310,7 +376,9 @@ int main(int argc, char** argv){
      pthread_join(thread_draw, NULL);
 
      // cleanup
-     ce_buffer_free(&buffer);
+     // TODO: free buffer_node_head
+     ce_buffer_free(buffer_list_buffer);
+     free(buffer_list_buffer);
      ce_vim_free(&vim);
      free(draw_thread_data);
      endwin();

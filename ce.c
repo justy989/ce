@@ -650,6 +650,16 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
      return buffer->lines != NULL;
 }
 
+bool ce_buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
+     int64_t last_line = buffer->line_count;
+     if(last_line) last_line--;
+     int64_t line_len = ce_utf8_strlen(buffer->lines[last_line]);
+     if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     int64_t next_line = last_line;
+     if(line_len) next_line++;
+     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
+}
+
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool newline_if_entire_line){
      if(!ce_buffer_point_is_valid(buffer, point)) return NULL;
 
