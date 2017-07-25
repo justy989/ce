@@ -195,10 +195,19 @@ CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRun
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
-static int64_t match_words(const char* str, const char** words, int64_t word_count){
+static int64_t match_words(const char* str, const char* beginning_of_line, const char** words, int64_t word_count){
      for(int64_t i = 0; i < word_count; ++i){
           int64_t word_len = strlen(words[i]);
           if(strncmp(words[i], str, word_len) == 0){
+
+               // make sure word isn't in the middle of an identifier
+               char post_char = str[word_len];
+               if(isalnum(post_char) || post_char == '_') return 0;
+               if(str > beginning_of_line){
+                    char pre_char = *(str - 1);
+                    if(isalnum(pre_char) || pre_char == '_') return 0;
+               }
+
                return word_len;
           }
      }
@@ -244,7 +253,7 @@ int64_t match_c_type(const char* str, const char* beginning_of_line){
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
-     return match_words(str, keywords, keyword_count);
+     return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
 int64_t match_c_keyword(const char* str, const char* beginning_of_line){
@@ -281,10 +290,10 @@ int64_t match_c_keyword(const char* str, const char* beginning_of_line){
           if(is_c_type_char(*(str - 1))) return 0;
      }
 
-     return match_words(str, keywords, keyword_count);
+     return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
-int64_t match_c_control(const char* str){
+int64_t match_c_control(const char* str, const char* beginning_of_line){
      static const char* keywords [] = {
           "break",
           "const",
@@ -295,7 +304,7 @@ int64_t match_c_control(const char* str){
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
-     return match_words(str, keywords, keyword_count);
+     return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
 static bool is_caps_var_char(int ch){
@@ -477,11 +486,11 @@ void syntax_highlight(CeView_t* view, DrawColorList_t* draw_color_list){
                          multiline_comment = false;
                     }
                }else{
-                    if((match_len = match_c_keyword(str, line))){
-                         draw_color_list_insert(draw_color_list, COLOR_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_type(str, line))){
+                    if((match_len = match_c_type(str, line))){
                          draw_color_list_insert(draw_color_list, COLOR_BRIGHT_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
-                    }else if((match_len = match_c_control(str))){
+                    }else if((match_len = match_c_keyword(str, line))){
+                         draw_color_list_insert(draw_color_list, COLOR_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_control(str, line))){
                          draw_color_list_insert(draw_color_list, COLOR_YELLOW, COLOR_DEFAULT, (CePoint_t){x, y});
                     }else if((match_len = match_caps_var(str))){
                          draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
