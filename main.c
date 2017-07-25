@@ -15,6 +15,9 @@ typedef struct BufferNode_t{
      struct BufferNode_t* next;
 }BufferNode_t;
 
+/*
+this is a test
+*/
 bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      BufferNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
@@ -329,9 +332,19 @@ int64_t match_c_preproc(const char* str){
 }
 
 int64_t match_c_comment(const char* str){
-     if(strncmp("//", str, 2) == 0){
-          return ce_utf8_strlen(str);
-     }
+     if(strncmp("//", str, 2) == 0) return ce_utf8_strlen(str);
+
+     return 0;
+}
+
+int64_t match_c_multiline_comment(const char* str){
+     if(strncmp("/*", str, 2) == 0) return ce_utf8_strlen(str);
+
+     return 0;
+}
+
+int64_t match_c_multiline_comment_end(const char* str){
+     if(strncmp("*/", str, 2) == 0) return 2;
 
      return 0;
 }
@@ -437,6 +450,7 @@ void syntax_highlight(CeView_t* view, DrawColorList_t* draw_color_list){
      CE_CLAMP(min, 0, (view->buffer->line_count - 1));
      CE_CLAMP(max, 0, (view->buffer->line_count - 1));
      int64_t match_len = 0;
+     bool multiline_comment = false;
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
@@ -444,24 +458,33 @@ void syntax_highlight(CeView_t* view, DrawColorList_t* draw_color_list){
           for(int64_t x = 0; x < line_len; ++x){
                char* str = line + x;
 
-               if((match_len = match_c_keyword(str, line))){
-                    draw_color_list_insert(draw_color_list, COLOR_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_c_type(str, line))){
-                    draw_color_list_insert(draw_color_list, COLOR_BRIGHT_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_c_control(str))){
-                    draw_color_list_insert(draw_color_list, COLOR_YELLOW, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_caps_var(str))){
-                    draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_c_comment(str))){
-                    draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_c_string(str))){
-                    draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_c_literal(str, line))){
-                    draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
-               }else if((match_len = match_c_preproc(str))){
-                    draw_color_list_insert(draw_color_list, COLOR_BRIGHT_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+               if(multiline_comment){
+                    if((match_len = match_c_multiline_comment_end(str))){
+                         multiline_comment = false;
+                    }
                }else{
-                    draw_color_list_insert(draw_color_list, -1, -1, (CePoint_t){x, y});
+                    if((match_len = match_c_keyword(str, line))){
+                         draw_color_list_insert(draw_color_list, COLOR_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_type(str, line))){
+                         draw_color_list_insert(draw_color_list, COLOR_BRIGHT_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_control(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_YELLOW, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_caps_var(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_comment(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_string(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_literal(str, line))){
+                         draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_preproc(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_BRIGHT_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_multiline_comment(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
+                         multiline_comment = true;
+                    }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                         draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }
                }
 
                if(match_len) x += (match_len - 1);
@@ -511,7 +534,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                          rune = ce_utf8_decode(line, &rune_len);
 
                          if(x >= col_min && x <= col_max && rune > 0){
-                              if(draw_color_node && ce_points_equal(draw_color_node->point, (CePoint_t){x, y + view->scroll.y})){
+                              if(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){x, y + view->scroll.y})){
                                    int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
                                    attron(COLOR_PAIR(change_color_pair));
                                    draw_color_node = draw_color_node->next;
