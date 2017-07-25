@@ -24,13 +24,48 @@ bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
+typedef struct DrawColorNode_t{
+     int fg;
+     int bg;
+     CePoint_t point;
+     struct DrawColorNode_t* next;
+}DrawColorNode_t;
+
+typedef struct{
+     DrawColorNode_t* head;
+     DrawColorNode_t* tail;
+}DrawColorList_t;
+
+bool draw_color_list_insert(DrawColorList_t* list, int fg, int bg, CePoint_t point){
+     DrawColorNode_t* node = malloc(sizeof(*node));
+     if(!node) return false;
+     node->fg = fg;
+     node->bg = bg;
+     node->point = point;
+     node->next = NULL;
+     if(list->tail) list->tail->next = node;
+     list->tail = node;
+     if(!list->head) list->head = node;
+     return true;
+}
+
+bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
+     int64_t last_line = buffer->line_count;
+     if(last_line) last_line--;
+     int64_t line_len = ce_utf8_strlen(buffer->lines[last_line]);
+     if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     int64_t next_line = last_line;
+     if(line_len) next_line++;
+     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
+}
+
 void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
      int64_t index = 1;
      char line[256];
      ce_buffer_empty(buffer);
      while(head){
           snprintf(line, 256, "%ld %s %ld", index, head->buffer->name, head->buffer->line_count);
-          ce_buffer_append_on_new_line(buffer, line);
+          buffer_append_on_new_line(buffer, line);
           head = head->next;
           index++;
      }
