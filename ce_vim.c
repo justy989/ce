@@ -37,7 +37,7 @@ static int64_t istrlen(const CeRune_t* istr){
      return len;
 }
 
-static void add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function){
+void ce_vim_add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function){
      assert(vim->key_bind_count < CE_VIM_MAX_KEY_BINDS);
      vim->key_binds[vim->key_bind_count].key = key;
      vim->key_binds[vim->key_bind_count].function = function;
@@ -52,43 +52,43 @@ static void insert_mode(CeVim_t* vim){
 bool ce_vim_init(CeVim_t* vim){
      vim->chain_undo = false;
 
-     add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
-     add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
-     add_key_bind(vim, 'V', &ce_vim_parse_verb_visual_line_mode);
-     add_key_bind(vim, 27, &ce_vim_parse_verb_normal_mode);
-     add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
-     add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
-     add_key_bind(vim, 'e', &ce_vim_parse_motion_end_little_word);
-     add_key_bind(vim, 'E', &ce_vim_parse_motion_end_big_word);
-     add_key_bind(vim, 'b', &ce_vim_parse_motion_begin_little_word);
-     add_key_bind(vim, 'B', &ce_vim_parse_motion_begin_big_word);
-     add_key_bind(vim, 'h', &ce_vim_parse_motion_left);
-     add_key_bind(vim, 'l', &ce_vim_parse_motion_right);
-     add_key_bind(vim, 'k', &ce_vim_parse_motion_up);
-     add_key_bind(vim, 'j', &ce_vim_parse_motion_down);
-     add_key_bind(vim, '^', &ce_vim_parse_motion_soft_begin_line);
-     add_key_bind(vim, '0', &ce_vim_parse_motion_hard_begin_line);
-     add_key_bind(vim, '$', &ce_vim_parse_motion_end_line);
-     add_key_bind(vim, 'f', &ce_vim_parse_motion_find_forward);
-     add_key_bind(vim, 'F', &ce_vim_parse_motion_find_backward);
-     add_key_bind(vim, 't', &ce_vim_parse_motion_until_forward);
-     add_key_bind(vim, 'T', &ce_vim_parse_motion_until_backward);
-     add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
-     add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
-     add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
-     add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
-     add_key_bind(vim, '"', &ce_vim_parse_select_yank_register);
-     add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
-     add_key_bind(vim, 'p', &ce_vim_parse_verb_paste_after);
-     add_key_bind(vim, 'u', &ce_vim_parse_verb_undo);
-     add_key_bind(vim, KEY_REDO, &ce_vim_parse_verb_redo);
-     add_key_bind(vim, 'O', &ce_vim_parse_verb_open_above);
-     add_key_bind(vim, 'o', &ce_vim_parse_verb_open_below);
-     add_key_bind(vim, '.', &ce_vim_parse_verb_last_action);
-     add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
-     add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
-     add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
-     add_key_bind(vim, 4, &ce_vim_parse_motion_half_page_down);
+     ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
+     ce_vim_add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
+     ce_vim_add_key_bind(vim, 'V', &ce_vim_parse_verb_visual_line_mode);
+     ce_vim_add_key_bind(vim, 27, &ce_vim_parse_verb_normal_mode);
+     ce_vim_add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
+     ce_vim_add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
+     ce_vim_add_key_bind(vim, 'e', &ce_vim_parse_motion_end_little_word);
+     ce_vim_add_key_bind(vim, 'E', &ce_vim_parse_motion_end_big_word);
+     ce_vim_add_key_bind(vim, 'b', &ce_vim_parse_motion_begin_little_word);
+     ce_vim_add_key_bind(vim, 'B', &ce_vim_parse_motion_begin_big_word);
+     ce_vim_add_key_bind(vim, 'h', &ce_vim_parse_motion_left);
+     ce_vim_add_key_bind(vim, 'l', &ce_vim_parse_motion_right);
+     ce_vim_add_key_bind(vim, 'k', &ce_vim_parse_motion_up);
+     ce_vim_add_key_bind(vim, 'j', &ce_vim_parse_motion_down);
+     ce_vim_add_key_bind(vim, '^', &ce_vim_parse_motion_soft_begin_line);
+     ce_vim_add_key_bind(vim, '0', &ce_vim_parse_motion_hard_begin_line);
+     ce_vim_add_key_bind(vim, '$', &ce_vim_parse_motion_end_line);
+     ce_vim_add_key_bind(vim, 'f', &ce_vim_parse_motion_find_forward);
+     ce_vim_add_key_bind(vim, 'F', &ce_vim_parse_motion_find_backward);
+     ce_vim_add_key_bind(vim, 't', &ce_vim_parse_motion_until_forward);
+     ce_vim_add_key_bind(vim, 'T', &ce_vim_parse_motion_until_backward);
+     ce_vim_add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
+     ce_vim_add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
+     ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
+     ce_vim_add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
+     ce_vim_add_key_bind(vim, '"', &ce_vim_parse_select_yank_register);
+     ce_vim_add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
+     ce_vim_add_key_bind(vim, 'p', &ce_vim_parse_verb_paste_after);
+     ce_vim_add_key_bind(vim, 'u', &ce_vim_parse_verb_undo);
+     ce_vim_add_key_bind(vim, KEY_REDO, &ce_vim_parse_verb_redo);
+     ce_vim_add_key_bind(vim, 'O', &ce_vim_parse_verb_open_above);
+     ce_vim_add_key_bind(vim, 'o', &ce_vim_parse_verb_open_below);
+     ce_vim_add_key_bind(vim, '.', &ce_vim_parse_verb_last_action);
+     ce_vim_add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
+     ce_vim_add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
+     ce_vim_add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
+     ce_vim_add_key_bind(vim, 4, &ce_vim_parse_motion_half_page_down);
 
      return true;
 }
@@ -347,8 +347,7 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, co
 }
 
 static bool is_little_word_character(int c){
-     //return isalnum(c) || c == '_';
-     return isalnum(c);
+     return isalnum(c) || c == '_';
 }
 
 typedef enum{
@@ -1048,7 +1047,7 @@ static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConf
      return true;
 }
 
-static bool motion_range_sort(CeVimMotionRange_t* motion_range){
+bool ce_vim_motion_range_sort(CeVimMotionRange_t* motion_range){
      if(ce_point_after(motion_range->start, motion_range->end)){
           CePoint_t tmp = motion_range->start;
           motion_range->start = motion_range->end;
@@ -1078,7 +1077,7 @@ bool ce_vim_motion_up(const CeVim_t* vim, CeVimAction_t* action, const CeView_t*
                motion_range->start.x = 0;
                motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
                action->yank_line = true;
-               motion_range_sort(motion_range);
+               ce_vim_motion_range_sort(motion_range);
           }
 
           return true;
@@ -1095,7 +1094,7 @@ bool ce_vim_motion_down(const CeVim_t* vim, CeVimAction_t* action, const CeView_
                motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
                motion_range->start.x = 0;
                action->yank_line = true;
-               motion_range_sort(motion_range);
+               ce_vim_motion_range_sort(motion_range);
           }
           return true;
      }
@@ -1219,7 +1218,7 @@ bool ce_vim_motion_visual(const CeVim_t* vim, CeVimAction_t* action, const CeVie
                           const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      motion_range->start = view->cursor;
      motion_range->end = vim->visual;
-     motion_range_sort(motion_range);
+     ce_vim_motion_range_sort(motion_range);
 
      if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
           motion_range->start.x = 0;;
@@ -1262,7 +1261,7 @@ bool ce_vim_motion_until_backward(const CeVim_t* vim, CeVimAction_t* action, con
      return true;
 }
 
-static int64_t yank_register_index(CeRune_t rune){
+int64_t ce_vim_yank_register_index(CeRune_t rune){
      if(rune < 33 || rune >= 177) return -1; // ascii printable character range
      return rune - '!';
 }
@@ -1281,7 +1280,7 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
 
 bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options){
-     bool do_not_include_end = motion_range_sort(&motion_range);
+     bool do_not_include_end = ce_vim_motion_range_sort(&motion_range);
 
      if(action->motion.function == ce_vim_motion_little_word ||
         action->motion.function == ce_vim_motion_big_word ||
@@ -1313,7 +1312,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      view->cursor = motion_range.start;
      vim->chain_undo = action->chain_undo;
 
-     CeVimYank_t* yank = vim->yanks + yank_register_index('"');
+     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
      if(yank->text) free(yank->text);
      yank->text = strdup(removed_string);
      yank->line = action->yank_line;
@@ -1329,7 +1328,7 @@ bool ce_vim_verb_change(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
 
 bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                                const CeConfigOptions_t* config_options){
-     motion_range_sort(&motion_range);
+     ce_vim_motion_range_sort(&motion_range);
 
      // TODO: CE_NEWLINE doesn't work
 
@@ -1383,7 +1382,7 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
 
 bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                       const CeConfigOptions_t* config_options){
-     CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
+     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.character);
      if(yank->text) free(yank->text);
      int64_t yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len, action->yank_line);
@@ -1393,7 +1392,7 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
 
 static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                        const CeConfigOptions_t* config_options, bool after){
-     CeVimYank_t* yank = vim->yanks + yank_register_index(action->verb.character);
+     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.character);
      if(!yank->text) return false;
 
      CePoint_t insertion_point = motion_range.end;

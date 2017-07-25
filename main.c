@@ -13,6 +13,68 @@
 // 60 fps
 #define DRAW_USEC_LIMIT 16666
 
+bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view, \
+                                const CeConfigOptions_t* config_options){
+     char reg = action->verb.character;
+     if(reg == 0) reg = '"';
+     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(reg);
+     if(!yank->text) return false;
+
+     bool do_not_include_end = ce_vim_motion_range_sort(&motion_range);
+
+     if(action->motion.function == ce_vim_motion_little_word ||
+        action->motion.function == ce_vim_motion_big_word ||
+        action->motion.function == ce_vim_motion_begin_little_word ||
+        action->motion.function == ce_vim_motion_begin_big_word){
+          do_not_include_end = true;
+     }
+
+     // delete the range
+     if(do_not_include_end) motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
+     int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
+     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len, action->yank_line);
+     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, action->yank_line)){
+          free(removed_string);
+          return false;
+     }
+
+     // commit the change
+     CeBufferChange_t change = {};
+     change.chain = false;
+     change.insertion = false;
+     change.remove_line_if_empty = action->yank_line;
+     change.string = removed_string;
+     change.location = motion_range.start;
+     change.cursor_before = view->cursor;
+     change.cursor_after = motion_range.start;
+     ce_buffer_change(view->buffer, &change);
+
+     // insert the yank
+     int64_t yank_len = ce_utf8_insertion_strlen(yank->text);
+     if(!ce_buffer_insert_string(view->buffer, yank->text, motion_range.start)) return false;
+     CePoint_t cursor_end = ce_buffer_advance_point(view->buffer, motion_range.start, yank_len);
+
+     // commit the change
+     change.chain = true;
+     change.insertion = true;
+     change.remove_line_if_empty = true;
+     change.string = strdup(yank->text);
+     change.location = motion_range.start;
+     change.cursor_before = view->cursor;
+     change.cursor_after = cursor_end;
+     ce_buffer_change(view->buffer, &change);
+
+     view->cursor = cursor_end;
+     vim->chain_undo = action->chain_undo;
+
+     return true;
+}
+
+CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &custom_vim_verb_substitute;
+     return CE_VIM_PARSE_IN_PROGRESS;
+}
+
 typedef struct{
      CeView_t* view;
      CeVim_t* vim;
@@ -205,6 +267,8 @@ int main(int argc, char** argv){
 
      CeVim_t vim = {};
      ce_vim_init(&vim);
+
+     ce_vim_add_key_bind(&vim, 'S', &custom_vim_parse_verb_substitute);
 
      // init draw thread
      pthread_t thread_draw;
