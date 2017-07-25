@@ -15,9 +15,6 @@ typedef struct BufferNode_t{
      struct BufferNode_t* next;
 }BufferNode_t;
 
-/*
-this is a test
-*/
 bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      BufferNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
@@ -363,6 +360,23 @@ int64_t match_c_string(const char* str){
      return 0;
 }
 
+int64_t match_c_character_literal(const char* str){
+     if(*str == '\''){
+          const char* match = str;
+          while(match){
+               match = strchr(match + 1, '\'');
+               if(match && *(match - 1) != '\\'){
+                    int64_t len = (match - str) + 1;
+                    if(len == 3) return len;
+                    if(*(str + 1) == '\\') return len;
+                    return 0;
+               }
+          }
+     }
+
+     return 0;
+}
+
 static int64_t match_c_literal(const char* str, const char* beginning_of_line)
 {
      const char* itr = str;
@@ -474,6 +488,8 @@ void syntax_highlight(CeView_t* view, DrawColorList_t* draw_color_list){
                     }else if((match_len = match_c_comment(str))){
                          draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
                     }else if((match_len = match_c_string(str))){
+                         draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
+                    }else if((match_len = match_c_character_literal(str))){
                          draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
                     }else if((match_len = match_c_literal(str, line))){
                          draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
