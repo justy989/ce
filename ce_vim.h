@@ -152,6 +152,7 @@ CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeR
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key);
@@ -196,6 +197,7 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_delete);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_change);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_character);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_delete_character);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_yank);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_before);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_after);

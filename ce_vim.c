@@ -76,6 +76,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
      ce_vim_add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
      ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
+     ce_vim_add_key_bind(vim, 'x', &ce_vim_parse_verb_delete_character);
      ce_vim_add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
      ce_vim_add_key_bind(vim, '"', &ce_vim_parse_select_yank_register);
      ce_vim_add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
@@ -943,6 +944,11 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune
      return CE_VIM_PARSE_INVALID;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_delete_character;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == &ce_vim_verb_yank){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1371,6 +1377,41 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
 
           motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
           if(motion_range.start.x == -1) return false;
+     }
+
+     return true;
+}
+
+bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                                  const CeConfigOptions_t* config_options){
+     ce_vim_motion_range_sort(&motion_range);
+
+     // TODO: CE_NEWLINE doesn't work
+
+     while(!ce_point_after(motion_range.start, motion_range.end)){
+          // dupe previous rune
+          int64_t rune_len = 0;
+          char* str = ce_utf8_find_index(view->buffer->lines[view->cursor.y], motion_range.start.x);
+          char* previous_string = malloc(5);
+          CeRune_t previous_rune = ce_utf8_decode(str, &rune_len);
+          ce_utf8_encode(previous_rune, previous_string, 5, &rune_len);
+          previous_string[rune_len] = 0;
+
+          // delete
+          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1, false)) return false; // NOTE: leak previous_string
+
+          // commit the deletion
+          CeBufferChange_t change = {};
+          change.chain = false;
+          change.insertion = false;
+          change.remove_line_if_empty = false;
+          change.string = previous_string;
+          change.location = view->cursor;
+          change.cursor_before = view->cursor;
+          change.cursor_after = view->cursor;
+          ce_buffer_change(view->buffer, &change);
+
+          motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
      }
 
      return true;
