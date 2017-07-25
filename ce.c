@@ -261,6 +261,14 @@ int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point){
      return true;
 }
 
+CeRune_t ce_buffer_get_rune(CeBuffer_t* buffer, CePoint_t point){
+     if(!ce_buffer_point_is_valid(buffer, point)) return CE_UTF8_INVALID;
+
+     char* str = ce_utf8_find_index(buffer->lines[point.y], point.x);
+     int64_t rune_len = 0;
+     return ce_utf8_decode(str, &rune_len);
+}
+
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;
      if(!ce_buffer_point_is_valid(buffer, end)) return -1;

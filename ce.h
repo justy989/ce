@@ -134,6 +134,7 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
 bool ce_buffer_save(CeBuffer_t* buffer);
 bool ce_buffer_empty(CeBuffer_t* buffer);
 
+CeRune_t ce_buffer_get_rune(CeBuffer_t* buffer, CePoint_t point); // TODO: unittest
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end); // inclusive
 int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line);
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, CeClampX_t clamp_x); // TODO: unittest
@@ -158,7 +159,7 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
 int64_t ce_utf8_strlen(const char* string);
 int64_t ce_utf8_insertion_strlen(const char* string);
 int64_t ce_utf8_last_index(const char* string);
-char* ce_utf8_find_index(char* string, int64_t index);
+char* ce_utf8_find_index(char* string, int64_t index); // TODO: rename? ce_utf8_iterate_to()?
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
 CeRune_t ce_utf8_decode_reverse(const char* string, const char* string_start, int64_t* bytes_consumed);
 bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes_written);

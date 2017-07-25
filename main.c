@@ -672,7 +672,18 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
      pthread_mutex_unlock(&view->buffer->lock);
 }
 
-void draw_view_status(CeView_t* view, CeVim_t* vim){
+void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs){
+     // create bottom bar bg
+     int color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+     attron(COLOR_PAIR(color_pair));
+     int64_t width = (view->rect.right - view->rect.left) + 1;
+     move(view->rect.bottom, view->rect.left);
+     for(int64_t i = 0; i < width; ++i){
+          addch(' ');
+     }
+
+     // set the mode line
+     int vim_mode_fg = COLOR_DEFAULT;
      const char* vim_mode_string = "UNKNOWN";
 
      switch(vim->mode){
@@ -680,32 +691,40 @@ void draw_view_status(CeView_t* view, CeVim_t* vim){
           break;
      case CE_VIM_MODE_NORMAL:
           vim_mode_string = "N";
+          vim_mode_fg = COLOR_BLUE;
           break;
      case CE_VIM_MODE_INSERT:
           vim_mode_string = "I";
+          vim_mode_fg = COLOR_GREEN;
           break;
      case CE_VIM_MODE_VISUAL:
           vim_mode_string = "V";
+          vim_mode_fg = COLOR_YELLOW;
           break;
      case CE_VIM_MODE_VISUAL_LINE:
           vim_mode_string = "VL";
+          vim_mode_fg = COLOR_BRIGHT_YELLOW;
           break;
      case CE_VIM_MODE_VISUAL_BLOCK:
           vim_mode_string = "VB";
+          vim_mode_fg = COLOR_BRIGHT_YELLOW;
           break;
      case CE_VIM_MODE_REPLACE:
           vim_mode_string = "R";
+          vim_mode_fg = COLOR_RED;
           break;
      }
 
-     standend();
-     int64_t width = (view->rect.right - view->rect.left) + 1;
-     move(view->rect.bottom, view->rect.left);
-     for(int64_t i = 0; i < width; ++i){
-          addch(ACS_HLINE);
-     }
+     color_pair = color_def_get(color_defs, vim_mode_fg, COLOR_BRIGHT_BLACK);
+     attron(COLOR_PAIR(color_pair));
+     mvprintw(view->rect.bottom, view->rect.left + 1, "%s", vim_mode_string);
 
-     mvprintw(view->rect.bottom, view->rect.left + 1, " %s %s ", vim_mode_string, view->buffer->name);
+     color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+     attron(COLOR_PAIR(color_pair));
+     printw(" %s", view->buffer->name);
+     char cursor_pos_string[32];
+     int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x, view->cursor.y);
+     mvprintw(view->rect.bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
 void* draw_thread(void* thread_data){
@@ -731,7 +750,7 @@ void* draw_thread(void* thread_data){
           draw_color_list_free(&draw_color_list);
           syntax_highlight(data->view, data->vim, &draw_color_list);
           draw_view(data->view, data->tab_width, &draw_color_list, &color_defs);
-          draw_view_status(data->view, data->vim);
+          draw_view_status(data->view, data->vim, &color_defs);
 
           // move the visual cursor to the right location
           int64_t visible_cursor_x = 0;
