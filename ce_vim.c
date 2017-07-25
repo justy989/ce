@@ -333,10 +333,6 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, co
                     return false;
                }
           }
-
-          ce_log("multiplier: %d, start: %d, %d end: %d, %d\n", total_multiplier,
-                 motion_range.start.x, motion_range.start.y,
-                 motion_range.end.x, motion_range.end.y);
      }
      if(action->verb.function){
           if(!action->verb.function(vim, action, motion_range, view, config_options)){

@@ -11,6 +11,16 @@
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
+#define COLOR_DEFAULT -1
+#define COLOR_BRIGHT_BLACK 8
+#define COLOR_BRIGHT_RED 9
+#define COLOR_BRIGHT_GREEN 10
+#define COLOR_BRIGHT_YELLOW 11
+#define COLOR_BRIGHT_BLUE 12
+#define COLOR_BRIGHT_MAGENTA 13
+#define COLOR_BRIGHT_CYAN 14
+#define COLOR_BRIGHT_WHITE 15
+
 typedef int32_t CeRune_t;
 
 typedef enum{

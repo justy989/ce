@@ -49,6 +49,56 @@ bool draw_color_list_insert(DrawColorList_t* list, int fg, int bg, CePoint_t poi
      return true;
 }
 
+void draw_color_list_free(DrawColorList_t* list){
+     DrawColorNode_t* itr = list->head;
+     while(itr){
+          DrawColorNode_t* tmp = itr;
+          itr = itr->next;
+          free(tmp);
+     }
+
+     list->head = NULL;
+     list->tail = NULL;
+}
+
+typedef struct{
+     int fg;
+     int bg;
+}ColorPair_t;
+
+typedef struct{
+     int32_t count;
+     int32_t current;
+     ColorPair_t pairs[256]; // NOTE: this is what COLOR_PAIRS was for me (which is for some reason not const?)
+}ColorDefs_t;
+
+int color_def_get(ColorDefs_t* color_defs, int fg, int bg){
+     // search for the already defined color
+     for(int32_t i = 0; i < color_defs->count; ++i){
+          if(color_defs->pairs[i].fg == fg && color_defs->pairs[i].bg == bg){
+               return i;
+          }
+     }
+
+     // increment the color pair we are going to define, but make sure it wraps around to 0 at the max
+     color_defs->current++;
+     color_defs->current %= 256;
+     if(color_defs->current <= 0) color_defs->current = 1; // when we wrap around, start at 1, because curses doesn't like 0 index color pairs
+
+     // create the pair definition
+     init_pair(color_defs->current, fg, bg);
+
+     // set our internal definition
+     color_defs->pairs[color_defs->current].fg = fg;
+     color_defs->pairs[color_defs->current].bg = bg;
+
+     if(color_defs->current >= color_defs->count){
+          color_defs->count = color_defs->current + 1;
+     }
+
+     return color_defs->current;
+}
+
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
      int64_t last_line = buffer->line_count;
      if(last_line) last_line--;
@@ -145,6 +195,280 @@ CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRun
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
+static int64_t match_words(const char* str, const char** words, int64_t word_count){
+     for(int64_t i = 0; i < word_count; ++i){
+          int64_t word_len = strlen(words[i]);
+          if(strncmp(words[i], str, word_len) == 0){
+               return word_len;
+          }
+     }
+
+     return 0;
+}
+
+static bool is_c_type_char(int ch){
+     return isalnum(ch) || ch == '_';
+}
+
+int64_t match_c_type(const char* str, const char* beginning_of_line){
+     if(!isalpha(*str)) return false;
+
+     const char* itr = str;
+     while(*itr){
+          if(!is_c_type_char(*itr)) break;
+          itr++;
+     }
+
+     int64_t len = itr - str;
+     if(len <= 2) return 0;
+
+     if(strncmp((itr - 2), "_t", 2) == 0) return len;
+
+     // weed out middle of words
+     if(str > beginning_of_line){
+          if(is_c_type_char(*(str - 1))) return 0;
+     }
+
+     static const char* keywords[] = {
+          "bool",
+          "char",
+          "double",
+          "float",
+          "int",
+          "long",
+          "short",
+          "signed",
+          "unsigned",
+          "void",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     return match_words(str, keywords, keyword_count);
+}
+
+int64_t match_c_keyword(const char* str, const char* beginning_of_line){
+     static const char* keywords[] = {
+          "__thread",
+          "auto",
+          "case",
+          "default",
+          "do",
+          "else",
+          "enum",
+          "extern",
+          "false",
+          "for",
+          "if",
+          "inline",
+          "register",
+          "sizeof",
+          "static",
+          "struct",
+          "switch",
+          "true",
+          "typedef",
+          "typeof",
+          "union",
+          "volatile",
+          "while",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     // weed out middle of words
+     if(str > beginning_of_line){
+          if(is_c_type_char(*(str - 1))) return 0;
+     }
+
+     return match_words(str, keywords, keyword_count);
+}
+
+int64_t match_c_control(const char* str){
+     static const char* keywords [] = {
+          "break",
+          "const",
+          "continue",
+          "goto",
+          "return",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     return match_words(str, keywords, keyword_count);
+}
+
+static bool is_caps_var_char(int ch){
+     return (ch >= 'A' && ch <= 'Z') || ch == '_';
+}
+
+int64_t match_caps_var(const char* str){
+     const char* itr = str;
+     while(*itr){
+          if(!is_caps_var_char(*itr)) break;
+          itr++;
+     }
+
+     int64_t len = itr - str;
+     if(len > 1) return len;
+     return 0;
+}
+
+int64_t match_c_preproc(const char* str){
+     if(*str == '#'){
+          const char* itr = str + 1;
+          while(*itr){
+               if(!isalpha(*itr)) break;
+               itr++;
+          }
+
+          return itr - str;
+     }
+
+     return 0;
+}
+
+int64_t match_c_comment(const char* str){
+     if(strncmp("//", str, 2) == 0){
+          return ce_utf8_strlen(str);
+     }
+
+     return 0;
+}
+
+int64_t match_c_string(const char* str){
+     if(*str == '"'){
+          const char* match = str;
+          while(match){
+               match = strchr(match + 1, '"');
+               if(match && *(match - 1) != '\\'){
+                    return (match - str) + 1;
+               }
+          }
+     }
+
+     return 0;
+}
+
+static int64_t match_c_literal(const char* str, const char* beginning_of_line)
+{
+     const char* itr = str;
+     int64_t count = 0;
+     char ch = *itr;
+     bool seen_decimal = false;
+     bool seen_hex = false;
+     bool seen_u = false;
+     bool seen_digit = false;
+     int seen_l = 0;
+
+     while(ch != 0){
+          if(isdigit(ch)){
+               if(seen_u || seen_l) break;
+               seen_digit = true;
+               count++;
+          }else if(!seen_decimal && ch == '.'){
+               if(seen_u || seen_l) break;
+               seen_decimal = true;
+               count++;
+          }else if(ch == 'f' && seen_decimal){
+               if(seen_u || seen_l) break;
+               count++;
+               break;
+          }else if(ch == '-' && itr == str){
+               count++;
+          }else if(ch == 'x' && itr == (str + 1)){
+               seen_hex = true;
+               count++;
+          }else if((ch == 'u' || ch == 'U') && !seen_u){
+               seen_u = true;
+               count++;
+          }else if((ch == 'l' || ch == 'L') && seen_l < 2){
+               seen_l++;
+               count++;
+          }else if(seen_hex){
+               if(seen_u || seen_l) break;
+
+               bool valid_hex_char = false;
+
+               switch(ch){
+               default:
+                    break;
+               case 'a':
+               case 'b':
+               case 'c':
+               case 'd':
+               case 'e':
+               case 'f':
+               case 'A':
+               case 'B':
+               case 'C':
+               case 'D':
+               case 'E':
+               case 'F':
+                    count++;
+                    valid_hex_char = true;
+                    break;
+               }
+
+               if(!valid_hex_char) break;
+          }else{
+               break;
+          }
+
+          itr++;
+          ch = *itr;
+     }
+
+     if(count == 1 && (str[0] == '-' || str[0] == '.')) return 0;
+     if(!seen_digit) return 0;
+
+     // check if the previous character is not a delimiter
+     if(str > beginning_of_line){
+          const char* prev = str - 1;
+          if(is_caps_var_char(*prev) || isalpha(*prev)) return 0;
+     }
+
+     return count;
+}
+
+void syntax_highlight(CeView_t* view, DrawColorList_t* draw_color_list){
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     CE_CLAMP(min, 0, (view->buffer->line_count - 1));
+     CE_CLAMP(max, 0, (view->buffer->line_count - 1));
+     int64_t match_len = 0;
+
+     for(int64_t y = min; y <= max; ++y){
+          char* line = view->buffer->lines[y];
+          int64_t line_len = strlen(line);
+          for(int64_t x = 0; x < line_len; ++x){
+               char* str = line + x;
+
+               if((match_len = match_c_keyword(str, line))){
+                    draw_color_list_insert(draw_color_list, COLOR_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_c_type(str, line))){
+                    draw_color_list_insert(draw_color_list, COLOR_BRIGHT_BLUE, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_c_control(str))){
+                    draw_color_list_insert(draw_color_list, COLOR_YELLOW, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_caps_var(str))){
+                    draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_c_comment(str))){
+                    draw_color_list_insert(draw_color_list, COLOR_GREEN, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_c_string(str))){
+                    draw_color_list_insert(draw_color_list, COLOR_RED, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_c_literal(str, line))){
+                    draw_color_list_insert(draw_color_list, COLOR_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else if((match_len = match_c_preproc(str))){
+                    draw_color_list_insert(draw_color_list, COLOR_BRIGHT_MAGENTA, COLOR_DEFAULT, (CePoint_t){x, y});
+               }else{
+                    draw_color_list_insert(draw_color_list, -1, -1, (CePoint_t){x, y});
+               }
+
+               if(match_len) x += (match_len - 1);
+          }
+     }
+}
+
 typedef struct{
      CeView_t* view;
      CeVim_t* vim;
@@ -154,7 +478,7 @@ typedef struct{
      bool done;
 }DrawThreadData_t;
 
-void draw_view(CeView_t* view, int64_t tab_width){
+void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_list, ColorDefs_t* color_defs){
      pthread_mutex_lock(&view->buffer->lock);
 
      int64_t view_height = view->rect.bottom - view->rect.top;
@@ -166,6 +490,8 @@ void draw_view(CeView_t* view, int64_t tab_width){
      char tab_str[tab_width + 1];
      memset(tab_str, ' ', tab_width);
      tab_str[tab_width] = 0;
+
+     DrawColorNode_t* draw_color_node = draw_color_list->head;
 
      if(view->buffer->line_count > 0){
           move(0, 0);
@@ -185,6 +511,12 @@ void draw_view(CeView_t* view, int64_t tab_width){
                          rune = ce_utf8_decode(line, &rune_len);
 
                          if(x >= col_min && x <= col_max && rune > 0){
+                              if(draw_color_node && ce_points_equal(draw_color_node->point, (CePoint_t){x, y + view->scroll.y})){
+                                   int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
+                                   attron(COLOR_PAIR(change_color_pair));
+                                   draw_color_node = draw_color_node->next;
+                              }
+
                               if(rune == CE_TAB){
                                    x += tab_width;
                                    addstr(tab_str);
@@ -245,6 +577,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim){
           break;
      }
 
+     standend();
      int64_t width = (view->rect.right - view->rect.left) + 1;
      move(view->rect.bottom, view->rect.left);
      for(int64_t i = 0; i < width; ++i){
@@ -259,6 +592,8 @@ void* draw_thread(void* thread_data){
      struct timeval previous_draw_time;
      struct timeval current_draw_time;
      uint64_t time_since_last_draw = 0;
+     DrawColorList_t draw_color_list = {};
+     ColorDefs_t color_defs = {};
 
      while(!data->done){
           time_since_last_draw = 0;
@@ -272,7 +607,9 @@ void* draw_thread(void* thread_data){
           }
 
           standend();
-          draw_view(data->view, data->tab_width);
+          draw_color_list_free(&draw_color_list);
+          syntax_highlight(data->view, &draw_color_list);
+          draw_view(data->view, data->tab_width, &draw_color_list, &color_defs);
           draw_view_status(data->view, data->vim);
 
           // move the visual cursor to the right location
@@ -343,6 +680,9 @@ int main(int argc, char** argv){
                ce_buffer_load_file(buffer, argv[i]);
                buffer_node_insert(&buffer_node_head, buffer);
                view.buffer = buffer;
+
+               // TODO: figure out type based on extention
+               buffer->type = CE_BUFFER_FILE_TYPE_C;
           }
      }else{
           CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
