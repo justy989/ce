@@ -52,10 +52,6 @@ static void insert_mode(CeVim_t* vim){
 bool ce_vim_init(CeVim_t* vim){
      vim->chain_undo = false;
 
-     ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
-     ce_vim_add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
-     ce_vim_add_key_bind(vim, 'V', &ce_vim_parse_verb_visual_line_mode);
-     ce_vim_add_key_bind(vim, 27, &ce_vim_parse_verb_normal_mode);
      ce_vim_add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
      ce_vim_add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
      ce_vim_add_key_bind(vim, 'e', &ce_vim_parse_motion_end_little_word);
@@ -75,6 +71,12 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'T', &ce_vim_parse_motion_until_backward);
      ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_motion_inside_pair);
      ce_vim_add_key_bind(vim, 'a', &ce_vim_parse_motion_around_pair);
+     ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
+     ce_vim_add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
+     ce_vim_add_key_bind(vim, 'V', &ce_vim_parse_verb_visual_line_mode);
+     ce_vim_add_key_bind(vim, 27, &ce_vim_parse_verb_normal_mode);
+     ce_vim_add_key_bind(vim, 'a', &ce_vim_parse_verb_append);
+     ce_vim_add_key_bind(vim, 'A', &ce_vim_parse_verb_append_at_end_of_line);
      ce_vim_add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
      ce_vim_add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
      ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
@@ -901,6 +903,20 @@ CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_append(CeVimAction_t* action, CeRune_t key){
+     if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
+     action->verb.function = &ce_vim_verb_append;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action, CeRune_t key){
+     if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
+     action->verb.function = &ce_vim_verb_append_at_end_of_line;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 static CeVimParseResult_t parse_motion_direction(CeVimAction_t* action, CeVimMotionFunc_t* func){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      action->motion.function = func;
@@ -992,6 +1008,9 @@ CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune
 }
 
 CeVimParseResult_t ce_vim_parse_motion_around_pair(CeVimAction_t* action, CeRune_t key){
+     // around requires a verb
+     if(!action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
      if(action->motion.function == NULL){
           action->motion.function = &ce_vim_motion_around_pair;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1680,6 +1699,20 @@ bool ce_vim_verb_visual_line_mode(CeVim_t* vim, const CeVimAction_t* action, CeV
 bool ce_vim_verb_normal_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                              const CeConfigOptions_t* config_options){
      vim->mode = CE_VIM_MODE_NORMAL;
+     return true;
+}
+
+bool ce_vim_verb_append(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                        const CeConfigOptions_t* config_options){
+     view->cursor.x++;
+     insert_mode(vim);
+     return true;
+}
+
+bool ce_vim_verb_append_at_end_of_line(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                                       const CeConfigOptions_t* config_options){
+     view->cursor.x = ce_utf8_strlen(view->buffer->lines[view->cursor.y]);
+     insert_mode(vim);
      return true;
 }
 
