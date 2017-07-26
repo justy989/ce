@@ -542,12 +542,23 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
 
      int64_t length_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
      if(length_left_on_line == 0){
-          if(length == 0 && remove_line_if_empty){
-               return ce_buffer_remove_lines(buffer, point.y, 1);
+          if(length == 0){
+               // perform a join
+               int64_t next_line_index = point.y + 1;
+               if(next_line_index > buffer->line_count) return false;
+               int64_t cur_line_len = strlen(buffer->lines[point.y]);
+               int64_t next_line_len = strlen(buffer->lines[next_line_index]);
+               int64_t new_line_len = next_line_len + cur_line_len;
+               buffer->lines[next_line_index] = realloc(buffer->lines[next_line_index], new_line_len + 1);
+               strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
+               buffer->lines[next_line_index][new_line_len] = 0;
+               return ce_buffer_remove_lines(buffer, next_line_index, 1);
           }
 
+          // TODO: I'm not sure this applies, unless the line itself is empty
           length_left_on_line = 1;
      }
+
      if(length_left_on_line > length){
           // case: glue together left and right sides and cut out the middle
           char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);

@@ -1610,7 +1610,7 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      change.insertion = true;
      change.remove_line_if_empty = true;
      change.string = insert_string;
-     change.location = (CePoint_t){0, cursor_end.y}; // lie about where we inserted the newline so we remove the complete line
+     change.location = motion_range.start;
      change.cursor_before = view->cursor;
      change.cursor_after = cursor_end;
      ce_buffer_change(view->buffer, &change);
@@ -1637,13 +1637,12 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      change.insertion = true;
      change.remove_line_if_empty = true;
      change.string = insert_string;
-     change.location = (CePoint_t){0, cursor_end.y}; // lie about where we inserted the newline so we remove the complete line
+     change.location = motion_range.start;
      change.cursor_before = view->cursor;
      change.cursor_after = cursor_end;
      ce_buffer_change(view->buffer, &change);
 
      view->cursor = cursor_end;
-     insert_mode(vim);
      insert_mode(vim);
      return true;
 }
