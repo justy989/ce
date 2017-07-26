@@ -864,8 +864,13 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
      CE_CLAMP(view->scroll.y, 0, max_scroll_y);
 
      pthread_mutex_unlock(&view->buffer->lock);
-
      return view->scroll;
+}
+
+void ce_view_scroll_to(CeView_t* view, CePoint_t point){
+     view->scroll = point;
+     if(view->scroll.x < 0) view->scroll.x = 0;
+     if(view->scroll.y < 0) view->scroll.y = 0;
 }
 
 int64_t ce_utf8_strlen(const char* string){

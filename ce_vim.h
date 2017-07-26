@@ -153,6 +153,7 @@ CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, CeRu
 CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_around_pair(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);
@@ -172,6 +173,8 @@ CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t
 CeVimParseResult_t ce_vim_parse_verb_append(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_z_command(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t key);
 
 // motion functions
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_left);
@@ -199,6 +202,7 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_forward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_backward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_inside_pair);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_around_pair);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_end_of_file);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);
@@ -220,3 +224,5 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_normal_mode);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_append);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_append_at_end_of_line);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_last_action);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_z_command);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_g_command);
