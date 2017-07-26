@@ -17,6 +17,29 @@ CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
      return tab_layout;
 }
 
+void ce_layout_free(CeLayout_t** root){
+     CeLayout_t* layout = *root;
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               ce_layout_free(&layout->list.layouts[i]);
+          }
+          free(layout->list.layouts);
+          layout->list.layout_count = 0;
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          ce_layout_free(&layout->tab.root);
+          break;
+     }
+
+     free(*root);
+     *root = NULL;
+}
+
 static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
      switch(layout->type){
      default:
@@ -37,11 +60,7 @@ static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
      return NULL;
 }
 
-bool ce_layout_tab_split(CeLayout_t* layout, bool vertical){
-     assert(layout->type == CE_LAYOUT_TYPE_TAB);
-     if(layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
-          ce_log("wee\n");
-     }
+bool ce_layout_split(CeLayout_t* layout, bool vertical){
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
      if(parent_of_current){
           CeBuffer_t* buffer = ce_layout_find_buffer(layout->tab.current);
@@ -80,7 +99,7 @@ bool ce_layout_tab_split(CeLayout_t* layout, bool vertical){
                          }
                     }
 
-                    return ce_layout_tab_split(layout, vertical);
+                    return ce_layout_split(layout, vertical);
                }
                break;
           case CE_LAYOUT_TYPE_TAB:
@@ -92,7 +111,7 @@ bool ce_layout_tab_split(CeLayout_t* layout, bool vertical){
                list_layout->list.layouts[0] = layout->tab.current;
                list_layout->list.vertical = vertical;
                parent_of_current->tab.root = list_layout;
-               return ce_layout_tab_split(layout, vertical);
+               return ce_layout_split(layout, vertical);
           } break;
           }
 
@@ -202,3 +221,40 @@ CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node){
      return NULL;
 }
 
+bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node){
+     CeLayout_t* parent = ce_layout_find_parent(root, node);
+     if(!parent) return false;
+
+     switch(parent->type){
+     default:
+          return false;
+     case CE_LAYOUT_TYPE_LIST:
+     {
+          // find index of matching node
+          int64_t index = -1;
+          for(int64_t i = 0; i < parent->list.layout_count; i++){
+               if(parent->list.layouts[i] == node){
+                    index = i;
+                    break;
+               }
+          }
+
+          if(index == -1) return false;
+
+          ce_layout_free(&node);
+
+          // remove element, keeping element order
+          int64_t new_count = parent->list.layout_count - 1;
+          for(int64_t i = index; i < new_count; i++){
+               parent->list.layouts[i] = parent->list.layouts[i + 1];
+          }
+          parent->list.layout_count = new_count;
+
+          if(new_count == 0) return ce_layout_delete(root, parent);
+     } break;
+     case CE_LAYOUT_TYPE_TAB:
+          break;
+     }
+
+     return true;
+}

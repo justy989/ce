@@ -976,12 +976,12 @@ int main(int argc, char** argv){
                break;
           case 22: // Ctrl + v
                if(view) pthread_mutex_lock(&view->buffer->lock);
-               ce_layout_tab_split(tab_layout, false);
+               ce_layout_split(tab_layout, false);
                if(view) pthread_mutex_unlock(&view->buffer->lock);
                break;
           case 19: // Ctrl + s
                if(view) pthread_mutex_lock(&view->buffer->lock);
-               ce_layout_tab_split(tab_layout, true);
+               ce_layout_split(tab_layout, true);
                if(view) pthread_mutex_unlock(&view->buffer->lock);
                break;
           case 8: // Ctrl + h
@@ -1049,6 +1049,21 @@ int main(int argc, char** argv){
                CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
                if(layout) tab_layout->tab.current = layout;
           } break;
+          case 1: // Ctrl + a
+          {
+               // check if this is the only view, and ignore the delete request
+               if(tab_layout->tab.root == tab_layout->tab.current) break;
+               if(tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
+                  tab_layout->tab.root->list.layout_count == 1 &&
+                  tab_layout->tab.root->list.layouts[0] == tab_layout->tab.current) break;
+
+               CePoint_t cursor = {view_rect.left, view_rect.top};
+               if(view) cursor = view->cursor;
+               ce_layout_delete(tab_layout, tab_layout->tab.current);
+               ce_layout_distribute_rect(tab_layout, terminal_rect);
+               CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
+               if(layout) tab_layout->tab.current = layout;
+          } break;
           }
 
           draw_thread_data->ready_to_draw = true;
@@ -1061,6 +1076,7 @@ int main(int argc, char** argv){
      // cleanup
      // TODO: free buffer_node_head
      ce_buffer_free(buffer_list_buffer);
+     ce_layout_free(&tab_layout);
      free(buffer_list_buffer);
      ce_vim_free(&vim);
      free(draw_thread_data);
