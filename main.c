@@ -756,6 +756,18 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int6
      }
 }
 
+static CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width){
+     // move the visual cursor to the right location
+     int64_t visible_cursor_x = 0;
+     if(ce_buffer_point_is_valid(view->buffer, view->cursor)){
+          visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
+                                                                   view->cursor.x, tab_width);
+     }
+
+     return (CePoint_t){visible_cursor_x - view->scroll.x + view->rect.left,
+                        view->cursor.y - view->scroll.y + view->rect.top};
+}
+
 void* draw_thread(void* thread_data){
      DrawThreadData_t* data = (DrawThreadData_t*)thread_data;
      struct timeval previous_draw_time;
@@ -779,14 +791,8 @@ void* draw_thread(void* thread_data){
           standend();
           draw_layout(data->layout, data->vim, &color_defs, data->tab_width);
 
-          // move the visual cursor to the right location
-          int64_t visible_cursor_x = 0;
-          if(ce_buffer_point_is_valid(view->buffer, view->cursor)){
-               visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
-                                                                        view->cursor.x, data->tab_width);
-          }
-          move(view->cursor.y - view->scroll.y + view->rect.top,
-               visible_cursor_x - view->scroll.x + view->rect.left);
+          CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
+          move(screen_cursor.y, screen_cursor.x);
 
           refresh();
 
@@ -972,25 +978,29 @@ int main(int argc, char** argv){
                break;
           case 8: // Ctrl + h
           {
-               CePoint_t target = (CePoint_t){view->rect.left - 1, view->rect.top};
+               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+               CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
                CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                if(layout) tab_layout->tab.current = layout;
           } break;
           case 10: // Ctrl + j
           {
-               CePoint_t target = (CePoint_t){view->rect.left, view->rect.bottom + 1};
+               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+               CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
                CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                if(layout) tab_layout->tab.current = layout;
           } break;
           case 11: // Ctrl + k
           {
-               CePoint_t target = (CePoint_t){view->rect.left, view->rect.top - 1};
+               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+               CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
                CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                if(layout) tab_layout->tab.current = layout;
           } break;
           case 12: // Ctrl + l
           {
-               CePoint_t target = (CePoint_t){view->rect.right + 1, view->rect.top};
+               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+               CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
                CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                if(layout) tab_layout->tab.current = layout;
           } break;
