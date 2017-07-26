@@ -43,5 +43,6 @@ typedef struct CeLayout_t{
 
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer);
 bool ce_layout_tab_split(CeLayout_t* layout, bool vertical);
-CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point);
 void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect);
+CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point);
+CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node);

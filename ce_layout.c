@@ -17,23 +17,21 @@ CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
      return tab_layout;
 }
 
-static CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node){
-     switch(root->type){
+static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
+     switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
+          if(layout->view.buffer) return layout->view.buffer;
           break;
      case CE_LAYOUT_TYPE_LIST:
-          for(int64_t i = 0; i < root->list.layout_count; i++){
-               if(root->list.layouts[i] == node) return root;
-               CeLayout_t* found = ce_layout_find_parent(root->list.layouts[i], node);
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               CeBuffer_t* found = ce_layout_find_buffer(layout->list.layouts[i]);
                if(found) return found;
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          if(root->tab.root == node) return root;
-          else return ce_layout_find_parent(root->tab.root, node);
-          break;
+          return ce_layout_find_buffer(layout->tab.root);
      }
 
      return NULL;
@@ -41,8 +39,13 @@ static CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node){
 
 bool ce_layout_tab_split(CeLayout_t* layout, bool vertical){
      assert(layout->type == CE_LAYOUT_TYPE_TAB);
+     if(layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
+          ce_log("wee\n");
+     }
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
      if(parent_of_current){
+          CeBuffer_t* buffer = ce_layout_find_buffer(layout->tab.current);
+          assert(buffer);
           switch(parent_of_current->type){
           default:
                break;
@@ -51,8 +54,7 @@ bool ce_layout_tab_split(CeLayout_t* layout, bool vertical){
                     CeLayout_t* new_layout = calloc(1, sizeof(*new_layout));
                     if(!new_layout) return false;
                     new_layout->type = CE_LAYOUT_TYPE_VIEW;
-                    // TODO: find a better way of deciding what buffer to give this new view
-                    new_layout->view.buffer = layout->tab.current->view.buffer;
+                    new_layout->view.buffer = buffer;
 
                     int64_t new_layout_count = parent_of_current->list.layout_count + 1;
                     parent_of_current->list.layouts = realloc(parent_of_current->list.layouts,
@@ -177,3 +179,26 @@ CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point){
 
      return NULL;
 }
+
+CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node){
+     switch(root->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < root->list.layout_count; i++){
+               if(root->list.layouts[i] == node) return root;
+               CeLayout_t* found = ce_layout_find_parent(root->list.layouts[i], node);
+               if(found) return found;
+          }
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          if(root->tab.root == node) return root;
+          else return ce_layout_find_parent(root->tab.root, node);
+          break;
+     }
+
+     return NULL;
+}
+

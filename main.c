@@ -786,13 +786,48 @@ void* draw_thread(void* thread_data){
                sleep(0);
           }
 
-          CeView_t* view = &data->layout->tab.current->view;
 
           standend();
           draw_layout(data->layout, data->vim, &color_defs, data->tab_width);
 
-          CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
-          move(screen_cursor.y, screen_cursor.x);
+          // show border when non view is selected
+          if(data->layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
+               int64_t rect_height = 0;
+               int64_t rect_width = 0;
+               CeRect_t* rect = NULL;
+               switch(data->layout->tab.current->type){
+               default:
+                    break;
+               case CE_LAYOUT_TYPE_LIST:
+                    rect = &data->layout->tab.current->list.rect;
+                    rect_width = rect->right - rect->left;
+                    rect_height = rect->bottom - rect->top;
+                    break;
+               case CE_LAYOUT_TYPE_TAB:
+                    rect = &data->layout->tab.current->tab.rect;
+                    rect_width = rect->right - rect->left;
+                    rect_height = rect->bottom - rect->top;
+                    break;
+               }
+
+               int color_pair = color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+               attron(COLOR_PAIR(color_pair));
+               for(int i = 1; i < rect_height - 1; i++){
+                    mvaddch(rect->top + i, rect->right, ACS_VLINE);
+                    mvaddch(rect->top + i, rect->left, ACS_VLINE);
+               }
+
+               for(int i = 1; i < rect_width - 1; i++){
+                    mvaddch(rect->top, rect->left + i, ACS_HLINE);
+                    mvaddch(rect->bottom, rect->left + i, ACS_HLINE);
+               }
+
+               move(0, 0);
+          }else{
+               CeView_t* view = &data->layout->tab.current->view;
+               CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
+               move(screen_cursor.y, screen_cursor.x);
+          }
 
           refresh();
 
@@ -800,6 +835,12 @@ void* draw_thread(void* thread_data){
      }
 
      return NULL;
+}
+
+static CePoint_t point_modulus_dimensions(CePoint_t p, int64_t x, int64_t y){
+     p.x %= x;
+     p.y %= y;
+     return p;
 }
 
 int main(int argc, char** argv){
@@ -864,56 +905,7 @@ int main(int argc, char** argv){
 
      ce_vim_add_key_bind(&vim, 'S', &custom_vim_parse_verb_substitute);
 
-     // layout setup
      CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
-#if 0
-     CeLayout_t* tab_layout = NULL;
-     {
-          tab_layout = calloc(1, sizeof(*tab_layout));
-
-          CeLayout_t* list_layout = calloc(1, sizeof(*list_layout));
-          list_layout->type = CE_LAYOUT_TYPE_LIST;
-          list_layout->list.layout_count = 3;
-          list_layout->list.layouts = calloc(list_layout->list.layout_count, sizeof(*list_layout->list.layouts));
-
-          CeLayout_t* view_layout = calloc(1, sizeof(*view_layout));
-          view_layout->type = CE_LAYOUT_TYPE_VIEW;
-          view_layout->view.buffer = buffer_node_head->buffer;
-          list_layout->list.layouts[0] = view_layout;
-
-          view_layout = calloc(1, sizeof(*view_layout));
-          view_layout->type = CE_LAYOUT_TYPE_VIEW;
-          view_layout->view.buffer = buffer_node_head->buffer;
-          list_layout->list.layouts[1] = view_layout;
-
-          CeLayout_t* next_list_layout = calloc(1, sizeof(*list_layout));
-          next_list_layout->type = CE_LAYOUT_TYPE_LIST;
-          next_list_layout->list.layout_count = 3;
-          next_list_layout->list.vertical = true;
-          next_list_layout->list.layouts = calloc(next_list_layout->list.layout_count, sizeof(*next_list_layout->list.layouts));
-          list_layout->list.layouts[2] = next_list_layout;
-
-          view_layout = calloc(1, sizeof(*view_layout));
-          view_layout->type = CE_LAYOUT_TYPE_VIEW;
-          view_layout->view.buffer = buffer_node_head->buffer;
-          next_list_layout->list.layouts[0] = view_layout;
-
-          view_layout = calloc(1, sizeof(*view_layout));
-          view_layout->type = CE_LAYOUT_TYPE_VIEW;
-          view_layout->view.buffer = buffer_node_head->buffer;
-          next_list_layout->list.layouts[1] = view_layout;
-
-          view_layout = calloc(1, sizeof(*view_layout));
-          view_layout->type = CE_LAYOUT_TYPE_VIEW;
-          view_layout->view.buffer = buffer_node_head->buffer;
-          next_list_layout->list.layouts[2] = view_layout;
-
-          tab_layout = calloc(1, sizeof(*tab_layout));
-          tab_layout->type = CE_LAYOUT_TYPE_TAB;
-          tab_layout->tab.root = list_layout;
-          tab_layout->tab.current = view_layout;
-     }
-#endif
 
      // init draw thread
      pthread_t thread_draw;
@@ -932,11 +924,26 @@ int main(int argc, char** argv){
           CeRect_t terminal_rect = {0, terminal_width - 1, 0, terminal_height - 1};
           ce_layout_distribute_rect(tab_layout, terminal_rect);
 
-          CeView_t* view = &tab_layout->tab.current->view;
+          CeView_t* view = NULL;
+          CeRect_t view_rect = {};
+          switch(tab_layout->tab.current->type){
+          default:
+               break;
+          case CE_LAYOUT_TYPE_VIEW:
+               view = &tab_layout->tab.current->view;
+               break;
+          case CE_LAYOUT_TYPE_LIST:
+               view_rect = tab_layout->list.rect;
+               break;
+          case CE_LAYOUT_TYPE_TAB:
+               view_rect = tab_layout->tab.rect;
+               break;
+          }
 
           int key = getch();
           switch(key){
           default:
+               if(!view) break;
                if(key == KEY_ENTER){
                     if(view->buffer == buffer_list_buffer){
                          BufferNode_t* itr = buffer_node_head;
@@ -960,48 +967,86 @@ int main(int argc, char** argv){
                done = true;
                break;
           case 23: // Ctrl + w
-               ce_buffer_save(view->buffer);
+               if(view) ce_buffer_save(view->buffer);
                break;
           case 2: // Ctrl + b
+               if(!view) break;
                build_buffer_list(buffer_list_buffer, buffer_node_head);
                view_switch_buffer(view, buffer_list_buffer);
                break;
           case 22: // Ctrl + v
-               pthread_mutex_lock(&view->buffer->lock);
-               ce_layout_tab_split(tab_layout, true);
-               pthread_mutex_unlock(&view->buffer->lock);
+               if(view) pthread_mutex_lock(&view->buffer->lock);
+               ce_layout_tab_split(tab_layout, false);
+               if(view) pthread_mutex_unlock(&view->buffer->lock);
                break;
           case 19: // Ctrl + s
-               pthread_mutex_lock(&view->buffer->lock);
-               ce_layout_tab_split(tab_layout, false);
-               pthread_mutex_unlock(&view->buffer->lock);
+               if(view) pthread_mutex_lock(&view->buffer->lock);
+               ce_layout_tab_split(tab_layout, true);
+               if(view) pthread_mutex_unlock(&view->buffer->lock);
                break;
           case 8: // Ctrl + h
           {
-               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-               CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
-               CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-               if(layout) tab_layout->tab.current = layout;
+               if(view){
+                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                    CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }else{
+                    CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }
           } break;
           case 10: // Ctrl + j
           {
-               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-               CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
-               CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-               if(layout) tab_layout->tab.current = layout;
+               if(view){
+                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                    CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }else{
+                    CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }
           } break;
           case 11: // Ctrl + k
           {
-               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-               CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
-               CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-               if(layout) tab_layout->tab.current = layout;
+               if(view){
+                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                    CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }else{
+                    CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    if(layout) tab_layout->tab.current = layout;
+               }
           } break;
           case 12: // Ctrl + l
           {
-               CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-               CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
-               CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+               if(view){
+                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                    CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }else{
+                    CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
+                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                    if(layout) tab_layout->tab.current = layout;
+               }
+          } break;
+          case 16: // Ctrl + p
+          {
+               CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
                if(layout) tab_layout->tab.current = layout;
           } break;
           }
