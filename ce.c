@@ -1134,6 +1134,11 @@ bool ce_points_equal(CePoint_t a, CePoint_t b){
      return (a.x == b.x) && (a.y == b.y);
 }
 
+bool ce_point_in_rect(CePoint_t a, CeRect_t r){
+     return (a.x >= r.left && a.x <= r.right &&
+             a.y >= r.top && a.y <= r.bottom);
+}
+
 bool ce_rune_node_insert(CeRuneNode_t** head, CeRune_t rune){
      CeRuneNode_t* node = malloc(sizeof(*node));
      if(!node) return false;

@@ -170,6 +170,7 @@ int64_t ce_util_visible_index_to_string_index(const char* string, int64_t charac
 
 bool ce_point_after(CePoint_t a, CePoint_t b);
 bool ce_points_equal(CePoint_t a, CePoint_t b);
+bool ce_point_in_rect(CePoint_t a, CeRect_t r);
 
 bool ce_rune_node_insert(CeRuneNode_t** head, CeRune_t rune);
 CeRune_t* ce_rune_node_string(CeRuneNode_t* head);

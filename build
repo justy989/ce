@@ -1,6 +1,6 @@
 #!/bin/bash
 set -x
-SOURCES=(main.c ce.c ce_vim.c)
+SOURCES=(main.c ce.c ce_vim.c ce_layout.c)
 FLAGS='-Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3'
 EXE='ce'
 LINK='-lpthread -lncursesw'
