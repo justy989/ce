@@ -25,6 +25,18 @@ bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
+void buffer_node_free(BufferNode_t** head){
+     BufferNode_t* itr = *head;
+     while(itr){
+          BufferNode_t* tmp = itr;
+          itr = itr->next;
+          ce_buffer_free(tmp->buffer);
+          free(tmp->buffer);
+          free(tmp);
+     }
+     *head = NULL;
+}
+
 typedef struct DrawColorNode_t{
      int fg;
      int bg;
@@ -1074,10 +1086,8 @@ int main(int argc, char** argv){
      pthread_join(thread_draw, NULL);
 
      // cleanup
-     // TODO: free buffer_node_head
-     ce_buffer_free(buffer_list_buffer);
+     buffer_node_free(&buffer_node_head);
      ce_layout_free(&tab_layout);
-     free(buffer_list_buffer);
      ce_vim_free(&vim);
      free(draw_thread_data);
      endwin();
