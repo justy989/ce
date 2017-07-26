@@ -535,6 +535,7 @@ CePoint_t ce_vim_move_end_little_word(CeBuffer_t* buffer, CePoint_t start){
           start.x++;
 
           if(*itr == 0){
+               if(state == WORD_INSIDE_WORD) break;
                if(start.y >= buffer->line_count - 1) break;
                start.x = 0;
                start.y++;
