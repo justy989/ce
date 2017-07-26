@@ -148,7 +148,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                          CeBufferChange_t change = {};
                          change.chain = vim->chain_undo;
                          change.insertion = true;
-                         change.remove_line_if_empty = true;
+                         change.remove_line_if_empty = (key == CE_NEWLINE);
                          change.string = strdup(str);
                          change.location = view->cursor;
                          change.cursor_before = view->cursor;
@@ -1676,6 +1676,7 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      ce_buffer_change(view->buffer, &change);
 
      view->cursor = cursor_end;
+     vim->chain_undo = true;
      insert_mode(vim);
      return true;
 }
@@ -1683,7 +1684,7 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
 bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                             const CeConfigOptions_t* config_options){
      // TODO: insert whitespace for indentation
-     // insert newline on next line
+     // insert newline at the end of the current line
      char* insert_string = strdup("\n");
      motion_range.start.x = ce_utf8_strlen(view->buffer->lines[motion_range.start.y]);
      if(!ce_buffer_insert_string(view->buffer, insert_string, motion_range.start)) return false;
@@ -1703,6 +1704,7 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      ce_buffer_change(view->buffer, &change);
 
      view->cursor = cursor_end;
+     vim->chain_undo = true;
      insert_mode(vim);
      return true;
 }

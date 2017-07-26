@@ -440,12 +440,12 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      }else if(string_lines == 1){
           pthread_mutex_lock(&buffer->lock);
 
+          char* line = buffer->lines[point.y];
           size_t insert_len = strlen(string);
-          size_t existing_len = strlen(buffer->lines[point.y]);
+          size_t existing_len = strlen(line);
           size_t total_len = insert_len + existing_len;
 
           // re-alloc the new size
-          char* line = buffer->lines[point.y];
           line = realloc(line, total_len + 1);
           if(!line){
                pthread_mutex_unlock(&buffer->lock);
@@ -549,14 +549,14 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                int64_t cur_line_len = strlen(buffer->lines[point.y]);
                int64_t next_line_len = strlen(buffer->lines[next_line_index]);
                int64_t new_line_len = next_line_len + cur_line_len;
-               buffer->lines[next_line_index] = realloc(buffer->lines[next_line_index], new_line_len + 1);
+               buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
                strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
-               buffer->lines[next_line_index][new_line_len] = 0;
+               buffer->lines[point.y][new_line_len] = 0;
                return ce_buffer_remove_lines(buffer, next_line_index, 1);
           }
 
           // TODO: I'm not sure this applies, unless the line itself is empty
-          length_left_on_line = 1;
+          //length_left_on_line = 1;
      }
 
      if(length_left_on_line > length){
