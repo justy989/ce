@@ -934,7 +934,7 @@ int main(int argc, char** argv){
      }
 
      CeConfigOptions_t config_options = {};
-     config_options.tab_width = 8;
+     config_options.tab_width = 5;
      config_options.horizontal_scroll_off = 10;
      config_options.vertical_scroll_off = 5;
 

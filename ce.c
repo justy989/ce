@@ -625,9 +625,9 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
      int64_t length_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
-     if(length_left_on_line == 0){
-          if(length == 0){
-               // perform a join
+     if(length == 0){
+          if(length_left_on_line == 0){
+               // perform a join with the next line
                int64_t next_line_index = point.y + 1;
                if(next_line_index > buffer->line_count) return false;
                int64_t cur_line_len = strlen(buffer->lines[point.y]);
@@ -637,10 +637,20 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
                buffer->lines[point.y][new_line_len] = 0;
                return ce_buffer_remove_lines(buffer, next_line_index, 1);
+          }else if(point.x == 0){
+               // perform a join with the previous line
+               int64_t prev_line_index = point.y - 1;
+               if(prev_line_index < 0) return false;
+               int64_t cur_line_len = strlen(buffer->lines[point.y]);
+               int64_t prev_line_len = strlen(buffer->lines[prev_line_index]);
+               int64_t new_line_len = prev_line_len + cur_line_len;
+               buffer->lines[prev_line_index] = realloc(buffer->lines[prev_line_index], new_line_len + 1);
+               strncpy(buffer->lines[prev_line_index] + prev_line_len, buffer->lines[point.y], cur_line_len);
+               buffer->lines[prev_line_index][new_line_len] = 0;
+               return ce_buffer_remove_lines(buffer, point.y, 1);
           }
 
-          // TODO: I'm not sure this applies, unless the line itself is empty
-          //length_left_on_line = 1;
+          assert(!"we should never get here");
      }
 
      if(length_left_on_line > length){
@@ -1017,6 +1027,36 @@ int64_t ce_utf8_insertion_strlen(const char* string){
      }
 
      return len;
+}
+
+int64_t ce_utf8_strlen_between(const char* start, const char* end){
+     int64_t len = 0;
+     int64_t byte_count = 0;
+
+     while(start <= end){
+          if((*start & 0x80) == 0){
+               byte_count = 1;
+          }else if((*start & 0xE0) == 0xC0){
+               byte_count = 2;
+          }else if((*start & 0xF0) == 0xE0){
+               byte_count = 3;
+          }else if((*start & 0xF8) == 0xF0){
+               byte_count = 4;
+          }else{
+               return -1;
+          }
+
+          // validate string doesn't early terminate
+          for(int64_t i = 0; i < byte_count; i++){
+               if(*start == 0) return -1;
+               start++;
+          }
+
+          len++;
+     }
+
+     return len;
+
 }
 
 int64_t ce_utf8_last_index(const char* string){

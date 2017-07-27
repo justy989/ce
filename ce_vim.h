@@ -115,6 +115,7 @@ CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* ke
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options);
 
 // util
+// TODO: add const, since most of these are just readonly
 int64_t ce_vim_soft_begin_line(CeBuffer_t* buffer, int64_t line); // returns -1
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
 CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start);
@@ -131,6 +132,7 @@ CeVimMotionRange_t ce_vim_find_around_pair(CeBuffer_t* buffer, CePoint_t start, 
 int64_t ce_vim_yank_register_index(CeRune_t rune);
 bool ce_vim_motion_range_sort(CeVimMotionRange_t* motion_range);
 void ce_vim_add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function);
+int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length);
 
 // parse functions
 CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key);
