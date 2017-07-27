@@ -86,6 +86,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'C', &ce_vim_parse_verb_change_to_end_of_line);
      ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
      ce_vim_add_key_bind(vim, 'x', &ce_vim_parse_verb_delete_character);
+     ce_vim_add_key_bind(vim, 's', &ce_vim_parse_verb_substitute_character);
      ce_vim_add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
      ce_vim_add_key_bind(vim, '"', &ce_vim_parse_select_yank_register);
      ce_vim_add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
@@ -1120,6 +1121,11 @@ CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeR
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_substitute_character;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == &ce_vim_verb_yank){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1643,6 +1649,16 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeV
      }
 
      return true;
+}
+
+bool ce_vim_verb_substitute_character(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                                      const CeConfigOptions_t* config_options){
+     bool success = ce_vim_verb_delete_character(vim, action, motion_range, view, config_options);
+     if(success){
+          vim->chain_undo = true;
+          vim->mode = CE_VIM_MODE_INSERT;
+     }
+     return success;
 }
 
 bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
