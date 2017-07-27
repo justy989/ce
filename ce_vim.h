@@ -115,6 +115,7 @@ CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* ke
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options);
 
 // util
+int64_t ce_vim_soft_begin_line(CeBuffer_t* buffer, int64_t line); // returns -1
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
 CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_end_little_word(CeBuffer_t* buffer, CePoint_t start);
@@ -163,6 +164,7 @@ CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_substitute_soft_begin_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key);
@@ -218,6 +220,7 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_change);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_character);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_delete_character);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_substitute_character);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_substitute_soft_begin_line);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_yank);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_before);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_paste_after);

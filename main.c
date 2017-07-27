@@ -967,7 +967,15 @@ int main(int argc, char** argv){
      CeVim_t vim = {};
      ce_vim_init(&vim);
 
-     ce_vim_add_key_bind(&vim, 'S', &custom_vim_parse_verb_substitute);
+     // ce_vim_add_key_bind(&vim, 'S', &custom_vim_parse_verb_substitute);
+     // override 'S' key
+     for(int64_t i = 0; i < vim.key_bind_count; ++i){
+          CeVimKeyBind_t* key_bind = vim.key_binds + i;
+          if(key_bind->key == 'S'){
+               key_bind->function = &custom_vim_parse_verb_substitute;
+               break;
+          }
+     }
 
      CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
 
@@ -1023,9 +1031,200 @@ int main(int argc, char** argv){
           }
 
           int key = getch();
-          switch(key){
-          default:
-               if(!view) break;
+          bool handled_key = false;
+
+          if(vim.mode == CE_VIM_MODE_NORMAL){
+               handled_key = true;
+
+               switch(key){
+               default:
+                    handled_key = false;
+                    break;
+               case KEY_CLOSE:
+                    done = true;
+                    break;
+               case 23: // Ctrl + w
+                    if(view) ce_buffer_save(view->buffer);
+                    break;
+               case 2: // Ctrl + b
+                    if(!view) break;
+                    build_buffer_list(buffer_list_buffer, buffer_node_head);
+                    view_switch_buffer(view, buffer_list_buffer, &vim);
+                    break;
+               case 22: // Ctrl + v
+                    if(view) pthread_mutex_lock(&view->buffer->lock);
+                    ce_layout_split(tab_layout, false);
+                    if(view) pthread_mutex_unlock(&view->buffer->lock);
+                    break;
+               case 19: // Ctrl + s
+                    if(view) pthread_mutex_lock(&view->buffer->lock);
+                    ce_layout_split(tab_layout, true);
+                    if(view) pthread_mutex_unlock(&view->buffer->lock);
+                    break;
+               case 8: // Ctrl + h
+               {
+                    if(view){
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }else{
+                         CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }
+               } break;
+               case 10: // Ctrl + j
+               {
+                    if(view){
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }else{
+                         CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }
+               } break;
+               case 11: // Ctrl + k
+               {
+                    if(view){
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }else{
+                         CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }
+               } break;
+               case 12: // Ctrl + l
+               {
+                    if(view){
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }else{
+                         CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
+                         target.x %= terminal_width;
+                         target.y %= terminal_height;
+                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+                         if(layout){
+                              tab_layout->tab.current = layout;
+                              vim.mode = CE_VIM_MODE_NORMAL;
+                              input_mode = false;
+                         }
+                    }
+               } break;
+               case 16: // Ctrl + p
+               {
+                    CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
+                    if(layout) tab_layout->tab.current = layout;
+               } break;
+               case 1: // Ctrl + a
+               {
+                    // check if this is the only view, and ignore the delete request
+                    if(tab_layout->tab.root == tab_layout->tab.current) break;
+                    if(tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
+                       tab_layout->tab.root->list.layout_count == 1 &&
+                       tab_layout->tab.root->list.layouts[0] == tab_layout->tab.current) break;
+                    if(input_mode) break;
+
+                    CePoint_t cursor = {view_rect.left, view_rect.top};
+                    if(view) cursor = view->cursor;
+                    ce_layout_delete(tab_layout, tab_layout->tab.current);
+                    ce_layout_distribute_rect(tab_layout, terminal_rect);
+                    CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
+                    if(layout) tab_layout->tab.current = layout;
+               } break;
+               case 6: // Ctrl + f
+               {
+                    if(!view || input_mode) break;
+                    input_mode = enable_input_mode(&input_view, view, &vim, "LOAD FILE");
+               } break;
+               case '/':
+               {
+                    if(!view || input_mode) break;
+                    input_mode = enable_input_mode(&input_view, view, &vim, "SEARCH");
+               } break;
+               case '?':
+               {
+                    if(!view || input_mode) break;
+                    input_mode = enable_input_mode(&input_view, view, &vim, "REVERSE SEARCH");
+               } break;
+               }
+
+               if(input_mode){
+                    if(strcmp(input_view.buffer->name, "SEARCH") == 0){
+                         if(input_view.buffer->line_count && view->buffer->line_count){
+                              CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+                              if(match_point.x >= 0){
+                                   view->cursor = match_point;
+                                   view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
+                                                                        config_options.vertical_scroll_off,
+                                                                        config_options.tab_width);
+                              }
+                         }
+                    }else if(strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
+                         if(input_view.buffer->line_count && view->buffer->line_count){
+                              CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+                              if(match_point.x >= 0){
+                                   view->cursor = match_point;
+                                   view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
+                                                                        config_options.vertical_scroll_off,
+                                                                        config_options.tab_width);
+                              }
+                         }
+                    }
+               }
+          }
+
+          if(!handled_key){
                if(key == KEY_ENTER){
                     if(view->buffer == buffer_list_buffer){
                          BufferNode_t* itr = buffer_node_head;
@@ -1077,188 +1276,6 @@ int main(int argc, char** argv){
 
                if(input_mode) ce_vim_handle_key(&vim, &input_view, key, &config_options);
                else ce_vim_handle_key(&vim, view, key, &config_options);
-               break;
-          case KEY_CLOSE:
-               done = true;
-               break;
-          case 23: // Ctrl + w
-               if(view) ce_buffer_save(view->buffer);
-               break;
-          case 2: // Ctrl + b
-               if(!view) break;
-               build_buffer_list(buffer_list_buffer, buffer_node_head);
-               view_switch_buffer(view, buffer_list_buffer, &vim);
-               break;
-          case 22: // Ctrl + v
-               if(view) pthread_mutex_lock(&view->buffer->lock);
-               ce_layout_split(tab_layout, false);
-               if(view) pthread_mutex_unlock(&view->buffer->lock);
-               break;
-          case 19: // Ctrl + s
-               if(view) pthread_mutex_lock(&view->buffer->lock);
-               ce_layout_split(tab_layout, true);
-               if(view) pthread_mutex_unlock(&view->buffer->lock);
-               break;
-          case 8: // Ctrl + h
-          {
-               if(view){
-                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-                    CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }else{
-                    CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }
-          } break;
-          case 10: // Ctrl + j
-          {
-               if(view){
-                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-                    CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }else{
-                    CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }
-          } break;
-          case 11: // Ctrl + k
-          {
-               if(view){
-                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-                    CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }else{
-                    CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }
-          } break;
-          case 12: // Ctrl + l
-          {
-               if(view){
-                    CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
-                    CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }else{
-                    CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
-                    target.x %= terminal_width;
-                    target.y %= terminal_height;
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout){
-                         tab_layout->tab.current = layout;
-                         vim.mode = CE_VIM_MODE_NORMAL;
-                         input_mode = false;
-                    }
-               }
-          } break;
-          case 16: // Ctrl + p
-          {
-               CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
-               if(layout) tab_layout->tab.current = layout;
-          } break;
-          case 1: // Ctrl + a
-          {
-               // check if this is the only view, and ignore the delete request
-               if(tab_layout->tab.root == tab_layout->tab.current) break;
-               if(tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
-                  tab_layout->tab.root->list.layout_count == 1 &&
-                  tab_layout->tab.root->list.layouts[0] == tab_layout->tab.current) break;
-               if(input_mode) break;
-
-               CePoint_t cursor = {view_rect.left, view_rect.top};
-               if(view) cursor = view->cursor;
-               ce_layout_delete(tab_layout, tab_layout->tab.current);
-               ce_layout_distribute_rect(tab_layout, terminal_rect);
-               CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
-               if(layout) tab_layout->tab.current = layout;
-          } break;
-          case 6: // Ctrl + f
-          {
-               if(!view || input_mode) break;
-               input_mode = enable_input_mode(&input_view, view, &vim, "LOAD FILE");
-          } break;
-          case '/':
-          {
-               if(!view || input_mode) break;
-               input_mode = enable_input_mode(&input_view, view, &vim, "SEARCH");
-          } break;
-          case '?':
-          {
-               if(!view || input_mode) break;
-               input_mode = enable_input_mode(&input_view, view, &vim, "REVERSE SEARCH");
-          } break;
-          }
-
-          if(input_mode){
-               if(strcmp(input_view.buffer->name, "SEARCH") == 0){
-                    if(input_view.buffer->line_count && view->buffer->line_count){
-                         CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
-                         if(match_point.x >= 0){
-                              view->cursor = match_point;
-                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
-                                                                   config_options.vertical_scroll_off,
-                                                                   config_options.tab_width);
-                         }
-                    }
-               }else if(strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
-                    if(input_view.buffer->line_count && view->buffer->line_count){
-                         CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, input_view.buffer->lines[0]);
-                         if(match_point.x >= 0){
-                              view->cursor = match_point;
-                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
-                                                                   config_options.vertical_scroll_off,
-                                                                   config_options.tab_width);
-                         }
-                    }
-               }
           }
 
           draw_thread_data->ready_to_draw = true;

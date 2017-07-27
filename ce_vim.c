@@ -87,6 +87,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
      ce_vim_add_key_bind(vim, 'x', &ce_vim_parse_verb_delete_character);
      ce_vim_add_key_bind(vim, 's', &ce_vim_parse_verb_substitute_character);
+     ce_vim_add_key_bind(vim, 'S', &ce_vim_parse_verb_substitute_soft_begin_line);
      ce_vim_add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
      ce_vim_add_key_bind(vim, '"', &ce_vim_parse_select_yank_register);
      ce_vim_add_key_bind(vim, 'P', &ce_vim_parse_verb_paste_before);
@@ -365,6 +366,24 @@ typedef enum{
      WORD_INSIDE_OTHER,
      WORD_NEW_LINE,
 }WordState_t;
+
+int64_t ce_vim_soft_begin_line(CeBuffer_t* buffer, int64_t line){
+     if(line < 0 || line >= buffer->line_count) return -1;
+
+     const char* itr = buffer->lines[line];
+     int64_t index = 0;
+     int64_t rune_len = 0;
+     CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+
+     while(true){
+          rune = ce_utf8_decode(itr, &rune_len);
+          itr += rune_len;
+          if(isspace(rune)) index++;
+          else break;
+     }
+
+     return index;
+}
 
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
      if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
@@ -1126,6 +1145,11 @@ CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action,
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_substitute_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == &ce_vim_verb_yank){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1324,20 +1348,9 @@ bool ce_vim_motion_begin_big_word(const CeVim_t* vim, CeVimAction_t* action, con
 
 bool ce_vim_motion_soft_begin_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                    const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     if(!ce_buffer_point_is_valid(view->buffer, motion_range->end)) return false;
-     const char* itr = view->buffer->lines[motion_range->end.y];
-     int64_t index = 0;
-     int64_t rune_len = 0;
-     CeRune_t rune = ce_utf8_decode(itr, &rune_len);
-
-     while(true){
-          rune = ce_utf8_decode(itr, &rune_len);
-          itr += rune_len;
-          if(isspace(rune)) index++;
-          else break;
-     }
-
-     motion_range->end = (CePoint_t){index, motion_range->end.y};
+     int64_t result = ce_vim_soft_begin_line(view->buffer, motion_range->end.y);
+     if(result < 0) return false;
+     motion_range->end.x = result;
      return true;
 }
 
@@ -1349,8 +1362,7 @@ bool ce_vim_motion_hard_begin_line(const CeVim_t* vim, CeVimAction_t* action, co
 
 bool ce_vim_motion_end_line(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                             const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     int64_t last_index = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
-     motion_range->end = (CePoint_t){last_index, motion_range->end.y};
+     motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
      return true;
 }
 
@@ -1654,6 +1666,22 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeV
 bool ce_vim_verb_substitute_character(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                                       const CeConfigOptions_t* config_options){
      bool success = ce_vim_verb_delete_character(vim, action, motion_range, view, config_options);
+     if(success){
+          vim->chain_undo = true;
+          vim->mode = CE_VIM_MODE_INSERT;
+     }
+     return success;
+}
+
+bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                                            const CeConfigOptions_t* config_options){
+     int64_t soft_begin_index = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+     if(soft_begin_index < 0) return false;
+
+     view->cursor.x = soft_begin_index;
+     motion_range.start = view->cursor;
+     motion_range.end.x = ce_utf8_last_index(view->buffer->lines[motion_range.end.y]);
+     bool success = ce_vim_verb_change(vim, action, motion_range, view, config_options);
      if(success){
           vim->chain_undo = true;
           vim->mode = CE_VIM_MODE_INSERT;
