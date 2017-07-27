@@ -101,6 +101,7 @@ typedef struct CeVim_t{
      CeRuneNode_t* insert_rune_head;
      bool chain_undo;
      bool verb_last_action; // flag whether or not we are repeating our last action
+     bool search_forward;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
@@ -155,6 +156,7 @@ CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune
 CeVimParseResult_t ce_vim_parse_motion_around_pair(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);
@@ -205,6 +207,7 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_inside_pair);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_around_pair);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_end_of_file);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_next);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_prev);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);

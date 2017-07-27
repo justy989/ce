@@ -73,6 +73,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'a', &ce_vim_parse_motion_around_pair);
      ce_vim_add_key_bind(vim, 'G', &ce_vim_parse_motion_end_of_file);
      ce_vim_add_key_bind(vim, 'n', &ce_vim_parse_motion_search_next);
+     ce_vim_add_key_bind(vim, 'N', &ce_vim_parse_motion_search_prev);
      ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
      ce_vim_add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
      ce_vim_add_key_bind(vim, 'V', &ce_vim_parse_verb_visual_line_mode);
@@ -1067,6 +1068,10 @@ CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune
      return parse_motion_direction(action, ce_vim_motion_search_next);
 }
 
+CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_search_prev);
+}
+
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1446,8 +1451,31 @@ bool ce_vim_motion_search_next(const CeVim_t* vim, CeVimAction_t* action, const 
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
      if(!yank->text) return false;
-     CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
-     CePoint_t result = ce_buffer_search_forward(view->buffer, start, yank->text);
+     CePoint_t result = {-1, -1};
+     if(vim->search_forward){
+          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
+          result = ce_buffer_search_forward(view->buffer, start, yank->text);
+     }else{
+          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
+          result = ce_buffer_search_backward(view->buffer, start, yank->text);
+     }
+     if(result.x < 0) return false;
+     motion_range->end = result;
+     return true;
+}
+
+bool ce_vim_motion_search_prev(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
+                               const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+     if(!yank->text) return false;
+     CePoint_t result = {-1, -1};
+     if(vim->search_forward){
+          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
+          result = ce_buffer_search_backward(view->buffer, start, yank->text);
+     }else{
+          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
+          result = ce_buffer_search_forward(view->buffer, start, yank->text);
+     }
      if(result.x < 0) return false;
      motion_range->end = result;
      return true;

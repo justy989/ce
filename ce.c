@@ -309,6 +309,50 @@ CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const ch
      return result;
 }
 
+CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const char* pattern){
+     CePoint_t result = (CePoint_t){-1, -1};
+
+     if(!ce_buffer_point_is_valid(buffer, start)) return result;
+
+     char* beginning_of_line = buffer->lines[start.y];
+     char* itr = ce_utf8_find_index(beginning_of_line, start.x);
+     bool match = false;
+     size_t pattern_len = strlen(pattern);
+
+     // try to match the pattern on each line to the end
+     while(true){
+          while(itr > beginning_of_line){
+               if(strncmp(itr, pattern, pattern_len) == 0){
+                    match = true;
+                    break;
+               }
+
+               itr--;
+          }
+          if(match) break;
+          start.y--;
+          if(start.y < 0) break;
+          beginning_of_line = buffer->lines[start.y];
+          itr = beginning_of_line + ce_utf8_last_index(beginning_of_line);
+     }
+
+     if(match){
+          // figure out index in the line
+          int64_t index = 0;
+          int64_t rune_len = 0;
+          while(itr > beginning_of_line){
+               ce_utf8_decode(beginning_of_line, &rune_len);
+               beginning_of_line += rune_len;
+               index++;
+          }
+
+          result.x = index;
+          result.y = start.y;
+     }
+
+     return result;
+}
+
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;
      if(!ce_buffer_point_is_valid(buffer, end)) return -1;

@@ -1040,7 +1040,8 @@ int main(int argc, char** argv){
                                    // TODO: figure out type based on extention
                                    buffer->type = CE_BUFFER_FILE_TYPE_C;
                               }
-                         }else if(strcmp(input_view.buffer->name, "SEARCH") == 0){
+                         }else if(strcmp(input_view.buffer->name, "SEARCH") == 0 ||
+                                  strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
                               // update yanks
                               int64_t index = ce_vim_yank_register_index('/');
                               CeVimYank_t* yank = vim.yanks + index;
@@ -1225,11 +1226,11 @@ int main(int argc, char** argv){
                ce_buffer_alloc(input_view.buffer, 1, "SEARCH");
                input_view.cursor = (CePoint_t){0, 0};
                vim.mode = CE_VIM_MODE_INSERT;
+               vim.search_forward = true;
 
                // now popup the view
                input_mode = true;
           } break;
-#if 0
           case '?':
           {
                if(!view || input_mode) break;
@@ -1241,18 +1242,33 @@ int main(int argc, char** argv){
                ce_buffer_alloc(input_view.buffer, 1, "REVERSE SEARCH");
                input_view.cursor = (CePoint_t){0, 0};
                vim.mode = CE_VIM_MODE_INSERT;
+               vim.search_forward = false;
 
                // now popup the view
                input_mode = true;
           } break;
-#endif
           }
 
           if(input_mode){
                if(strcmp(input_view.buffer->name, "SEARCH") == 0){
                     if(input_view.buffer->line_count && view->buffer->line_count){
                          CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
-                         if(match_point.x >= 0) view->cursor = match_point;
+                         if(match_point.x >= 0){
+                              view->cursor = match_point;
+                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
+                                                                   config_options.vertical_scroll_off,
+                                                                   config_options.tab_width);
+                         }
+                    }
+               }else if(strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
+                    if(input_view.buffer->line_count && view->buffer->line_count){
+                         CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+                         if(match_point.x >= 0){
+                              view->cursor = match_point;
+                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
+                                                                   config_options.vertical_scroll_off,
+                                                                   config_options.tab_width);
+                         }
                     }
                }
           }
