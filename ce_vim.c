@@ -1000,6 +1000,8 @@ CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, CeR
 }
 
 CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune_t key){
+     if(!action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
      if(action->motion.function == NULL){
           action->motion.function = &ce_vim_motion_inside_pair;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1749,6 +1751,7 @@ bool ce_vim_verb_normal_mode(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
 bool ce_vim_verb_append(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options){
      view->cursor.x++;
+     if(ce_utf8_strlen(view->buffer->lines[view->cursor.y]) == 0) view->cursor.x = 0;
      insert_mode(vim);
      return true;
 }

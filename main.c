@@ -140,7 +140,7 @@ void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
      }
 }
 
-void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer){
+void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim){
      // save the cursor on the old buffer
      view->buffer->cursor_save = view->cursor;
      view->buffer->scroll_save = view->scroll;
@@ -149,6 +149,8 @@ void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer){
      view->buffer = buffer;
      view->cursor = buffer->cursor_save;
      view->scroll = buffer->scroll_save;
+
+     vim->mode = CE_VIM_MODE_NORMAL;
 }
 
 // 60 fps
@@ -489,10 +491,14 @@ static int64_t match_c_literal(const char* str, const char* beginning_of_line)
 }
 
 void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_list){
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
      int64_t min = view->scroll.y;
      int64_t max = min + (view->rect.bottom - view->rect.top);
-     CE_CLAMP(min, 0, (view->buffer->line_count - 1));
-     CE_CLAMP(max, 0, (view->buffer->line_count - 1));
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
      int64_t match_len = 0;
      bool multiline_comment = false;
      int bg_color = COLOR_DEFAULT;
@@ -608,6 +614,8 @@ typedef struct{
      int64_t tab_width;
      CePoint_t scroll;
      volatile bool ready_to_draw;
+     volatile bool* input_mode;
+     CeView_t* input_view;
      bool done;
 }DrawThreadData_t;
 
@@ -684,12 +692,13 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
      pthread_mutex_unlock(&view->buffer->lock);
 }
 
-void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs){
+void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs, int64_t height_offset){
      // create bottom bar bg
+     int64_t bottom = view->rect.bottom + height_offset;
      int color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
      attron(COLOR_PAIR(color_pair));
      int64_t width = (view->rect.right - view->rect.left) + 1;
-     move(view->rect.bottom, view->rect.left);
+     move(bottom, view->rect.left);
      for(int64_t i = 0; i < width; ++i){
           addch(' ');
      }
@@ -729,14 +738,14 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs){
 
      color_pair = color_def_get(color_defs, vim_mode_fg, COLOR_BRIGHT_BLACK);
      attron(COLOR_PAIR(color_pair));
-     mvprintw(view->rect.bottom, view->rect.left + 1, "%s", vim_mode_string);
+     mvprintw(bottom, view->rect.left + 1, "%s", vim_mode_string);
 
      color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
      attron(COLOR_PAIR(color_pair));
      printw(" %s", view->buffer->name);
      char cursor_pos_string[32];
      int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x, view->cursor.y);
-     mvprintw(view->rect.bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
+     mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
 void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int64_t tab_width){
@@ -749,7 +758,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int6
           syntax_highlight(&layout->view, vim, &draw_color_list);
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
           draw_color_list_free(&draw_color_list);
-          draw_view_status(&layout->view, vim, color_defs);
+          draw_view_status(&layout->view, vim, color_defs, 0);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
           int color_pair = color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_DEFAULT);
           attron(COLOR_PAIR(color_pair));
@@ -798,9 +807,18 @@ void* draw_thread(void* thread_data){
                sleep(0);
           }
 
-
           standend();
           draw_layout(data->layout, data->vim, &color_defs, data->tab_width);
+
+          if(*data->input_mode){
+               DrawColorList_t draw_color_list = {};
+               syntax_highlight(data->input_view, data->vim, &draw_color_list);
+               draw_view(data->input_view, data->tab_width, &draw_color_list, &color_defs);
+               draw_color_list_free(&draw_color_list);
+               int64_t new_status_bar_offset = (data->input_view->rect.bottom - data->input_view->rect.top) + 1;
+               draw_view_status(data->input_view, data->vim, &color_defs, 0);
+               draw_view_status(&data->layout->tab.current->view, data->vim, &color_defs, -new_status_bar_offset);
+          }
 
           // show border when non view is selected
           if(data->layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
@@ -835,6 +853,9 @@ void* draw_thread(void* thread_data){
                }
 
                move(0, 0);
+          }else if(*data->input_mode){
+               CePoint_t screen_cursor = view_cursor_on_screen(data->input_view, data->tab_width);
+               move(screen_cursor.y, screen_cursor.x);
           }else{
                CeView_t* view = &data->layout->tab.current->view;
                CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
@@ -849,10 +870,23 @@ void* draw_thread(void* thread_data){
      return NULL;
 }
 
+// NOTE: this is probably stupid
 static CePoint_t point_modulus_dimensions(CePoint_t p, int64_t x, int64_t y){
      p.x %= x;
      p.y %= y;
      return p;
+}
+
+void input_view_overlay(CeView_t* input_view, CeView_t* view){
+     input_view->rect.left = view->rect.left;
+     input_view->rect.right = view->rect.right;
+     input_view->rect.bottom = view->rect.bottom;
+     int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
+     int64_t height = input_view->buffer->line_count;
+     if(height <= 0) height = 1;
+     if(height > max_height) height = max_height;
+     input_view->rect.top = view->rect.bottom - height;
+
 }
 
 int main(int argc, char** argv){
@@ -919,6 +953,17 @@ int main(int argc, char** argv){
 
      CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
 
+     CeView_t input_view = {};
+     bool input_mode = false;
+
+     // setup input buffer
+     {
+          CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+          ce_buffer_alloc(buffer, 1, "input");
+          input_view.buffer = buffer;
+          buffer_node_insert(&buffer_node_head, buffer);
+     }
+
      // init draw thread
      pthread_t thread_draw;
      DrawThreadData_t* draw_thread_data = calloc(1, sizeof(*draw_thread_data));
@@ -926,6 +971,8 @@ int main(int argc, char** argv){
           draw_thread_data->layout = tab_layout;
           draw_thread_data->vim = &vim;
           draw_thread_data->tab_width = config_options.tab_width;
+          draw_thread_data->input_mode = &input_mode;
+          draw_thread_data->input_view = &input_view;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
           draw_thread_data->ready_to_draw = true;
      }
@@ -952,6 +999,11 @@ int main(int argc, char** argv){
                break;
           }
 
+          // setup input view rect
+          if(input_mode && view){
+               input_view_overlay(&input_view, view);
+          }
+
           int key = getch();
           switch(key){
           default:
@@ -962,18 +1014,34 @@ int main(int argc, char** argv){
                          int64_t index = 0;
                          while(itr){
                               if(index == view->cursor.y){
-                                   view_switch_buffer(view, itr->buffer);
+                                   view_switch_buffer(view, itr->buffer, &vim);
                                    break;
                               }
                               itr = itr->next;
                               index++;
                          }
+                    }else if(input_mode){
+                         if(strcmp(input_view.buffer->name, "LOAD FILE") == 0){
+                              for(int64_t i = 0; i < input_view.buffer->line_count; i++){
+                                   CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+                                   ce_buffer_load_file(buffer, input_view.buffer->lines[i]);
+                                   buffer_node_insert(&buffer_node_head, buffer);
+                                   view->buffer = buffer;
+
+                                   // TODO: figure out type based on extention
+                                   buffer->type = CE_BUFFER_FILE_TYPE_C;
+                              }
+                         }
+
+                         input_mode = false;
+                         vim.mode = CE_VIM_MODE_NORMAL;
                     }else{
                          key = CE_NEWLINE;
                     }
                }
 
-               ce_vim_handle_key(&vim, view, key, &config_options);
+               if(input_mode) ce_vim_handle_key(&vim, &input_view, key, &config_options);
+               else ce_vim_handle_key(&vim, view, key, &config_options);
                break;
           case KEY_CLOSE:
                done = true;
@@ -984,7 +1052,7 @@ int main(int argc, char** argv){
           case 2: // Ctrl + b
                if(!view) break;
                build_buffer_list(buffer_list_buffer, buffer_node_head);
-               view_switch_buffer(view, buffer_list_buffer);
+               view_switch_buffer(view, buffer_list_buffer, &vim);
                break;
           case 22: // Ctrl + v
                if(view) pthread_mutex_lock(&view->buffer->lock);
@@ -1008,7 +1076,10 @@ int main(int argc, char** argv){
                     CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
                     target = point_modulus_dimensions(target, terminal_width, terminal_height);
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout) tab_layout->tab.current = layout;
+                    if(layout){
+                         tab_layout->tab.current = layout;
+                         vim.mode = CE_VIM_MODE_NORMAL;
+                    }
                }
           } break;
           case 10: // Ctrl + j
@@ -1023,7 +1094,10 @@ int main(int argc, char** argv){
                     CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
                     target = point_modulus_dimensions(target, terminal_width, terminal_height);
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout) tab_layout->tab.current = layout;
+                    if(layout){
+                         tab_layout->tab.current = layout;
+                         vim.mode = CE_VIM_MODE_NORMAL;
+                    }
                }
           } break;
           case 11: // Ctrl + k
@@ -1038,7 +1112,10 @@ int main(int argc, char** argv){
                     CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     target = point_modulus_dimensions(target, terminal_width, terminal_height);
-                    if(layout) tab_layout->tab.current = layout;
+                    if(layout){
+                         tab_layout->tab.current = layout;
+                         vim.mode = CE_VIM_MODE_NORMAL;
+                    }
                }
           } break;
           case 12: // Ctrl + l
@@ -1053,7 +1130,10 @@ int main(int argc, char** argv){
                     CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
                     target = point_modulus_dimensions(target, terminal_width, terminal_height);
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    if(layout) tab_layout->tab.current = layout;
+                    if(layout){
+                         tab_layout->tab.current = layout;
+                         vim.mode = CE_VIM_MODE_NORMAL;
+                    }
                }
           } break;
           case 16: // Ctrl + p
@@ -1068,6 +1148,7 @@ int main(int argc, char** argv){
                if(tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
                   tab_layout->tab.root->list.layout_count == 1 &&
                   tab_layout->tab.root->list.layouts[0] == tab_layout->tab.current) break;
+               if(input_mode) break;
 
                CePoint_t cursor = {view_rect.left, view_rect.top};
                if(view) cursor = view->cursor;
@@ -1075,6 +1156,21 @@ int main(int argc, char** argv){
                ce_layout_distribute_rect(tab_layout, terminal_rect);
                CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
                if(layout) tab_layout->tab.current = layout;
+          } break;
+          case 6: // Ctrl + f
+          {
+               if(!view) break;
+
+               // update input view to overlay the current view
+               input_view_overlay(&input_view, view);
+
+               // update name based on dialog
+               ce_buffer_alloc(input_view.buffer, 1, "LOAD FILE");
+               input_view.cursor = (CePoint_t){0, 0};
+               vim.mode = CE_VIM_MODE_INSERT;
+
+               // now popup the view
+               input_mode = !input_mode;
           } break;
           }
 
