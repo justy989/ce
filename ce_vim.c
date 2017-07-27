@@ -70,8 +70,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'F', &ce_vim_parse_motion_find_backward);
      ce_vim_add_key_bind(vim, 't', &ce_vim_parse_motion_until_forward);
      ce_vim_add_key_bind(vim, 'T', &ce_vim_parse_motion_until_backward);
-     ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_motion_inside_pair);
-     ce_vim_add_key_bind(vim, 'a', &ce_vim_parse_motion_around_pair);
+     ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_motion_inside);
+     ce_vim_add_key_bind(vim, 'a', &ce_vim_parse_motion_around);
      ce_vim_add_key_bind(vim, 'G', &ce_vim_parse_motion_end_of_file);
      ce_vim_add_key_bind(vim, 'n', &ce_vim_parse_motion_search_next);
      ce_vim_add_key_bind(vim, 'N', &ce_vim_parse_motion_search_prev);
@@ -832,6 +832,78 @@ CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, Ce
      return start;
 }
 
+CeVimMotionRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start){
+     CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
+     char* line_start = buffer->lines[start.y];
+     char* itr = ce_utf8_find_index(line_start, start.x);
+     char* save_start = itr;
+     if(!is_little_word_character(*itr)) return range;
+
+     int64_t end_x = start.x - 1;
+     while(*itr){
+          int64_t rune_len = 0;
+          CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+          if(!is_little_word_character(rune)) break;
+          end_x++;
+          itr += rune_len;
+     }
+
+     int64_t start_x = start.x + 1;
+     itr = save_start;
+     while(itr > line_start){
+          int64_t rune_len = 0;
+          CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
+          if(!is_little_word_character(rune)) break;
+          start_x--;
+          itr -= rune_len;
+     }
+
+     if(start_x > end_x) return range;
+
+     range.start.x = start_x;
+     range.start.y = start.y;
+     range.end.x = end_x;
+     range.end.y = start.y;
+
+     return range;
+}
+
+CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start){
+     CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
+     char* line_start = buffer->lines[start.y];
+     char* itr = ce_utf8_find_index(line_start, start.x);
+     char* save_start = itr;
+     if(!is_little_word_character(*itr)) return range;
+
+     int64_t end_x = start.x - 1;
+     while(*itr){
+          int64_t rune_len = 0;
+          CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+          if(isspace(rune)) break;
+          end_x++;
+          itr += rune_len;
+     }
+
+     int64_t start_x = start.x + 1;
+     itr = save_start;
+     while(itr > line_start){
+          int64_t rune_len = 0;
+          CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
+          if(isspace(rune)) break;
+          start_x--;
+          itr -= rune_len;
+     }
+
+     if(start_x > end_x) return range;
+
+     range.start.x = start_x;
+     range.start.y = start.y;
+     range.end.x = end_x;
+     range.end.y = start.y;
+
+     return range;
+}
+
 CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool inside){
      CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
      CeRune_t left_match;
@@ -855,6 +927,10 @@ CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_
           left_match = '[';
           right_match = ']';
           break;
+     case 'w':
+          return ce_vim_find_little_word_boundaries(buffer, start);
+     case 'W':
+          return ce_vim_find_big_word_boundaries(buffer, start);
      }
 
      int64_t match_count = 0;
@@ -1023,13 +1099,13 @@ CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, CeR
      return parse_motion_direction(action, ce_vim_motion_half_page_down);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, CeRune_t key){
      if(!action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      if(action->motion.function == NULL){
-          action->motion.function = &ce_vim_motion_inside_pair;
+          action->motion.function = &ce_vim_motion_inside;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
-     }else if(action->motion.function == &ce_vim_motion_inside_pair){
+     }else if(action->motion.function == &ce_vim_motion_inside){
           action->motion.integer = key;
           return CE_VIM_PARSE_COMPLETE;
      }
@@ -1037,14 +1113,14 @@ CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_around_pair(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_around(CeVimAction_t* action, CeRune_t key){
      // around requires a verb
      if(!action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      if(action->motion.function == NULL){
-          action->motion.function = &ce_vim_motion_around_pair;
+          action->motion.function = &ce_vim_motion_around;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
-     }else if(action->motion.function == &ce_vim_motion_around_pair){
+     }else if(action->motion.function == &ce_vim_motion_around){
           action->motion.integer = key;
           return CE_VIM_PARSE_COMPLETE;
      }
@@ -1445,22 +1521,22 @@ bool ce_vim_motion_until_backward(const CeVim_t* vim, CeVimAction_t* action, con
      return true;
 }
 
-static bool vim_motion_find_pair(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
-                                 const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range, bool inside){
+static bool vim_motion_find(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
+                            const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range, bool inside){
      CeVimMotionRange_t new_range = ce_vim_find_pair(view->buffer, motion_range->end, action->motion.integer, inside);
      if(new_range.start.x < 0) return false;
      *motion_range = new_range;
      return true;
 }
 
-bool ce_vim_motion_inside_pair(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
-                               const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     return vim_motion_find_pair(vim, action, view, config_options, motion_range, true);
+bool ce_vim_motion_inside(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
+                          const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     return vim_motion_find(vim, action, view, config_options, motion_range, true);
 }
 
-bool ce_vim_motion_around_pair(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
-                               const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     return vim_motion_find_pair(vim, action, view, config_options, motion_range, false);
+bool ce_vim_motion_around(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
+                          const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     return vim_motion_find(vim, action, view, config_options, motion_range, false);
 }
 
 bool ce_vim_motion_end_of_file(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,

@@ -124,6 +124,8 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
 CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
+CeVimMotionRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
+CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
 CeVimMotionRange_t ce_vim_find_inside_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune);
 CeVimMotionRange_t ce_vim_find_around_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune);
 int64_t ce_vim_yank_register_index(CeRune_t rune);
@@ -153,8 +155,8 @@ CeVimParseResult_t ce_vim_parse_motion_find_forward(CeVimAction_t* action, CeRun
 CeVimParseResult_t ce_vim_parse_motion_find_backward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeRune_t key);
-CeVimParseResult_t ce_vim_parse_motion_inside_pair(CeVimAction_t* action, CeRune_t key);
-CeVimParseResult_t ce_vim_parse_motion_around_pair(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_around(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key);
@@ -207,8 +209,8 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_find_forward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_find_backward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_forward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_backward);
-CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_inside_pair);
-CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_around_pair);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_inside);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_around);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_end_of_file);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_next);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_prev);
