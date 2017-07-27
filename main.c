@@ -1191,36 +1191,14 @@ int main(int argc, char** argv){
                {
                     if(!view || input_mode) break;
                     input_mode = enable_input_mode(&input_view, view, &vim, "SEARCH");
+                    vim.search_forward = true;
                } break;
                case '?':
                {
                     if(!view || input_mode) break;
                     input_mode = enable_input_mode(&input_view, view, &vim, "REVERSE SEARCH");
+                    vim.search_forward = false;
                } break;
-               }
-
-               if(input_mode){
-                    if(strcmp(input_view.buffer->name, "SEARCH") == 0){
-                         if(input_view.buffer->line_count && view->buffer->line_count){
-                              CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
-                              if(match_point.x >= 0){
-                                   view->cursor = match_point;
-                                   view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
-                                                                        config_options.vertical_scroll_off,
-                                                                        config_options.tab_width);
-                              }
-                         }
-                    }else if(strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
-                         if(input_view.buffer->line_count && view->buffer->line_count){
-                              CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, input_view.buffer->lines[0]);
-                              if(match_point.x >= 0){
-                                   view->cursor = match_point;
-                                   view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
-                                                                        config_options.vertical_scroll_off,
-                                                                        config_options.tab_width);
-                              }
-                         }
-                    }
                }
           }
 
@@ -1276,6 +1254,30 @@ int main(int argc, char** argv){
 
                if(input_mode) ce_vim_handle_key(&vim, &input_view, key, &config_options);
                else ce_vim_handle_key(&vim, view, key, &config_options);
+          }
+
+          if(input_mode){
+               if(strcmp(input_view.buffer->name, "SEARCH") == 0){
+                    if(input_view.buffer->line_count && view->buffer->line_count){
+                         CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+                         if(match_point.x >= 0){
+                              view->cursor = match_point;
+                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
+                                                                   config_options.vertical_scroll_off,
+                                                                   config_options.tab_width);
+                         }
+                    }
+               }else if(strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
+                    if(input_view.buffer->line_count && view->buffer->line_count){
+                         CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+                         if(match_point.x >= 0){
+                              view->cursor = match_point;
+                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
+                                                                   config_options.vertical_scroll_off,
+                                                                   config_options.tab_width);
+                         }
+                    }
+               }
           }
 
           draw_thread_data->ready_to_draw = true;
