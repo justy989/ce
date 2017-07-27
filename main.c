@@ -634,6 +634,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
 
      DrawColorNode_t* draw_color_node = draw_color_list->head;
 
+     standend();
      if(view->buffer->line_count > 0){
           move(0, 0);
 
@@ -769,7 +770,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int6
           draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, color_defs, 0);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
-          int color_pair = color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_DEFAULT);
+          int color_pair = color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_BLACK);
           attron(COLOR_PAIR(color_pair));
           for(int i = 0; i < rect_height; i++){
                mvaddch(layout->view.rect.top + i, layout->view.rect.right, ACS_VLINE);
@@ -944,11 +945,14 @@ int main(int argc, char** argv){
      if(argc > 1){
           for(int64_t i = 1; i < argc; i++){
                CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-               ce_buffer_load_file(buffer, argv[i]);
-               buffer_node_insert(&buffer_node_head, buffer);
+               if(ce_buffer_load_file(buffer, argv[i])){
+                    buffer_node_insert(&buffer_node_head, buffer);
 
-               // TODO: figure out type based on extention
-               buffer->type = CE_BUFFER_FILE_TYPE_C;
+                    // TODO: figure out type based on extention
+                    buffer->type = CE_BUFFER_FILE_TYPE_C;
+               }else{
+                    free(buffer);
+               }
           }
      }else{
           CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
@@ -1033,12 +1037,16 @@ int main(int argc, char** argv){
                          if(strcmp(input_view.buffer->name, "LOAD FILE") == 0){
                               for(int64_t i = 0; i < input_view.buffer->line_count; i++){
                                    CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-                                   ce_buffer_load_file(buffer, input_view.buffer->lines[i]);
-                                   buffer_node_insert(&buffer_node_head, buffer);
-                                   view->buffer = buffer;
+                                   if(ce_buffer_load_file(buffer, input_view.buffer->lines[i])){
+                                        buffer_node_insert(&buffer_node_head, buffer);
+                                        view->buffer = buffer;
+                                        view->cursor = (CePoint_t){0, 0};
 
-                                   // TODO: figure out type based on extention
-                                   buffer->type = CE_BUFFER_FILE_TYPE_C;
+                                        // TODO: figure out type based on extention
+                                        buffer->type = CE_BUFFER_FILE_TYPE_C;
+                                   }else{
+                                        free(buffer);
+                                   }
                               }
                          }else if(strcmp(input_view.buffer->name, "SEARCH") == 0 ||
                                   strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
