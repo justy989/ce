@@ -1040,8 +1040,16 @@ int main(int argc, char** argv){
                                    // TODO: figure out type based on extention
                                    buffer->type = CE_BUFFER_FILE_TYPE_C;
                               }
+                         }else if(strcmp(input_view.buffer->name, "SEARCH") == 0){
+                              // update yanks
+                              int64_t index = ce_vim_yank_register_index('/');
+                              CeVimYank_t* yank = vim.yanks + index;
+                              free(yank->text);
+                              yank->text = strdup(input_view.buffer->lines[0]);
+                              yank->line = false;
                          }
 
+                         // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
                          input_mode = false;
                          vim.mode = CE_VIM_MODE_NORMAL;
                     }else{
@@ -1243,33 +1251,8 @@ int main(int argc, char** argv){
           if(input_mode){
                if(strcmp(input_view.buffer->name, "SEARCH") == 0){
                     if(input_view.buffer->line_count && view->buffer->line_count){
-                         int64_t line = view->cursor.y;
-                         char* search = input_view.buffer->lines[0];
-                         char* itr = ce_utf8_find_index(view->buffer->lines[line], view->cursor.x);
-                         char* match = NULL;
-
-                         while(true){
-                              match = strstr(itr, search);
-                              if(match) break;
-                              line++;
-                              if(line >= view->buffer->line_count) break;
-                              itr = view->buffer->lines[line];
-                         }
-
-                         if(match){
-                              // figure out index in the line
-                              int64_t index = 0;
-                              int64_t rune_len = 0;
-                              while(match > itr){
-                                   ce_utf8_decode(itr, &rune_len);
-                                   itr += rune_len;
-                                   index++;
-                              }
-
-                              // update the view cursor
-                              view->cursor.y = line;
-                              view->cursor.x = index;
-                         }
+                         CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+                         if(match_point.x >= 0) view->cursor = match_point;
                     }
                }
           }

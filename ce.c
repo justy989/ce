@@ -269,6 +269,46 @@ CeRune_t ce_buffer_get_rune(CeBuffer_t* buffer, CePoint_t point){
      return ce_utf8_decode(str, &rune_len);
 }
 
+CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const char* pattern){
+     CePoint_t result = (CePoint_t){-1, -1};
+
+     if(!ce_buffer_point_is_valid(buffer, start)) return result;
+
+     int64_t save_y = start.y;
+     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+     char* match = NULL;
+
+     // try to match the pattern on each line to the end
+     while(true){
+          match = strstr(itr, pattern);
+          if(match) break;
+          start.y++;
+          if(start.y >= buffer->line_count) break;
+          itr = buffer->lines[start.y];
+     }
+
+     if(match){
+          // figure out index in the line
+          int64_t index = 0;
+          int64_t rune_len = 0;
+          while(match > itr){
+               ce_utf8_decode(itr, &rune_len);
+               itr += rune_len;
+               index++;
+          }
+
+          if(start.y == save_y){
+               // if we are on the same line, use the starting x plus the index
+               result.x = start.x + index;
+          }else{
+               result.x = index;
+          }
+          result.y = start.y;
+     }
+
+     return result;
+}
+
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;
      if(!ce_buffer_point_is_valid(buffer, end)) return -1;
