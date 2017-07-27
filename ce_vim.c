@@ -52,6 +52,7 @@ static void insert_mode(CeVim_t* vim){
 bool ce_vim_init(CeVim_t* vim){
      vim->chain_undo = false;
 
+     // TODO: 's', 'S', ctrl + a, ctrl + x
      ce_vim_add_key_bind(vim, 'w', &ce_vim_parse_motion_little_word);
      ce_vim_add_key_bind(vim, 'W', &ce_vim_parse_motion_big_word);
      ce_vim_add_key_bind(vim, 'e', &ce_vim_parse_motion_end_little_word);
@@ -82,6 +83,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'A', &ce_vim_parse_verb_append_at_end_of_line);
      ce_vim_add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
      ce_vim_add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
+     ce_vim_add_key_bind(vim, 'C', &ce_vim_parse_verb_change_to_end_of_line);
      ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
      ce_vim_add_key_bind(vim, 'x', &ce_vim_parse_verb_delete_character);
      ce_vim_add_key_bind(vim, 'y', &ce_vim_parse_verb_yank);
@@ -1094,6 +1096,13 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action, CeRune_t key){
+     action->motion.function = &ce_vim_motion_end_line;
+     action->verb.function = &ce_vim_verb_change;
+     action->chain_undo = true;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == NULL){
           action->verb.function = &ce_vim_verb_set_character;
@@ -1531,6 +1540,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
 
      view->cursor = motion_range.start;
      vim->chain_undo = action->chain_undo;
+     vim->mode = CE_VIM_MODE_NORMAL;
 
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
      if(yank->text) free(yank->text);
@@ -1686,6 +1696,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      ce_buffer_change(view->buffer, &change);
 
      view->cursor = cursor_end;
+     vim->mode = CE_VIM_MODE_NORMAL;
 
      return true;
 }

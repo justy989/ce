@@ -880,13 +880,6 @@ void* draw_thread(void* thread_data){
      return NULL;
 }
 
-// NOTE: this is probably stupid
-static CePoint_t point_modulus_dimensions(CePoint_t p, int64_t x, int64_t y){
-     p.x %= x;
-     p.y %= y;
-     return p;
-}
-
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
      input_view->rect.right = view->rect.right;
@@ -897,6 +890,18 @@ void input_view_overlay(CeView_t* input_view, CeView_t* view){
      if(height > max_height) height = max_height;
      input_view->rect.top = view->rect.bottom - height;
 
+}
+
+bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue){
+     // update input view to overlay the current view
+     input_view_overlay(input_view, view);
+
+     // update name based on dialog
+     bool success = ce_buffer_alloc(input_view->buffer, 1, dialogue);
+     input_view->cursor = (CePoint_t){0, 0};
+     vim->mode = CE_VIM_MODE_INSERT;
+
+     return success;
 }
 
 int main(int argc, char** argv){
@@ -1099,7 +1104,8 @@ int main(int argc, char** argv){
                if(view){
                     CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
                     CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1108,7 +1114,8 @@ int main(int argc, char** argv){
                     }
                }else{
                     CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1122,7 +1129,8 @@ int main(int argc, char** argv){
                if(view){
                     CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
                     CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1131,7 +1139,8 @@ int main(int argc, char** argv){
                     }
                }else{
                     CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1145,7 +1154,8 @@ int main(int argc, char** argv){
                if(view){
                     CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
                     CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1155,7 +1165,8 @@ int main(int argc, char** argv){
                }else{
                     CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     if(layout){
                          tab_layout->tab.current = layout;
                          vim.mode = CE_VIM_MODE_NORMAL;
@@ -1168,7 +1179,8 @@ int main(int argc, char** argv){
                if(view){
                     CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
                     CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1177,7 +1189,8 @@ int main(int argc, char** argv){
                     }
                }else{
                     CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
-                    target = point_modulus_dimensions(target, terminal_width, terminal_height);
+                    target.x %= terminal_width;
+                    target.y %= terminal_height;
                     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                     if(layout){
                          tab_layout->tab.current = layout;
@@ -1210,50 +1223,17 @@ int main(int argc, char** argv){
           case 6: // Ctrl + f
           {
                if(!view || input_mode) break;
-
-               // update input view to overlay the current view
-               input_view_overlay(&input_view, view);
-
-               // update name based on dialog
-               ce_buffer_alloc(input_view.buffer, 1, "LOAD FILE");
-               input_view.cursor = (CePoint_t){0, 0};
-               vim.mode = CE_VIM_MODE_INSERT;
-
-               // now popup the view
-               input_mode = true;
+               input_mode = enable_input_mode(&input_view, view, &vim, "LOAD FILE");
           } break;
           case '/':
           {
                if(!view || input_mode) break;
-
-               // TODO: compress with above code
-               // update input view to overlay the current view
-               input_view_overlay(&input_view, view);
-
-               // update name based on dialog
-               ce_buffer_alloc(input_view.buffer, 1, "SEARCH");
-               input_view.cursor = (CePoint_t){0, 0};
-               vim.mode = CE_VIM_MODE_INSERT;
-               vim.search_forward = true;
-
-               // now popup the view
-               input_mode = true;
+               input_mode = enable_input_mode(&input_view, view, &vim, "SEARCH");
           } break;
           case '?':
           {
                if(!view || input_mode) break;
-
-               // update input view to overlay the current view
-               input_view_overlay(&input_view, view);
-
-               // update name based on dialog
-               ce_buffer_alloc(input_view.buffer, 1, "REVERSE SEARCH");
-               input_view.cursor = (CePoint_t){0, 0};
-               vim.mode = CE_VIM_MODE_INSERT;
-               vim.search_forward = false;
-
-               // now popup the view
-               input_mode = true;
+               input_mode = enable_input_mode(&input_view, view, &vim, "REVERSE SEARCH");
           } break;
           }
 
