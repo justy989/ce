@@ -168,9 +168,26 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                break;
           case KEY_BACKSPACE:
                if(!ce_points_equal(view->cursor, (CePoint_t){0, 0})){
-                    CePoint_t remove_point = ce_buffer_advance_point(view->buffer, view->cursor, -1);
-                    char* removed_string = ce_buffer_dupe_string(view->buffer, remove_point, 1, false);
-                    if(ce_buffer_remove_string(view->buffer, remove_point, 1, true)){
+                    CePoint_t remove_point;
+                    char* removed_string;
+                    CePoint_t end_cursor;
+                    int64_t remove_len = 1;
+
+                    if(view->cursor.x == 0){
+                         // if we are a the beginning of the line, we want to do a join line
+                         if(view->cursor.y == 0) break;
+                         end_cursor.y = view->cursor.y - 1;
+                         end_cursor.x = ce_utf8_strlen(view->buffer->lines[end_cursor.y]);
+                         remove_point = view->cursor;
+                         removed_string = strdup("\n");
+                         remove_len = 0;
+                    }else{
+                         remove_point = ce_buffer_advance_point(view->buffer, view->cursor, -1);
+                         end_cursor = remove_point;
+                         removed_string = ce_buffer_dupe_string(view->buffer, remove_point, remove_len, false);
+                    }
+
+                    if(ce_buffer_remove_string(view->buffer, remove_point, remove_len, true)){
 
                          // TODO: convenience function
                          CeBufferChange_t change = {};
@@ -180,10 +197,10 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                          change.string = removed_string;
                          change.location = remove_point;
                          change.cursor_before = view->cursor;
-                         change.cursor_after = remove_point;
+                         change.cursor_after = end_cursor;
                          ce_buffer_change(view->buffer, &change);
 
-                         view->cursor = remove_point;
+                         view->cursor = end_cursor;
                          vim->chain_undo = true;
                     }
                }
