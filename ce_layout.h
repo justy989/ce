@@ -11,6 +11,10 @@ typedef enum{
      CE_LAYOUT_TYPE_TAB_LIST,
 }CeLayoutType_t;
 
+// NOTE: We use double pointers so that the usage code can take pointers to layouts. I tried re-organizing these
+//       structures with just single arrays, but when I resized those arrays with re-alloc, the user code's
+//       pointers had the change to become invalid.
+
 typedef struct{
      struct CeLayout_t** layouts;
      int64_t layout_count;
@@ -44,6 +48,7 @@ typedef struct CeLayout_t{
 
 CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout);
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer);
+CeLayout_t* ce_layout_tab_list_add(CeLayout_t* tab_list_layout);
 void ce_layout_free(CeLayout_t** layout);
 bool ce_layout_split(CeLayout_t* layout, bool vertical);
 void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect);

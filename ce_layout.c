@@ -14,6 +14,17 @@ CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout){
      return tab_list_layout;
 }
 
+CeLayout_t* ce_layout_tab_list_add(CeLayout_t* tab_list_layout){
+     assert(tab_list_layout->type == CE_LAYOUT_TYPE_TAB_LIST);
+     int64_t new_tab_count = tab_list_layout->tab_list.tab_count + 1;
+     CeLayout_t** new_tabs = realloc(tab_list_layout->tab_list.tabs, new_tab_count * sizeof(*tab_list_layout->tab_list.tabs));
+     if(!new_tabs) return false;
+     tab_list_layout->tab_list.tabs = new_tabs;
+     new_tabs[tab_list_layout->tab_list.tab_count] = ce_layout_tab_init(tab_list_layout->tab_list.current->tab.current->view.buffer);
+     tab_list_layout->tab_list.tab_count = new_tab_count;
+     return new_tabs[tab_list_layout->tab_list.tab_count - 1];
+}
+
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
      CeLayout_t* view_layout = calloc(1, sizeof(*view_layout));
      if(!view_layout) return NULL;
@@ -49,6 +60,8 @@ void ce_layout_free(CeLayout_t** root){
           for(int64_t i = 0; i < layout->tab_list.tab_count; i++){
                ce_layout_free(&layout->tab_list.tabs[i]);
           }
+          free(layout->tab_list.tabs);
+          layout->tab_list.tab_count = 0;
           break;
      }
 
@@ -83,6 +96,7 @@ static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
 }
 
 bool ce_layout_split(CeLayout_t* layout, bool vertical){
+     assert(layout->type = CE_LAYOUT_TYPE_TAB);
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
      if(parent_of_current){
           CeBuffer_t* buffer = ce_layout_find_buffer(layout->tab.current);
@@ -132,7 +146,9 @@ bool ce_layout_split(CeLayout_t* layout, bool vertical){
                list_layout->list.layouts = calloc(list_layout->list.layout_count, sizeof(*list_layout->list.layouts));
                list_layout->list.layouts[0] = layout->tab.current;
                list_layout->list.vertical = vertical;
+
                parent_of_current->tab.root = list_layout;
+
                return ce_layout_split(layout, vertical);
           } break;
           case CE_LAYOUT_TYPE_TAB_LIST:
@@ -201,10 +217,8 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
           break;
      case CE_LAYOUT_TYPE_TAB_LIST:
           layout->tab_list.rect = rect;
-          rect.top++;
-          for(int64_t i = 0; i < layout->tab_list.tab_count; i++){
-               ce_layout_distribute_rect(layout->tab.root, rect);
-          }
+          if(layout->tab_list.tab_count > 1) rect.top++; // leave space for a tab bar, this probably doesn't want to be built in?
+          ce_layout_distribute_rect(layout->tab_list.current, rect);
           break;
      }
 }

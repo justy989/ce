@@ -843,8 +843,35 @@ void* draw_thread(void* thread_data){
                sleep(0);
           }
 
+          CeLayout_t* tab_layout = data->layout->tab_list.current;
+
+          // draw a tab bar if there is more than 1 tab
+          if(data->layout->tab_list.tab_count > 1){
+               int color_pair = color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+               attron(COLOR_PAIR(color_pair));
+               for(int64_t i = data->layout->tab_list.rect.left; i <= data->layout->tab_list.rect.right; i++){
+                    addch(' ');
+               }
+
+               move(0, 0);
+
+               for(int64_t i = 0; i < data->layout->tab_list.tab_count; i++){
+                    const char* buffer_name = data->layout->tab_list.tabs[i]->tab.current->view.buffer->name;
+
+                    if(data->layout->tab_list.tabs[i] == data->layout->tab_list.current){
+                         color_pair = color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+                         attron(COLOR_PAIR(color_pair));
+                    }else{
+                         color_pair = color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+                         attron(COLOR_PAIR(color_pair));
+                    }
+
+                    printw(" %s ", buffer_name);
+               }
+          }
+
           standend();
-          draw_layout(data->layout, data->vim, &color_defs, data->tab_width, data->layout->tab.current);
+          draw_layout(tab_layout, data->vim, &color_defs, data->tab_width, tab_layout->tab.current);
 
           if(*data->input_mode){
                DrawColorList_t draw_color_list = {};
@@ -853,24 +880,24 @@ void* draw_thread(void* thread_data){
                draw_color_list_free(&draw_color_list);
                int64_t new_status_bar_offset = (data->input_view->rect.bottom - data->input_view->rect.top) + 1;
                draw_view_status(data->input_view, data->vim, &color_defs, 0);
-               draw_view_status(&data->layout->tab.current->view, NULL, &color_defs, -new_status_bar_offset);
+               draw_view_status(&tab_layout->tab.current->view, NULL, &color_defs, -new_status_bar_offset);
           }
 
           // show border when non view is selected
-          if(data->layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
+          if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
                int64_t rect_height = 0;
                int64_t rect_width = 0;
                CeRect_t* rect = NULL;
-               switch(data->layout->tab.current->type){
+               switch(tab_layout->tab.current->type){
                default:
                     break;
                case CE_LAYOUT_TYPE_LIST:
-                    rect = &data->layout->tab.current->list.rect;
+                    rect = &tab_layout->tab.current->list.rect;
                     rect_width = rect->right - rect->left;
                     rect_height = rect->bottom - rect->top;
                     break;
                case CE_LAYOUT_TYPE_TAB:
-                    rect = &data->layout->tab.current->tab.rect;
+                    rect = &tab_layout->tab.current->tab.rect;
                     rect_width = rect->right - rect->left;
                     rect_height = rect->bottom - rect->top;
                     break;
@@ -893,7 +920,7 @@ void* draw_thread(void* thread_data){
                CePoint_t screen_cursor = view_cursor_on_screen(data->input_view, data->tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }else{
-               CeView_t* view = &data->layout->tab.current->view;
+               CeView_t* view = &tab_layout->tab.current->view;
                CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }
@@ -1003,8 +1030,11 @@ int main(int argc, char** argv){
           }
      }
 
-     CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
-     CeLayout_t* tab_list_layout = ce_layout_tab_list_init(tab_layouts);
+     CeLayout_t* tab_list_layout = NULL;
+     {
+          CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
+          tab_list_layout = ce_layout_tab_list_init(tab_layout);
+     }
 
      CeView_t input_view = {};
      bool input_mode = false;
@@ -1021,7 +1051,7 @@ int main(int argc, char** argv){
      pthread_t thread_draw;
      DrawThreadData_t* draw_thread_data = calloc(1, sizeof(*draw_thread_data));
      {
-          draw_thread_data->layout = tab_layout;
+          draw_thread_data->layout = tab_list_layout;
           draw_thread_data->vim = &vim;
           draw_thread_data->tab_width = config_options.tab_width;
           draw_thread_data->input_mode = &input_mode;
@@ -1032,12 +1062,14 @@ int main(int argc, char** argv){
 
      bool done = false;
      while(!done){
-          getmaxyx(stdscr, terminal_height, terminal_width);
-          CeRect_t terminal_rect = {0, terminal_width - 1, 0, terminal_height - 1};
-          ce_layout_distribute_rect(tab_layout, terminal_rect);
-
           CeView_t* view = NULL;
           CeRect_t view_rect = {};
+          CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
+
+          getmaxyx(stdscr, terminal_height, terminal_width);
+          CeRect_t terminal_rect = {0, terminal_width - 1, 0, terminal_height - 1};
+          ce_layout_distribute_rect(tab_list_layout, terminal_rect);
+
           switch(tab_layout->tab.current->type){
           default:
                break;
@@ -1196,10 +1228,10 @@ int main(int argc, char** argv){
                case 1: // Ctrl + a
                {
                     // check if this is the only view, and ignore the delete request
-                    if(tab_layout->tab.root == tab_layout->tab.current) break;
-                    if(tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
+                    if(tab_list_layout->tab_list.tab_count == 1 &&
+                       tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
                        tab_layout->tab.root->list.layout_count == 1 &&
-                       tab_layout->tab.root->list.layouts[0] == tab_layout->tab.current) break;
+                       tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]) break;
                     if(input_mode) break;
 
                     CePoint_t cursor = {view_rect.left, view_rect.top};
@@ -1213,6 +1245,39 @@ int main(int argc, char** argv){
                {
                     if(!view || input_mode) break;
                     input_mode = enable_input_mode(&input_view, view, &vim, "LOAD FILE");
+               } break;
+               case 20: // Ctrl + t
+               {
+                    CeLayout_t* new_tab_layout = ce_layout_tab_list_add(tab_list_layout);
+                    if(new_tab_layout) tab_list_layout->tab_list.current = new_tab_layout;
+               } break;
+               case 9: // Ctrl + i
+                    for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
+                         if(tab_list_layout->tab_list.current == tab_list_layout->tab_list.tabs[i]){
+                              if(i > 0){
+                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[i - 1];
+                              }else{
+                                   // wrap around
+                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[tab_list_layout->tab_list.tab_count - 1];
+                              }
+                              break;
+                         }
+                    }
+                    break;
+               case 15: // Ctrl + o
+               {
+                    int64_t last_index = tab_list_layout->tab_list.tab_count - 1;
+                    for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
+                         if(tab_list_layout->tab_list.current == tab_list_layout->tab_list.tabs[i]){
+                              if(i < last_index){
+                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[i + 1];
+                              }else{
+                                   // wrap around
+                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[0];
+                              }
+                              break;
+                         }
+                    }
                } break;
                case '/':
                {
@@ -1316,7 +1381,7 @@ int main(int argc, char** argv){
 
      // cleanup
      buffer_node_free(&buffer_node_head);
-     ce_layout_free(&tab_layout);
+     ce_layout_free(&tab_list_layout);
      ce_vim_free(&vim);
      free(draw_thread_data);
      endwin();
