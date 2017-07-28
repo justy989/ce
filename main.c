@@ -1004,6 +1004,7 @@ int main(int argc, char** argv){
      }
 
      CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
+     CeLayout_t* tab_list_layout = ce_layout_tab_list_init(tab_layouts);
 
      CeView_t input_view = {};
      bool input_mode = false;

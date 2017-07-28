@@ -3,6 +3,17 @@
 #include <stdlib.h>
 #include <assert.h>
 
+CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout){
+     CeLayout_t* tab_list_layout = calloc(1, sizeof(*tab_list_layout));
+     if(!tab_list_layout) return NULL;
+     tab_list_layout->type = CE_LAYOUT_TYPE_TAB_LIST;
+     tab_list_layout->tab_list.tabs = malloc(sizeof(*tab_list_layout->tab_list.tabs));
+     tab_list_layout->tab_list.tabs[0] = tab_layout;
+     tab_list_layout->tab_list.tab_count = 1;
+     tab_list_layout->tab_list.current = tab_layout;
+     return tab_list_layout;
+}
+
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
      CeLayout_t* view_layout = calloc(1, sizeof(*view_layout));
      if(!view_layout) return NULL;
@@ -34,6 +45,11 @@ void ce_layout_free(CeLayout_t** root){
      case CE_LAYOUT_TYPE_TAB:
           ce_layout_free(&layout->tab.root);
           break;
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          for(int64_t i = 0; i < layout->tab_list.tab_count; i++){
+               ce_layout_free(&layout->tab_list.tabs[i]);
+          }
+          break;
      }
 
      free(*root);
@@ -55,6 +71,12 @@ static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
           break;
      case CE_LAYOUT_TYPE_TAB:
           return ce_layout_find_buffer(layout->tab.root);
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          for(int64_t i = 0; i < layout->tab_list.tab_count; i++){
+               CeBuffer_t* buffer = ce_layout_find_buffer(layout->tab_list.tabs[i]);
+               if(buffer) return buffer;
+          }
+          break;
      }
 
      return NULL;
@@ -113,6 +135,9 @@ bool ce_layout_split(CeLayout_t* layout, bool vertical){
                parent_of_current->tab.root = list_layout;
                return ce_layout_split(layout, vertical);
           } break;
+          case CE_LAYOUT_TYPE_TAB_LIST:
+               if(layout->tab_list.current) return ce_layout_split(layout->tab_list.current, vertical);
+               break;
           }
 
           return true;
@@ -175,6 +200,11 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
           ce_layout_distribute_rect(layout->tab.root, rect);
           break;
      case CE_LAYOUT_TYPE_TAB_LIST:
+          layout->tab_list.rect = rect;
+          rect.top++;
+          for(int64_t i = 0; i < layout->tab_list.tab_count; i++){
+               ce_layout_distribute_rect(layout->tab.root, rect);
+          }
           break;
      }
 }
@@ -194,6 +224,8 @@ CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point){
           break;
      case CE_LAYOUT_TYPE_TAB:
           return ce_layout_find_at(layout->tab.root, point);
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          return ce_layout_find_at(layout->tab_list.current, point);
      }
 
      return NULL;
@@ -215,6 +247,13 @@ CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node){
      case CE_LAYOUT_TYPE_TAB:
           if(root->tab.root == node) return root;
           else return ce_layout_find_parent(root->tab.root, node);
+          break;
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          for(int64_t i = 0; i < root->tab_list.tab_count; i++){
+               if(root->tab_list.tabs[i] == node) return root;
+               CeLayout_t* found = ce_layout_find_parent(root->tab_list.tabs[i], node);
+               if(found) return found;
+          }
           break;
      }
 
@@ -254,6 +293,28 @@ bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node){
      } break;
      case CE_LAYOUT_TYPE_TAB:
           break;
+     case CE_LAYOUT_TYPE_TAB_LIST:
+     {
+          // find index of matching node
+          int64_t index = -1;
+          for(int64_t i = 0; i < parent->tab_list.tab_count; i++){
+               if(parent->tab_list.tabs[i] == node){
+                    index = i;
+                    break;
+               }
+          }
+
+          if(index == -1) return false;
+
+          ce_layout_free(&node);
+
+          // remove element, keeping element order
+          int64_t new_count = parent->tab_list.tab_count - 1;
+          for(int64_t i = index; i < new_count; i++){
+               parent->tab_list.tabs[i] = parent->tab_list.tabs[i + 1];
+          }
+          parent->tab_list.tab_count = new_count;
+     } break;
      }
 
      return true;

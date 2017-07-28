@@ -25,7 +25,8 @@ typedef struct{
 }CeTabLayout_t;
 
 typedef struct{
-     CeTabLayout_t* tabs;
+     struct CeLayout_t** tabs;
+     struct CeLayout_t* current;
      int64_t tab_count;
      CeRect_t rect;
 }CeTabListLayout_t;
@@ -41,6 +42,7 @@ typedef struct CeLayout_t{
      };
 }CeLayout_t;
 
+CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout);
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer);
 void ce_layout_free(CeLayout_t** layout);
 bool ce_layout_split(CeLayout_t* layout, bool vertical);
