@@ -99,6 +99,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, '.', &ce_vim_parse_verb_last_action);
      ce_vim_add_key_bind(vim, 'z', &ce_vim_parse_verb_z_command);
      ce_vim_add_key_bind(vim, 'g', &ce_vim_parse_verb_g_command);
+     ce_vim_add_key_bind(vim, '>', &ce_vim_parse_verb_indent);
+     ce_vim_add_key_bind(vim, '<', &ce_vim_parse_verb_unindent);
      ce_vim_add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
      ce_vim_add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
      ce_vim_add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
@@ -1376,6 +1378,28 @@ CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t k
      return CE_VIM_PARSE_INVALID;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, CeRune_t key){
+     if(action->verb.function == NULL){
+          action->verb.function = ce_vim_verb_indent;
+          return CE_VIM_PARSE_IN_PROGRESS;
+     }else if(action->verb.function == ce_vim_verb_indent){
+          return CE_VIM_PARSE_COMPLETE;
+     }
+
+     return CE_VIM_PARSE_INVALID;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t key){
+     if(action->verb.function == NULL){
+          action->verb.function = ce_vim_verb_unindent;
+          return CE_VIM_PARSE_IN_PROGRESS;
+     }else if(action->verb.function == ce_vim_verb_unindent){
+          return CE_VIM_PARSE_COMPLETE;
+     }
+
+     return CE_VIM_PARSE_INVALID;
+}
+
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
                              CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_buffer_move_point(view->buffer, motion_range->end, delta, config_options->tab_width, CE_CLAMP_X_NONE);
@@ -2102,4 +2126,70 @@ bool ce_vim_verb_g_command(CeVim_t* vim, const CeVimAction_t* action, CeVimMotio
      }
 
      return false;
+}
+
+bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                        const CeConfigOptions_t* config_options){
+     ce_vim_motion_range_sort(&motion_range);
+     for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
+          // calc indentation
+          CePoint_t indentation_point = {0, i};
+
+          // build indentation string
+          char* insert_string = malloc(config_options->tab_width + 1);
+          memset(insert_string, ' ', config_options->tab_width);
+          insert_string[config_options->tab_width] = 0;
+
+          // insert indentation
+          if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+
+          // commit the change
+          CeBufferChange_t change = {};
+          change.chain = true;
+          change.insertion = true;
+          change.remove_line_if_empty = false;
+          change.string = insert_string;
+          change.location = indentation_point;
+          change.cursor_before = view->cursor;
+          change.cursor_after = view->cursor;
+          ce_buffer_change(view->buffer, &change);
+     }
+
+     return true;
+}
+
+bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                          const CeConfigOptions_t* config_options){
+     bool chain = false;
+     ce_vim_motion_range_sort(&motion_range);
+     for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
+          // calc indentation
+          CePoint_t indentation_point = {0, i};
+
+          // build indentation string
+          char* remove_string = malloc(config_options->tab_width + 1);
+          memset(remove_string, ' ', config_options->tab_width);
+          remove_string[config_options->tab_width] = 0;
+
+          if(strncmp(view->buffer->lines[i], remove_string, config_options->tab_width) == 0){
+               // insert indentation
+               if(!ce_buffer_remove_string(view->buffer, indentation_point, config_options->tab_width, false)) return false;
+
+               // commit the change
+               CeBufferChange_t change = {};
+               change.chain = chain;
+               change.insertion = false;
+               change.remove_line_if_empty = false;
+               change.string = remove_string;
+               change.location = indentation_point;
+               change.cursor_before = view->cursor;
+               change.cursor_after = view->cursor;
+               ce_buffer_change(view->buffer, &change);
+               chain = true;
+          }else{
+               free(remove_string);
+          }
+     }
+
+     return true;
 }

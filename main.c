@@ -540,6 +540,7 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                if(match_point.y >= visual_start.y &&
                   match_point.y <= visual_end.y){
                     bg_color = COLOR_WHITE;
+                    draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
                }else{
                     // if the line is empty, reset the colors
                     if(line_len == 0 && bg_color == COLOR_WHITE){
@@ -548,6 +549,13 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
 
                     bg_color = COLOR_DEFAULT;
                }
+          }else if(vim->mode == CE_VIM_MODE_VISUAL){
+               if(ce_points_equal(match_point, visual_start) ||
+                  ce_points_equal(match_point, visual_end) ||
+                  (ce_point_after(match_point, visual_start) &&
+                   !ce_point_after(match_point, visual_end))){
+                    draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+               }
           }
 
           for(int64_t x = 0; x < line_len; ++x){
@@ -555,7 +563,6 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                match_point.x = x;
 
                if(vim->mode == CE_VIM_MODE_VISUAL){
-                    // BUG: when cursor is on the first character in a word in a visual selection is has the wrong foreground color
                     if(ce_points_equal(match_point, visual_start) ||
                        ce_points_equal(match_point, visual_end) ||
                        (ce_point_after(match_point, visual_start) &&
