@@ -367,7 +367,11 @@ int64_t match_c_comment(const char* str){
 }
 
 int64_t match_c_multiline_comment(const char* str){
-     if(strncmp("/*", str, 2) == 0) return ce_utf8_strlen(str);
+     if(strncmp("/*", str, 2) == 0){
+          char* matching_comment = strstr(str, "*/");
+          if(matching_comment) return (matching_comment - str);
+          return ce_utf8_strlen(str);
+     }
 
      return 0;
 }
@@ -490,6 +494,16 @@ static int64_t match_c_literal(const char* str, const char* beginning_of_line)
      return count;
 }
 
+static int64_t match_trailing_whitespace(const char* str){
+     const char* itr = str;
+     while(*itr){
+          if(!isspace(*itr)) return 0;
+          itr++;
+     }
+
+     return (itr - str);
+}
+
 void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_list){
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
@@ -591,6 +605,8 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                               multiline_comment = true;
                          }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != bg_color)){
                               draw_color_list_insert(draw_color_list, COLOR_DEFAULT, bg_color, match_point);
+                         }else if((match_len = match_trailing_whitespace(str))){
+                              draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_RED, match_point);
                          }
                     }
 
@@ -639,6 +655,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
           move(0, 0);
 
           for(int64_t y = 0; y < view_height; y++){
+               int64_t index = 0;
                int64_t x = 0;
                int64_t rune_len = 0;
                int64_t line_index = y + row_min;
@@ -653,7 +670,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                          rune = ce_utf8_decode(line, &rune_len);
 
                          // check if we need to move to the next color
-                         if(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){x, y + view->scroll.y})){
+                         if(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
                               int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
                               attron(COLOR_PAIR(change_color_pair));
                               draw_color_node = draw_color_node->next;
@@ -681,9 +698,11 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                          }
 
                          line += rune_len;
+                         index++;
                     }
                }
 
+               standend();
                for(; x <= col_max; x++){
                     addch(' ');
                }

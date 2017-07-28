@@ -163,6 +163,34 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
 
                          view->cursor = new_cursor;
                          vim->chain_undo = true;
+
+                         // indent after newline
+                         if(key == CE_NEWLINE){
+                              // calc indentation
+                              CePoint_t indentation_point = {0, view->cursor.y};
+                              int64_t indentation = ce_vim_get_indentation(view->buffer, indentation_point, config_options->tab_width);
+                              CePoint_t cursor_end = {indentation, indentation_point.y};
+
+                              // build indentation string
+                              char* insert_string = malloc(indentation + 1);
+                              memset(insert_string, ' ', indentation);
+                              insert_string[indentation] = 0;
+
+                              // insert indentation
+                              if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+
+                              // commit the change
+                              change.chain = true;
+                              change.insertion = true;
+                              change.remove_line_if_empty = false;
+                              change.string = insert_string;
+                              change.location = indentation_point;
+                              change.cursor_before = view->cursor;
+                              change.cursor_after = cursor_end;
+                              ce_buffer_change(view->buffer, &change);
+
+                              view->cursor = cursor_end;
+                         }
                     }
                }
                break;
@@ -999,80 +1027,18 @@ CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_
      return range;
 }
 
-#if 0
-static int64_t last_index_before_comment(const char* line){
-     const char* match = strstr(line, "//");
-     if(match) return ce_utf8_strlen_between(line, match);
-
-     return ce_utf8_strlen(line);
-}
-#endif
-
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length){
-     CeVimMotionRange_t range = ce_vim_find_pair(buffer, point, '{', false);
-     if(range.start.x < 0) return 0;
-     int64_t index = ce_vim_soft_begin_line(buffer, range.start.y);
-     return index + tab_length;
-}
-
-#if 0
-     // NOTE: specifically for C
-     // first, match this line's indentation
-     CeRune_t rune;
-
-     // then, check the line for a '{' that is unmatched on location's line + indent if you find one
-     for(int64_t y = point.y; y >= 0; --y){
-          int64_t start_x = last_index_before_comment(buffer->lines[point.y]);
-          if(y == point.y && start_x > point.x) start_x = point.x - 1;
-
-          for(int64_t x = start_x; x >= 0; x--){
-               CePoint_t iter = {x, y};
-               rune = ce_buffer_get_rune(buffer, iter);
-
-               switch(rune){
-               default:
-                    break;
-               case '"':
-                    if(!find_matching_string_backward(buffer, &iter, '"')){
-                         return false;
-                    }
-                    x = iter.x;
-                    y = iter.y;
-                    break;
-               case '\'':
-                    if(!find_matching_string_backward(buffer, &iter, '\'')){
-                         return false;
-                    }
-                    x = iter.x;
-                    y = iter.y;
-                    break;
-               case '{':
-               {
-                    CeVimMotionRange_t range = ce_vim_find_pair(buffer, iter, '{', false);
-                    if(range.start.x < 0) return 0;
-                    return range.start.x + tab_length;
-
-                    if((start.y == bol.y || end.y == bol.y) && start.y != end.y && start.x > 0){
-                         start.x = 0;
-                         return ce_get_indentation_for_line(buffer, start, tab_len) + tab_len;
-                    }
-               } break;
-               case '(':
-               {
-                    Point_t match = iter;
-                    bool matched = ce_move_cursor_to_matching_pair(buffer, &match, '(');
-
-                    if(ce_point_after(match, point) || ce_points_equal(match, point) || !matched){
-                         return iter.x + 1; // if a line has "{{", we don't want to double tab the next line!
-                    }
-               } break;
-               }
-          }
+     CeVimMotionRange_t brace_range = ce_vim_find_pair(buffer, point, '{', false);
+     CeVimMotionRange_t paren_range = ce_vim_find_pair(buffer, point, '(', false);
+     if(brace_range.start.x < 0 && paren_range.start.x < 0) return -1;
+     int64_t indent = 0;
+     if(ce_point_after(paren_range.start, brace_range.start)){
+          indent = paren_range.start.x + 1;
+     }else{
+          indent = ce_vim_soft_begin_line(buffer, brace_range.start.y) + tab_length;
      }
-
-     return 0;
+     return indent;
 }
-#endif
 
 CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
@@ -1932,14 +1898,10 @@ bool ce_vim_verb_paste_after(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
 
 bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                             const CeConfigOptions_t* config_options){
-     // TODO: insert whitespace for indentation
      // insert newline on next line
      char* insert_string = strdup("\n");
      motion_range.start.x = 0;
      if(!ce_buffer_insert_string(view->buffer, insert_string, motion_range.start)) return false;
-
-     int64_t indentation = 0;
-     CePoint_t cursor_end = {indentation, motion_range.start.y};
 
      // commit the change
      CeBufferChange_t change = {};
@@ -1948,6 +1910,30 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      change.remove_line_if_empty = true;
      change.string = insert_string;
      change.location = motion_range.start;
+     change.cursor_before = view->cursor;
+     change.cursor_after = view->cursor;
+     ce_buffer_change(view->buffer, &change);
+
+     // TODO: compress what we can with open_below
+     // calc indentation
+     CePoint_t indentation_point = {0, motion_range.start.y};
+     int64_t indentation = ce_vim_get_indentation(view->buffer, indentation_point, config_options->tab_width);
+     CePoint_t cursor_end = {indentation, indentation_point.y};
+
+     // build indentation string
+     insert_string = malloc(indentation + 1);
+     memset(insert_string, ' ', indentation);
+     insert_string[indentation] = 0;
+
+     // insert indentation
+     if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+
+     // commit the change
+     change.chain = true;
+     change.insertion = true;
+     change.remove_line_if_empty = false;
+     change.string = insert_string;
+     change.location = indentation_point;
      change.cursor_before = view->cursor;
      change.cursor_after = cursor_end;
      ce_buffer_change(view->buffer, &change);
