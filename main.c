@@ -612,8 +612,16 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                               multiline_comment = true;
                          }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != bg_color)){
                               draw_color_list_insert(draw_color_list, COLOR_DEFAULT, bg_color, match_point);
-                         }else if((match_len = match_trailing_whitespace(str))){
-                              draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_RED, match_point);
+                         }else{
+                              if(view->cursor.y != y){
+                                   if((match_len = match_trailing_whitespace(str))){
+                                        draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_RED, match_point);
+                                   }
+                              }else if(x >= view->cursor.x){
+                                   if((match_len = match_trailing_whitespace(str))){
+                                        draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_RED, match_point);
+                                   }
+                              }
                          }
                     }
 

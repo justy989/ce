@@ -163,6 +163,7 @@ CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune
 CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key);

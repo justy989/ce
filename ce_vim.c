@@ -82,6 +82,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'a', &ce_vim_parse_verb_append);
      ce_vim_add_key_bind(vim, 'A', &ce_vim_parse_verb_append_at_end_of_line);
      ce_vim_add_key_bind(vim, 'd', &ce_vim_parse_verb_delete);
+     ce_vim_add_key_bind(vim, 'D', &ce_vim_parse_verb_delete_to_end_of_line);
      ce_vim_add_key_bind(vim, 'c', &ce_vim_parse_verb_change);
      ce_vim_add_key_bind(vim, 'C', &ce_vim_parse_verb_change_to_end_of_line);
      ce_vim_add_key_bind(vim, 'r', &ce_vim_parse_verb_set_character);
@@ -1246,6 +1247,13 @@ CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key)
 
      action->verb.function = &ce_vim_verb_delete;
      return CE_VIM_PARSE_IN_PROGRESS;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key){
+     action->motion.function = &ce_vim_motion_end_line;
+     action->verb.function = &ce_vim_verb_delete;
+     action->chain_undo = true;
+     return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key){
