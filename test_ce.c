@@ -178,6 +178,22 @@ TEST(buffer_insert_string_newline){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_insert_string_newline_at_end_of_line){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     const char* string = "\n";
+     ce_buffer_insert_string(&buffer, string, (CePoint_t){10, 0});
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 4);
+     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[1], "") == 0);
+     EXPECT(strcmp(buffer.lines[2], "second line") == 0);
+     EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+
+     ce_buffer_free(&buffer);
+}
+
 TEST(buffer_insert_string_on_empty_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, "first line\n\nthird line", g_name);
@@ -288,6 +304,31 @@ TEST(buffer_remove_string_across_multiple_lines){
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
      EXPECT(strcmp(buffer.lines[1], "0123423456789") == 0);
+
+     ce_buffer_free(&buffer);
+}
+
+TEST(buffer_remove_string_join_lines){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, "first\nsecond", g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 0}, 0, false));
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 1);
+     EXPECT(strcmp(buffer.lines[0], "firstsecond") == 0);
+
+     ce_buffer_free(&buffer);
+}
+
+TEST(buffer_remove_string_remove_empty_line){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, "first\n\nsecond", g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 0}, 0, false));
+
+     EXPECT(buffer.lines);
+     EXPECT(buffer.line_count == 2);
+     EXPECT(strcmp(buffer.lines[0], "first") == 0);
+     EXPECT(strcmp(buffer.lines[1], "second") == 0);
 
      ce_buffer_free(&buffer);
 }

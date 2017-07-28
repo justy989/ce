@@ -177,7 +177,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                          // if we are a the beginning of the line, we want to do a join line
                          end_cursor.y = view->cursor.y - 1;
                          end_cursor.x = ce_utf8_strlen(view->buffer->lines[end_cursor.y]);
-                         remove_point = view->cursor;
+                         remove_point = end_cursor;
                          removed_string = strdup("\n");
                          remove_len = 0;
                     }else{
@@ -186,8 +186,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                          removed_string = ce_buffer_dupe_string(view->buffer, remove_point, remove_len, false);
                     }
 
-                    if(ce_buffer_remove_string(view->buffer, remove_point, remove_len, true)){
-
+                    if(ce_buffer_remove_string(view->buffer, remove_point, remove_len, false)){
                          // TODO: convenience function
                          CeBufferChange_t change = {};
                          change.chain = vim->chain_undo;
@@ -1960,7 +1959,6 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
 
 bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                             const CeConfigOptions_t* config_options){
-     // TODO: insert whitespace for indentation
      // insert newline at the end of the current line
      char* insert_string = strdup("\n");
      motion_range.start.x = ce_utf8_strlen(view->buffer->lines[motion_range.start.y]);
@@ -1968,9 +1966,9 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
 
      // commit the change
      CeBufferChange_t change = {};
-     change.chain = action->chain_undo;
+     change.chain = false;
      change.insertion = true;
-     change.remove_line_if_empty = true;
+     change.remove_line_if_empty = false;
      change.string = insert_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -1991,9 +1989,9 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
      // commit the change
-     change.chain = action->chain_undo;
+     change.chain = true;
      change.insertion = true;
-     change.remove_line_if_empty = true;
+     change.remove_line_if_empty = false;
      change.string = insert_string;
      change.location = indentation_point;
      change.cursor_before = view->cursor;
