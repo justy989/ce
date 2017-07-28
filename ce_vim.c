@@ -229,6 +229,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                break;
           case 27: // escape
                vim->mode = CE_VIM_MODE_NORMAL;
+               vim->chain_undo = false;
                break;
           }
           break;
