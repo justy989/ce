@@ -63,6 +63,18 @@ typedef struct{
      int bg;
 }SyntaxDef_t;
 
+int syntax_def_get_fg(SyntaxDef_t* syntax_defs, SyntaxColor_t syntax_color, int current_fg){
+     int new_color = syntax_defs[syntax_color].fg;
+     if(new_color == SYNTAX_USE_CURRENT_COLOR) return current_fg;
+     return new_color;
+}
+
+int syntax_def_get_bg(SyntaxDef_t* syntax_defs, SyntaxColor_t syntax_color, int current_bg){
+     int new_color = syntax_defs[syntax_color].bg;
+     if(new_color == SYNTAX_USE_CURRENT_COLOR) return current_bg;
+     return new_color;
+}
+
 typedef struct DrawColorNode_t{
      int fg;
      int bg;
@@ -100,10 +112,16 @@ void draw_color_list_free(DrawColorList_t* list){
      list->tail = NULL;
 }
 
-int draw_color_list_last_color(DrawColorList_t* draw_color_list){
+int draw_color_list_last_fg_color(DrawColorList_t* draw_color_list){
      int fg = COLOR_DEFAULT;
      if(draw_color_list->tail) fg = draw_color_list->tail->fg;
      return fg;
+}
+
+int draw_color_list_last_bg_color(DrawColorList_t* draw_color_list){
+     int bg = COLOR_DEFAULT;
+     if(draw_color_list->tail) bg = draw_color_list->tail->bg;
+     return bg;
 }
 
 typedef struct{
@@ -530,6 +548,12 @@ static int64_t match_trailing_whitespace(const char* str){
      return (itr - str);
 }
 
+static void change_draw_color(DrawColorList_t* draw_color_list, SyntaxDef_t* syntax_defs, SyntaxColor_t syntax_color, CePoint_t point){
+     int fg = syntax_def_get_fg(syntax_defs, syntax_color, draw_color_list_last_fg_color(draw_color_list));
+     int bg = syntax_def_get_bg(syntax_defs, syntax_color, draw_color_list_last_bg_color(draw_color_list));
+     draw_color_list_insert(draw_color_list, fg, bg, point);
+}
+
 void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_list, SyntaxDef_t* syntax_defs){
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
@@ -541,12 +565,11 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
      CE_CLAMP(max, 0, clamp_max);
      int64_t match_len = 0;
      bool multiline_comment = false;
-     int bg_color = COLOR_DEFAULT;
+     int bg_color = COLOR_DEFAULT; // TODO: eval bg_color to see if we can eliminate it since updating how visual mode is highlighted
      CePoint_t visual_start;
      CePoint_t visual_end;
 
-     if(vim->mode == CE_VIM_MODE_VISUAL ||
-        vim->mode == CE_VIM_MODE_VISUAL_LINE){
+     if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
           if(ce_point_after(view->cursor, vim->visual)){
                visual_start = vim->visual;
                visual_end = view->cursor;
@@ -566,21 +589,21 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                if(match_point.y >= visual_start.y &&
                   match_point.y <= visual_end.y){
                     bg_color = COLOR_WHITE;
-                    draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+                    change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
                }else{
-                    // if the line is empty, reset the colors
-                    if(line_len == 0 && bg_color == COLOR_WHITE){
-                         draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, match_point);
+                    if(bg_color == COLOR_WHITE){
+                         bg_color = COLOR_DEFAULT;
+                         draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
+                    }else{
+                         bg_color = COLOR_DEFAULT;
                     }
-
-                    bg_color = COLOR_DEFAULT;
                }
           }else if(vim->mode == CE_VIM_MODE_VISUAL){
                if(ce_points_equal(match_point, visual_start) ||
                   ce_points_equal(match_point, visual_end) ||
                   (ce_point_after(match_point, visual_start) &&
                    !ce_point_after(match_point, visual_end))){
-                    draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+                    change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
                }
           }
 
@@ -593,16 +616,16 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                        ce_points_equal(match_point, visual_end) ||
                        (ce_point_after(match_point, visual_start) &&
                         !ce_point_after(match_point, visual_end))){
-                         if(bg_color == COLOR_DEFAULT && current_match_len > 1){
+                         if(bg_color == COLOR_DEFAULT){
                               bg_color = COLOR_WHITE;
-                              draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
                          }else{
                               bg_color = COLOR_WHITE;
                          }
                     }else{
-                         if(bg_color == COLOR_WHITE && current_match_len > 1){
+                         if(bg_color == COLOR_WHITE){
                               bg_color = COLOR_DEFAULT;
-                              draw_color_list_insert(draw_color_list, draw_color_list_last_color(draw_color_list), bg_color, match_point);
+                              draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
                          }else{
                               bg_color = COLOR_DEFAULT;
                          }
@@ -616,40 +639,30 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                          }
                     }else{
                          if((match_len = match_c_type(str, line))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_TYPE].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_TYPE, match_point);
                          }else if((match_len = match_c_keyword(str, line))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_KEYWORD].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_KEYWORD, match_point);
                          }else if((match_len = match_c_control(str, line))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_CONTROL].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_CONTROL, match_point);
                          }else if((match_len = match_caps_var(str))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_CAPS_VAR].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_CAPS_VAR, match_point);
                          }else if((match_len = match_c_comment(str))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_COMMENT].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_COMMENT, match_point);
                          }else if((match_len = match_c_string(str))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_STRING].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_STRING, match_point);
                          }else if((match_len = match_c_character_literal(str))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_CHAR_LITERAL].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_CHAR_LITERAL, match_point);
                          }else if((match_len = match_c_literal(str, line))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_NUMBER_LITERAL].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_NUMBER_LITERAL, match_point);
                          }else if((match_len = match_c_preproc(str))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_PREPROCESSOR].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_PREPROCESSOR, match_point);
                          }else if((match_len = match_c_multiline_comment(str))){
-                              draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_COMMENT].fg, bg_color, match_point);
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_COMMENT, match_point);
                               multiline_comment = true;
+                         }else if(((view->cursor.y != y) || (x >= view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
                          }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != bg_color)){
-                              draw_color_list_insert(draw_color_list, COLOR_DEFAULT, bg_color, match_point);
-                         }else{
-                              if(view->cursor.y != y){
-                                   if((match_len = match_trailing_whitespace(str))){
-                                        draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].fg,
-                                                               syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].bg, match_point);
-                                   }
-                              }else if(x >= view->cursor.x){
-                                   if((match_len = match_trailing_whitespace(str))){
-                                        draw_color_list_insert(draw_color_list, syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].fg,
-                                                               syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].bg, match_point);
-                                   }
-                              }
+                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_NORMAL, match_point);
                          }
                     }
 
@@ -659,10 +672,11 @@ void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_
                }
           }
 
+          // handle case where visual mode ends at the end of the line
           match_point.x = line_len;
           if(vim->mode == CE_VIM_MODE_VISUAL && bg_color == COLOR_WHITE && ce_point_after(match_point, visual_end)){
                bg_color = COLOR_DEFAULT;
-               draw_color_list_insert(draw_color_list, COLOR_DEFAULT, bg_color, match_point);
+               draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
           }
      }
 }
@@ -713,7 +727,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                          rune = ce_utf8_decode(line, &rune_len);
 
                          // check if we need to move to the next color
-                         if(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
+                         while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
                               int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
                               attron(COLOR_PAIR(change_color_pair));
                               draw_color_node = draw_color_node->next;
@@ -1030,33 +1044,33 @@ int main(int argc, char** argv){
      SyntaxDef_t syntax_defs[SYNTAX_COLOR_COUNT];
      {
           syntax_defs[SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
-          syntax_defs[SYNTAX_COLOR_NORMAL].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_NORMAL].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
-          syntax_defs[SYNTAX_COLOR_TYPE].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_TYPE].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
-          syntax_defs[SYNTAX_COLOR_KEYWORD].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_KEYWORD].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
-          syntax_defs[SYNTAX_COLOR_CONTROL].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_CONTROL].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
-          syntax_defs[SYNTAX_COLOR_CAPS_VAR].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_CAPS_VAR].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
-          syntax_defs[SYNTAX_COLOR_COMMENT].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_COMMENT].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_STRING].fg = COLOR_RED;
-          syntax_defs[SYNTAX_COLOR_STRING].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_STRING].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
-          syntax_defs[SYNTAX_COLOR_CHAR_LITERAL].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_CHAR_LITERAL].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
-          syntax_defs[SYNTAX_COLOR_NUMBER_LITERAL].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_NUMBER_LITERAL].bg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
-          syntax_defs[SYNTAX_COLOR_PREPROCESSOR].bg = COLOR_DEFAULT;
-          syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_PREPROCESSOR].bg = SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
           syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
           syntax_defs[SYNTAX_COLOR_VISUAL].fg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_VISUAL].bg = COLOR_BRIGHT_BLACK;
+          syntax_defs[SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
           syntax_defs[SYNTAX_COLOR_MATCH].fg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_MATCH].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
           syntax_defs[SYNTAX_COLOR_CURRENT_LINE].fg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_CURRENT_LINE].bg = COLOR_DEFAULT;
+          syntax_defs[SYNTAX_COLOR_CURRENT_LINE].bg = COLOR_BRIGHT_BLACK;
      }
 
      CeConfigOptions_t config_options = {};
