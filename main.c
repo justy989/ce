@@ -10,6 +10,7 @@
 #include "ce.h"
 #include "ce_vim.h"
 #include "ce_layout.h"
+#include "ce_command.h"
 
 typedef struct BufferNode_t{
      CeBuffer_t* buffer;
@@ -1012,6 +1013,29 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
      return success;
 }
 
+typedef struct{
+     CeVim_t vim;
+     CeConfigOptions_t config_options;
+     int terminal_width;
+     int terminal_height;
+     CeView_t input_view;
+     bool input_mode;
+     CeLayout_t* tab_list_layout;
+     SyntaxDef_t* syntax_defs;
+     BufferNode_t* buffer_node_head;
+     CeCommandEntry_t* command_entries;
+     int64_t command_entry_count;
+     bool quit;
+}App_t;
+
+CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     app->quit = true;
+     return CE_COMMAND_SUCCESS;
+}
+
 int main(int argc, char** argv){
      setlocale(LC_ALL, "");
 
@@ -1041,6 +1065,10 @@ int main(int argc, char** argv){
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
      }
 
+     // TODO: allocate this on the heap when it gets too big?
+     App_t app = {};
+
+     // init custon syntax highlighting
      SyntaxDef_t syntax_defs[SYNTAX_COLOR_COUNT];
      {
           syntax_defs[SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
@@ -1071,92 +1099,103 @@ int main(int argc, char** argv){
           syntax_defs[SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
           syntax_defs[SYNTAX_COLOR_CURRENT_LINE].fg = SYNTAX_USE_CURRENT_COLOR;
           syntax_defs[SYNTAX_COLOR_CURRENT_LINE].bg = COLOR_BRIGHT_BLACK;
+
+          app.syntax_defs = syntax_defs;
      }
 
-     CeConfigOptions_t config_options = {};
-     config_options.tab_width = 5;
-     config_options.horizontal_scroll_off = 10;
-     config_options.vertical_scroll_off = 5;
+     // init config options
+     {
+          app.config_options.tab_width = 5;
+          app.config_options.horizontal_scroll_off = 10;
+          app.config_options.vertical_scroll_off = 5;
+     }
 
-     int terminal_width;
-     int terminal_height;
-
-     BufferNode_t* buffer_node_head = NULL;
+     // init commands
+     CeCommandEntry_t command_entries[] = {
+          {command_quit, "quit", "quit ce"},
+     };
+     app.command_entries = command_entries;
+     app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
 
      CeBuffer_t* buffer_list_buffer = calloc(1, sizeof(*buffer_list_buffer));
-     ce_buffer_alloc(buffer_list_buffer, 1, "buffers");
-     buffer_node_insert(&buffer_node_head, buffer_list_buffer);
 
-     if(argc > 1){
-          for(int64_t i = 1; i < argc; i++){
+     // init buffers
+     {
+          ce_buffer_alloc(buffer_list_buffer, 1, "buffers");
+          buffer_node_insert(&app.buffer_node_head, buffer_list_buffer);
+
+          if(argc > 1){
+               for(int64_t i = 1; i < argc; i++){
+                    CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+                    if(ce_buffer_load_file(buffer, argv[i])){
+                         buffer_node_insert(&app.buffer_node_head, buffer);
+
+                         // TODO: figure out type based on extention
+                         buffer->type = CE_BUFFER_FILE_TYPE_C;
+                    }else{
+                         free(buffer);
+                    }
+               }
+          }else{
                CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-               if(ce_buffer_load_file(buffer, argv[i])){
-                    buffer_node_insert(&buffer_node_head, buffer);
+               ce_buffer_alloc(buffer, 1, "unnamed");
+          }
+     }
 
-                    // TODO: figure out type based on extention
-                    buffer->type = CE_BUFFER_FILE_TYPE_C;
-               }else{
-                    free(buffer);
+     // init vim
+     {
+          ce_vim_init(&app.vim);
+
+          // override 'S' key
+          for(int64_t i = 0; i < app.vim.key_bind_count; ++i){
+               CeVimKeyBind_t* key_bind = app.vim.key_binds + i;
+               if(key_bind->key == 'S'){
+                    key_bind->function = &custom_vim_parse_verb_substitute;
+                    break;
                }
           }
-     }else{
-          CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-          ce_buffer_alloc(buffer, 1, "unnamed");
      }
 
-     CeVim_t vim = {};
-     ce_vim_init(&vim);
-
-     // ce_vim_add_key_bind(&vim, 'S', &custom_vim_parse_verb_substitute);
-     // override 'S' key
-     for(int64_t i = 0; i < vim.key_bind_count; ++i){
-          CeVimKeyBind_t* key_bind = vim.key_binds + i;
-          if(key_bind->key == 'S'){
-               key_bind->function = &custom_vim_parse_verb_substitute;
-               break;
-          }
-     }
-
-     CeLayout_t* tab_list_layout = NULL;
+     // init layout
      {
-          CeLayout_t* tab_layout = ce_layout_tab_init(buffer_node_head->buffer);
-          tab_list_layout = ce_layout_tab_list_init(tab_layout);
+          CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer);
+          app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
      }
-
-     CeView_t input_view = {};
-     bool input_mode = false;
 
      // setup input buffer
      {
           CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
           ce_buffer_alloc(buffer, 1, "input");
-          input_view.buffer = buffer;
-          buffer_node_insert(&buffer_node_head, buffer);
+          app.input_view.buffer = buffer;
+          buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
      // init draw thread
      pthread_t thread_draw;
      DrawThreadData_t* draw_thread_data = calloc(1, sizeof(*draw_thread_data));
      {
-          draw_thread_data->layout = tab_list_layout;
-          draw_thread_data->vim = &vim;
-          draw_thread_data->tab_width = config_options.tab_width;
-          draw_thread_data->input_mode = &input_mode;
-          draw_thread_data->input_view = &input_view;
+          draw_thread_data->layout = app.tab_list_layout;
+          draw_thread_data->vim = &app.vim;
+          draw_thread_data->tab_width = app.config_options.tab_width;
+          draw_thread_data->input_mode = &app.input_mode;
+          draw_thread_data->input_view = &app.input_view;
           draw_thread_data->syntax_defs = syntax_defs;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
           draw_thread_data->ready_to_draw = true;
      }
 
-     bool done = false;
-     while(!done){
+     // main loop
+     while(!app.quit){
+          // handle if terminal was resized
+          // TODO: we can optimize by only doing this at the start and when we see a resized event
+          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
+          CeRect_t terminal_rect = {0, app.terminal_width - 1, 0, app.terminal_height - 1};
+          ce_layout_distribute_rect(app.tab_list_layout, terminal_rect);
+
+          // figure out our current view rect
           CeView_t* view = NULL;
           CeRect_t view_rect = {};
-          CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
-
-          getmaxyx(stdscr, terminal_height, terminal_width);
-          CeRect_t terminal_rect = {0, terminal_width - 1, 0, terminal_height - 1};
-          ce_layout_distribute_rect(tab_list_layout, terminal_rect);
+          CeLayout_t* tab_layout = app.tab_list_layout->tab_list.current;
 
           switch(tab_layout->tab.current->type){
           default:
@@ -1173,14 +1212,14 @@ int main(int argc, char** argv){
           }
 
           // setup input view rect
-          if(input_mode && view){
-               input_view_overlay(&input_view, view);
-          }
+          if(app.input_mode && view) input_view_overlay(&app.input_view, view);
 
+          // wait for input from the user
           int key = getch();
           bool handled_key = false;
 
-          if(vim.mode == CE_VIM_MODE_NORMAL){
+          // handle custom bindings
+          if(app.vim.mode == CE_VIM_MODE_NORMAL){
                handled_key = true;
 
                switch(key){
@@ -1188,15 +1227,15 @@ int main(int argc, char** argv){
                     handled_key = false;
                     break;
                case KEY_CLOSE:
-                    done = true;
+                    app.quit = true;
                     break;
                case 23: // Ctrl + w
                     if(view) ce_buffer_save(view->buffer);
                     break;
                case 2: // Ctrl + b
                     if(!view) break;
-                    build_buffer_list(buffer_list_buffer, buffer_node_head);
-                    view_switch_buffer(view, buffer_list_buffer, &vim);
+                    build_buffer_list(buffer_list_buffer, app.buffer_node_head);
+                    view_switch_buffer(view, buffer_list_buffer, &app.vim);
                     break;
                case 22: // Ctrl + v
                     if(view) pthread_mutex_lock(&view->buffer->lock);
@@ -1211,100 +1250,100 @@ int main(int argc, char** argv){
                case 8: // Ctrl + h
                {
                     if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
                          CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }else{
                          CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }
                } break;
                case 10: // Ctrl + j
                {
                     if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
                          CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }else{
                          CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }
                } break;
                case 11: // Ctrl + k
                {
                     if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
                          CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }else{
                          CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }
                } break;
                case 12: // Ctrl + l
                {
                     if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, config_options.tab_width);
+                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
                          CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }else{
                          CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
-                         target.x %= terminal_width;
-                         target.y %= terminal_height;
+                         target.x %= app.terminal_width;
+                         target.y %= app.terminal_height;
                          CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
                          if(layout){
                               tab_layout->tab.current = layout;
-                              vim.mode = CE_VIM_MODE_NORMAL;
-                              input_mode = false;
+                              app.vim.mode = CE_VIM_MODE_NORMAL;
+                              app.input_mode = false;
                          }
                     }
                } break;
@@ -1316,11 +1355,11 @@ int main(int argc, char** argv){
                case 1: // Ctrl + a
                {
                     // check if this is the only view, and ignore the delete request
-                    if(tab_list_layout->tab_list.tab_count == 1 &&
+                    if(app.tab_list_layout->tab_list.tab_count == 1 &&
                        tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
                        tab_layout->tab.root->list.layout_count == 1 &&
                        tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]) break;
-                    if(input_mode) break;
+                    if(app.input_mode) break;
 
                     CePoint_t cursor = {view_rect.left, view_rect.top};
                     if(view) cursor = view->cursor;
@@ -1331,22 +1370,22 @@ int main(int argc, char** argv){
                } break;
                case 6: // Ctrl + f
                {
-                    if(!view || input_mode) break;
-                    input_mode = enable_input_mode(&input_view, view, &vim, "LOAD FILE");
+                    if(!view || app.input_mode) break;
+                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "LOAD FILE");
                } break;
                case 20: // Ctrl + t
                {
-                    CeLayout_t* new_tab_layout = ce_layout_tab_list_add(tab_list_layout);
-                    if(new_tab_layout) tab_list_layout->tab_list.current = new_tab_layout;
+                    CeLayout_t* new_tab_layout = ce_layout_tab_list_add(app.tab_list_layout);
+                    if(new_tab_layout) app.tab_list_layout->tab_list.current = new_tab_layout;
                } break;
                case 9: // Ctrl + i
-                    for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
-                         if(tab_list_layout->tab_list.current == tab_list_layout->tab_list.tabs[i]){
+                    for(int64_t i = 0; i < app.tab_list_layout->tab_list.tab_count; i++){
+                         if(app.tab_list_layout->tab_list.current == app.tab_list_layout->tab_list.tabs[i]){
                               if(i > 0){
-                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[i - 1];
+                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[i - 1];
                               }else{
                                    // wrap around
-                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[tab_list_layout->tab_list.tab_count - 1];
+                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[app.tab_list_layout->tab_list.tab_count - 1];
                               }
                               break;
                          }
@@ -1354,14 +1393,14 @@ int main(int argc, char** argv){
                     break;
                case 15: // Ctrl + o
                {
-                    int64_t last_index = tab_list_layout->tab_list.tab_count - 1;
-                    for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
-                         if(tab_list_layout->tab_list.current == tab_list_layout->tab_list.tabs[i]){
+                    int64_t last_index = app.tab_list_layout->tab_list.tab_count - 1;
+                    for(int64_t i = 0; i < app.tab_list_layout->tab_list.tab_count; i++){
+                         if(app.tab_list_layout->tab_list.current == app.tab_list_layout->tab_list.tabs[i]){
                               if(i < last_index){
-                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[i + 1];
+                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[i + 1];
                               }else{
                                    // wrap around
-                                   tab_list_layout->tab_list.current = tab_list_layout->tab_list.tabs[0];
+                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[0];
                               }
                               break;
                          }
@@ -1369,15 +1408,20 @@ int main(int argc, char** argv){
                } break;
                case '/':
                {
-                    if(!view || input_mode) break;
-                    input_mode = enable_input_mode(&input_view, view, &vim, "SEARCH");
-                    vim.search_forward = true;
+                    if(!view || app.input_mode) break;
+                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "SEARCH");
+                    app.vim.search_forward = true;
                } break;
                case '?':
                {
-                    if(!view || input_mode) break;
-                    input_mode = enable_input_mode(&input_view, view, &vim, "REVERSE SEARCH");
-                    vim.search_forward = false;
+                    if(!view || app.input_mode) break;
+                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "REVERSE SEARCH");
+                    app.vim.search_forward = false;
+               } break;
+               case ':':
+               {
+                    if(!view || app.input_mode) break;
+                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "COMMAND");
                } break;
                }
           }
@@ -1385,22 +1429,22 @@ int main(int argc, char** argv){
           if(!handled_key){
                if(key == KEY_ENTER){
                     if(view->buffer == buffer_list_buffer){
-                         BufferNode_t* itr = buffer_node_head;
+                         BufferNode_t* itr = app.buffer_node_head;
                          int64_t index = 0;
                          while(itr){
                               if(index == view->cursor.y){
-                                   view_switch_buffer(view, itr->buffer, &vim);
+                                   view_switch_buffer(view, itr->buffer, &app.vim);
                                    break;
                               }
                               itr = itr->next;
                               index++;
                          }
-                    }else if(input_mode){
-                         if(strcmp(input_view.buffer->name, "LOAD FILE") == 0){
-                              for(int64_t i = 0; i < input_view.buffer->line_count; i++){
+                    }else if(app.input_mode){
+                         if(strcmp(app.input_view.buffer->name, "LOAD FILE") == 0){
+                              for(int64_t i = 0; i < app.input_view.buffer->line_count; i++){
                                    CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-                                   if(ce_buffer_load_file(buffer, input_view.buffer->lines[i])){
-                                        buffer_node_insert(&buffer_node_head, buffer);
+                                   if(ce_buffer_load_file(buffer, app.input_view.buffer->lines[i])){
+                                        buffer_node_insert(&app.buffer_node_head, buffer);
                                         view->buffer = buffer;
                                         view->cursor = (CePoint_t){0, 0};
 
@@ -1410,51 +1454,53 @@ int main(int argc, char** argv){
                                         free(buffer);
                                    }
                               }
-                         }else if(strcmp(input_view.buffer->name, "SEARCH") == 0 ||
-                                  strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
+                         }else if(strcmp(app.input_view.buffer->name, "SEARCH") == 0 ||
+                                  strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0){
                               // update yanks
                               int64_t index = ce_vim_yank_register_index('/');
-                              CeVimYank_t* yank = vim.yanks + index;
+                              CeVimYank_t* yank = app.vim.yanks + index;
                               free(yank->text);
-                              yank->text = strdup(input_view.buffer->lines[0]);
+                              yank->text = strdup(app.input_view.buffer->lines[0]);
                               yank->line = false;
+                         }else if(strcmp(app.input_view.buffer->name, "COMMAND")){
                          }
 
                          // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
-                         input_mode = false;
-                         vim.mode = CE_VIM_MODE_NORMAL;
+                         app.input_mode = false;
+                         app.vim.mode = CE_VIM_MODE_NORMAL;
                     }else{
                          key = CE_NEWLINE;
                     }
-               }else if(key == 27 && input_mode){ // Escape
-                    input_mode = false;
-                    vim.mode = CE_VIM_MODE_NORMAL;
+               }else if(key == 27 && app.input_mode){ // Escape
+                    app.input_mode = false;
+                    app.vim.mode = CE_VIM_MODE_NORMAL;
                     break;
                }
 
-               if(input_mode) ce_vim_handle_key(&vim, &input_view, key, &config_options);
-               else ce_vim_handle_key(&vim, view, key, &config_options);
+               if(app.input_mode) ce_vim_handle_key(&app.vim, &app.input_view, key, &app.config_options);
+               else ce_vim_handle_key(&app.vim, view, key, &app.config_options);
           }
 
-          if(input_mode){
-               if(strcmp(input_view.buffer->name, "SEARCH") == 0){
-                    if(input_view.buffer->line_count && view->buffer->line_count){
-                         CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+          // incremental search
+          if(app.input_mode){
+               if(strcmp(app.input_view.buffer->name, "SEARCH") == 0){
+                    if(app.input_view.buffer->line_count && view->buffer->line_count){
+                         CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, app.input_view.buffer->lines[0]);
                          if(match_point.x >= 0){
                               view->cursor = match_point;
-                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
-                                                                   config_options.vertical_scroll_off,
-                                                                   config_options.tab_width);
+                              view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                                   app.config_options.vertical_scroll_off,
+                                                                   app.config_options.tab_width);
                          }
                     }
-               }else if(strcmp(input_view.buffer->name, "REVERSE SEARCH") == 0){
-                    if(input_view.buffer->line_count && view->buffer->line_count){
-                         CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, input_view.buffer->lines[0]);
+               }else if(strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0){
+                    if(app.input_view.buffer->line_count && view->buffer->line_count){
+                         CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, app.input_view.buffer->lines[0]);
                          if(match_point.x >= 0){
                               view->cursor = match_point;
-                              view->scroll = ce_view_follow_cursor(view, config_options.horizontal_scroll_off,
-                                                                   config_options.vertical_scroll_off,
-                                                                   config_options.tab_width);
+                              view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                                   app.config_options.vertical_scroll_off,
+                                                                   app.config_options.tab_width);
                          }
                     }
                }
@@ -1463,14 +1509,14 @@ int main(int argc, char** argv){
           draw_thread_data->ready_to_draw = true;
      }
 
+     // cleanup
      draw_thread_data->done = true;
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
 
-     // cleanup
-     buffer_node_free(&buffer_node_head);
-     ce_layout_free(&tab_list_layout);
-     ce_vim_free(&vim);
+     buffer_node_free(&app.buffer_node_head);
+     ce_layout_free(&app.tab_list_layout);
+     ce_vim_free(&app.vim);
      free(draw_thread_data);
      endwin();
      return 0;
