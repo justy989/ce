@@ -1462,7 +1462,26 @@ int main(int argc, char** argv){
                               free(yank->text);
                               yank->text = strdup(app.input_view.buffer->lines[0]);
                               yank->line = false;
-                         }else if(strcmp(app.input_view.buffer->name, "COMMAND")){
+                         }else if(strcmp(app.input_view.buffer->name, "COMMAND") == 0){
+                              CeCommand_t command = {};
+                              if(!ce_command_parse(&command, app.input_view.buffer->lines[0])){
+                                   ce_log("failed to parse command: '%s'\n", app.input_view.buffer->lines[0]);
+                              }else{
+                                   CeCommandFunc_t* command_func = NULL;
+                                   for(int64_t i = 0; i < app.command_entry_count; i++){
+                                        CeCommandEntry_t* entry = app.command_entries + i;
+                                        if(strcmp(entry->name, command.name) == 0){
+                                             command_func = entry->func;
+                                             break;
+                                        }
+                                   }
+
+                                   if(command_func){
+                                        command_func(&command, &app);
+                                   }else{
+                                        ce_log("unknown command: '%s'\n", command.name);
+                                   }
+                              }
                          }
 
                          // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future

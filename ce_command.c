@@ -80,12 +80,6 @@ static bool parse_arg(CeCommandArg_t* arg, const char* string)
      return true;
 }
 
-void ce_command_entry_log(CeCommandEntry_t* entry)
-{
-     // TODO: get rid of this function
-     ce_log("%s %s", entry->name, entry->description);
-}
-
 bool ce_command_parse(CeCommand_t* command, const char* string)
 {
      if(*string == 0) return false;
@@ -116,7 +110,7 @@ bool ce_command_parse(CeCommand_t* command, const char* string)
 
           int64_t len = strlen(start);
           if(len >= CE_COMMAND_NAME_MAX_LEN){
-               ce_log("error: in command '%s' command name is greater than max %d characters", string, CE_COMMAND_NAME_MAX_LEN);
+               ce_log("error: in command '%s' command name is greater than max %d characters\n", string, CE_COMMAND_NAME_MAX_LEN);
                return false;
           }
 
@@ -127,7 +121,7 @@ bool ce_command_parse(CeCommand_t* command, const char* string)
      // copy the command name
      int64_t len = end - start;
      if(len >= CE_COMMAND_NAME_MAX_LEN){
-          ce_log("error: in command '%s' command name is greater than max %d characters", string, CE_COMMAND_NAME_MAX_LEN);
+          ce_log("error: in command '%s' command name is greater than max %d characters\n", string, CE_COMMAND_NAME_MAX_LEN);
           return false;
      }
 
@@ -201,7 +195,7 @@ void ce_command_free(CeCommand_t* command)
 
 void ce_command_log(CeCommand_t* command)
 {
-     ce_log("command: '%s', %ld args", command->name, command->arg_count);
+     ce_log("command: '%s', %ld args\n", command->name, command->arg_count);
 
      for(int64_t i = 0; i < command->arg_count; ++i){
           CeCommandArg_t* arg = command->args + i;
@@ -209,13 +203,13 @@ void ce_command_log(CeCommand_t* command)
           default:
                break;
           case CE_COMMAND_ARG_INTEGER:
-               ce_log("  %ld", arg->integer);
+               ce_log("  %ld\n", arg->integer);
                break;
           case CE_COMMAND_ARG_DECIMAL:
-               ce_log("  %f", arg->decimal);
+               ce_log("  %f\n", arg->decimal);
                break;
           case CE_COMMAND_ARG_STRING:
-               ce_log("  '%s'", arg->string);
+               ce_log("  '%s'\n", arg->string);
                break;
           }
      }

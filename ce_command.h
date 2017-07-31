@@ -35,15 +35,13 @@ typedef struct{
      int64_t arg_count;
 }CeCommand_t;
 
-typedef CeCommandStatus_t ce_command (CeCommand_t*, void*);
+typedef CeCommandStatus_t CeCommandFunc_t (CeCommand_t*, void*);
 
 typedef struct{
-     ce_command* func;
+     CeCommandFunc_t* func;
      const char* name;
      const char* description;
 }CeCommandEntry_t;
-
-void ce_command_entry_log(CeCommandEntry_t* entry);
 
 bool ce_command_parse(CeCommand_t* command, const char* string);
 void ce_command_free(CeCommand_t* command);
