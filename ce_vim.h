@@ -43,6 +43,7 @@ typedef enum{
      CE_VIM_MODE_VISUAL_LINE,
      CE_VIM_MODE_VISUAL_BLOCK,
      CE_VIM_MODE_REPLACE,
+     CE_VIM_MODE_COUNT,
 }CeVimMode_t;
 
 typedef struct CeVimMotionRange_t{

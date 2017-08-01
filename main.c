@@ -1014,6 +1014,47 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 }
 
 typedef struct{
+     int* keys;
+     int64_t key_count;
+     CeCommand_t command;
+     CeVimMode_t vim_mode;
+}KeyBind_t;
+
+typedef struct{
+     KeyBind_t* binds;
+     int64_t count;
+}KeyBinds_t;
+
+typedef struct{
+     int keys[4];
+     const char* command;
+}KeyBindDef_t;
+
+static void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count)
+{
+     binds->count = bind_def_count;
+     binds->binds = malloc(binds->count * sizeof(*binds->binds));
+
+     for(int64_t i = 0; i < binds->count; ++i){
+          ce_command_parse(&binds->binds[i].command, bind_defs[i].command);
+          binds->binds[i].key_count = 0;
+
+          for(int k = 0; k < 4; ++k){
+               if(bind_defs[i].keys[k] == 0) break;
+               binds->binds[i].key_count++;
+          }
+
+          if(!binds->binds[i].key_count) continue;
+
+          binds->binds[i].keys = malloc(binds->binds[i].key_count * sizeof(binds->binds[i].keys[0]));
+
+          for(int k = 0; k < binds->binds[i].key_count; ++k){
+               binds->binds[i].keys[k] = bind_defs[i].keys[k];
+          }
+     }
+}
+
+typedef struct{
      CeVim_t vim;
      CeConfigOptions_t config_options;
      int terminal_width;
@@ -1025,6 +1066,7 @@ typedef struct{
      BufferNode_t* buffer_node_head;
      CeCommandEntry_t* command_entries;
      int64_t command_entry_count;
+     KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      bool quit;
 }App_t;
 
@@ -1140,6 +1182,15 @@ int main(int argc, char** argv){
                CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
                ce_buffer_alloc(buffer, 1, "unnamed");
           }
+     }
+
+     // init keybinds
+     {
+          KeyBindDef_t normal_mode_bind_defs[] = {
+               {{'\\', 'q'}, "quit"},
+          };
+
+          convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
      }
 
      // init vim
