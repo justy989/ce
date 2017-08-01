@@ -1054,6 +1054,8 @@ static void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_
      }
 }
 
+#define APP_MAX_KEY_COUNT 16
+
 typedef struct{
      CeVim_t vim;
      CeConfigOptions_t config_options;
@@ -1066,7 +1068,10 @@ typedef struct{
      BufferNode_t* buffer_node_head;
      CeCommandEntry_t* command_entries;
      int64_t command_entry_count;
+     CeVimParseResult_t last_vim_handle_result;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
+     CeRune_t keys[APP_MAX_KEY_COUNT];
+     int64_t key_count;
      bool quit;
 }App_t;
 
@@ -1076,6 +1081,19 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      App_t* app = user_data;
      app->quit = true;
      return CE_COMMAND_SUCCESS;
+}
+
+static int int_strneq(int* a, int* b, size_t len)
+{
+     for(size_t i = 0; i < len; ++i){
+          if(!*a) return false;
+          if(!*b) return false;
+          if(*a != *b) return false;
+          a++;
+          b++;
+     }
+
+     return true;
 }
 
 int main(int argc, char** argv){
@@ -1107,7 +1125,7 @@ int main(int argc, char** argv){
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
      }
 
-     // TODO: allocate this on the heap when it gets too big?
+     // TODO: allocate this on the heap when/if it gets too big?
      App_t app = {};
 
      // init custon syntax highlighting
@@ -1268,6 +1286,69 @@ int main(int argc, char** argv){
           // wait for input from the user
           int key = getch();
           bool handled_key = false;
+
+          // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
+          if(app.last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS || app.vim.mode == CE_VIM_MODE_INSERT){
+               // append to keys
+               if(app.key_count < APP_MAX_KEY_COUNT){
+                    app.keys[app.key_count] = key;
+                    app.key_count++;
+
+                    bool no_matches = true;
+                    for(int64_t i = 0; i < app.key_binds[app.vim.mode].count; ++i){
+                         if(int_strneq(app.key_binds[app.vim.mode].binds[i].keys, app.keys, app.key_count)){
+                              no_matches = false;
+                              // if we have matches, but don't completely match, then wait for more keypresses,
+                              // otherwise, execute the action
+                              if(app.key_binds[app.vim.mode].binds[i].key_count == app.key_count){
+                                   CeCommand_t* command = &app.key_binds[app.vim.mode].binds[i].command;
+                                   CeCommandFunc_t* command_func = NULL;
+                                   CeCommandEntry_t* entry = NULL;
+                                   for(int64_t c = 0; c < app.command_entry_count; ++c){
+                                        entry = app.command_entries + c;
+                                        if(strcmp(entry->name, command->name) == 0){
+                                             command_func = entry->func;
+                                             break;
+                                        }
+                                   }
+
+                                   if(command_func){
+                                        CeCommandStatus_t cs = command_func(command, &app);
+
+                                        switch(cs){
+                                        default:
+                                             handled_key = true;
+                                             break;
+                                        case CE_COMMAND_NO_ACTION:
+                                             break;
+                                        case CE_COMMAND_FAILURE:
+                                             ce_log("'%s' failed", entry->name);
+                                             break;
+                                        case CE_COMMAND_PRINT_HELP:
+                                             ce_log("command help:\n'%s' %s\n", entry->name, entry->description);
+                                             break;
+                                        }
+                                   }else{
+                                        ce_log("unknown command: '%s'", command->name);
+                                   }
+
+                                   app.key_count = 0;
+                              }else{
+                                   handled_key = true;
+                              }
+                         }
+                    }
+
+                    if(no_matches){
+                         app.vim.current_command[0] = 0;
+                         for(int64_t i = 0; i < app.key_count - 1; ++i){
+                              ce_vim_append_key(&app.vim, key);
+                         }
+
+                         app.key_count = 0;
+                    }
+               }
+          }
 
           // handle custom bindings
           if(app.vim.mode == CE_VIM_MODE_NORMAL){
@@ -1547,8 +1628,11 @@ int main(int argc, char** argv){
                     break;
                }
 
-               if(app.input_mode) ce_vim_handle_key(&app.vim, &app.input_view, key, &app.config_options);
-               else ce_vim_handle_key(&app.vim, view, key, &app.config_options);
+               if(app.input_mode){
+                    app.last_vim_handle_result = ce_vim_handle_key(&app.vim, &app.input_view, key, &app.config_options);
+               }else{
+                    app.last_vim_handle_result = ce_vim_handle_key(&app.vim, view, key, &app.config_options);
+               }
           }
 
           // incremental search

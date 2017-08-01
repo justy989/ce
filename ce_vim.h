@@ -114,6 +114,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* keys, CeVimKeyBind_t* key_binds,
                                        int64_t key_bind_count, CeVimMode_t vim_mode);
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options);
+bool ce_vim_append_key(CeVim_t* vim, CeRune_t key);
 
 // util
 // TODO: add const, since most of these are just readonly

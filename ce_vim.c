@@ -139,6 +139,17 @@ bool ce_vim_bind_key(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function){
      return true;
 }
 
+bool ce_vim_append_key(CeVim_t* vim, CeRune_t key){
+     int64_t command_len = istrlen(vim->current_command);
+     if(command_len < (CE_VIM_MAX_COMMAND_LEN - 1)){
+          vim->current_command[command_len] = key;
+          vim->current_command[command_len + 1] = 0;
+          return true;
+     }
+
+     return false;
+}
+
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, const CeConfigOptions_t* config_options){
      switch(vim->mode){
      default:
@@ -270,11 +281,9 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
      {
           CeVimAction_t action = {};
 
-          // append key to command
-          int64_t command_len = istrlen(vim->current_command);
-          if(command_len < (CE_VIM_MAX_COMMAND_LEN - 1)){
-               vim->current_command[command_len] = key;
-               vim->current_command[command_len + 1] = 0;
+          if(!ce_vim_append_key(vim, key)){
+               vim->current_command[0] = 0;
+               break;
           }
 
           CeVimParseResult_t result = ce_vim_parse_action(&action, vim->current_command, vim->key_binds,
