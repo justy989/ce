@@ -6,6 +6,7 @@
 #include <ncurses.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "ce.h"
 #include "ce_vim.h"
@@ -1083,6 +1084,73 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data)
+{
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CePoint_t target;
+     CeView_t* view = NULL;
+     CeRect_t view_rect = {};
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_LIST){
+          view_rect = tab_layout->list.rect;
+     }else if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_TAB){
+          view_rect = tab_layout->tab.rect;
+     }else{
+          assert(!"unknown layout type");
+          return CE_COMMAND_FAILURE;
+     }
+
+     if(strcmp(command->args[0].string, "up") == 0){
+          if(view){
+               CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width);
+               target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
+          }else{
+               target = (CePoint_t){view_rect.left, view_rect.top - 1};
+          }
+     }else if(strcmp(command->args[0].string, "down") == 0){
+          if(view){
+               CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width);
+               target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
+          }else{
+               target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
+          }
+     }else if(strcmp(command->args[0].string, "left") == 0){
+          if(view){
+               CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width);
+               target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
+          }else{
+               target = (CePoint_t){view_rect.left - 1, view_rect.top};
+          }
+     }else if(strcmp(command->args[0].string, "right") == 0){
+          if(view){
+               CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width);
+               target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
+          }else{
+               target = (CePoint_t){view_rect.right + 1, view_rect.top};
+          }
+     }else{
+          ce_log("unrecognized option: '%s'", command->args[0].string);
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     target.x %= app->terminal_width;
+     target.y %= app->terminal_height;
+     CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
+     if(layout){
+          tab_layout->tab.current = layout;
+          app->vim.mode = CE_VIM_MODE_NORMAL;
+          app->input_mode = false;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len)
 {
      for(size_t i = 0; i < len; ++i){
@@ -1173,6 +1241,7 @@ int main(int argc, char** argv){
      // init commands
      CeCommandEntry_t command_entries[] = {
           {command_quit, "quit", "quit ce"},
+          {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
@@ -1206,6 +1275,10 @@ int main(int argc, char** argv){
      {
           KeyBindDef_t normal_mode_bind_defs[] = {
                {{'\\', 'q'}, "quit"},
+               {{8}, "select_adjacent_layout left"}, // ctrl h
+               {{12}, "select_adjacent_layout right"}, // ctrl l
+               {{11}, "select_adjacent_layout up"}, // ctrl k
+               {{10}, "select_adjacent_layout down"}, // ctrl j
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
@@ -1372,113 +1445,26 @@ int main(int argc, char** argv){
                case 22: // Ctrl + v
                     if(view) pthread_mutex_lock(&view->buffer->lock);
                     ce_layout_split(tab_layout, false);
-                    if(view) pthread_mutex_unlock(&view->buffer->lock);
+                    if(view){
+                         pthread_mutex_unlock(&view->buffer->lock);
+                         view = &tab_layout->tab.current->view;
+
+                         ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                               app.config_options.tab_width);
+                    }
                     break;
                case 19: // Ctrl + s
                     if(view) pthread_mutex_lock(&view->buffer->lock);
                     ce_layout_split(tab_layout, true);
-                    if(view) pthread_mutex_unlock(&view->buffer->lock);
+
+                    if(view){
+                         pthread_mutex_unlock(&view->buffer->lock);
+                         view = &tab_layout->tab.current->view;
+
+                         ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                               app.config_options.tab_width);
+                    }
                     break;
-               case 8: // Ctrl + h
-               {
-                    if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
-                         CePoint_t target = (CePoint_t){view->rect.left - 1, screen_cursor.y};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }else{
-                         CePoint_t target = (CePoint_t){view_rect.left - 1, view_rect.top};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }
-               } break;
-               case 10: // Ctrl + j
-               {
-                    if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
-                         CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.bottom + 1};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }else{
-                         CePoint_t target = (CePoint_t){view_rect.left, view_rect.bottom + 1};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }
-               } break;
-               case 11: // Ctrl + k
-               {
-                    if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
-                         CePoint_t target = (CePoint_t){screen_cursor.x, view->rect.top - 1};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }else{
-                         CePoint_t target = (CePoint_t){view_rect.left, view_rect.top - 1};
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }
-               } break;
-               case 12: // Ctrl + l
-               {
-                    if(view){
-                         CePoint_t screen_cursor = view_cursor_on_screen(view, app.config_options.tab_width);
-                         CePoint_t target = (CePoint_t){view->rect.right + 1, screen_cursor.y};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }else{
-                         CePoint_t target = (CePoint_t){view_rect.right + 1, view_rect.top};
-                         target.x %= app.terminal_width;
-                         target.y %= app.terminal_height;
-                         CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
-                         if(layout){
-                              tab_layout->tab.current = layout;
-                              app.vim.mode = CE_VIM_MODE_NORMAL;
-                              app.input_mode = false;
-                         }
-                    }
-               } break;
                case 16: // Ctrl + p
                {
                     CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
