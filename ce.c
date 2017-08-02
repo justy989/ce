@@ -356,6 +356,35 @@ CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const c
      return result;
 }
 
+CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
+     CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
+
+     if(!ce_buffer_point_is_valid(buffer, start)) return result;
+
+     const size_t match_count = 1;
+     regmatch_t matches[match_count];
+
+     while(start.y < buffer->line_count){
+          int rc = regexec(regex, buffer->lines[start.y] + start.x, match_count, matches, 0);
+          if(rc == 0){
+               result.point = start;
+               result.point.x += matches[0].rm_so;
+               result.length = matches[0].rm_eo - matches[0].rm_so;
+               break;
+          }else if(rc != REG_NOMATCH){
+               char error_buffer[128];
+               regerror(rc, regex, error_buffer, 128);
+               ce_log("regexec() failed: '%s'", error_buffer);
+               break;
+          }
+
+          start.y++;
+          start.x = 0;
+     }
+
+     return result;
+}
+
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;
      if(!ce_buffer_point_is_valid(buffer, end)) return -1;

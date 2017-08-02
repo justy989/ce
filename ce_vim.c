@@ -1674,12 +1674,33 @@ bool ce_vim_motion_search_next(const CeVim_t* vim, CeVimAction_t* action, const 
      const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
      if(!yank->text) return false;
      CePoint_t result = {-1, -1};
-     if(vim->search_forward){
+     switch(vim->search_mode){
+     default:
+          return false;
+     case CE_VIM_SEARCH_MODE_FORWARD:
+     {
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
           result = ce_buffer_search_forward(view->buffer, start, yank->text);
-     }else{
+     } break;
+     case CE_VIM_SEARCH_MODE_REVERSE:
+     {
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
           result = ce_buffer_search_backward(view->buffer, start, yank->text);
+     } break;
+     case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
+     {
+          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
+          regex_t regex = {};
+          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
+          if(rc != 0){
+               char error_buffer[BUFSIZ];
+               regerror(rc, &regex, error_buffer, BUFSIZ);
+               ce_log("regcomp() failed: '%s'", error_buffer);
+          }else{
+               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
+               result = regex_result.point;
+          }
+     } break;
      }
      if(result.x < 0) return false;
      motion_range->end = result;
@@ -1691,12 +1712,33 @@ bool ce_vim_motion_search_prev(const CeVim_t* vim, CeVimAction_t* action, const 
      const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
      if(!yank->text) return false;
      CePoint_t result = {-1, -1};
-     if(vim->search_forward){
+     switch(vim->search_mode){
+     default:
+          return false;
+     case CE_VIM_SEARCH_MODE_FORWARD:
+     {
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
           result = ce_buffer_search_backward(view->buffer, start, yank->text);
-     }else{
+     } break;
+     case CE_VIM_SEARCH_MODE_REVERSE:
+     {
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
           result = ce_buffer_search_forward(view->buffer, start, yank->text);
+     } break;
+     case CE_VIM_SEARCH_MODE_REGEX_REVERSE:
+     {
+          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
+          regex_t regex = {};
+          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
+          if(rc != 0){
+               char error_buffer[BUFSIZ];
+               regerror(rc, &regex, error_buffer, BUFSIZ);
+               ce_log("regcomp() failed: '%s'", error_buffer);
+          }else{
+               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
+               result = regex_result.point;
+          }
+     } break;
      }
      if(result.x < 0) return false;
      motion_range->end = result;

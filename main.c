@@ -1411,10 +1411,37 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
 
      if(strcmp(command->args[0].string, "forward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SEARCH");
-          app->vim.search_forward = true;
+          app->vim.search_mode = CE_VIM_SEARCH_MODE_FORWARD;
      }else if(strcmp(command->args[0].string, "backward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REVERSE SEARCH");
-          app->vim.search_forward = false;
+          app->vim.search_mode = CE_VIM_SEARCH_MODE_REVERSE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(strcmp(command->args[0].string, "forward") == 0){
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REGEX SEARCH");
+          app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_FORWARD;
+     }else if(strcmp(command->args[0].string, "backward") == 0){
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REGEX REVERSE SEARCH");
+          app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_REVERSE;
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1539,6 +1566,7 @@ int main(int argc, char** argv){
           {command_new_tab, "new_tab", "create a new tab"},
           {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
           {command_search, "search", "interactive search 'forward' or 'backward'"},
+          {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_command, "command", "interactively send a commmand"},
      };
      app.command_entries = command_entries;
@@ -1590,6 +1618,8 @@ int main(int argc, char** argv){
                {{':'}, "command"},
                {{'g', 't'}, "select_adjacent_tab right"},
                {{'g', 'T'}, "select_adjacent_tab left"},
+               {{'\\', '/'}, "regex_search forward"},
+               {{'\\', '?'}, "regex_search backward"},
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
@@ -1729,7 +1759,7 @@ int main(int argc, char** argv){
                }
           }
 
-          if(!handled_key){
+          if(!handled_key && view){
                if(key == KEY_ENTER){
                     if(view->buffer == app.buffer_list_buffer){
                          BufferNode_t* itr = app.buffer_node_head;
@@ -1748,7 +1778,9 @@ int main(int argc, char** argv){
                                    load_new_file_into_view(&app.buffer_node_head, view, &app.config_options, &app.vim, app.input_view.buffer->lines[i]);
                               }
                          }else if(strcmp(app.input_view.buffer->name, "SEARCH") == 0 ||
-                                  strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0){
+                                  strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0 ||
+                                  strcmp(app.input_view.buffer->name, "REGEX SEARCH") == 0 ||
+                                  strcmp(app.input_view.buffer->name, "REVERSE REGEX SEARCH") == 0){
                               // update yanks
                               int64_t index = ce_vim_yank_register_index('/');
                               CeVimYank_t* yank = app.vim.yanks + index;
@@ -1815,6 +1847,24 @@ int main(int argc, char** argv){
                               view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
                                                                    app.config_options.vertical_scroll_off,
                                                                    app.config_options.tab_width);
+                         }
+                    }
+               }else if(strcmp(app.input_view.buffer->name, "REGEX SEARCH") == 0){
+                    if(app.input_view.buffer->line_count && view->buffer->line_count){
+                         regex_t regex = {};
+                         int rc = regcomp(&regex, app.input_view.buffer->lines[0], REG_EXTENDED);
+                         if(rc != 0){
+                              char error_buffer[BUFSIZ];
+                              regerror(rc, &regex, error_buffer, BUFSIZ);
+                              ce_log("regcomp() failed: '%s'", error_buffer);
+                         }else{
+                              CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
+                              if(result.point.x >= 0){
+                                   view->cursor = result.point;
+                                   view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                                        app.config_options.vertical_scroll_off,
+                                                                        app.config_options.tab_width);
+                              }
                          }
                     }
                }

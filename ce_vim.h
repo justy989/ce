@@ -90,6 +90,13 @@ typedef struct{
      bool line;
 }CeVimYank_t;
 
+typedef enum{
+     CE_VIM_SEARCH_MODE_FORWARD,
+     CE_VIM_SEARCH_MODE_REVERSE,
+     CE_VIM_SEARCH_MODE_REGEX_FORWARD,
+     CE_VIM_SEARCH_MODE_REGEX_REVERSE,
+}CeVimSearchMode_t;
+
 typedef struct CeVim_t{
      CeVimMode_t mode;
      CeVimKeyBind_t key_binds[CE_VIM_MAX_KEY_BINDS];
@@ -102,7 +109,7 @@ typedef struct CeVim_t{
      CeRuneNode_t* insert_rune_head;
      bool chain_undo;
      bool verb_last_action; // flag whether or not we are repeating our last action
-     bool search_forward;
+     CeVimSearchMode_t search_mode;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
