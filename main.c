@@ -1644,7 +1644,9 @@ int main(int argc, char** argv){
           bool handled_key = false;
 
           // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
-          if(app.last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS || app.vim.mode == CE_VIM_MODE_INSERT){
+          if(app.last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
+             app.last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
+             app.vim.mode != CE_VIM_MODE_INSERT){
                // append to keys
                if(app.key_count < APP_MAX_KEY_COUNT){
                     app.keys[app.key_count] = key;
