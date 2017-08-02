@@ -1267,7 +1267,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
 
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == ce_vim_verb_change){
-          action->motion.function = &ce_vim_motion_entire_line;
+          action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
           return CE_VIM_PARSE_COMPLETE;
      }
 
