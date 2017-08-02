@@ -1582,14 +1582,27 @@ bool ce_vim_motion_half_page_down(const CeVim_t* vim, CeVimAction_t* action, con
 
 bool ce_vim_motion_visual(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                           const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     motion_range->start = view->cursor;
-     motion_range->end = vim->visual;
-     ce_vim_motion_range_sort(motion_range);
+     if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
+          motion_range->start = view->cursor;
+          motion_range->end = vim->visual;
+          ce_vim_motion_range_sort(motion_range);
+          action->motion.integer = ce_buffer_range_len(view->buffer, motion_range->start, motion_range->end);
 
-     if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
-          motion_range->start.x = 0;;
-          motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
-          action->yank_line = true;
+          if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
+               motion_range->start.x = 0;;
+               motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+               action->yank_line = true;
+               action->motion.integer = motion_range->end.y - motion_range->start.y;
+          }
+     }else if(vim->verb_last_action){
+          if(action->yank_line){
+               motion_range->start = (CePoint_t){0, view->cursor.y};
+               motion_range->end.y = view->cursor.y + action->motion.integer;
+               motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+          }else{
+               motion_range->start = view->cursor;
+               motion_range->end = ce_buffer_advance_point(view->buffer, view->cursor, action->motion.integer);
+          }
      }
 
      return true;
