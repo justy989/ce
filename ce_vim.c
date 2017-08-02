@@ -1247,6 +1247,10 @@ CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune
      return parse_motion_direction(action, ce_vim_motion_search_prev);
 }
 
+CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_search_word_forward);
+}
+
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
