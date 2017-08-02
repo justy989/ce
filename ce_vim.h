@@ -92,9 +92,9 @@ typedef struct{
 
 typedef enum{
      CE_VIM_SEARCH_MODE_FORWARD,
-     CE_VIM_SEARCH_MODE_REVERSE,
+     CE_VIM_SEARCH_MODE_BACKWARD,
      CE_VIM_SEARCH_MODE_REGEX_FORWARD,
-     CE_VIM_SEARCH_MODE_REGEX_REVERSE,
+     CE_VIM_SEARCH_MODE_REGEX_BACKWARD,
 }CeVimSearchMode_t;
 
 typedef struct CeVim_t{

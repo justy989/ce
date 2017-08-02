@@ -152,6 +152,7 @@ int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like c
 CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
 CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
 CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
+CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool newline_if_entire_line);
 
