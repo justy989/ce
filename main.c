@@ -1308,6 +1308,8 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
                buffer_node_insert(&app->buffer_node_head, buffer);
                view->buffer = buffer;
                view->cursor = (CePoint_t){0, 0};
+               ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
+                                     app->config_options.tab_width);
 
                // TODO: figure out type based on extention
                buffer->type = CE_BUFFER_FILE_TYPE_C;
@@ -1455,7 +1457,6 @@ int main(int argc, char** argv){
           start_color();
           use_default_colors();
 
-          define_key("\x11", KEY_CLOSE);
           define_key("\x12", KEY_REDO);
           define_key(NULL, KEY_ENTER);       // Blow away enter
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
@@ -1730,6 +1731,9 @@ int main(int argc, char** argv){
                                         buffer_node_insert(&app.buffer_node_head, buffer);
                                         view->buffer = buffer;
                                         view->cursor = (CePoint_t){0, 0};
+                                        ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                              app.config_options.vertical_scroll_off,
+                                                              app.config_options.tab_width);
 
                                         // TODO: figure out type based on extention
                                         buffer->type = CE_BUFFER_FILE_TYPE_C;
@@ -1776,7 +1780,6 @@ int main(int argc, char** argv){
                }else if(key == 27 && app.input_mode){ // Escape
                     app.input_mode = false;
                     app.vim.mode = CE_VIM_MODE_NORMAL;
-                    break;
                }
 
                if(app.input_mode){
