@@ -188,7 +188,7 @@ void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim){
+void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
      // save the cursor on the old buffer
      view->buffer->cursor_save = view->cursor;
      view->buffer->scroll_save = view->scroll;
@@ -198,7 +198,36 @@ void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim){
      view->cursor = buffer->cursor_save;
      view->scroll = buffer->scroll_save;
 
+     ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+
      vim->mode = CE_VIM_MODE_NORMAL;
+}
+
+static CeBuffer_t* load_new_file_into_view(BufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
+     // have we already loaded this file?
+     BufferNode_t* itr = *buffer_node_head;
+     while(itr){
+          if(strcmp(itr->buffer->name, filepath) == 0){
+               view_switch_buffer(view, itr->buffer, vim, config_options);
+               return itr->buffer;
+          }
+          itr = itr->next;
+     }
+
+     // load file
+     CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+     if(ce_buffer_load_file(buffer, filepath)){
+          buffer_node_insert(buffer_node_head, buffer);
+          view_switch_buffer(view, buffer, vim, config_options);
+
+          // TODO: figure out type based on extention
+          buffer->type = CE_BUFFER_FILE_TYPE_C;
+     }else{
+          free(buffer);
+          return NULL;
+     }
+
+     return buffer;
 }
 
 // 60 fps
@@ -1201,7 +1230,7 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data)
      if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
           view = &tab_layout->tab.current->view;
           build_buffer_list(app->buffer_list_buffer, app->buffer_node_head);
-          view_switch_buffer(view, app->buffer_list_buffer, &app->vim);
+          view_switch_buffer(view, app->buffer_list_buffer, &app->vim, &app->config_options);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1234,6 +1263,8 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      if(view){
           pthread_mutex_unlock(&view->buffer->lock);
           view = &tab_layout->tab.current->view;
+
+          ce_layout_distribute_rect(tab_layout, app->terminal_rect);
 
           ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
                                 app->config_options.tab_width);
@@ -1303,19 +1334,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-          if(ce_buffer_load_file(buffer, command->args[0].string)){
-               buffer_node_insert(&app->buffer_node_head, buffer);
-               view->buffer = buffer;
-               view->cursor = (CePoint_t){0, 0};
-               ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
-                                     app->config_options.tab_width);
-
-               // TODO: figure out type based on extention
-               buffer->type = CE_BUFFER_FILE_TYPE_C;
-          }else{
-               free(buffer);
-          }
+          load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, command->args[0].string);
      }else{ // it's 0
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
      }
@@ -1717,7 +1736,7 @@ int main(int argc, char** argv){
                          int64_t index = 0;
                          while(itr){
                               if(index == view->cursor.y){
-                                   view_switch_buffer(view, itr->buffer, &app.vim);
+                                   view_switch_buffer(view, itr->buffer, &app.vim, &app.config_options);
                                    break;
                               }
                               itr = itr->next;
@@ -1726,20 +1745,7 @@ int main(int argc, char** argv){
                     }else if(app.input_mode){
                          if(strcmp(app.input_view.buffer->name, "LOAD FILE") == 0){
                               for(int64_t i = 0; i < app.input_view.buffer->line_count; i++){
-                                   CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
-                                   if(ce_buffer_load_file(buffer, app.input_view.buffer->lines[i])){
-                                        buffer_node_insert(&app.buffer_node_head, buffer);
-                                        view->buffer = buffer;
-                                        view->cursor = (CePoint_t){0, 0};
-                                        ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
-                                                              app.config_options.vertical_scroll_off,
-                                                              app.config_options.tab_width);
-
-                                        // TODO: figure out type based on extention
-                                        buffer->type = CE_BUFFER_FILE_TYPE_C;
-                                   }else{
-                                        free(buffer);
-                                   }
+                                   load_new_file_into_view(&app.buffer_node_head, view, &app.config_options, &app.vim, app.input_view.buffer->lines[i]);
                               }
                          }else if(strcmp(app.input_view.buffer->name, "SEARCH") == 0 ||
                                   strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0){
