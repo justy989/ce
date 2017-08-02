@@ -1070,6 +1070,7 @@ typedef struct{
      CeCommandEntry_t* command_entries;
      int64_t command_entry_count;
      CeVimParseResult_t last_vim_handle_result;
+     CeBuffer_t* buffer_list_buffer;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
@@ -1084,6 +1085,21 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+// TODO: is this useful or did I pre-maturely create this
+static bool get_view_info_from_tab(CeLayout_t* tab_layout, CeView_t** view, CeRect_t* view_rect){
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          *view = &tab_layout->tab.current->view;
+     }else if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_LIST){
+          *view_rect = tab_layout->list.rect;
+     }else if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_TAB){
+          *view_rect = tab_layout->tab.rect;
+     }else{
+          return false;
+     }
+
+     return true;
+}
+
 CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data)
 {
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
@@ -1095,13 +1111,7 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
      CeRect_t view_rect = {};
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-          view = &tab_layout->tab.current->view;
-     }else if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_LIST){
-          view_rect = tab_layout->list.rect;
-     }else if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_TAB){
-          view_rect = tab_layout->tab.rect;
-     }else{
+     if(!get_view_info_from_tab(tab_layout, &view, &view_rect)){
           assert(!"unknown layout type");
           return CE_COMMAND_FAILURE;
      }
@@ -1146,6 +1156,74 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
           tab_layout->tab.current = layout;
           app->vim.mode = CE_VIM_MODE_NORMAL;
           app->input_mode = false;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data)
+{
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+          ce_buffer_save(view->buffer);
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data)
+{
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+          build_buffer_list(app->buffer_list_buffer, app->buffer_node_head);
+          view_switch_buffer(view, app->buffer_list_buffer, &app->vim);
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     bool vertical = false;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }
+
+     if(strcmp(command->args[0].string, "vertical") == 0){
+          vertical = true;
+     }else if(strcmp(command->args[0].string, "horizontal") == 0){
+          // pass
+     }else{
+          ce_log("unrecognized argument '%s'\n", command->args[0]);
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     if(view) pthread_mutex_lock(&view->buffer->lock);
+     ce_layout_split(tab_layout, vertical);
+     if(view){
+          pthread_mutex_unlock(&view->buffer->lock);
+          view = &tab_layout->tab.current->view;
+
+          ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
+                                app->config_options.tab_width);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1242,16 +1320,19 @@ int main(int argc, char** argv){
      CeCommandEntry_t command_entries[] = {
           {command_quit, "quit", "quit ce"},
           {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
+          {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
+          {command_show_buffers, "show_buffers", "show the list of buffers"},
+          {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
 
-     CeBuffer_t* buffer_list_buffer = calloc(1, sizeof(*buffer_list_buffer));
+     app.buffer_list_buffer = calloc(1, sizeof(*app.buffer_list_buffer));
 
      // init buffers
      {
-          ce_buffer_alloc(buffer_list_buffer, 1, "buffers");
-          buffer_node_insert(&app.buffer_node_head, buffer_list_buffer);
+          ce_buffer_alloc(app.buffer_list_buffer, 1, "buffers");
+          buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
@@ -1279,6 +1360,10 @@ int main(int argc, char** argv){
                {{12}, "select_adjacent_layout right"}, // ctrl l
                {{11}, "select_adjacent_layout up"}, // ctrl k
                {{10}, "select_adjacent_layout down"}, // ctrl j
+               {{23}, "save_buffer"}, // ctrl w
+               {{2}, "show_buffers"}, // ctrl b
+               {{22}, "split_layout horizontal"}, // ctrl b
+               {{19}, "split_layout vertical"}, // ctrl b
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
@@ -1431,40 +1516,6 @@ int main(int argc, char** argv){
                default:
                     handled_key = false;
                     break;
-               case KEY_CLOSE:
-                    app.quit = true;
-                    break;
-               case 23: // Ctrl + w
-                    if(view) ce_buffer_save(view->buffer);
-                    break;
-               case 2: // Ctrl + b
-                    if(!view) break;
-                    build_buffer_list(buffer_list_buffer, app.buffer_node_head);
-                    view_switch_buffer(view, buffer_list_buffer, &app.vim);
-                    break;
-               case 22: // Ctrl + v
-                    if(view) pthread_mutex_lock(&view->buffer->lock);
-                    ce_layout_split(tab_layout, false);
-                    if(view){
-                         pthread_mutex_unlock(&view->buffer->lock);
-                         view = &tab_layout->tab.current->view;
-
-                         ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                               app.config_options.tab_width);
-                    }
-                    break;
-               case 19: // Ctrl + s
-                    if(view) pthread_mutex_lock(&view->buffer->lock);
-                    ce_layout_split(tab_layout, true);
-
-                    if(view){
-                         pthread_mutex_unlock(&view->buffer->lock);
-                         view = &tab_layout->tab.current->view;
-
-                         ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                               app.config_options.tab_width);
-                    }
-                    break;
                case 16: // Ctrl + p
                {
                     CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
@@ -1546,7 +1597,7 @@ int main(int argc, char** argv){
 
           if(!handled_key){
                if(key == KEY_ENTER){
-                    if(view->buffer == buffer_list_buffer){
+                    if(view->buffer == app.buffer_list_buffer){
                          BufferNode_t* itr = app.buffer_node_head;
                          int64_t index = 0;
                          while(itr){
