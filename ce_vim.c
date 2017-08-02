@@ -1612,7 +1612,6 @@ bool ce_vim_motion_find_forward(const CeVim_t* vim, CeVimAction_t* action, const
                                 const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CePoint_t new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, action->motion.integer, false);
      if(new_position.x < 0) return false;
-     motion_range->end = new_position;
      return true;
 }
 

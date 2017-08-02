@@ -97,6 +97,7 @@ typedef struct{
      pthread_mutex_t lock;
 
      CeBufferChangeNode_t* change_node;
+     CeBufferChangeNode_t* save_at_change_node;
 
      void* user_data;
 }CeBuffer_t;

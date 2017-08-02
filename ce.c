@@ -220,6 +220,8 @@ bool ce_buffer_save(CeBuffer_t* buffer){
      }
 
      fclose(file);
+     if(buffer->status == CE_BUFFER_STATUS_MODIFIED) buffer->status = CE_BUFFER_STATUS_NONE;
+     buffer->save_at_change_node = buffer->change_node;
      return true;
 }
 
@@ -236,6 +238,7 @@ bool ce_buffer_empty(CeBuffer_t* buffer){
      buffer->lines[0] = realloc(buffer->lines[0], sizeof(buffer->lines[0]));
      buffer->lines[0][0] = 0;
      buffer->line_count = 1;
+     buffer->status = CE_BUFFER_STATUS_NONE;
 
      return true;
 }
@@ -504,6 +507,8 @@ CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t 
 }
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point){
+     if(buffer->status == CE_BUFFER_STATUS_READONLY) return false;
+
      if(!ce_buffer_point_is_valid(buffer, point)){
           if(buffer->line_count == 0 && ce_points_equal(point, (CePoint_t){0, 0})){
                int64_t string_len = strlen(string);
@@ -549,6 +554,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           line[total_len] = 0;
           buffer->lines[point.y] = line;
           pthread_mutex_unlock(&buffer->lock);
+          buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return true;
      }
 
@@ -610,6 +616,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      }
      buffer->lines[next_line][last_line_len] = 0;
 
+     buffer->status = CE_BUFFER_STATUS_MODIFIED;
      return true;
 }
 
@@ -622,6 +629,7 @@ bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point){
 }
 
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty){
+     if(buffer->status == CE_BUFFER_STATUS_READONLY) return false;
      if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
      int64_t length_left_on_line = ce_utf8_strlen(buffer->lines[point.y] + point.x);
@@ -636,6 +644,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
                strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
                buffer->lines[point.y][new_line_len] = 0;
+               buffer->status = CE_BUFFER_STATUS_MODIFIED;
                return ce_buffer_remove_lines(buffer, next_line_index, 1);
           }else if(point.x == 0){
                // perform a join with the previous line
@@ -647,6 +656,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                buffer->lines[prev_line_index] = realloc(buffer->lines[prev_line_index], new_line_len + 1);
                strncpy(buffer->lines[prev_line_index] + prev_line_len, buffer->lines[point.y], cur_line_len);
                buffer->lines[prev_line_index][new_line_len] = 0;
+               buffer->status = CE_BUFFER_STATUS_MODIFIED;
                return ce_buffer_remove_lines(buffer, point.y, 1);
           }
 
@@ -676,6 +686,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
           free(buffer->lines[point.y]);
           buffer->lines[point.y] = new_line;
 
+          buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return true;
      }else if(length_left_on_line == length){
           // case: cut the line, keeping only the left side
@@ -695,6 +706,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                buffer->lines[point.y][point.x] = 0;
           }
 
+          buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return true;
      }
 
@@ -760,6 +772,7 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
      buffer->line_count -= lines_to_remove;
      buffer->lines = realloc(buffer->lines, buffer->line_count * sizeof(*buffer->lines));
 
+     buffer->status = CE_BUFFER_STATUS_MODIFIED;
      return buffer->lines != NULL;
 }
 
@@ -876,6 +889,7 @@ bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
           CeBufferChangeNode_t* first_empty_node = calloc(1, sizeof(*node));
           first_empty_node->next = node;
           node->prev = first_empty_node;
+          if(buffer->save_at_change_node == NULL) buffer->save_at_change_node = first_empty_node;
      }
 
      buffer->change_node = node;
@@ -899,6 +913,10 @@ bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor){
 
      if(change->chain) return ce_buffer_undo(buffer, cursor);
 
+     if(buffer->status == CE_BUFFER_STATUS_MODIFIED && buffer->change_node == buffer->save_at_change_node){
+          buffer->status = CE_BUFFER_STATUS_NONE;
+     }
+
      return true;
 }
 
@@ -918,6 +936,10 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
      *cursor = change->cursor_after;
 
      if(buffer->change_node->next && buffer->change_node->next->change.chain) return ce_buffer_redo(buffer, cursor);
+
+     if(buffer->status == CE_BUFFER_STATUS_MODIFIED && buffer->change_node == buffer->save_at_change_node){
+          buffer->status = CE_BUFFER_STATUS_NONE;
+     }
 
      return true;
 }

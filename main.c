@@ -184,6 +184,8 @@ void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
           head = head->next;
           index++;
      }
+
+     buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
 void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim){
@@ -831,6 +833,13 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs, int
           mvprintw(bottom, view->rect.left + 1, "%s", view->buffer->name);
      }
 
+     if(view->buffer->status == CE_BUFFER_STATUS_MODIFIED ||
+        view->buffer->status == CE_BUFFER_STATUS_NEW_FILE){
+          addch('*');
+     }else if(view->buffer->status == CE_BUFFER_STATUS_READONLY){
+          printw("[RO]");
+     }
+
      char cursor_pos_string[32];
      int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x, view->cursor.y);
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
@@ -1376,10 +1385,10 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
           return CE_COMMAND_NO_ACTION;
      }
 
-     if(strcmp(command->args[0].string, "forward")){
+     if(strcmp(command->args[0].string, "forward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SEARCH");
           app->vim.search_forward = true;
-     }else if(strcmp(command->args[0].string, "backward")){
+     }else if(strcmp(command->args[0].string, "backward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REVERSE SEARCH");
           app->vim.search_forward = false;
      }
@@ -1389,8 +1398,7 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
 
 // lol
 CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
-     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      App_t* app = user_data;
      CeView_t* view = NULL;
