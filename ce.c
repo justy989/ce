@@ -373,7 +373,7 @@ int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
                else length += end.x + 1;
           }else{
                // count entire line
-               int64_t line_length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x));
+               int64_t line_length = ce_utf8_strlen(buffer->lines[y]);
                if(line_length == 0) length++;
                length += line_length;
           }

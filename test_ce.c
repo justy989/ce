@@ -63,6 +63,27 @@ TEST(buffer_empty){
      ce_buffer_free(&buffer);
 }
 
+TEST(buffer_range_len_single_line){
+     CeBuffer_t buffer = {};
+     EXPECT(ce_buffer_load_string(&buffer, "the only line", g_name));
+
+     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){1, 0}, (CePoint_t){8, 0}) == 8);
+}
+
+TEST(buffer_range_len_two_lines){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+
+     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){3, 0}, (CePoint_t){5, 1}) == 13);
+}
+
+TEST(buffer_range_len_three_lines){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+
+     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){3, 0}, (CePoint_t){5, 2}) == 24);
+}
+
 TEST(buffer_line_len){
      CeBuffer_t buffer = {};
      EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, g_name));
