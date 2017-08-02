@@ -1058,6 +1058,7 @@ static void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_
 #define APP_MAX_KEY_COUNT 16
 
 typedef struct{
+     CeRect_t terminal_rect;
      CeVim_t vim;
      CeConfigOptions_t config_options;
      int terminal_width;
@@ -1229,6 +1230,184 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
+     if(layout) tab_layout->tab.current = layout;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeRect_t view_rect = {};
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     // check if this is the only view, and ignore the delete request
+     if(app->tab_list_layout->tab_list.tab_count == 1 &&
+        tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
+        tab_layout->tab.root->list.layout_count == 1 &&
+        tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]){
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(!get_view_info_from_tab(tab_layout, &view, &view_rect)){
+          assert(!"unknown layout type");
+          return CE_COMMAND_FAILURE;
+     }
+
+     CePoint_t cursor = {view_rect.left, view_rect.top};
+     if(view) cursor = view->cursor;
+     ce_layout_delete(tab_layout, tab_layout->tab.current);
+     ce_layout_distribute_rect(tab_layout, app->terminal_rect);
+     CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
+     if(layout) tab_layout->tab.current = layout;
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
+     if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(command->arg_count == 1){
+          if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+          CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+          if(ce_buffer_load_file(buffer, command->args[0].string)){
+               buffer_node_insert(&app->buffer_node_head, buffer);
+               view->buffer = buffer;
+               view->cursor = (CePoint_t){0, 0};
+
+               // TODO: figure out type based on extention
+               buffer->type = CE_BUFFER_FILE_TYPE_C;
+          }else{
+               free(buffer);
+          }
+     }else{ // it's 0
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+
+     CeLayout_t* new_tab_layout = ce_layout_tab_list_add(app->tab_list_layout);
+     if(!new_tab_layout) return CE_COMMAND_NO_ACTION;
+     app->tab_list_layout->tab_list.current = new_tab_layout;
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+
+     if(strcmp(command->args[0].string, "left") == 0){
+          for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
+               if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
+                    if(i > 0){
+                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i - 1];
+                         return CE_COMMAND_SUCCESS;
+                    }else{
+                         // wrap around
+                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[app->tab_list_layout->tab_list.tab_count - 1];
+                         return CE_COMMAND_SUCCESS;
+                    }
+                    break;
+               }
+          }
+     }else if(strcmp(command->args[0].string, "right") == 0){
+          for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
+               if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
+                    if(i > 0){
+                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i - 1];
+                         return CE_COMMAND_SUCCESS;
+                    }else{
+                         // wrap around
+                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[app->tab_list_layout->tab_list.tab_count - 1];
+                         return CE_COMMAND_SUCCESS;
+                    }
+                    break;
+               }
+          }
+     }
+
+     return CE_COMMAND_NO_ACTION;
+}
+
+CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(strcmp(command->args[0].string, "forward")){
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SEARCH");
+          app->vim.search_forward = true;
+     }else if(strcmp(command->args[0].string, "backward")){
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REVERSE SEARCH");
+          app->vim.search_forward = false;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+// lol
+CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "COMMAND");
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len)
 {
      for(size_t i = 0; i < len; ++i){
@@ -1323,6 +1502,13 @@ int main(int argc, char** argv){
           {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
           {command_show_buffers, "show_buffers", "show the list of buffers"},
           {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
+          {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
+          {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
+          {command_load_file, "load_file", "load a file (optionally specified)"},
+          {command_new_tab, "new_tab", "create a new tab"},
+          {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
+          {command_search, "search", "interactive search 'forward' or 'backward'"},
+          {command_command, "command", "interactively send a commmand"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
@@ -1362,8 +1548,17 @@ int main(int argc, char** argv){
                {{10}, "select_adjacent_layout down"}, // ctrl j
                {{23}, "save_buffer"}, // ctrl w
                {{2}, "show_buffers"}, // ctrl b
-               {{22}, "split_layout horizontal"}, // ctrl b
-               {{19}, "split_layout vertical"}, // ctrl b
+               {{22}, "split_layout horizontal"}, // ctrl s
+               {{19}, "split_layout vertical"}, // ctrl v
+               {{16}, "select_parent_layout"}, // ctrl p
+               {{1}, "delete_layout"}, // ctrl a
+               {{6}, "load_file"}, // ctrl f
+               {{20}, "new_tab"}, // ctrl t
+               {{'/'}, "search forward"},
+               {{'?'}, "search backward"},
+               {{':'}, "command"},
+               {{'g', 't'}, "select_adjacent_tab right"},
+               {{'g', 'T'}, "select_adjacent_tab left"},
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
@@ -1416,12 +1611,11 @@ int main(int argc, char** argv){
           // handle if terminal was resized
           // TODO: we can optimize by only doing this at the start and when we see a resized event
           getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          CeRect_t terminal_rect = {0, app.terminal_width - 1, 0, app.terminal_height - 1};
-          ce_layout_distribute_rect(app.tab_list_layout, terminal_rect);
+          app.terminal_rect = (CeRect_t){0, app.terminal_width - 1, 0, app.terminal_height - 1};
+          ce_layout_distribute_rect(app.tab_list_layout, app.terminal_rect);
 
           // figure out our current view rect
           CeView_t* view = NULL;
-          CeRect_t view_rect = {};
           CeLayout_t* tab_layout = app.tab_list_layout->tab_list.current;
 
           switch(tab_layout->tab.current->type){
@@ -1429,12 +1623,6 @@ int main(int argc, char** argv){
                break;
           case CE_LAYOUT_TYPE_VIEW:
                view = &tab_layout->tab.current->view;
-               break;
-          case CE_LAYOUT_TYPE_LIST:
-               view_rect = tab_layout->list.rect;
-               break;
-          case CE_LAYOUT_TYPE_TAB:
-               view_rect = tab_layout->tab.rect;
                break;
           }
 
@@ -1505,93 +1693,6 @@ int main(int argc, char** argv){
 
                          app.key_count = 0;
                     }
-               }
-          }
-
-          // handle custom bindings
-          if(app.vim.mode == CE_VIM_MODE_NORMAL){
-               handled_key = true;
-
-               switch(key){
-               default:
-                    handled_key = false;
-                    break;
-               case 16: // Ctrl + p
-               {
-                    CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
-                    if(layout) tab_layout->tab.current = layout;
-               } break;
-               case 1: // Ctrl + a
-               {
-                    // check if this is the only view, and ignore the delete request
-                    if(app.tab_list_layout->tab_list.tab_count == 1 &&
-                       tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
-                       tab_layout->tab.root->list.layout_count == 1 &&
-                       tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]) break;
-                    if(app.input_mode) break;
-
-                    CePoint_t cursor = {view_rect.left, view_rect.top};
-                    if(view) cursor = view->cursor;
-                    ce_layout_delete(tab_layout, tab_layout->tab.current);
-                    ce_layout_distribute_rect(tab_layout, terminal_rect);
-                    CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
-                    if(layout) tab_layout->tab.current = layout;
-               } break;
-               case 6: // Ctrl + f
-               {
-                    if(!view || app.input_mode) break;
-                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "LOAD FILE");
-               } break;
-               case 20: // Ctrl + t
-               {
-                    CeLayout_t* new_tab_layout = ce_layout_tab_list_add(app.tab_list_layout);
-                    if(new_tab_layout) app.tab_list_layout->tab_list.current = new_tab_layout;
-               } break;
-               case 9: // Ctrl + i
-                    for(int64_t i = 0; i < app.tab_list_layout->tab_list.tab_count; i++){
-                         if(app.tab_list_layout->tab_list.current == app.tab_list_layout->tab_list.tabs[i]){
-                              if(i > 0){
-                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[i - 1];
-                              }else{
-                                   // wrap around
-                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[app.tab_list_layout->tab_list.tab_count - 1];
-                              }
-                              break;
-                         }
-                    }
-                    break;
-               case 15: // Ctrl + o
-               {
-                    int64_t last_index = app.tab_list_layout->tab_list.tab_count - 1;
-                    for(int64_t i = 0; i < app.tab_list_layout->tab_list.tab_count; i++){
-                         if(app.tab_list_layout->tab_list.current == app.tab_list_layout->tab_list.tabs[i]){
-                              if(i < last_index){
-                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[i + 1];
-                              }else{
-                                   // wrap around
-                                   app.tab_list_layout->tab_list.current = app.tab_list_layout->tab_list.tabs[0];
-                              }
-                              break;
-                         }
-                    }
-               } break;
-               case '/':
-               {
-                    if(!view || app.input_mode) break;
-                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "SEARCH");
-                    app.vim.search_forward = true;
-               } break;
-               case '?':
-               {
-                    if(!view || app.input_mode) break;
-                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "REVERSE SEARCH");
-                    app.vim.search_forward = false;
-               } break;
-               case ':':
-               {
-                    if(!view || app.input_mode) break;
-                    app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "COMMAND");
-               } break;
                }
           }
 
