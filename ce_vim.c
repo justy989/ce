@@ -1042,7 +1042,7 @@ CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length){
      CeVimMotionRange_t brace_range = ce_vim_find_pair(buffer, point, '{', false);
      CeVimMotionRange_t paren_range = ce_vim_find_pair(buffer, point, '(', false);
-     if(brace_range.start.x < 0 && paren_range.start.x < 0) return -1;
+     if(brace_range.start.x < 0 && paren_range.start.x < 0) return 0;
      int64_t indent = 0;
      if(ce_point_after(paren_range.start, brace_range.start)){
           indent = paren_range.start.x + 1;
@@ -1970,26 +1970,29 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      // TODO: compress what we can with open_below
      // calc indentation
      CePoint_t indentation_point = {0, motion_range.start.y};
+     CePoint_t cursor_end = {0, indentation_point.y};
      int64_t indentation = ce_vim_get_indentation(view->buffer, indentation_point, config_options->tab_width);
-     CePoint_t cursor_end = {indentation, indentation_point.y};
+     if(indentation > 0){
+          cursor_end.x = indentation;
 
-     // build indentation string
-     insert_string = malloc(indentation + 1);
-     memset(insert_string, ' ', indentation);
-     insert_string[indentation] = 0;
+          // build indentation string
+          insert_string = malloc(indentation + 1);
+          memset(insert_string, ' ', indentation);
+          insert_string[indentation] = 0;
 
-     // insert indentation
-     if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+          // insert indentation
+          if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
-     // commit the change
-     change.chain = true;
-     change.insertion = true;
-     change.remove_line_if_empty = false;
-     change.string = insert_string;
-     change.location = indentation_point;
-     change.cursor_before = view->cursor;
-     change.cursor_after = cursor_end;
-     ce_buffer_change(view->buffer, &change);
+          // commit the change
+          change.chain = true;
+          change.insertion = true;
+          change.remove_line_if_empty = false;
+          change.string = insert_string;
+          change.location = indentation_point;
+          change.cursor_before = view->cursor;
+          change.cursor_after = cursor_end;
+          ce_buffer_change(view->buffer, &change);
+     }
 
      view->cursor = cursor_end;
      vim->chain_undo = true;
@@ -2018,25 +2021,28 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      // calc indentation
      CePoint_t indentation_point = {0, motion_range.start.y + 1};
      int64_t indentation = ce_vim_get_indentation(view->buffer, indentation_point, config_options->tab_width);
-     CePoint_t cursor_end = {indentation, indentation_point.y};
+     CePoint_t cursor_end = {0, indentation_point.y};
+     if(indentation > 0){
+          cursor_end.x = indentation;
 
-     // build indentation string
-     insert_string = malloc(indentation + 1);
-     memset(insert_string, ' ', indentation);
-     insert_string[indentation] = 0;
+          // build indentation string
+          insert_string = malloc(indentation + 1);
+          memset(insert_string, ' ', indentation);
+          insert_string[indentation] = 0;
 
-     // insert indentation
-     if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+          // insert indentation
+          if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
-     // commit the change
-     change.chain = true;
-     change.insertion = true;
-     change.remove_line_if_empty = false;
-     change.string = insert_string;
-     change.location = indentation_point;
-     change.cursor_before = view->cursor;
-     change.cursor_after = cursor_end;
-     ce_buffer_change(view->buffer, &change);
+          // commit the change
+          change.chain = true;
+          change.insertion = true;
+          change.remove_line_if_empty = false;
+          change.string = insert_string;
+          change.location = indentation_point;
+          change.cursor_before = view->cursor;
+          change.cursor_after = cursor_end;
+          ce_buffer_change(view->buffer, &change);
+     }
 
      view->cursor = cursor_end;
      vim->chain_undo = true;
