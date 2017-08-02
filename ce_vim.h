@@ -8,7 +8,7 @@
 #define CE_VIM_MAX_KEY_BINDS 256
 
 #define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                              \
-bool function_name(const CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,            \
+bool function_name(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,                  \
                    const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range);
 
 #define CE_VIM_DECLARE_VERB_FUNC(function_name)                                                                \
@@ -22,7 +22,7 @@ struct CeVimMotionRange_t;
 enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, CeRune_t key);
-typedef bool CeVimMotionFunc_t(const struct CeVim_t*, struct CeVimAction_t*, const CeView_t*,
+typedef bool CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*,
                                const CeConfigOptions_t*, struct CeVimMotionRange_t*);
 typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struct CeVimMotionRange_t, CeView_t*,
                              const CeConfigOptions_t*);
@@ -172,6 +172,7 @@ CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune
 CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
@@ -230,6 +231,7 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_end_of_file);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_next);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_prev);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_word_forward);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_word_backward);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);
