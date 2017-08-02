@@ -911,6 +911,7 @@ void* draw_thread(void* thread_data){
 
           // draw a tab bar if there is more than 1 tab
           if(data->layout->tab_list.tab_count > 1){
+               move(0, 0);
                int color_pair = color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
                attron(COLOR_PAIR(color_pair));
                for(int64_t i = data->layout->tab_list.rect.left; i <= data->layout->tab_list.rect.right; i++){
@@ -1355,12 +1356,12 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
      }else if(strcmp(command->args[0].string, "right") == 0){
           for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
                if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
-                    if(i > 0){
-                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i - 1];
+                    if(i < (app->tab_list_layout->tab_list.tab_count - 1)){
+                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i + 1];
                          return CE_COMMAND_SUCCESS;
                     }else{
                          // wrap around
-                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[app->tab_list_layout->tab_list.tab_count - 1];
+                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[0];
                          return CE_COMMAND_SUCCESS;
                     }
                     break;
