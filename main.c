@@ -1207,8 +1207,12 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
           return CE_COMMAND_PRINT_HELP;
      }
 
-     target.x %= app->terminal_width;
-     target.y %= app->terminal_height;
+     // wrap around
+     if(target.x >= app->terminal_width) target.x %= app->terminal_width;
+     if(target.x < 0) target.x = app->terminal_width + target.x;
+     if(target.y >= app->terminal_height) target.y %= app->terminal_height;
+     if(target.y < 0) target.y = app->terminal_height + target.y;
+
      CeLayout_t* layout = ce_layout_find_at(tab_layout, target);
      if(layout){
           tab_layout->tab.current = layout;
