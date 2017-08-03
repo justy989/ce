@@ -165,6 +165,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                if(isprint(key) || key == CE_NEWLINE || key == '\t'){
                     if(ce_buffer_insert_rune(view->buffer, key, view->cursor)){
                          const char str[2] = {key, 0};
+                         CePoint_t save_cursor = view->cursor;
                          CePoint_t new_cursor = ce_buffer_advance_point(view->buffer, view->cursor, 1);
 
                          // TODO: convenience function
@@ -185,26 +186,28 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                          if(key == CE_NEWLINE){
                               // calc indentation
                               CePoint_t indentation_point = {0, view->cursor.y};
-                              int64_t indentation = ce_vim_get_indentation(view->buffer, indentation_point, config_options->tab_width);
+                              int64_t indentation = ce_vim_get_indentation(view->buffer, save_cursor, config_options->tab_width);
                               CePoint_t cursor_end = {indentation, indentation_point.y};
 
-                              // build indentation string
-                              char* insert_string = malloc(indentation + 1);
-                              memset(insert_string, ' ', indentation);
-                              insert_string[indentation] = 0;
+                              if(indentation > 0){
+                                   // build indentation string
+                                   char* insert_string = malloc(indentation + 1);
+                                   memset(insert_string, ' ', indentation);
+                                   insert_string[indentation] = 0;
 
-                              // insert indentation
-                              if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+                                   // insert indentation
+                                   if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
-                              // commit the change
-                              change.chain = true;
-                              change.insertion = true;
-                              change.remove_line_if_empty = false;
-                              change.string = insert_string;
-                              change.location = indentation_point;
-                              change.cursor_before = view->cursor;
-                              change.cursor_after = cursor_end;
-                              ce_buffer_change(view->buffer, &change);
+                                   // commit the change
+                                   change.chain = true;
+                                   change.insertion = true;
+                                   change.remove_line_if_empty = false;
+                                   change.string = insert_string;
+                                   change.location = indentation_point;
+                                   change.cursor_before = view->cursor;
+                                   change.cursor_after = cursor_end;
+                                   ce_buffer_change(view->buffer, &change);
+                              }
 
                               view->cursor = cursor_end;
                          }
@@ -1052,7 +1055,12 @@ int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_
      if(ce_point_after(paren_range.start, brace_range.start)){
           indent = paren_range.start.x + 1;
      }else{
-          indent = ce_vim_soft_begin_line(buffer, brace_range.start.y) + tab_length;
+          indent = ce_vim_soft_begin_line(buffer, brace_range.start.y);
+          paren_range = ce_vim_find_pair(buffer, (CePoint_t){indent, brace_range.start.y}, '(', false);
+          if(paren_range.start.x >= 0){
+               indent = ce_vim_soft_begin_line(buffer, paren_range.start.y);
+          }
+          indent += tab_length;
      }
      return indent;
 }
