@@ -904,6 +904,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 
      // calculate how big of an array we need to allocate for the dupe
      int64_t current_line = point.y + 1;
+     if(current_line >= buffer->line_count) return NULL;
+
      while(true){
           int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
           if(line_utf8_length == 0) line_utf8_length = 1; // treat empty lines as taking up 1 character

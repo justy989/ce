@@ -200,6 +200,7 @@ CeVimParseResult_t ce_vim_parse_verb_z_command(CeVimAction_t* action, CeRune_t k
 CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_join(CeVimAction_t* action, CeRune_t key);
 
 // motion functions
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_left);
@@ -259,3 +260,4 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_z_command);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_g_command);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_indent);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_unindent);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_join);

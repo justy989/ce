@@ -104,6 +104,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'g', &ce_vim_parse_verb_g_command);
      ce_vim_add_key_bind(vim, '>', &ce_vim_parse_verb_indent);
      ce_vim_add_key_bind(vim, '<', &ce_vim_parse_verb_unindent);
+     ce_vim_add_key_bind(vim, 'J', &ce_vim_parse_verb_join);
      ce_vim_add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
      ce_vim_add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
      ce_vim_add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
@@ -1378,6 +1379,11 @@ CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key){
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_join(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_join;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key){
      if(action->verb.integer == 0){
           action->verb.integer = '"';
@@ -2372,3 +2378,61 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
      return true;
 }
 
+bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                      const CeConfigOptions_t* config_options){
+     if(view->cursor.y < 0) return false;
+     if(view->cursor.y >= (view->buffer->line_count - 1)) return false;
+
+     CeBufferChange_t change = {};
+
+     // delete up to the soft beginning of the line
+     CePoint_t beginning_of_next_line = {0, view->cursor.y + 1};
+     int64_t whitespace_len = ce_vim_soft_begin_line(view->buffer, beginning_of_next_line.y);
+     if(whitespace_len > 0){
+          char* whitespace_str = ce_buffer_dupe_string(view->buffer, beginning_of_next_line, whitespace_len, false);
+          if(!ce_buffer_remove_string(view->buffer, beginning_of_next_line, whitespace_len, false)) return false;
+
+          change.chain = false;
+          change.insertion = false;
+          change.remove_line_if_empty = false;
+          change.string = whitespace_str;
+          change.location = beginning_of_next_line;
+          change.cursor_before = view->cursor;
+          change.cursor_after = view->cursor;
+          ce_buffer_change(view->buffer, &change);
+     }
+
+     // TODO: compress with KEY_BACKSPACE
+     // join the lines
+     CePoint_t point = {ce_utf8_strlen(view->buffer->lines[view->cursor.y]), view->cursor.y};
+     if(!ce_buffer_remove_string(view->buffer, point, 0, false)) return false;
+
+     change.chain = true;
+     change.insertion = false;
+     change.remove_line_if_empty = false;
+     change.string = strdup("\n");
+     change.location = point;
+     change.cursor_before = view->cursor;
+     change.cursor_after = view->cursor;
+     ce_buffer_change(view->buffer, &change);
+
+     if(whitespace_len > 0){
+          char* space_str = strdup(" ");
+          if(!ce_buffer_insert_string(view->buffer, space_str, point)) return false;
+
+          change.chain = true;
+          change.insertion = true;
+          change.remove_line_if_empty = false;
+          change.string = space_str;
+          change.location = point;
+          change.cursor_before = view->cursor;
+          change.cursor_after = view->cursor;
+          ce_buffer_change(view->buffer, &change);
+
+          view->cursor = ce_buffer_advance_point(view->buffer, point, 1);
+     }else{
+          view->cursor = point;
+     }
+
+     return true;
+}
