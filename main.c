@@ -808,10 +808,10 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                     }
                }
 
+               if(x < col_min) x = col_min;
+
                standend();
-               for(; x <= col_max; x++){
-                    addch(' ');
-               }
+               for(; x <= col_max + 1; x++) addch(' ');
           }
      }
 
@@ -891,7 +891,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs, int
 }
 
 void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int64_t tab_width, CeLayout_t* current,
-                 SyntaxDef_t* syntax_defs){
+                 SyntaxDef_t* syntax_defs, int64_t terminal_width){
      switch(layout->type){
      default:
           break;
@@ -905,17 +905,19 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int6
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
           int color_pair = color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_BLACK);
           attron(COLOR_PAIR(color_pair));
-          for(int i = 0; i < rect_height; i++){
-               mvaddch(layout->view.rect.top + i, layout->view.rect.right, ACS_VLINE);
+          if(layout->view.rect.right < (terminal_width - 1)){
+               for(int i = 0; i < rect_height; i++){
+                    mvaddch(layout->view.rect.top + i, layout->view.rect.right, ' ');
+               }
           }
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               draw_layout(layout->list.layouts[i], vim, color_defs, tab_width, current, syntax_defs);
+               draw_layout(layout->list.layouts[i], vim, color_defs, tab_width, current, syntax_defs, terminal_width);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          draw_layout(layout->tab.root, vim, color_defs, tab_width, current, syntax_defs);
+          draw_layout(layout->tab.root, vim, color_defs, tab_width, current, syntax_defs, terminal_width);
           break;
      }
 }
@@ -950,21 +952,22 @@ void* draw_thread(void* thread_data){
                sleep(0);
           }
 
-          CeLayout_t* tab_layout = data->layout->tab_list.current;
+          CeLayout_t* tab_list_layout = data->layout;
+          CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
 
           // draw a tab bar if there is more than 1 tab
-          if(data->layout->tab_list.tab_count > 1){
+          if(tab_list_layout->tab_list.tab_count > 1){
                move(0, 0);
                int color_pair = color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
                attron(COLOR_PAIR(color_pair));
-               for(int64_t i = data->layout->tab_list.rect.left; i <= data->layout->tab_list.rect.right; i++){
+               for(int64_t i = tab_list_layout->tab_list.rect.left; i <= tab_list_layout->tab_list.rect.right; i++){
                     addch(' ');
                }
 
                move(0, 0);
 
-               for(int64_t i = 0; i < data->layout->tab_list.tab_count; i++){
-                    if(data->layout->tab_list.tabs[i] == data->layout->tab_list.current){
+               for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
+                    if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
                          color_pair = color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
                          attron(COLOR_PAIR(color_pair));
                     }else{
@@ -972,8 +975,8 @@ void* draw_thread(void* thread_data){
                          attron(COLOR_PAIR(color_pair));
                     }
 
-                    if(data->layout->tab_list.tabs[i]->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-                         const char* buffer_name = data->layout->tab_list.tabs[i]->tab.current->view.buffer->name;
+                    if(tab_list_layout->tab_list.tabs[i]->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+                         const char* buffer_name = tab_list_layout->tab_list.tabs[i]->tab.current->view.buffer->name;
 
                          printw(" %s ", buffer_name);
                     }else{
@@ -983,7 +986,8 @@ void* draw_thread(void* thread_data){
           }
 
           standend();
-          draw_layout(tab_layout, data->vim, &color_defs, data->tab_width, tab_layout->tab.current, data->syntax_defs);
+          draw_layout(tab_layout, data->vim, &color_defs, data->tab_width, tab_layout->tab.current, data->syntax_defs,
+                      tab_list_layout->tab_list.rect.right);
 
           if(*data->input_mode){
                DrawColorList_t draw_color_list = {};

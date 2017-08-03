@@ -1031,6 +1031,7 @@ bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor){
 
 bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
      // nothing to redo
+     if(!buffer->change_node) return false;
      if(!buffer->change_node->next) return false;
 
      buffer->change_node = buffer->change_node->next;
