@@ -905,6 +905,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 
      // calculate how big of an array we need to allocate for the dupe
      int64_t current_line = point.y + 1;
+
+     // this means we asked for a string passed the length of the buffer, starting at the end, just return an empty string
      if(current_line >= buffer->line_count) return strdup("");
 
      while(true){

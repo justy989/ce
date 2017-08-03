@@ -1600,6 +1600,7 @@ int main(int argc, char** argv){
           app.config_options.tab_width = 5;
           app.config_options.horizontal_scroll_off = 10;
           app.config_options.vertical_scroll_off = 5;
+          app.config_options.insert_spaces_on_tab = true;
      }
 
      // init commands

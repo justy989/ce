@@ -37,6 +37,22 @@ static int64_t istrlen(const CeRune_t* istr){
      return len;
 }
 
+static bool string_is_whitespace(const char* string)
+{
+     if(*string == 0) return false;
+
+     bool all_whitespace = true;
+     while(*string){
+          if(!isspace(*string)){
+               all_whitespace = false;
+               break;
+          }
+          string++;
+     }
+
+     return all_whitespace;
+}
+
 void ce_vim_add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function){
      assert(vim->key_bind_count < CE_VIM_MAX_KEY_BINDS);
      vim->key_binds[vim->key_bind_count].key = key;
@@ -162,7 +178,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
 
           switch(key){
           default:
-               if(isprint(key) || key == CE_NEWLINE || key == '\t'){
+               if(isprint(key) || key == CE_NEWLINE){
                     if(ce_buffer_insert_rune(view->buffer, key, view->cursor)){
                          const char str[2] = {key, 0};
                          CePoint_t save_cursor = view->cursor;
@@ -210,8 +226,55 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                               }
 
                               view->cursor = cursor_end;
+
+                              // check if previous line was all whitespace, if so, remove it
+                              CePoint_t remove_loc = {0, save_cursor.y};
+                              if(string_is_whitespace(view->buffer->lines[save_cursor.y])){
+                                   int64_t remove_len = strlen(view->buffer->lines[save_cursor.y]);
+                                   char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len, false);
+                                   if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len, false)){
+                                        change.chain = true;
+                                        change.insertion = false;
+                                        change.remove_line_if_empty = false;
+                                        change.string = remove_string;
+                                        change.location = remove_loc;
+                                        change.cursor_before = view->cursor;
+                                        change.cursor_after = view->cursor;
+                                        ce_buffer_change(view->buffer, &change);
+                                   }
+                              }
                          }
                     }
+               }else if(key == '\t'){
+                    // build a string to insert
+                    int64_t insert_len = 1;
+                    if(config_options->insert_spaces_on_tab){
+                         insert_len = config_options->tab_width;
+                    }
+                    char* insert_string = malloc(insert_len + 1);
+                    if(config_options->insert_spaces_on_tab){
+                         memset(insert_string, ' ', insert_len);
+                    }else{
+                         *insert_string = key;
+                    }
+                    insert_string[insert_len] = 0;
+
+                    CePoint_t new_cursor = ce_buffer_advance_point(view->buffer, view->cursor, insert_len);
+
+                    if(!ce_buffer_insert_string(view->buffer, insert_string, view->cursor)) break;
+
+                    CeBufferChange_t change = {};
+                    change.chain = vim->chain_undo;
+                    change.insertion = true;
+                    change.remove_line_if_empty = false;
+                    change.string = insert_string;
+                    change.location = view->cursor;
+                    change.cursor_before = view->cursor;
+                    change.cursor_after = new_cursor;
+                    ce_buffer_change(view->buffer, &change);
+
+                    view->cursor = new_cursor;
+                    vim->chain_undo = true;
                }
                break;
           case KEY_BACKSPACE:
@@ -278,9 +341,30 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                vim->chain_undo = false;
                break;
           case 27: // escape
+          {
+               // check if previous line was all whitespace, if so, remove it
+               CePoint_t remove_loc = {0, view->cursor.y};
+               if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
+                    int64_t remove_len = strlen(view->buffer->lines[view->cursor.y]);
+                    char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len, false);
+                    if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len, false)){
+                         CeBufferChange_t change = {};
+                         change.chain = true;
+                         change.insertion = false;
+                         change.remove_line_if_empty = false;
+                         change.string = remove_string;
+                         change.location = remove_loc;
+                         change.cursor_before = view->cursor;
+                         change.cursor_after = remove_loc;
+                         ce_buffer_change(view->buffer, &change);
+
+                         view->cursor = remove_loc;
+                    }
+               }
+
                vim->mode = CE_VIM_MODE_NORMAL;
                vim->chain_undo = false;
-               break;
+          } break;
           }
           break;
      case CE_VIM_MODE_NORMAL:
@@ -1056,6 +1140,7 @@ int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_
           indent = paren_range.start.x + 1;
      }else{
           indent = ce_vim_soft_begin_line(buffer, brace_range.start.y);
+          // if in our indent, we are inside parens, get the indentation of where the parens started
           paren_range = ce_vim_find_pair(buffer, (CePoint_t){indent, brace_range.start.y}, '(', false);
           if(paren_range.start.x >= 0){
                indent = ce_vim_soft_begin_line(buffer, paren_range.start.y);
