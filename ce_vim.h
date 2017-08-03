@@ -142,6 +142,7 @@ int64_t ce_vim_yank_register_index(CeRune_t rune);
 bool ce_vim_motion_range_sort(CeVimMotionRange_t* motion_range);
 void ce_vim_add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function);
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length);
+bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, bool chain_undo);
 
 // parse functions
 CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key);

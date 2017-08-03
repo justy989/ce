@@ -219,33 +219,31 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                     int64_t remove_len = 1;
 
                     if(view->cursor.x == 0){
-                         // if we are a the beginning of the line, we want to do a join line
-                         end_cursor.y = view->cursor.y - 1;
-                         end_cursor.x = ce_utf8_strlen(view->buffer->lines[end_cursor.y]);
-                         remove_point = end_cursor;
-                         removed_string = strdup("\n");
-                         remove_len = 0;
+                         int64_t line = view->cursor.y - 1;
+                         end_cursor = (CePoint_t){ce_utf8_strlen(view->buffer->lines[line]), line};
+                         ce_vim_join_next_line(view->buffer, view->cursor.y - 1, view->cursor, vim->chain_undo);
                     }else{
                          remove_point = ce_buffer_advance_point(view->buffer, view->cursor, -1);
                          end_cursor = remove_point;
                          removed_string = ce_buffer_dupe_string(view->buffer, remove_point, remove_len, false);
+
+                         if(ce_buffer_remove_string(view->buffer, remove_point, remove_len, false)){
+                              // TODO: convenience function
+                              CeBufferChange_t change = {};
+                              change.chain = vim->chain_undo;
+                              change.insertion = false;
+                              change.remove_line_if_empty = false;
+                              change.string = removed_string;
+                              change.location = remove_point;
+                              change.cursor_before = view->cursor;
+                              change.cursor_after = end_cursor;
+                              ce_buffer_change(view->buffer, &change);
+
+                         }
                     }
 
-                    if(ce_buffer_remove_string(view->buffer, remove_point, remove_len, false)){
-                         // TODO: convenience function
-                         CeBufferChange_t change = {};
-                         change.chain = vim->chain_undo;
-                         change.insertion = false;
-                         change.remove_line_if_empty = false;
-                         change.string = removed_string;
-                         change.location = remove_point;
-                         change.cursor_before = view->cursor;
-                         change.cursor_after = end_cursor;
-                         ce_buffer_change(view->buffer, &change);
-
-                         view->cursor = end_cursor;
-                         vim->chain_undo = true;
-                    }
+                    view->cursor = end_cursor;
+                    vim->chain_undo = true;
                }
                break;
           case KEY_LEFT:
@@ -1057,6 +1055,24 @@ int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_
           indent = ce_vim_soft_begin_line(buffer, brace_range.start.y) + tab_length;
      }
      return indent;
+}
+
+bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, bool chain_undo){
+     CePoint_t point = {ce_utf8_strlen(buffer->lines[line]), line};
+     if(!ce_buffer_remove_string(buffer, point, 0, false)) return false;
+     CePoint_t after_point = ce_buffer_advance_point(buffer, point, 1);
+
+     CeBufferChange_t change = {};
+     change.chain = chain_undo;
+     change.insertion = false;
+     change.remove_line_if_empty = false;
+     change.string = strdup("\n");
+     change.location = point;
+     change.cursor_before = cursor;
+     change.cursor_after = after_point;
+     ce_buffer_change(buffer, &change);
+
+     return true;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t key){
@@ -2402,23 +2418,13 @@ bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
           ce_buffer_change(view->buffer, &change);
      }
 
-     // TODO: compress with KEY_BACKSPACE
-     // join the lines
      CePoint_t point = {ce_utf8_strlen(view->buffer->lines[view->cursor.y]), view->cursor.y};
-     if(!ce_buffer_remove_string(view->buffer, point, 0, false)) return false;
-
-     change.chain = true;
-     change.insertion = false;
-     change.remove_line_if_empty = false;
-     change.string = strdup("\n");
-     change.location = point;
-     change.cursor_before = view->cursor;
-     change.cursor_after = view->cursor;
-     ce_buffer_change(view->buffer, &change);
+     ce_vim_join_next_line(view->buffer, view->cursor.y, view->cursor, true);
 
      if(whitespace_len > 0){
           char* space_str = strdup(" ");
           if(!ce_buffer_insert_string(view->buffer, space_str, point)) return false;
+          CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, point, 1);
 
           change.chain = true;
           change.insertion = true;
@@ -2426,10 +2432,10 @@ bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
           change.string = space_str;
           change.location = point;
           change.cursor_before = view->cursor;
-          change.cursor_after = view->cursor;
+          change.cursor_after = end_cursor;
           ce_buffer_change(view->buffer, &change);
 
-          view->cursor = ce_buffer_advance_point(view->buffer, point, 1);
+          view->cursor = end_cursor;
      }else{
           view->cursor = point;
      }
