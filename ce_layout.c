@@ -333,3 +333,25 @@ bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node){
 
      return true;
 }
+
+CeLayout_t* ce_layout_buffer_in_view(CeLayout_t* layout, CeBuffer_t* buffer){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          if(layout->view.buffer == buffer) return layout;
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               CeLayout_t* found = ce_layout_buffer_in_view(layout->list.layouts[i], buffer);
+               if(found) return found;
+          }
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          return ce_layout_buffer_in_view(layout->tab.root, buffer);
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          return ce_layout_buffer_in_view(layout->tab_list.current, buffer);
+     }
+
+     return NULL;
+}

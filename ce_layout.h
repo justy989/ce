@@ -55,3 +55,4 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect);
 CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point);
 CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node);
 bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node);
+CeLayout_t* ce_layout_buffer_in_view(CeLayout_t* root, CeBuffer_t* buffer);

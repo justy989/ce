@@ -174,7 +174,7 @@ bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
      return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
 }
 
-void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
+static void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
      int64_t index = 1;
      char line[256];
      ce_buffer_empty(buffer);
@@ -183,6 +183,20 @@ void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
           buffer_append_on_new_line(buffer, line);
           head = head->next;
           index++;
+     }
+
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
+static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
+     char line[256];
+     ce_buffer_empty(buffer);
+     for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
+          CeVimYank_t* yank = yanks + i;
+          char reg = i + '!';
+          if(yank->text == NULL) continue;
+          snprintf(line, 256, "// register '%c': line: %s\n%s\n", reg, yank->line ? "true" : "false", yank->text);
+          buffer_append_on_new_line(buffer, line);
      }
 
      buffer->status = CE_BUFFER_STATUS_READONLY;
@@ -1113,6 +1127,7 @@ typedef struct{
      int64_t command_entry_count;
      CeVimParseResult_t last_vim_handle_result;
      CeBuffer_t* buffer_list_buffer;
+     CeBuffer_t* yank_list_buffer;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
@@ -1229,8 +1244,23 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data)
 
      if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
           view = &tab_layout->tab.current->view;
-          build_buffer_list(app->buffer_list_buffer, app->buffer_node_head);
           view_switch_buffer(view, app->buffer_list_buffer, &app->vim, &app->config_options);
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data)
+{
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+          view_switch_buffer(view, app->yank_list_buffer, &app->vim, &app->config_options);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1568,6 +1598,7 @@ int main(int argc, char** argv){
           {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
           {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
           {command_show_buffers, "show_buffers", "show the list of buffers"},
+          {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
           {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
           {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
@@ -1582,11 +1613,14 @@ int main(int argc, char** argv){
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
 
      app.buffer_list_buffer = calloc(1, sizeof(*app.buffer_list_buffer));
+     app.yank_list_buffer = calloc(1, sizeof(*app.yank_list_buffer));
 
      // init buffers
      {
           ce_buffer_alloc(app.buffer_list_buffer, 1, "buffers");
           buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
+          ce_buffer_alloc(app.yank_list_buffer, 1, "yanks");
+          buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
@@ -1629,6 +1663,7 @@ int main(int argc, char** argv){
                {{'g', 'T'}, "select_adjacent_tab left"},
                {{'\\', '/'}, "regex_search forward"},
                {{'\\', '?'}, "regex_search backward"},
+               {{'"', '?'}, "show_yanks"},
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
@@ -1895,6 +1930,14 @@ int main(int argc, char** argv){
                          }
                     }
                }
+          }
+
+          if(ce_layout_buffer_in_view(tab_layout, app.buffer_list_buffer)){
+               build_buffer_list(app.buffer_list_buffer, app.buffer_node_head);
+          }
+
+          if(ce_layout_buffer_in_view(tab_layout, app.yank_list_buffer)){
+               build_yank_list(app.yank_list_buffer, app.vim.yanks);
           }
 
           draw_thread_data->ready_to_draw = true;
