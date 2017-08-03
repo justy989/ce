@@ -1515,6 +1515,11 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
+     clear();
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len)
 {
      for(size_t i = 0; i < len; ++i){
@@ -1619,6 +1624,7 @@ int main(int argc, char** argv){
           {command_search, "search", "interactive search 'forward' or 'backward'"},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_command, "command", "interactively send a commmand"},
+          {command_redraw, "redraw", "redraw the entire editor"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
@@ -1675,6 +1681,7 @@ int main(int argc, char** argv){
                {{'\\', '/'}, "regex_search forward"},
                {{'\\', '?'}, "regex_search backward"},
                {{'"', '?'}, "show_yanks"},
+               {{'\\', 'r'}, "redraw"},
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));

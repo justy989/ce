@@ -814,8 +814,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      //       line, and join the remaining characters in the last line to the initial line
      int64_t length_left = length - length_left_on_line;
      int64_t current_line = point.y + 1;
-     // check whether we should delete the whole first line as long as it isn't empty, or start at the next line
-     int64_t save_current_line = (point.x == 0 && length_left_on_line) ? point.y : current_line;
+     int64_t save_current_line = current_line;
      int64_t line_len = 0;
      int64_t last_line_offset = 0;
 
