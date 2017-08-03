@@ -248,27 +248,31 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                }
                break;
           case KEY_LEFT:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0}, config_options->tab_width, CE_CLAMP_X_ON);
-               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
-                                                    config_options->vertical_scroll_off, config_options->tab_width);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0},
+                                                   config_options->tab_width, CE_CLAMP_X_ON);
+               ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
+                                     config_options->tab_width);
                vim->chain_undo = false;
                break;
           case KEY_DOWN:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1}, config_options->tab_width, CE_CLAMP_X_ON);
-               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
-                                                    config_options->vertical_scroll_off, config_options->tab_width);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1},
+                                                   config_options->tab_width, CE_CLAMP_X_ON);
+               ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
+                                     config_options->tab_width);
                vim->chain_undo = false;
                break;
           case KEY_UP:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1}, config_options->tab_width, CE_CLAMP_X_ON);
-               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
-                                                    config_options->vertical_scroll_off, config_options->tab_width);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1},
+                                                   config_options->tab_width, CE_CLAMP_X_ON);
+               ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
+                                     config_options->tab_width);
                vim->chain_undo = false;
                break;
           case KEY_RIGHT:
-               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0}, config_options->tab_width, CE_CLAMP_X_ON);
-               view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
-                                                    config_options->vertical_scroll_off, config_options->tab_width);
+               view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0},
+                                                   config_options->tab_width, CE_CLAMP_X_ON);
+               ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
+                                     config_options->tab_width);
                vim->chain_undo = false;
                break;
           case 27: // escape
@@ -1843,8 +1847,8 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      }
      view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_ON);
      if(ce_points_equal(motion_range.end, view->cursor)) vim->motion_column = view->cursor.x;
-     view->scroll = ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
-                                          config_options->vertical_scroll_off, config_options->tab_width);
+     ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
+                           config_options->tab_width);
      return true;
 }
 

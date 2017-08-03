@@ -1053,8 +1053,8 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
      return true;
 }
 
-CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
-     if(!view->buffer) return view->scroll;
+void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
+     if(!view->buffer) return;
 
      int64_t view_height = (view->rect.bottom - view->rect.top);
      int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
@@ -1089,7 +1089,6 @@ CePoint_t ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, i
      CE_CLAMP(view->scroll.y, 0, max_scroll_y);
 
      pthread_mutex_unlock(&view->buffer->lock);
-     return view->scroll;
 }
 
 void ce_view_scroll_to(CeView_t* view, CePoint_t point){

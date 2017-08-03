@@ -1917,9 +1917,8 @@ int main(int argc, char** argv){
                          CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, app.input_view.buffer->lines[0]);
                          if(match_point.x >= 0){
                               view->cursor = match_point;
-                              view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
-                                                                   app.config_options.vertical_scroll_off,
-                                                                   app.config_options.tab_width);
+                              ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                    app.config_options.vertical_scroll_off, app.config_options.tab_width);
                          }
                     }
                }else if(strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0){
@@ -1927,9 +1926,8 @@ int main(int argc, char** argv){
                          CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, app.input_view.buffer->lines[0]);
                          if(match_point.x >= 0){
                               view->cursor = match_point;
-                              view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
-                                                                   app.config_options.vertical_scroll_off,
-                                                                   app.config_options.tab_width);
+                              ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                    app.config_options.vertical_scroll_off, app.config_options.tab_width);
                          }
                     }
                }else if(strcmp(app.input_view.buffer->name, "REGEX SEARCH") == 0){
@@ -1944,9 +1942,8 @@ int main(int argc, char** argv){
                               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
                               if(result.point.x >= 0){
                                    view->cursor = result.point;
-                                   view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
-                                                                        app.config_options.vertical_scroll_off,
-                                                                        app.config_options.tab_width);
+                                   ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                         app.config_options.vertical_scroll_off, app.config_options.tab_width);
                               }
                          }
                     }
@@ -1962,9 +1959,8 @@ int main(int argc, char** argv){
                               CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
                               if(result.point.x >= 0){
                                    view->cursor = result.point;
-                                   view->scroll = ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
-                                                                        app.config_options.vertical_scroll_off,
-                                                                        app.config_options.tab_width);
+                                   ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                         app.config_options.vertical_scroll_off, app.config_options.tab_width);
                               }
                          }
                     }
