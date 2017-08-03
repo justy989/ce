@@ -2055,7 +2055,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
      change.insertion = true;
-     change.remove_line_if_empty = true;
+     change.remove_line_if_empty = yank->line;
      change.string = strdup(yank->text);
      change.location = insertion_point;
      change.cursor_before = view->cursor;
