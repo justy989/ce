@@ -1917,8 +1917,13 @@ int main(int argc, char** argv){
                          CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, app.input_view.buffer->lines[0]);
                          if(match_point.x >= 0){
                               view->cursor = match_point;
+                              CePoint_t before_follow = view->scroll;
                               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
                                                     app.config_options.vertical_scroll_off, app.config_options.tab_width);
+                              if(!ce_points_equal(before_follow, view->scroll)){
+                                   int64_t view_height = view->rect.bottom - view->rect.top;
+                                   ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+                              }
                          }
                     }
                }else if(strcmp(app.input_view.buffer->name, "REVERSE SEARCH") == 0){
@@ -1926,8 +1931,13 @@ int main(int argc, char** argv){
                          CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, app.input_view.buffer->lines[0]);
                          if(match_point.x >= 0){
                               view->cursor = match_point;
+                              CePoint_t before_follow = view->scroll;
                               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
                                                     app.config_options.vertical_scroll_off, app.config_options.tab_width);
+                              if(!ce_points_equal(before_follow, view->scroll)){
+                                   int64_t view_height = view->rect.bottom - view->rect.top;
+                                   ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+                              }
                          }
                     }
                }else if(strcmp(app.input_view.buffer->name, "REGEX SEARCH") == 0){
@@ -1940,10 +1950,16 @@ int main(int argc, char** argv){
                               ce_log("regcomp() failed: '%s'", error_buffer);
                          }else{
                               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
+                              // TODO: compress result code with all other search code
                               if(result.point.x >= 0){
                                    view->cursor = result.point;
+                                   CePoint_t before_follow = view->scroll;
                                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
                                                          app.config_options.vertical_scroll_off, app.config_options.tab_width);
+                                   if(!ce_points_equal(before_follow, view->scroll)){
+                                        int64_t view_height = view->rect.bottom - view->rect.top;
+                                        ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+                                   }
                               }
                          }
                     }
@@ -1959,8 +1975,13 @@ int main(int argc, char** argv){
                               CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
                               if(result.point.x >= 0){
                                    view->cursor = result.point;
+                                   CePoint_t before_follow = view->scroll;
                                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
                                                          app.config_options.vertical_scroll_off, app.config_options.tab_width);
+                                   if(!ce_points_equal(before_follow, view->scroll)){
+                                        int64_t view_height = view->rect.bottom - view->rect.top;
+                                        ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+                                   }
                               }
                          }
                     }

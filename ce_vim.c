@@ -1847,8 +1847,18 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      }
      view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_ON);
      if(ce_points_equal(motion_range.end, view->cursor)) vim->motion_column = view->cursor.x;
+     CePoint_t before_follow = view->scroll;
      ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
                            config_options->tab_width);
+
+     // if we are searching, and our cursor goes off the screen, center it
+     if(!ce_points_equal(before_follow, view->scroll) &&
+        (action->motion.function == ce_vim_motion_search_next ||
+         action->motion.function == ce_vim_motion_search_prev)){
+          int64_t view_height = view->rect.bottom - view->rect.top;
+          ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+     }
+
      return true;
 }
 
