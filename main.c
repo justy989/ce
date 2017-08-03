@@ -1878,23 +1878,40 @@ int main(int argc, char** argv){
                               yank->text = strdup(app.input_view.buffer->lines[0]);
                               yank->line = false;
                          }else if(strcmp(app.input_view.buffer->name, "COMMAND") == 0){
-                              CeCommand_t command = {};
-                              if(!ce_command_parse(&command, app.input_view.buffer->lines[0])){
-                                   ce_log("failed to parse command: '%s'\n", app.input_view.buffer->lines[0]);
-                              }else{
-                                   CeCommandFunc_t* command_func = NULL;
-                                   for(int64_t i = 0; i < app.command_entry_count; i++){
-                                        CeCommandEntry_t* entry = app.command_entries + i;
-                                        if(strcmp(entry->name, command.name) == 0){
-                                             command_func = entry->func;
-                                             break;
-                                        }
+                              char* end_of_number = app.input_view.buffer->lines[0];
+                              int64_t line_number = strtol(app.input_view.buffer->lines[0], &end_of_number, 10);
+                              if(end_of_number > app.input_view.buffer->lines[0]){
+                                   // if the command entered was a number, go to that line
+                                   if(line_number >= 0 && line_number < view->buffer->line_count){
+                                        view->cursor.y = line_number - 1;
+                                        view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+                                        // TODO: compress with other view centering code I've seen
+                                        int64_t view_height = view->rect.bottom - view->rect.top;
+                                        ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off,
+                                                              app.config_options.vertical_scroll_off,
+                                                              app.config_options.tab_width);
+                                        ce_view_scroll_to(view, (CePoint_t){view->cursor.x, view->cursor.y - (view_height / 2)});
                                    }
-
-                                   if(command_func){
-                                        command_func(&command, &app);
+                              }else{
+                                   // convert and run the command
+                                   CeCommand_t command = {};
+                                   if(!ce_command_parse(&command, app.input_view.buffer->lines[0])){
+                                        ce_log("failed to parse command: '%s'\n", app.input_view.buffer->lines[0]);
                                    }else{
-                                        ce_log("unknown command: '%s'\n", command.name);
+                                        CeCommandFunc_t* command_func = NULL;
+                                        for(int64_t i = 0; i < app.command_entry_count; i++){
+                                             CeCommandEntry_t* entry = app.command_entries + i;
+                                             if(strcmp(entry->name, command.name) == 0){
+                                                  command_func = entry->func;
+                                                  break;
+                                             }
+                                        }
+
+                                        if(command_func){
+                                             command_func(&command, &app);
+                                        }else{
+                                             ce_log("unknown command: '%s'\n", command.name);
+                                        }
                                    }
                               }
                          }else if(strcmp(app.input_view.buffer->name, "EDIT YANK") == 0){
