@@ -1087,10 +1087,15 @@ CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_
 
      // find left match
      CePoint_t itr = start;
+     CeRune_t buffer_rune = ce_buffer_get_rune(buffer, itr);
+     // if we start on a right match, back up the starting point
+     if(buffer_rune == right_match){
+          itr = ce_buffer_advance_point(buffer, start, -1);
+     }
      CePoint_t prev = itr;
      CePoint_t new_start = range.start;
      while(true){
-          CeRune_t buffer_rune = ce_buffer_get_rune(buffer, itr);
+          buffer_rune = ce_buffer_get_rune(buffer, itr);
           if(buffer_rune == left_match){
                match_count--;
                if(match_count < 0){
@@ -1106,13 +1111,18 @@ CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_
      }
 
      // find right match
-     itr = start;
+     if(ce_points_equal(itr, start)){
+          itr = ce_buffer_advance_point(buffer, start, 1);
+     }else{
+          itr = start;
+     }
+
      prev = itr;
      match_count = 0;
      CePoint_t new_end = range.end;
      CePoint_t end_of_buffer = {ce_utf8_last_index(buffer->lines[buffer->line_count - 1]), buffer->line_count - 1};
      while(true){
-          CeRune_t buffer_rune = ce_buffer_get_rune(buffer, itr);
+          buffer_rune = ce_buffer_get_rune(buffer, itr);
           if(buffer_rune == right_match){
                match_count--;
                if(match_count < 0){
@@ -1958,25 +1968,7 @@ bool ce_vim_motion_search_word_backward(CeVim_t* vim, CeVimAction_t* action, con
 bool ce_vim_motion_match_pair(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                               const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
      CeRune_t rune = ce_buffer_get_rune(view->buffer, view->cursor);
-     CePoint_t point = view->cursor;
-
-     // offset the point based on the rune we are one
-     switch(rune){
-     default:
-          return false;
-     case '(':
-     case '{':
-     case '[':
-          point = ce_buffer_advance_point(view->buffer, point, 1);
-          break;
-     case ')':
-     case '}':
-     case ']':
-          point = ce_buffer_advance_point(view->buffer, point, -1);
-          break;
-     }
-
-     CeVimMotionRange_t result = ce_vim_find_pair(view->buffer, point, rune, false);
+     CeVimMotionRange_t result = ce_vim_find_pair(view->buffer, view->cursor, rune, false);
      if(result.start.x < 0) return false;
      if(ce_points_equal(motion_range->end, result.start)){
           motion_range->end = result.end;
