@@ -972,6 +972,16 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
      return dupe;
 }
 
+char* ce_buffer_dupe(CeBuffer_t* buffer){
+     CePoint_t start = {0, 0};
+     CePoint_t end = {buffer->line_count, 0};
+     if(end.y) end.y--;
+     end.x = ce_utf8_last_index(buffer->lines[end.y]);
+     int64_t len = ce_buffer_range_len(buffer, start, end);
+     if(len > 0) return ce_buffer_dupe_string(buffer, start, len, false);
+     return NULL;
+}
+
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
      CeBufferChangeNode_t* node = calloc(1, sizeof(*node));
      node->change = *change;

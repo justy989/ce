@@ -155,6 +155,7 @@ CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint
 CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool newline_if_entire_line);
+char* ce_buffer_dupe(CeBuffer_t* buffer);
 
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point);
 bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point); // TODO: unittest

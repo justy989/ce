@@ -193,8 +193,8 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
      ce_buffer_empty(buffer);
      for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
           CeVimYank_t* yank = yanks + i;
-          char reg = i + '!';
           if(yank->text == NULL) continue;
+          char reg = i + '!';
           snprintf(line, 256, "// register '%c': line: %s\n%s\n", reg, yank->line ? "true" : "false", yank->text);
           buffer_append_on_new_line(buffer, line);
      }
@@ -1131,6 +1131,7 @@ typedef struct{
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
+     char edit_yank_register;
      bool quit;
 }App_t;
 
@@ -1367,6 +1368,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
           load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, command->args[0].string);
      }else{ // it's 0
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
+
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1542,6 +1544,7 @@ int main(int argc, char** argv){
           start_color();
           use_default_colors();
 
+          define_key("\x11", KEY_CLOSE);     // ctrl + q    (17) (0x11) ASCII "DC1" Device Control 1
           define_key("\x12", KEY_REDO);
           define_key(NULL, KEY_ENTER);       // Blow away enter
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
@@ -1653,7 +1656,7 @@ int main(int argc, char** argv){
                {{22}, "split_layout horizontal"}, // ctrl s
                {{19}, "split_layout vertical"}, // ctrl v
                {{16}, "select_parent_layout"}, // ctrl p
-               {{1}, "delete_layout"}, // ctrl a
+               {{KEY_CLOSE}, "delete_layout"}, // ctrl q
                {{6}, "load_file"}, // ctrl f
                {{20}, "new_tab"}, // ctrl t
                {{'/'}, "search forward"},
@@ -1741,6 +1744,7 @@ int main(int argc, char** argv){
           // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
           if(app.last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
              app.last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
+             app.last_vim_handle_result != CE_VIM_PARSE_CONTINUE &&
              app.vim.mode != CE_VIM_MODE_INSERT){
                // append to keys
                if(app.key_count < APP_MAX_KEY_COUNT){
@@ -1795,7 +1799,7 @@ int main(int argc, char** argv){
                     if(no_matches){
                          app.vim.current_command[0] = 0;
                          for(int64_t i = 0; i < app.key_count - 1; ++i){
-                              ce_vim_append_key(&app.vim, key);
+                              ce_vim_append_key(&app.vim, app.keys[i]);
                          }
 
                          app.key_count = 0;
@@ -1815,6 +1819,32 @@ int main(int argc, char** argv){
                               }
                               itr = itr->next;
                               index++;
+                         }
+                    }else if(!app.input_mode && view->buffer == app.yank_list_buffer){
+                         // TODO: move to command
+                         app.edit_yank_register = -1;
+                         int64_t line = view->cursor.y;
+                         CeVimYank_t* selected_yank = NULL;
+                         for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
+                              CeVimYank_t* yank = app.vim.yanks + i;
+                              if(yank->text != NULL){
+                                   int64_t line_count = 2;
+                                   line_count += ce_util_count_string_lines(yank->text);
+                                   line -= line_count;
+                                   if(line <= 0){
+                                        app.edit_yank_register = i;
+                                        selected_yank = yank;
+                                        break;
+                                   }
+                              }
+                         }
+
+                         if(app.edit_yank_register >= 0){
+                              app.input_mode = enable_input_mode(&app.input_view, view, &app.vim, "EDIT YANK");
+                              ce_buffer_insert_string(app.input_view.buffer, selected_yank->text, (CePoint_t){0, 0});
+                              app.input_view.cursor.y = app.input_view.buffer->line_count;
+                              if(app.input_view.cursor.y) app.input_view.cursor.y--;
+                              app.input_view.cursor.x = ce_utf8_strlen(app.input_view.buffer->lines[app.input_view.cursor.y]);
                          }
                     }else if(app.input_mode){
                          if(strcmp(app.input_view.buffer->name, "LOAD FILE") == 0){
@@ -1851,6 +1881,11 @@ int main(int argc, char** argv){
                                         ce_log("unknown command: '%s'\n", command.name);
                                    }
                               }
+                         }else if(strcmp(app.input_view.buffer->name, "EDIT YANK") == 0){
+                              CeVimYank_t* yank = app.vim.yanks + app.edit_yank_register;
+                              free(yank->text);
+                              yank->text = ce_buffer_dupe(app.input_view.buffer);
+                              yank->line = false;
                          }
 
                          // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future

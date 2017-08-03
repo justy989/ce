@@ -1338,19 +1338,19 @@ CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      }
 
      action->verb.function = &ce_vim_verb_yank;
-     if(action->verb.character == 0) action->verb.character = '"';
+     if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key){
      action->verb.function = &ce_vim_verb_paste_before;
-     if(action->verb.character == 0) action->verb.character = '"';
+     if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key){
      action->verb.function = &ce_vim_verb_paste_after;
-     if(action->verb.character == 0) action->verb.character = '"';
+     if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1375,11 +1375,11 @@ CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key){
 }
 
 CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key){
-     if(action->verb.character == 0){
-          action->verb.character = '"';
+     if(action->verb.integer == 0){
+          action->verb.integer = '"';
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
-     }else if(action->verb.character == '"'){
-          action->verb.character = key;
+     }else if(action->verb.integer == '"'){
+          action->verb.integer = key;
           return CE_VIM_PARSE_CONTINUE;
      }
 
@@ -2014,7 +2014,7 @@ bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* a
 
 bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                       const CeConfigOptions_t* config_options){
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.character);
+     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
      if(yank->text) free(yank->text);
      int64_t yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len, action->yank_line);
@@ -2025,7 +2025,7 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
 
 static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                        const CeConfigOptions_t* config_options, bool after){
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.character);
+     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
      if(!yank->text) return false;
 
      CePoint_t insertion_point = motion_range.end;
