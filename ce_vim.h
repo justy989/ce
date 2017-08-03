@@ -136,8 +136,7 @@ CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeR
 CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
 CeVimMotionRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
 CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
-CeVimMotionRange_t ce_vim_find_inside_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune);
-CeVimMotionRange_t ce_vim_find_around_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune);
+CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool inside);
 int64_t ce_vim_yank_register_index(CeRune_t rune);
 bool ce_vim_motion_range_sort(CeVimMotionRange_t* motion_range);
 void ce_vim_add_key_bind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t* function);
@@ -174,6 +173,7 @@ CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune
 CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_match_pair(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
@@ -234,6 +234,7 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_next);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_prev);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_word_forward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_search_word_backward);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_match_pair);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);

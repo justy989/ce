@@ -91,6 +91,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, 'G', &ce_vim_parse_motion_end_of_file);
      ce_vim_add_key_bind(vim, 'n', &ce_vim_parse_motion_search_next);
      ce_vim_add_key_bind(vim, 'N', &ce_vim_parse_motion_search_prev);
+     ce_vim_add_key_bind(vim, '%', &ce_vim_parse_motion_match_pair);
      ce_vim_add_key_bind(vim, '*', &ce_vim_parse_motion_search_word_forward);
      ce_vim_add_key_bind(vim, '#', &ce_vim_parse_motion_search_word_backward);
      ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
@@ -1381,6 +1382,10 @@ CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune
      return parse_motion_direction(action, ce_vim_motion_search_prev);
 }
 
+CeVimParseResult_t ce_vim_parse_motion_match_pair(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_match_pair);
+}
+
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1948,6 +1953,39 @@ bool ce_vim_motion_search_word_backward(CeVim_t* vim, CeVimAction_t* action, con
      search_word(vim, action, view, motion_range);
      motion_range->end = motion_range->start;
      return ce_vim_motion_search_prev(vim, action, view, config_options, motion_range);
+}
+
+bool ce_vim_motion_match_pair(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
+                              const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
+     CeRune_t rune = ce_buffer_get_rune(view->buffer, view->cursor);
+     CePoint_t point = view->cursor;
+
+     // offset the point based on the rune we are one
+     switch(rune){
+     default:
+          return false;
+     case '(':
+     case '{':
+     case '[':
+          point = ce_buffer_advance_point(view->buffer, point, 1);
+          break;
+     case ')':
+     case '}':
+     case ']':
+          point = ce_buffer_advance_point(view->buffer, point, -1);
+          break;
+     }
+
+     CeVimMotionRange_t result = ce_vim_find_pair(view->buffer, point, rune, false);
+     if(result.start.x < 0) return false;
+     if(ce_points_equal(motion_range->end, result.start)){
+          motion_range->end = result.end;
+          return true;
+     }else if(ce_points_equal(motion_range->end, result.end)){
+          motion_range->end = result.start;
+          return true;
+     }
+     return false;
 }
 
 int64_t ce_vim_yank_register_index(CeRune_t rune){
