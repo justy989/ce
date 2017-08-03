@@ -1295,10 +1295,8 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           pthread_mutex_unlock(&view->buffer->lock);
           view = &tab_layout->tab.current->view;
 
-          ce_layout_distribute_rect(tab_layout, app->terminal_rect);
-
-          ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
-                                app->config_options.tab_width);
+          ce_layout_distribute_rect(tab_layout, app->terminal_rect, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
+                                    app->config_options.tab_width);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1338,10 +1336,11 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
           return CE_COMMAND_FAILURE;
      }
 
-     CePoint_t cursor = {view_rect.left, view_rect.top};
-     if(view) cursor = view->cursor;
+     CePoint_t cursor = {0, 0};
+     if(view) cursor = view_cursor_on_screen(view, app->config_options.tab_width);
      ce_layout_delete(tab_layout, tab_layout->tab.current);
-     ce_layout_distribute_rect(tab_layout, app->terminal_rect);
+     ce_layout_distribute_rect(tab_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
+                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 
@@ -1720,7 +1719,8 @@ int main(int argc, char** argv){
           // TODO: we can optimize by only doing this at the start and when we see a resized event
           getmaxyx(stdscr, app.terminal_height, app.terminal_width);
           app.terminal_rect = (CeRect_t){0, app.terminal_width - 1, 0, app.terminal_height - 1};
-          ce_layout_distribute_rect(app.tab_list_layout, app.terminal_rect);
+          ce_layout_distribute_rect(app.tab_list_layout, app.terminal_rect, app.config_options.horizontal_scroll_off,
+                                    app.config_options.vertical_scroll_off, app.config_options.tab_width);
 
           // figure out our current view rect
           CeView_t* view = NULL;
