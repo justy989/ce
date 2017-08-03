@@ -2078,7 +2078,18 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
           }
      }
 
-     if(!ce_buffer_insert_string(view->buffer, yank->text, insertion_point)) return false;
+     char* insert_str = strdup(yank->text);
+
+     // if we are inserting at the end of a file, remove any newline at the end of the text
+     if(insertion_point.x == 0 && insertion_point.y == view->buffer->line_count){
+          int64_t insert_len = strlen(insert_str);
+          if(insert_len > 0){
+               int64_t last_index = insert_len - 1;
+               if(insert_str[last_index] == CE_NEWLINE) insert_str[last_index] = 0;
+          }
+     }
+
+     if(!ce_buffer_insert_string(view->buffer, insert_str, insertion_point)) return false;
 
      CePoint_t cursor_end;
      if(yank->line){
@@ -2092,7 +2103,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      change.chain = action->chain_undo;
      change.insertion = true;
      change.remove_line_if_empty = yank->line;
-     change.string = strdup(yank->text);
+     change.string = insert_str;
      change.location = insertion_point;
      change.cursor_before = view->cursor;
      change.cursor_after = cursor_end;

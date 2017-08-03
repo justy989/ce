@@ -610,13 +610,12 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
 
      if(!ce_buffer_point_is_valid(buffer, point)){
           if(buffer->line_count == 0 && ce_points_equal(point, (CePoint_t){0, 0})){
-               int64_t string_len = strlen(string);
-               buffer->lines = malloc(sizeof(*buffer->lines));
-               buffer->lines[0] = malloc(string_len + 1);
-               strcpy(buffer->lines[0], string);
-               buffer->lines[0][string_len] = 0;
-               buffer->line_count = 1;
-               return true;
+               int64_t line_count = ce_util_count_string_lines(string);
+               buffer_realloc_lines(buffer, line_count);
+          }else if(point.y == buffer->line_count && point.x == 0){
+               // allow inserting a string after a buffer by resizing
+               if(!buffer_realloc_lines(buffer, buffer->line_count + 1)) return false;
+               buffer->lines[point.y] = calloc(1, 1); // allocate an empty string
           }else{
                return false;
           }
@@ -737,12 +736,14 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                // perform a join with the next line
                int64_t next_line_index = point.y + 1;
                if(next_line_index > buffer->line_count) return false;
-               int64_t cur_line_len = strlen(buffer->lines[point.y]);
-               int64_t next_line_len = strlen(buffer->lines[next_line_index]);
-               int64_t new_line_len = next_line_len + cur_line_len;
-               buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
-               strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
-               buffer->lines[point.y][new_line_len] = 0;
+               if(next_line_index < buffer->line_count){
+                    int64_t cur_line_len = strlen(buffer->lines[point.y]);
+                    int64_t next_line_len = strlen(buffer->lines[next_line_index]);
+                    int64_t new_line_len = next_line_len + cur_line_len;
+                    buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
+                    strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
+                    buffer->lines[point.y][new_line_len] = 0;
+               }
                buffer->status = CE_BUFFER_STATUS_MODIFIED;
                return ce_buffer_remove_lines(buffer, next_line_index, 1);
           }else if(point.x == 0){
@@ -904,7 +905,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 
      // calculate how big of an array we need to allocate for the dupe
      int64_t current_line = point.y + 1;
-     if(current_line >= buffer->line_count) return NULL;
+     if(current_line >= buffer->line_count) return strdup("");
 
      while(true){
           int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
