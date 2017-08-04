@@ -2225,12 +2225,7 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeV
 
      while(!ce_point_after(motion_range.start, motion_range.end)){
           // dupe previous rune
-          int64_t rune_len = 0;
-          char* str = ce_utf8_find_index(view->buffer->lines[view->cursor.y], motion_range.start.x);
-          char* previous_string = malloc(5);
-          CeRune_t previous_rune = ce_utf8_decode(str, &rune_len);
-          ce_utf8_encode(previous_rune, previous_string, 5, &rune_len);
-          previous_string[rune_len] = 0;
+          char* previous_string = ce_buffer_dupe_string(view->buffer, motion_range.start, 1, true);
 
           // delete
           if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1, false)) return false; // NOTE: leak previous_string
@@ -2282,7 +2277,8 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
                       const CeConfigOptions_t* config_options){
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
      if(yank->text) free(yank->text);
-     int64_t yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
+     int64_t yank_len = 1;
+     yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len, action->yank_line);
      yank->line = action->yank_line;
      vim->mode = CE_VIM_MODE_NORMAL;

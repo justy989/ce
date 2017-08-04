@@ -762,6 +762,9 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
           }
 
           assert(!"we should never get here");
+     }else if(length == 1 && point.x == 0 && length_left_on_line == 0){
+          // emptry line
+          return ce_buffer_remove_lines(buffer, point.y, 1);
      }
 
      if(length_left_on_line > length){
@@ -902,6 +905,9 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
           }
 
           return strndup(start, real_length);
+     }else if(buffer_utf8_length == 0 && length == 1){
+          // empty line
+          return strdup("\n");
      }
 
      real_length++; // account for newline
