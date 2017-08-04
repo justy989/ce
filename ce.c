@@ -1034,13 +1034,14 @@ bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor){
      *cursor = change->cursor_before;
      buffer->change_node = buffer->change_node->prev;
 
-     if(change->chain) return ce_buffer_undo(buffer, cursor);
+     bool success = true;
+     if(change->chain) success = ce_buffer_undo(buffer, cursor);
 
      if(buffer->status == CE_BUFFER_STATUS_MODIFIED && buffer->change_node == buffer->save_at_change_node){
           buffer->status = CE_BUFFER_STATUS_NONE;
      }
 
-     return true;
+     return success;
 }
 
 bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){

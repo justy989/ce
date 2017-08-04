@@ -447,22 +447,25 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
           return insert_mode_handle_key(vim, view, key, config_options);
      case CE_VIM_MODE_REPLACE:
           if(key != CE_NEWLINE && key != 27){ // escape
-               int64_t remove_len = 1;
-               char* removed_string = ce_buffer_dupe_string(view->buffer, view->cursor, remove_len, false);
+               int64_t last_index = ce_utf8_last_index(view->buffer->lines[view->cursor.y]);
+               if(view->cursor.x < last_index){
+                    int64_t remove_len = 1;
+                    char* removed_string = ce_buffer_dupe_string(view->buffer, view->cursor, remove_len, false);
 
-               if(ce_buffer_remove_string(view->buffer, view->cursor, remove_len, false)){
-                    // TODO: convenience function
-                    CeBufferChange_t change = {};
-                    change.chain = vim->chain_undo;
-                    change.insertion = false;
-                    change.remove_line_if_empty = false;
-                    change.string = removed_string;
-                    change.location = view->cursor;
-                    change.cursor_before = view->cursor;
-                    change.cursor_after = view->cursor;
-                    ce_buffer_change(view->buffer, &change);
+                    if(ce_buffer_remove_string(view->buffer, view->cursor, remove_len, false)){
+                         // TODO: convenience function
+                         CeBufferChange_t change = {};
+                         change.chain = vim->chain_undo;
+                         change.insertion = false;
+                         change.remove_line_if_empty = false;
+                         change.string = removed_string;
+                         change.location = view->cursor;
+                         change.cursor_before = view->cursor;
+                         change.cursor_after = view->cursor;
+                         ce_buffer_change(view->buffer, &change);
 
-                    vim->chain_undo = true;
+                         vim->chain_undo = true;
+                   }
               }
           }
 
@@ -485,14 +488,15 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                ce_vim_apply_action(vim, &action, view, config_options);
                vim->current_command[0] = 0;
 
-               if((action.verb.function != ce_vim_verb_motion &&
+               if(!vim->verb_last_action &&
+                  ((action.verb.function != ce_vim_verb_motion &&
                    action.verb.function != ce_vim_verb_yank &&
                    action.verb.function != ce_vim_verb_last_action &&
                    action.verb.function != ce_vim_verb_undo &&
                    action.verb.function != ce_vim_verb_redo &&
                    action.verb.function != ce_vim_verb_normal_mode &&
                    action.verb.function != ce_vim_verb_visual_mode) ||
-                  vim->mode == CE_VIM_MODE_INSERT){
+                  vim->mode == CE_VIM_MODE_INSERT)){
                     vim->last_action = action;
                }
           }else if(result == CE_VIM_PARSE_INVALID ||
@@ -2512,13 +2516,15 @@ bool ce_vim_verb_append_at_end_of_line(CeVim_t* vim, const CeVimAction_t* action
 
 bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                              const CeConfigOptions_t* config_options){
+     CeBufferChangeNode_t* change_node = view->buffer->change_node;
+
      vim->verb_last_action = true;
      if(!ce_vim_apply_action(vim, &vim->last_action, view, config_options)){
           vim->verb_last_action = false;
           return false;
      }
 
-     view->buffer->change_node->change.chain = false;
+     if(change_node->next) change_node->next->change.chain = false;
 
      if(vim->insert_rune_head){
           CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
@@ -2574,8 +2580,11 @@ bool ce_vim_verb_g_command(CeVim_t* vim, const CeVimAction_t* action, CeVimMotio
 
 bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options){
+     bool chain = false;
      ce_vim_motion_range_sort(&motion_range);
      for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
+          if(view->buffer->lines[i][0] == 0) continue;
+
           // calc indentation
           CePoint_t indentation_point = {0, i};
 
@@ -2584,13 +2593,12 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           memset(insert_string, ' ', config_options->tab_width);
           insert_string[config_options->tab_width] = 0;
 
-          // TODO: ignore empty lines
           // insert indentation
           if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
           // commit the change
           CeBufferChange_t change = {};
-          change.chain = true;
+          change.chain = chain;
           change.insertion = true;
           change.remove_line_if_empty = false;
           change.string = insert_string;
@@ -2598,8 +2606,10 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           change.cursor_before = view->cursor;
           change.cursor_after = view->cursor;
           ce_buffer_change(view->buffer, &change);
+          chain = true;
      }
 
+     vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }
 
@@ -2636,6 +2646,7 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
           }
      }
 
+     vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }
 
