@@ -843,6 +843,9 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
           buffer->lines[point.y] = realloc(buffer->lines[point.y], new_len + 1);
           memcpy(buffer->lines[point.y] + point.x, end_to_join, join_len);
           buffer->lines[point.y][new_len] = 0;
+     }else{
+          // if we aren't doing a join, then start with deleting the first line
+          save_current_line--;
      }
 
      // remove the intermediate lines

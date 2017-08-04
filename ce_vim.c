@@ -260,7 +260,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                     }
                     insert_string[insert_len] = 0;
 
-                    CePoint_t new_cursor = ce_buffer_advance_point(view->buffer, view->cursor, insert_len);
+                    CePoint_t new_cursor = {view->cursor.x + insert_len, view->cursor.y};
 
                     if(!ce_buffer_insert_string(view->buffer, insert_string, view->cursor)) break;
 
