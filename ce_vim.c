@@ -473,6 +473,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
      case CE_VIM_MODE_NORMAL:
      case CE_VIM_MODE_VISUAL:
      case CE_VIM_MODE_VISUAL_LINE:
+     case CE_VIM_MODE_VISUAL_BLOCK:
      {
           CeVimAction_t action = {};
 
@@ -553,7 +554,8 @@ VIM_PARSE_CONTINUE:
 
      // parse multiplier
      if(result != CE_VIM_PARSE_COMPLETE){
-          if(vim_mode == CE_VIM_MODE_VISUAL || vim_mode == CE_VIM_MODE_VISUAL_LINE){
+          if(vim_mode == CE_VIM_MODE_VISUAL || vim_mode == CE_VIM_MODE_VISUAL_LINE ||
+             vim_mode == CE_VIM_MODE_VISUAL_BLOCK){
                build_action.motion.function = &ce_vim_motion_visual;
                result = CE_VIM_PARSE_COMPLETE;
           }else{
@@ -591,6 +593,37 @@ VIM_PARSE_CONTINUE:
 }
 
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options){
+     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK &&
+        action->verb.function != ce_vim_verb_motion){
+          int64_t first_line = 0;
+          int64_t last_line = 0;
+          if(vim->visual.y < view->cursor.y){
+               first_line = vim->visual.y;
+               last_line = view->cursor.y;
+          }else{
+               last_line = vim->visual.y;
+               first_line = view->cursor.y;
+          }
+
+          int64_t first_index = 0;
+          int64_t last_index = 0;
+          if(vim->visual.x < view->cursor.x){
+               first_index = vim->visual.x;
+               last_index = view->cursor.x;
+          }else{
+               last_index = vim->visual.x;
+               first_index = view->cursor.x;
+          }
+
+          for(int64_t i = first_line; i <= last_line; i++){
+               //TODO: build motion ranges and run verb
+               CeVimMotionRange_t motion_range = {(CePoint_t){first_index, i}, (CePoint_t){last_index, i}};
+               if(!action->verb.function(vim, action, motion_range, view, config_options)){
+                    return false;
+               }
+          }
+          return true;
+     }
      CeVimMotionRange_t motion_range = {view->cursor, view->cursor};
      if(action->motion.function){
           int64_t total_multiplier = action->multiplier * action->motion.multiplier;
@@ -2573,6 +2606,10 @@ bool ce_vim_verb_g_command(CeVim_t* vim, const CeVimAction_t* action, CeVimMotio
      case 'g':
           motion_range.end = (CePoint_t){0, 0};
           return ce_vim_verb_motion(vim, action, motion_range, view, config_options);
+     case 'v':
+          vim->visual = view->cursor;
+          vim->mode = CE_VIM_MODE_VISUAL_BLOCK;
+          break;
      }
 
      return false;
