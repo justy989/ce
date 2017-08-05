@@ -595,6 +595,7 @@ VIM_PARSE_CONTINUE:
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, const CeConfigOptions_t* config_options){
      if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK &&
         action->verb.function != ce_vim_verb_motion){
+          // sort y
           int64_t first_line = 0;
           int64_t last_line = 0;
           if(vim->visual.y < view->cursor.y){
@@ -605,6 +606,7 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, co
                first_line = view->cursor.y;
           }
 
+          // sort x
           int64_t first_index = 0;
           int64_t last_index = 0;
           if(vim->visual.x < view->cursor.x){
@@ -615,14 +617,18 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, co
                first_index = view->cursor.x;
           }
 
+          // run verb for each line in range
+          bool success = true;
           for(int64_t i = first_line; i <= last_line; i++){
-               //TODO: build motion ranges and run verb
                CeVimMotionRange_t motion_range = {(CePoint_t){first_index, i}, (CePoint_t){last_index, i}};
                if(!action->verb.function(vim, action, motion_range, view, config_options)){
-                    return false;
+                    success = false;
+               }else if(i != first_line){
+                    view->buffer->change_node->change.chain = true;
                }
           }
-          return true;
+
+          return success;
      }
      CeVimMotionRange_t motion_range = {view->cursor, view->cursor};
      if(action->motion.function){
