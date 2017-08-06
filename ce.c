@@ -730,7 +730,7 @@ bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point){
      return ce_buffer_insert_string(buffer, str, point);
 }
 
-bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool remove_line_if_empty){
+bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length){
      if(buffer->status == CE_BUFFER_STATUS_READONLY) return false;
      if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
@@ -797,8 +797,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
           buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return true;
      }else if(length_left_on_line == length){
-          // case: cut the line, keeping only the left side
-          if(point.x == 0 && remove_line_if_empty){
+          if(point.x == 0){
                // remove the empty line from the buffer lines
                char** dst_line = buffer->lines + point.y;
                char** src_line = dst_line + 1;
@@ -808,14 +807,24 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                if(!buffer_realloc_lines(buffer, buffer->line_count - 1)){
                     return false;
                }
-          }else{
-               // re-alloc for just the first part of the line, even if it is 0 len
-               buffer->lines[point.y] = realloc(buffer->lines[point.y], point.x + 1);
-               buffer->lines[point.y][point.x] = 0;
+
+               buffer->status = CE_BUFFER_STATUS_MODIFIED;
+               return true;
           }
 
+          // perform a join with the next line
+          int64_t next_line_index = point.y + 1;
+          if(next_line_index > buffer->line_count) return false;
+          if(next_line_index < buffer->line_count){
+               int64_t cur_line_len = strlen(buffer->lines[point.y]);
+               int64_t next_line_len = strlen(buffer->lines[next_line_index]);
+               int64_t new_line_len = next_line_len + cur_line_len;
+               buffer->lines[point.y] = realloc(buffer->lines[point.y], new_line_len + 1);
+               strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
+               buffer->lines[point.y][new_line_len] = 0;
+          }
           buffer->status = CE_BUFFER_STATUS_MODIFIED;
-          return true;
+          return ce_buffer_remove_lines(buffer, next_line_index, 1);
      }
 
      // case: cut the end of the initial line, N lines in the middle and N leftover characters in the final
@@ -886,35 +895,25 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
      return buffer->lines != NULL;
 }
 
-char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length, bool newline_if_entire_line){
+char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length){
      if(!ce_buffer_point_is_valid(buffer, point)) return NULL;
 
      char* start = ce_utf8_find_index(buffer->lines[point.y], point.x);
      // NOTE: would a function that returns both utf8 len and byte len be helpful here?
-     int64_t buffer_utf8_length = ce_utf8_strlen(start);
-     int64_t real_length = strlen(start);
+     int64_t buffer_utf8_length = ce_utf8_strlen(start) + 1;
+     int64_t real_length = strlen(start) + 1;
 
      // exit early if the whole string is just on this line
      if(buffer_utf8_length > length){
           char* end = ce_utf8_find_index(start, length);
           return strndup(start, end - start);
      }else if(buffer_utf8_length == length){
-          if(newline_if_entire_line){
-               // copy the entire line, with a newline at the end
-               char* line = malloc(real_length + 2);
-               strncpy(line, start, real_length);
-               line[real_length] = CE_NEWLINE;
-               line[real_length + 1] = 0;
-               return line;
-          }
-
-          return strndup(start, real_length);
-     }else if(buffer_utf8_length == 0 && length == 1){
-          // empty line
-          return strdup("\n");
+          char* new_string = malloc(real_length + 1);
+          strncpy(new_string, start, real_length - 1);
+          new_string[real_length - 1] = CE_NEWLINE;
+          new_string[real_length] = 0;
+          return new_string;
      }
-
-     real_length++; // account for newline
 
      // calculate how big of an array we need to allocate for the dupe
      int64_t current_line = point.y + 1;
@@ -923,12 +922,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
      if(current_line >= buffer->line_count) return strdup("");
 
      while(true){
-          bool accounted_for_newline = false;
-          int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
-          if(line_utf8_length == 0){
-               line_utf8_length = 1; // treat empty lines as taking up 1 character, which accounts for the newline character
-               accounted_for_newline = true;
-          }
+          int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]) + 1;
           buffer_utf8_length += line_utf8_length;
           if(buffer_utf8_length > length){
                int64_t diff = buffer_utf8_length - length;
@@ -937,14 +931,10 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
                break;
           }
 
-          real_length += strlen(buffer->lines[current_line]);
-          if(buffer_utf8_length == length){
-               if(newline_if_entire_line && !accounted_for_newline) real_length++;
-               break;
-          }
-          if(!accounted_for_newline) real_length++;
+          real_length += strlen(buffer->lines[current_line]) + 1;
+          if(buffer_utf8_length == length) break;
           current_line++;
-          if(current_line > buffer->line_count) return NULL; // not enough length in the buffer
+          if(current_line >= buffer->line_count) return NULL; // not enough length in the buffer
      }
 
      // alloc
@@ -964,7 +954,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 
           // loop over each line again from the beginning
           current_line = point.y + 1;
-          while(true){
+          while(copy_length < real_length){
                int64_t line_length = strlen(buffer->lines[current_line]);
                copy_length += line_length;
 
@@ -983,11 +973,8 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
                *itr = CE_NEWLINE;
                itr++;
                copy_length++;
-               if(copy_length >= real_length) break;
                current_line++;
           }
-
-          if(dupe[real_length - 1] == CE_NEWLINE && !newline_if_entire_line) dupe[real_length - 1] = 0;
      }
 
      dupe[real_length] = 0;
@@ -1000,7 +987,7 @@ char* ce_buffer_dupe(CeBuffer_t* buffer){
      if(end.y) end.y--;
      end.x = ce_utf8_last_index(buffer->lines[end.y]);
      int64_t len = ce_buffer_range_len(buffer, start, end);
-     if(len > 0) return ce_buffer_dupe_string(buffer, start, len, false);
+     if(len > 0) return ce_buffer_dupe_string(buffer, start, len);
      return NULL;
 }
 
@@ -1034,7 +1021,7 @@ bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor){
 
      CeBufferChange_t* change = &buffer->change_node->change;
      if(change->insertion){
-          ce_buffer_remove_string(buffer, change->location, ce_utf8_insertion_strlen(change->string), change->remove_line_if_empty);
+          ce_buffer_remove_string(buffer, change->location, ce_utf8_insertion_strlen(change->string));
      }else{
           ce_buffer_insert_string(buffer, change->string, change->location);
      }
@@ -1063,7 +1050,7 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
      if(change->insertion){
           ce_buffer_insert_string(buffer, change->string, change->location);
      }else{
-          ce_buffer_remove_string(buffer, change->location, ce_utf8_insertion_strlen(change->string), change->remove_line_if_empty);
+          ce_buffer_remove_string(buffer, change->location, ce_utf8_insertion_strlen(change->string));
      }
 
      *cursor = change->cursor_after;

@@ -230,6 +230,7 @@ TEST(buffer_insert_string_on_empty_line){
      ce_buffer_free(&buffer);
 }
 
+#if 0
 TEST(buffer_remove_string_partial_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
@@ -394,6 +395,127 @@ TEST(buffer_dupe_entire_buffer){
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 31, false);
      EXPECT(strcmp(dupe, g_multiline_string) == 0);
+}
+#endif
+
+TEST(buffer_dupe_string_portion_of_line){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){3, 0}, 5);
+     EXPECT(strcmp(dupe, "34567") == 0);
+}
+
+TEST(buffer_dupe_string_entire_line){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 10);
+     EXPECT(strcmp(dupe, "0123456789") == 0);
+}
+
+TEST(buffer_dupe_string_entire_line_plus_newline){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 11);
+     EXPECT(strcmp(dupe, "0123456789\n") == 0);
+}
+
+TEST(buffer_dupe_string_entire_line_multiple){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 21);
+     EXPECT(strcmp(dupe, "0123456789\nabcdefghij") == 0);
+}
+
+TEST(buffer_dupe_string_entire_line_multiple_plus_newline){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 22);
+     EXPECT(strcmp(dupe, "0123456789\nabcdefghij\n") == 0);
+}
+
+TEST(buffer_dupe_string_across_line){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 10);
+     EXPECT(strcmp(dupe, "56789\nabcd") == 0);
+}
+
+TEST(buffer_dupe_string_across_multiplie_line){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 20);
+     EXPECT(strcmp(dupe, "56789\nabcdefghij\nklm") == 0);
+}
+
+TEST(buffer_dupe_string_blank_line){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 1}, 1);
+     EXPECT(strcmp(dupe, "\n") == 0);
+}
+
+TEST(buffer_dupe_string_blank_line_plus){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 1}, 5);
+     EXPECT(strcmp(dupe, "\nabcd") == 0);
+}
+
+TEST(buffer_dupe_string_blank_line_included){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 7);
+     EXPECT(strcmp(dupe, "56789\n\n") == 0);
+}
+
+TEST(buffer_dupe_string_blank_line_in_middle){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 10);
+     EXPECT(strcmp(dupe, "56789\n\nabc") == 0);
+}
+
+TEST(buffer_dupe_string_entire_buffer){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 33);
+     EXPECT(strcmp(dupe, "0123456789\n\nabcdefghij\nklmnopqrst") == 0);
+}
+
+TEST(buffer_dupe_string_entire_buffer_plus_newline){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 34);
+     EXPECT(strcmp(dupe, "0123456789\n\nabcdefghij\nklmnopqrst\n") == 0);
+}
+
+TEST(buffer_dupe_string_outside){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 5}, 10);
+     EXPECT(dupe == NULL);
+}
+
+TEST(buffer_dupe_string_too_long){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
+     ce_buffer_load_string(&buffer, string, g_name);
+     char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 50);
+     EXPECT(dupe == NULL);
 }
 
 TEST(view_follow_cursor){
