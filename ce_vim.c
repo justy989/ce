@@ -1022,7 +1022,7 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
                break;
           case WORD_INSIDE_SPACE:
                if(is_little_word_character(rune)) state = WORD_INSIDE_WORD;
-               else if(!isspace(rune)) goto END_LOOP;
+               else if(!isspace(rune)) state = WORD_INSIDE_OTHER;;
                break;
           case WORD_INSIDE_OTHER:
                if(isspace(rune)) goto END_LOOP;
@@ -1037,7 +1037,7 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
           itr -= rune_len;
           start.x--;
 
-          if(itr <= line_start){
+          if(itr < line_start){
                if(state == WORD_INSIDE_WORD || state == WORD_INSIDE_OTHER) break;
 
                start.y--;
@@ -1107,7 +1107,7 @@ CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start){
           itr -= rune_len;
           start.x--;
 
-          if(itr <= line_start){
+          if(itr < line_start){
                if(state == WORD_INSIDE_WORD) break;
 
                start.y--;
@@ -2215,10 +2215,14 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      }
 
      // delete the range
-     if(do_not_include_end) motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
+     bool yank_line = action->yank_line;
+     if(do_not_include_end){
+          motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
+          if(motion_range.end.x == ce_utf8_strlen(view->buffer->lines[motion_range.end.y])) yank_line = true;
+     }
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len, action->yank_line);
-     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, action->yank_line)){
+     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len, yank_line);
+     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, yank_line)){
           free(removed_string);
           return false;
      }
@@ -2227,7 +2231,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
      change.insertion = false;
-     change.remove_line_if_empty = action->yank_line;
+     change.remove_line_if_empty = yank_line;
      change.string = removed_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -2241,7 +2245,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
      if(yank->text) free(yank->text);
      yank->text = strdup(removed_string);
-     yank->line = action->yank_line;
+     yank->line = yank_line;
      return true;
 }
 

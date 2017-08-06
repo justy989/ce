@@ -541,7 +541,11 @@ CePoint_t ce_buffer_advance_point(CeBuffer_t* buffer, CePoint_t point, int64_t d
                     }
 
                     // move to the previous line, add to the delta
-                    delta += point.x;
+                    if(point.x == 0){
+                         delta += 1;
+                    }else{
+                         delta += point.x;
+                    }
                     point.y = new_line;
                     point.x = ce_utf8_strlen(buffer->lines[point.y]);
                }else{
@@ -919,8 +923,12 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
      if(current_line >= buffer->line_count) return strdup("");
 
      while(true){
+          bool accounted_for_newline = false;
           int64_t line_utf8_length = ce_utf8_strlen(buffer->lines[current_line]);
-          if(line_utf8_length == 0) line_utf8_length = 1; // treat empty lines as taking up 1 character
+          if(line_utf8_length == 0){
+               line_utf8_length = 1; // treat empty lines as taking up 1 character, which accounts for the newline character
+               accounted_for_newline = true;
+          }
           buffer_utf8_length += line_utf8_length;
           if(buffer_utf8_length > length){
                int64_t diff = buffer_utf8_length - length;
@@ -931,10 +939,10 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length,
 
           real_length += strlen(buffer->lines[current_line]);
           if(buffer_utf8_length == length){
-               if(newline_if_entire_line) real_length++; // account for newline
+               if(newline_if_entire_line && !accounted_for_newline) real_length++;
                break;
           }
-          real_length++; // account for newline
+          if(!accounted_for_newline) real_length++;
           current_line++;
           if(current_line > buffer->line_count) return NULL; // not enough length in the buffer
      }
