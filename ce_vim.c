@@ -184,7 +184,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                     CeBufferChange_t change = {};
                     change.chain = vim->chain_undo;
                     change.insertion = true;
-                    change.remove_line_if_empty = (key == CE_NEWLINE);
                     change.string = strdup(str);
                     change.location = view->cursor;
                     change.cursor_before = view->cursor;
@@ -213,7 +212,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                               // commit the change
                               change.chain = true;
                               change.insertion = true;
-                              change.remove_line_if_empty = false;
                               change.string = insert_string;
                               change.location = indentation_point;
                               change.cursor_before = view->cursor;
@@ -227,11 +225,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                          CePoint_t remove_loc = {0, save_cursor.y};
                          if(string_is_whitespace(view->buffer->lines[save_cursor.y])){
                               int64_t remove_len = strlen(view->buffer->lines[save_cursor.y]);
-                              char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len, false);
-                              if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len, false)){
+                              char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len);
+                              if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len)){
                                    change.chain = true;
                                    change.insertion = false;
-                                   change.remove_line_if_empty = false;
                                    change.string = remove_string;
                                    change.location = remove_loc;
                                    change.cursor_before = view->cursor;
@@ -262,7 +259,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                CeBufferChange_t change = {};
                change.chain = vim->chain_undo;
                change.insertion = true;
-               change.remove_line_if_empty = false;
                change.string = insert_string;
                change.location = view->cursor;
                change.cursor_before = view->cursor;
@@ -280,12 +276,11 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
          if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
                int64_t remove_len = strlen(view->buffer->lines[view->cursor.y]);
                CePoint_t remove_loc = {0, view->cursor.y};
-               char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len, false);
-               if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len, false)){
+               char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len);
+               if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len)){
                     CeBufferChange_t change = {};
                     change.chain = true;
                     change.insertion = false;
-                    change.remove_line_if_empty = false;
                     change.string = remove_string;
                     change.location = remove_loc;
                     change.cursor_before = view->cursor;
@@ -315,7 +310,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                CeBufferChange_t change = {};
                change.chain = true;
                change.insertion = true;
-               change.remove_line_if_empty = false;
                change.string = insert_string;
                change.location = indentation_point;
                change.cursor_before = view->cursor;
@@ -334,7 +328,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           CeBufferChange_t change = {};
           change.chain = vim->chain_undo;
           change.insertion = true;
-          change.remove_line_if_empty = (key == CE_NEWLINE);
           change.string = strdup(str);
           change.location = view->cursor;
           change.cursor_before = view->cursor;
@@ -359,14 +352,13 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                }else{
                     remove_point = ce_buffer_advance_point(view->buffer, view->cursor, -1);
                     end_cursor = remove_point;
-                    removed_string = ce_buffer_dupe_string(view->buffer, remove_point, remove_len, false);
+                    removed_string = ce_buffer_dupe_string(view->buffer, remove_point, remove_len);
 
-                    if(ce_buffer_remove_string(view->buffer, remove_point, remove_len, false)){
+                    if(ce_buffer_remove_string(view->buffer, remove_point, remove_len)){
                          // TODO: convenience function
                          CeBufferChange_t change = {};
                          change.chain = vim->chain_undo;
                          change.insertion = false;
-                         change.remove_line_if_empty = false;
                          change.string = removed_string;
                          change.location = remove_point;
                          change.cursor_before = view->cursor;
@@ -414,12 +406,11 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           CePoint_t remove_loc = {0, view->cursor.y};
           if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
                int64_t remove_len = strlen(view->buffer->lines[view->cursor.y]);
-               char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len, false);
-               if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len, false)){
+               char* remove_string = ce_buffer_dupe_string(view->buffer, remove_loc, remove_len);
+               if(ce_buffer_remove_string(view->buffer, remove_loc, remove_len)){
                     CeBufferChange_t change = {};
                     change.chain = true;
                     change.insertion = false;
-                    change.remove_line_if_empty = false;
                     change.string = remove_string;
                     change.location = remove_loc;
                     change.cursor_before = view->cursor;
@@ -486,14 +477,13 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                int64_t last_index = ce_utf8_last_index(view->buffer->lines[view->cursor.y]);
                if(view->cursor.x < last_index){
                     int64_t remove_len = 1;
-                    char* removed_string = ce_buffer_dupe_string(view->buffer, view->cursor, remove_len, false);
+                    char* removed_string = ce_buffer_dupe_string(view->buffer, view->cursor, remove_len);
 
-                    if(ce_buffer_remove_string(view->buffer, view->cursor, remove_len, false)){
+                    if(ce_buffer_remove_string(view->buffer, view->cursor, remove_len)){
                          // TODO: convenience function
                          CeBufferChange_t change = {};
                          change.chain = vim->chain_undo;
                          change.insertion = false;
-                         change.remove_line_if_empty = false;
                          change.string = removed_string;
                          change.location = view->cursor;
                          change.cursor_before = view->cursor;
@@ -1351,13 +1341,12 @@ int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_
 
 bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, bool chain_undo){
      CePoint_t point = {ce_utf8_strlen(buffer->lines[line]), line};
-     if(!ce_buffer_remove_string(buffer, point, 0, false)) return false;
+     if(!ce_buffer_remove_string(buffer, point, 1)) return false;
      CePoint_t after_point = ce_buffer_advance_point(buffer, point, 1);
 
      CeBufferChange_t change = {};
      change.chain = chain_undo;
      change.insertion = false;
-     change.remove_line_if_empty = false;
      change.string = strdup("\n");
      change.location = point;
      change.cursor_before = cursor;
@@ -1950,7 +1939,7 @@ bool ce_vim_motion_visual(CeVim_t* vim, CeVimAction_t* action, const CeView_t* v
 
           if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
                motion_range->start.x = 0;;
-               motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+               motion_range->end.x = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
                action->yank_line = true;
                action->motion.integer = motion_range->end.y - motion_range->start.y;
           }
@@ -2138,7 +2127,7 @@ static void search_word(CeVim_t* vim, CeVimAction_t* action, const CeView_t* vie
      free(yank->text);
      *motion_range = ce_vim_find_pair(view->buffer, view->cursor, 'w', true);
      int64_t word_len = ce_buffer_range_len(view->buffer, motion_range->start, motion_range->end);
-     char* word = ce_buffer_dupe_string(view->buffer, motion_range->start, word_len, false);
+     char* word = ce_buffer_dupe_string(view->buffer, motion_range->start, word_len);
      int64_t search_len = word_len + 4;
      yank->text = malloc(search_len + 1);
      snprintf(yank->text, search_len + 1, "\\b%s\\b", word); // TODO: this doesn't work on other platforms like macos
@@ -2221,8 +2210,8 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           if(motion_range.end.x == ce_utf8_strlen(view->buffer->lines[motion_range.end.y])) yank_line = true;
      }
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len, yank_line);
-     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, yank_line)){
+     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
+     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len)){
           free(removed_string);
           return false;
      }
@@ -2231,7 +2220,6 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
      change.insertion = false;
-     change.remove_line_if_empty = yank_line;
      change.string = removed_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -2272,13 +2260,12 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
           previous_string[rune_len] = 0;
 
           // delete
-          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1, false)) return false; // NOTE: leak previous_string
+          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1)) return false; // NOTE: leak previous_string
 
           // commit the deletion
           CeBufferChange_t change = {};
           change.chain = false;
           change.insertion = false;
-          change.remove_line_if_empty = false;
           change.string = previous_string;
           change.location = view->cursor;
           change.cursor_before = view->cursor;
@@ -2296,7 +2283,6 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
           // commit the insertion
           change.chain = true;
           change.insertion = true;
-          change.remove_line_if_empty = true;
           change.string = current_string;
           change.location = view->cursor;
           change.cursor_before = view->cursor;
@@ -2318,16 +2304,15 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeV
 
      while(!ce_point_after(motion_range.start, motion_range.end)){
           // dupe previous rune
-          char* previous_string = ce_buffer_dupe_string(view->buffer, motion_range.start, 1, true);
+          char* previous_string = ce_buffer_dupe_string(view->buffer, motion_range.start, 1);
 
           // delete
-          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1, false)) return false; // NOTE: leak previous_string
+          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1)) return false; // NOTE: leak previous_string
 
           // commit the deletion
           CeBufferChange_t change = {};
           change.chain = false;
           change.insertion = false;
-          change.remove_line_if_empty = false;
           change.string = previous_string;
           change.location = view->cursor;
           change.cursor_before = view->cursor;
@@ -2372,7 +2357,7 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
      if(yank->text) free(yank->text);
      int64_t yank_len = 1;
      yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len, action->yank_line);
+     yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
      yank->line = action->yank_line;
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
@@ -2421,7 +2406,6 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
      change.insertion = true;
-     change.remove_line_if_empty = yank->line;
      change.string = insert_str;
      change.location = insertion_point;
      change.cursor_before = view->cursor;
@@ -2455,7 +2439,6 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
      change.insertion = true;
-     change.remove_line_if_empty = true;
      change.string = insert_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -2481,7 +2464,6 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
           // commit the change
           change.chain = true;
           change.insertion = true;
-          change.remove_line_if_empty = false;
           change.string = insert_string;
           change.location = indentation_point;
           change.cursor_before = view->cursor;
@@ -2506,7 +2488,6 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      CeBufferChange_t change = {};
      change.chain = false;
      change.insertion = true;
-     change.remove_line_if_empty = false;
      change.string = insert_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -2531,7 +2512,6 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
           // commit the change
           change.chain = true;
           change.insertion = true;
-          change.remove_line_if_empty = false;
           change.string = insert_string;
           change.location = indentation_point;
           change.cursor_before = view->cursor;
@@ -2695,7 +2675,6 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           CeBufferChange_t change = {};
           change.chain = chain;
           change.insertion = true;
-          change.remove_line_if_empty = false;
           change.string = insert_string;
           change.location = indentation_point;
           change.cursor_before = view->cursor;
@@ -2723,13 +2702,12 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
 
           if(strncmp(view->buffer->lines[i], remove_string, config_options->tab_width) == 0){
                // insert indentation
-               if(!ce_buffer_remove_string(view->buffer, indentation_point, config_options->tab_width, false)) return false;
+               if(!ce_buffer_remove_string(view->buffer, indentation_point, config_options->tab_width)) return false;
 
                // commit the change
                CeBufferChange_t change = {};
                change.chain = chain;
                change.insertion = false;
-               change.remove_line_if_empty = false;
                change.string = remove_string;
                change.location = indentation_point;
                change.cursor_before = view->cursor;
@@ -2756,12 +2734,11 @@ bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
      CePoint_t beginning_of_next_line = {0, view->cursor.y + 1};
      int64_t whitespace_len = ce_vim_soft_begin_line(view->buffer, beginning_of_next_line.y);
      if(whitespace_len > 0){
-          char* whitespace_str = ce_buffer_dupe_string(view->buffer, beginning_of_next_line, whitespace_len, false);
-          if(!ce_buffer_remove_string(view->buffer, beginning_of_next_line, whitespace_len, false)) return false;
+          char* whitespace_str = ce_buffer_dupe_string(view->buffer, beginning_of_next_line, whitespace_len);
+          if(!ce_buffer_remove_string(view->buffer, beginning_of_next_line, whitespace_len)) return false;
 
           change.chain = false;
           change.insertion = false;
-          change.remove_line_if_empty = false;
           change.string = whitespace_str;
           change.location = beginning_of_next_line;
           change.cursor_before = view->cursor;
@@ -2779,7 +2756,6 @@ bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
 
           change.chain = true;
           change.insertion = true;
-          change.remove_line_if_empty = false;
           change.string = space_str;
           change.location = point;
           change.cursor_before = view->cursor;

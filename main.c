@@ -266,8 +266,8 @@ bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVim
      // delete the range
      if(do_not_include_end) motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len, action->yank_line);
-     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len, action->yank_line)){
+     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
+     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len)){
           free(removed_string);
           return false;
      }
@@ -276,7 +276,6 @@ bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVim
      CeBufferChange_t change = {};
      change.chain = false;
      change.insertion = false;
-     change.remove_line_if_empty = action->yank_line;
      change.string = removed_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
@@ -291,7 +290,6 @@ bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVim
      // commit the change
      change.chain = true;
      change.insertion = true;
-     change.remove_line_if_empty = true;
      change.string = strdup(yank->text);
      change.location = motion_range.start;
      change.cursor_before = view->cursor;

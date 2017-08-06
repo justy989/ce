@@ -4,7 +4,8 @@
 #include <string.h>
 #include <locale.h>
 
-const char* g_multiline_string = "first line\nsecond line\nthird line";
+const char* g_multiline_string = "0123456789\nabcdefghij\nklmnopqrst";
+const char* g_multiline_string_with_empty_line = "0123456789\n\nabcdefghij\nklmnopqrst";
 const char* g_name = "test.txt";
 
 TEST(buffer_alloc_and_free){
@@ -30,9 +31,9 @@ TEST(buffer_load_string){
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 3);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "second line") == 0);
-     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "abcdefghij") == 0);
+     EXPECT(strcmp(buffer.lines[2], "klmnopqrst") == 0);
 
      ce_buffer_free(&buffer);
 }
@@ -74,14 +75,14 @@ TEST(buffer_range_len_two_lines){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
 
-     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){3, 0}, (CePoint_t){5, 1}) == 13);
+     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){3, 0}, (CePoint_t){5, 1}) == 14);
 }
 
 TEST(buffer_range_len_three_lines){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
 
-     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){3, 0}, (CePoint_t){5, 2}) == 24);
+     EXPECT(ce_buffer_range_len(&buffer, (CePoint_t){3, 0}, (CePoint_t){5, 2}) == 25);
 }
 
 TEST(buffer_line_len){
@@ -89,7 +90,7 @@ TEST(buffer_line_len){
      EXPECT(ce_buffer_load_string(&buffer, g_multiline_string, g_name));
 
      EXPECT(ce_buffer_line_len(&buffer, 0) == 10);
-     EXPECT(ce_buffer_line_len(&buffer, 1) == 11);
+     EXPECT(ce_buffer_line_len(&buffer, 1) == 10);
      EXPECT(ce_buffer_line_len(&buffer, 2) == 10);
      EXPECT(ce_buffer_line_len(&buffer, 3) == -1);
 
@@ -138,14 +139,14 @@ TEST(buffer_contains_point){
 TEST(buffer_insert_string_one_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     const char* string = "simple";
+     const char* string = "taco";
      ce_buffer_insert_string(&buffer, string, (CePoint_t){2, 1});
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 3);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "sesimplecond line") == 0);
-     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "abtacocdefghij") == 0);
+     EXPECT(strcmp(buffer.lines[2], "klmnopqrst") == 0);
 
      ce_buffer_free(&buffer);
 }
@@ -153,15 +154,15 @@ TEST(buffer_insert_string_one_line){
 TEST(buffer_insert_string_two_lines){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     const char* string = "inserted first line\ninserted second line";
+     const char* string = "taco\ncat";
      ce_buffer_insert_string(&buffer, string, (CePoint_t){6, 0});
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 4);
-     EXPECT(strcmp(buffer.lines[0], "first inserted first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "inserted second lineline") == 0);
-     EXPECT(strcmp(buffer.lines[2], "second line") == 0);
-     EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "012345taco") == 0);
+     EXPECT(strcmp(buffer.lines[1], "cat6789") == 0);
+     EXPECT(strcmp(buffer.lines[2], "abcdefghij") == 0);
+     EXPECT(strcmp(buffer.lines[3], "klmnopqrst") == 0);
 
      ce_buffer_free(&buffer);
 }
@@ -169,16 +170,16 @@ TEST(buffer_insert_string_two_lines){
 TEST(buffer_insert_string_three_lines){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     const char* string = "one\ntwo\nthree";
+     const char* string = "taco\ncat\npizza";
      ce_buffer_insert_string(&buffer, string, (CePoint_t){7, 1});
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 5);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "second one") == 0);
-     EXPECT(strcmp(buffer.lines[2], "two") == 0);
-     EXPECT(strcmp(buffer.lines[3], "threeline") == 0);
-     EXPECT(strcmp(buffer.lines[4], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "abcdefgtaco") == 0);
+     EXPECT(strcmp(buffer.lines[2], "cat") == 0);
+     EXPECT(strcmp(buffer.lines[3], "pizzahij") == 0);
+     EXPECT(strcmp(buffer.lines[4], "klmnopqrst") == 0);
 
      ce_buffer_free(&buffer);
 }
@@ -191,10 +192,10 @@ TEST(buffer_insert_string_newline){
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 4);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "second ") == 0);
-     EXPECT(strcmp(buffer.lines[2], "line") == 0);
-     EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "abcdefg") == 0);
+     EXPECT(strcmp(buffer.lines[2], "hij") == 0);
+     EXPECT(strcmp(buffer.lines[3], "klmnopqrst") == 0);
 
      ce_buffer_free(&buffer);
 }
@@ -207,10 +208,10 @@ TEST(buffer_insert_string_newline_at_end_of_line){
 
      EXPECT(buffer.lines);
      EXPECT(buffer.line_count == 4);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
      EXPECT(strcmp(buffer.lines[1], "") == 0);
-     EXPECT(strcmp(buffer.lines[2], "second line") == 0);
-     EXPECT(strcmp(buffer.lines[3], "third line") == 0);
+     EXPECT(strcmp(buffer.lines[2], "abcdefghij") == 0);
+     EXPECT(strcmp(buffer.lines[3], "klmnopqrst") == 0);
 
      ce_buffer_free(&buffer);
 }
@@ -232,8 +233,7 @@ TEST(buffer_insert_string_on_empty_line){
 
 TEST(buffer_remove_string_portion_of_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){3, 0}, 5));
      EXPECT(buffer.line_count == 3);
      EXPECT(strcmp(buffer.lines[0], "01289") == 0);
@@ -241,8 +241,7 @@ TEST(buffer_remove_string_portion_of_line){
 
 TEST(buffer_remove_string_entire_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 0}, 10));
      EXPECT(buffer.line_count == 3);
      EXPECT(strcmp(buffer.lines[0], "") == 0);
@@ -250,8 +249,7 @@ TEST(buffer_remove_string_entire_line){
 
 TEST(buffer_remove_string_entire_line_plus_newline){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 0}, 11));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "abcdefghij") == 0);
@@ -259,8 +257,7 @@ TEST(buffer_remove_string_entire_line_plus_newline){
 
 TEST(buffer_remove_string_entire_line_multiple){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 0}, 21));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "") == 0);
@@ -268,8 +265,7 @@ TEST(buffer_remove_string_entire_line_multiple){
 
 TEST(buffer_remove_string_entire_line_multiple_with_newline){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 0}, 22));
      EXPECT(buffer.line_count == 1);
      EXPECT(strcmp(buffer.lines[0], "klmnopqrst") == 0);
@@ -277,8 +273,7 @@ TEST(buffer_remove_string_entire_line_multiple_with_newline){
 
 TEST(buffer_remove_string_across_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 0}, 10));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "01234efghij") == 0);
@@ -286,8 +281,7 @@ TEST(buffer_remove_string_across_line){
 
 TEST(buffer_remove_string_join){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){10, 0}, 1));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "0123456789abcdefghij") == 0);
@@ -295,8 +289,7 @@ TEST(buffer_remove_string_join){
 
 TEST(buffer_remove_string_join_plus){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){10, 0}, 5));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "0123456789efghij") == 0);
@@ -304,8 +297,7 @@ TEST(buffer_remove_string_join_plus){
 
 TEST(buffer_remove_string_join_minus){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){8, 0}, 5));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "01234567cdefghij") == 0);
@@ -313,8 +305,7 @@ TEST(buffer_remove_string_join_minus){
 
 TEST(buffer_remove_string_empty_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 1));
      EXPECT(buffer.line_count == 3);
      EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
@@ -323,8 +314,7 @@ TEST(buffer_remove_string_empty_line){
 
 TEST(buffer_remove_string_empty_line_plus){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 3));
      EXPECT(buffer.line_count == 3);
      EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
@@ -333,8 +323,7 @@ TEST(buffer_remove_string_empty_line_plus){
 
 TEST(buffer_remove_string_empty_line_minus){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){8, 0}, 5));
      EXPECT(buffer.line_count == 2);
      EXPECT(strcmp(buffer.lines[0], "01234567bcdefghij") == 0);
@@ -342,120 +331,105 @@ TEST(buffer_remove_string_empty_line_minus){
 
 TEST(buffer_dupe_string_portion_of_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){3, 0}, 5);
      EXPECT(strcmp(dupe, "34567") == 0);
 }
 
 TEST(buffer_dupe_string_entire_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 10);
      EXPECT(strcmp(dupe, "0123456789") == 0);
 }
 
 TEST(buffer_dupe_string_entire_line_plus_newline){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 11);
      EXPECT(strcmp(dupe, "0123456789\n") == 0);
 }
 
 TEST(buffer_dupe_string_entire_line_multiple){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 21);
      EXPECT(strcmp(dupe, "0123456789\nabcdefghij") == 0);
 }
 
 TEST(buffer_dupe_string_entire_line_multiple_plus_newline){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 22);
      EXPECT(strcmp(dupe, "0123456789\nabcdefghij\n") == 0);
 }
 
 TEST(buffer_dupe_string_across_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 10);
      EXPECT(strcmp(dupe, "56789\nabcd") == 0);
 }
 
 TEST(buffer_dupe_string_across_multiplie_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 20);
      EXPECT(strcmp(dupe, "56789\nabcdefghij\nklm") == 0);
 }
 
 TEST(buffer_dupe_string_blank_line){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 1}, 1);
      EXPECT(strcmp(dupe, "\n") == 0);
 }
 
 TEST(buffer_dupe_string_blank_line_plus){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 1}, 5);
      EXPECT(strcmp(dupe, "\nabcd") == 0);
 }
 
 TEST(buffer_dupe_string_blank_line_included){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 7);
      EXPECT(strcmp(dupe, "56789\n\n") == 0);
 }
 
 TEST(buffer_dupe_string_blank_line_in_middle){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 0}, 10);
      EXPECT(strcmp(dupe, "56789\n\nabc") == 0);
 }
 
 TEST(buffer_dupe_string_entire_buffer){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 33);
      EXPECT(strcmp(dupe, "0123456789\n\nabcdefghij\nklmnopqrst") == 0);
 }
 
 TEST(buffer_dupe_string_entire_buffer_plus_newline){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 34);
      EXPECT(strcmp(dupe, "0123456789\n\nabcdefghij\nklmnopqrst\n") == 0);
 }
 
 TEST(buffer_dupe_string_outside){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){5, 5}, 10);
      EXPECT(dupe == NULL);
 }
 
 TEST(buffer_dupe_string_too_long){
      CeBuffer_t buffer = {};
-     char* string = "0123456789\n\nabcdefghij\nklmnopqrs";
-     ce_buffer_load_string(&buffer, string, g_name);
+     ce_buffer_load_string(&buffer, g_multiline_string_with_empty_line, g_name);
      char* dupe = ce_buffer_dupe_string(&buffer, (CePoint_t){0, 0}, 50);
      EXPECT(dupe == NULL);
 }
