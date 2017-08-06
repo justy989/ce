@@ -430,6 +430,42 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                }
           }
 
+          if(!ce_points_equal(vim->visual_block_top_left, vim->visual_block_bottom_right)){
+               CePoint_t visual_top_left = vim->visual_block_top_left;
+               CePoint_t visual_bottom_right = vim->visual_block_bottom_right;
+
+               // adjust range because we've already inserted text the line the cursor is on
+               CePoint_t cursor_end;
+               if(ce_points_equal(visual_top_left, view->cursor)){
+                    cursor_end = visual_top_left;
+                    visual_top_left.y++;
+               }else{
+                    cursor_end = visual_bottom_right;
+                    visual_bottom_right.y--;
+               }
+
+               vim->visual_block_top_left = (CePoint_t){0, 0};
+               vim->visual_block_bottom_right = (CePoint_t){0, 0};
+
+               CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
+
+               if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
+               vim->chain_undo = true;
+
+               for(int64_t i = visual_top_left.y; i <= visual_bottom_right.y; i++){
+                    view->cursor = (CePoint_t){visual_top_left.x, i};
+                    CeRune_t* itr = rune_string;
+                    while(*itr){
+                         insert_mode_handle_key(vim, view, *itr, config_options);
+                         itr++;
+                    }
+               }
+
+               free(rune_string);
+               if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = cursor_end;
+               view->cursor = cursor_end;
+          }
+
           vim->mode = CE_VIM_MODE_NORMAL;
           vim->chain_undo = false;
      } break;
@@ -443,7 +479,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
      default:
           return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
-          if(!vim->verb_last_action) ce_rune_node_insert(&vim->insert_rune_head, key);
+          if(!vim->verb_last_action && key != 27) ce_rune_node_insert(&vim->insert_rune_head, key);
           return insert_mode_handle_key(vim, view, key, config_options);
      case CE_VIM_MODE_REPLACE:
           if(key != CE_NEWLINE && key != 27){ // escape
@@ -596,40 +632,43 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, co
      if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK &&
         action->verb.function != ce_vim_verb_motion){
           // sort y
-          int64_t first_line = 0;
-          int64_t last_line = 0;
           if(vim->visual.y < view->cursor.y){
-               first_line = vim->visual.y;
-               last_line = view->cursor.y;
+               vim->visual_block_top_left.y = vim->visual.y;
+               vim->visual_block_bottom_right.y = view->cursor.y;
           }else{
-               last_line = vim->visual.y;
-               first_line = view->cursor.y;
+               vim->visual_block_top_left.y = view->cursor.y;
+               vim->visual_block_bottom_right.y = vim->visual.y;
           }
 
           // sort x
-          int64_t first_index = 0;
-          int64_t last_index = 0;
           if(vim->visual.x < view->cursor.x){
-               first_index = vim->visual.x;
-               last_index = view->cursor.x;
+               vim->visual_block_top_left.x = vim->visual.x;
+               vim->visual_block_bottom_right.x = view->cursor.x;
           }else{
-               last_index = vim->visual.x;
-               first_index = view->cursor.x;
+               vim->visual_block_top_left.x = view->cursor.x;
+               vim->visual_block_bottom_right.x = vim->visual.x;
           }
 
           // run verb for each line in range
           bool success = true;
-          for(int64_t i = first_line; i <= last_line; i++){
-               CeVimMotionRange_t motion_range = {(CePoint_t){first_index, i}, (CePoint_t){last_index, i}};
+          for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
+               CeVimMotionRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
+                                                  (CePoint_t){vim->visual_block_bottom_right.x, i}};
                if(!action->verb.function(vim, action, motion_range, view, config_options)){
                     success = false;
-               }else if(i != first_line){
-                    view->buffer->change_node->change.chain = true;
+               }else if(i != vim->visual_block_top_left.y){
+                    if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
                }
+          }
+
+          if(vim->mode != CE_VIM_MODE_INSERT){
+               vim->visual_block_top_left = (CePoint_t){0, 0};
+               vim->visual_block_bottom_right = (CePoint_t){0, 0};
           }
 
           return success;
      }
+
      CeVimMotionRange_t motion_range = {view->cursor, view->cursor};
      if(action->motion.function){
           int64_t total_multiplier = action->multiplier * action->motion.multiplier;
