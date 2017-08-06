@@ -230,132 +230,6 @@ TEST(buffer_insert_string_on_empty_line){
      ce_buffer_free(&buffer);
 }
 
-#if 0
-TEST(buffer_remove_string_partial_line){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-
-     ce_buffer_remove_string(&buffer, (CePoint_t){2, 1}, 4, false);
-     EXPECT(buffer.lines);
-     EXPECT(buffer.line_count == 3);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "se line") == 0);
-     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_string_entire_line){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 11, false);
-
-     EXPECT(buffer.lines);
-     EXPECT(buffer.line_count == 3);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "") == 0);
-     EXPECT(strcmp(buffer.lines[2], "third line") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_string_entire_line_and_remove_line){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 11, true);
-
-     EXPECT(buffer.lines);
-     EXPECT(buffer.line_count == 2);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "third line") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_string_to_empty){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, "taco", g_name);
-     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 0}, 4, true));
-
-     EXPECT(buffer.line_count == 0);
-}
-
-TEST(buffer_remove_lines_single){
-     CeBuffer_t buffer = {};
-     EXPECT(!ce_buffer_remove_lines(&buffer, 0, 1));
-     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     EXPECT(ce_buffer_remove_lines(&buffer, 1, 1));
-
-     EXPECT(buffer.line_count == 2);
-     EXPECT(strcmp(buffer.lines[0], "first line") == 0);
-     EXPECT(strcmp(buffer.lines[1], "third line") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_lines_multiple){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-     EXPECT(ce_buffer_remove_lines(&buffer, 0, 2));
-
-     EXPECT(buffer.line_count == 1);
-     EXPECT(strcmp(buffer.lines[0], "third line") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_lines_invalid){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
-
-     EXPECT(!ce_buffer_remove_lines(&buffer, 0, 4));
-     EXPECT(!ce_buffer_remove_lines(&buffer, 0, 0));
-     EXPECT(!ce_buffer_remove_lines(&buffer, -1, 1));
-     EXPECT(!ce_buffer_remove_lines(&buffer, 0, -1));
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_string_across_multiple_lines){
-     CeBuffer_t buffer = {};
-     const char* name = "test.txt";
-     ce_buffer_load_string(&buffer, "0123456789\n0123456789\n0123456789\n0123456789\n0123456789", name);
-     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 1}, 27, false));
-
-     EXPECT(buffer.lines);
-     EXPECT(buffer.line_count == 2);
-     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
-     EXPECT(strcmp(buffer.lines[1], "0123423456789") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_string_join_lines){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, "first\nsecond", g_name);
-     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 0}, 0, false));
-
-     EXPECT(buffer.lines);
-     EXPECT(buffer.line_count == 1);
-     EXPECT(strcmp(buffer.lines[0], "firstsecond") == 0);
-
-     ce_buffer_free(&buffer);
-}
-
-TEST(buffer_remove_string_remove_empty_line){
-     CeBuffer_t buffer = {};
-     ce_buffer_load_string(&buffer, "first\n\nsecond", g_name);
-     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){5, 0}, 0, false));
-
-     EXPECT(buffer.lines);
-     EXPECT(buffer.line_count == 2);
-     EXPECT(strcmp(buffer.lines[0], "first") == 0);
-     EXPECT(strcmp(buffer.lines[1], "second") == 0);
-
-     ce_buffer_free(&buffer);
-}
-#endif
-
 TEST(buffer_remove_string_portion_of_line){
      CeBuffer_t buffer = {};
      char* string = "0123456789\nabcdefghij\nklmnopqrst";
@@ -434,8 +308,36 @@ TEST(buffer_remove_string_join_minus){
      ce_buffer_load_string(&buffer, string, g_name);
      EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){8, 0}, 5));
      EXPECT(buffer.line_count == 2);
-     printf("%s\n", buffer.lines[0]);
-     EXPECT(strcmp(buffer.lines[0], "01234567defghij") == 0);
+     EXPECT(strcmp(buffer.lines[0], "01234567cdefghij") == 0);
+}
+
+TEST(buffer_remove_string_empty_line){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
+     ce_buffer_load_string(&buffer, string, g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 1));
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "abcdefghij") == 0);
+}
+
+TEST(buffer_remove_string_empty_line_plus){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
+     ce_buffer_load_string(&buffer, string, g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){0, 1}, 3));
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "cdefghij") == 0);
+}
+
+TEST(buffer_remove_string_empty_line_minus){
+     CeBuffer_t buffer = {};
+     char* string = "0123456789\n\nabcdefghij\nklmnopqrst";
+     ce_buffer_load_string(&buffer, string, g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){8, 0}, 5));
+     EXPECT(buffer.line_count == 2);
+     EXPECT(strcmp(buffer.lines[0], "01234567bcdefghij") == 0);
 }
 
 TEST(buffer_dupe_string_portion_of_line){
