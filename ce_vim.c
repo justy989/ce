@@ -527,12 +527,12 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
 
                if(!vim->verb_last_action &&
                   ((action.verb.function != ce_vim_verb_motion &&
-                   action.verb.function != ce_vim_verb_yank &&
-                   action.verb.function != ce_vim_verb_last_action &&
-                   action.verb.function != ce_vim_verb_undo &&
-                   action.verb.function != ce_vim_verb_redo &&
-                   action.verb.function != ce_vim_verb_normal_mode &&
-                   action.verb.function != ce_vim_verb_visual_mode) ||
+                    action.verb.function != ce_vim_verb_yank &&
+                    action.verb.function != ce_vim_verb_last_action &&
+                    action.verb.function != ce_vim_verb_undo &&
+                    action.verb.function != ce_vim_verb_redo &&
+                    action.verb.function != ce_vim_verb_normal_mode &&
+                    action.verb.function != ce_vim_verb_visual_mode) ||
                   vim->mode == CE_VIM_MODE_INSERT)){
                     vim->last_action = action;
                }
@@ -2608,6 +2608,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
      CeBufferChangeNode_t* change_node = view->buffer->change_node;
 
      vim->verb_last_action = true;
+     CeVimMode_t save_mode = vim->mode;
      if(!ce_vim_apply_action(vim, &vim->last_action, view, config_options)){
           vim->verb_last_action = false;
           return false;
@@ -2627,6 +2628,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
           free(rune_string);
      }
 
+     vim->mode = save_mode;
      vim->verb_last_action = false;
      return true;
 }
