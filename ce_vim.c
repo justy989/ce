@@ -654,6 +654,13 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, co
           for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
                CeVimMotionRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
                                                   (CePoint_t){vim->visual_block_bottom_right.x, i}};
+               int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
+
+               // clamp the range to the line length
+               if(motion_range.start.x > line_last_index) motion_range.start.x = line_last_index;
+               if(motion_range.end.x > line_last_index) motion_range.end.x = line_last_index;
+               if(motion_range.end.x == 0) continue;
+
                if(!action->verb.function(vim, action, motion_range, view, config_options)){
                     success = false;
                }else if(i != vim->visual_block_top_left.y){
