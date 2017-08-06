@@ -287,6 +287,14 @@ TEST(buffer_remove_string_join){
      EXPECT(strcmp(buffer.lines[0], "0123456789abcdefghij") == 0);
 }
 
+TEST(buffer_remove_string_up_to_join){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){8, 0}, 3));
+     EXPECT(buffer.line_count == 2);
+     EXPECT(strcmp(buffer.lines[0], "01234567abcdefghij") == 0);
+}
+
 TEST(buffer_remove_string_join_plus){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);

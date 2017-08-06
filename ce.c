@@ -764,19 +764,14 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
           return true;
      }else if(length_left_on_line == length){
           if(point.x == 0){
-               // remove the empty line from the buffer lines
-               char** dst_line = buffer->lines + point.y;
-               char** src_line = dst_line + 1;
-               int64_t lines_to_shift = buffer->line_count - (point.y + 1);
-               free(buffer->lines[point.y]);
-               memmove(dst_line, src_line, lines_to_shift * sizeof(dst_line));
-               if(!buffer_realloc_lines(buffer, buffer->line_count - 1)){
-                    return false;
-               }
-
                buffer->status = CE_BUFFER_STATUS_MODIFIED;
-               return true;
+               return ce_buffer_remove_lines(buffer, point.y, 1);
           }
+
+          // remove characters left on current line
+          int64_t keep_length = (first_line_start - buffer->lines[point.y]);
+          buffer->lines[point.y] = realloc(buffer->lines[point.y], keep_length + 1);
+          buffer->lines[point.y][keep_length] = 0;
 
           // perform a join with the next line
           int64_t next_line_index = point.y + 1;
@@ -789,6 +784,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
                strncpy(buffer->lines[point.y] + cur_line_len, buffer->lines[next_line_index], next_line_len);
                buffer->lines[point.y][new_line_len] = 0;
           }
+
           buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return ce_buffer_remove_lines(buffer, next_line_index, 1);
      }
