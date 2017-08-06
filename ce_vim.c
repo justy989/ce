@@ -459,6 +459,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
 
           vim->mode = CE_VIM_MODE_NORMAL;
           vim->chain_undo = false;
+          view->cursor = ce_buffer_advance_point(view->buffer, view->cursor, -1);
      } break;
      }
 
@@ -754,15 +755,15 @@ CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
                break;
           }
 
-          itr += rune_len;
-          start.x++;
-
           if(*itr == 0){
                if(start.y >= buffer->line_count - 1) break;
                start.x = 0;
                start.y++;
                itr = buffer->lines[start.y];
                state = WORD_NEW_LINE;
+          }else{
+               itr += rune_len;
+               start.x++;
           }
      }
 
@@ -804,15 +805,15 @@ CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start){
                break;
           }
 
-          itr += rune_len;
-          start.x++;
-
           if(*itr == 0){
                if(start.y >= buffer->line_count - 1) break;
                start.x = 0;
                start.y++;
                itr = buffer->lines[start.y];
                state = WORD_NEW_LINE;
+          }else{
+               itr += rune_len;
+               start.x++;
           }
      }
 
@@ -2300,8 +2301,6 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeV
                                   const CeConfigOptions_t* config_options){
      ce_vim_motion_range_sort(&motion_range);
 
-     // TODO: CE_NEWLINE doesn't work
-
      while(!ce_point_after(motion_range.start, motion_range.end)){
           // dupe previous rune
           char* previous_string = ce_buffer_dupe_string(view->buffer, motion_range.start, 1);
@@ -2355,8 +2354,9 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
                       const CeConfigOptions_t* config_options){
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
      if(yank->text) free(yank->text);
-     int64_t yank_len = 1;
+     int64_t yank_len = 0;
      yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
+     if(action->yank_line) yank_len++;
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
      yank->line = action->yank_line;
      vim->mode = CE_VIM_MODE_NORMAL;
@@ -2384,12 +2384,19 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
 
      char* insert_str = strdup(yank->text);
 
-     // if we are inserting at the end of a file, remove any newline at the end of the text
+     // if we are inserting at the end of a file, put the newline at the beginning and insert at the end of the previous line
      if(insertion_point.x == 0 && insertion_point.y == view->buffer->line_count){
           int64_t insert_len = strlen(insert_str);
           if(insert_len > 0){
                int64_t last_index = insert_len - 1;
-               if(insert_str[last_index] == CE_NEWLINE) insert_str[last_index] = 0;
+               if(insert_str[last_index] == CE_NEWLINE){
+                    for(int64_t i = last_index; i > 0; i--){
+                         insert_str[i] = insert_str[i - 1];
+                    }
+                    insert_str[0] = CE_NEWLINE;
+                    insertion_point.y = view->buffer->line_count - 1;
+                    insertion_point.x = ce_utf8_strlen(view->buffer->lines[insertion_point.y]);
+               }
           }
      }
 
@@ -2399,7 +2406,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRan
      if(yank->line){
           cursor_end = insertion_point;
      }else{
-          cursor_end = ce_buffer_advance_point(view->buffer, view->cursor, ce_utf8_insertion_strlen(yank->text));
+          cursor_end = ce_buffer_advance_point(view->buffer, view->cursor, ce_utf8_strlen(yank->text));
      }
 
      // commit the change

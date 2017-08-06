@@ -337,6 +337,17 @@ TEST(buffer_remove_string_empty_line_minus){
      EXPECT(strcmp(buffer.lines[0], "01234567bcdefghij") == 0);
 }
 
+TEST(buffer_remove_string_last_empty_line){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, g_multiline_string, g_name);
+     ce_buffer_insert_string(&buffer, "\n", (CePoint_t){10, 2});
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){10, 2}, 1));
+     EXPECT(buffer.line_count == 3);
+     EXPECT(strcmp(buffer.lines[0], "0123456789") == 0);
+     EXPECT(strcmp(buffer.lines[1], "abcdefghij") == 0);
+     EXPECT(strcmp(buffer.lines[2], "klmnopqrst") == 0);
+}
+
 TEST(buffer_dupe_string_portion_of_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);

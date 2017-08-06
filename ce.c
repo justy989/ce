@@ -982,7 +982,7 @@ bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor){
 
      CeBufferChange_t* change = &buffer->change_node->change;
      if(change->insertion){
-          ce_buffer_remove_string(buffer, change->location, ce_utf8_insertion_strlen(change->string));
+          ce_buffer_remove_string(buffer, change->location, ce_utf8_strlen(change->string));
      }else{
           ce_buffer_insert_string(buffer, change->string, change->location);
      }
@@ -1011,7 +1011,7 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
      if(change->insertion){
           ce_buffer_insert_string(buffer, change->string, change->location);
      }else{
-          ce_buffer_remove_string(buffer, change->location, ce_utf8_insertion_strlen(change->string));
+          ce_buffer_remove_string(buffer, change->location, ce_utf8_strlen(change->string));
      }
 
      *cursor = change->cursor_after;
@@ -1093,39 +1093,6 @@ int64_t ce_utf8_strlen(const char* string){
           }
 
           len++;
-     }
-
-     return len;
-}
-
-int64_t ce_utf8_insertion_strlen(const char* string){
-     int64_t len = 0;
-     int64_t byte_count = 0;
-     char last_char = 0;;
-
-     while(*string){
-          if((*string & 0x80) == 0){
-               byte_count = 1;
-          }else if((*string & 0xE0) == 0xC0){
-               byte_count = 2;
-          }else if((*string & 0xF0) == 0xE0){
-               byte_count = 3;
-          }else if((*string & 0xF8) == 0xF0){
-               byte_count = 4;
-          }else{
-               return -1;
-          }
-
-          // if we see a newline, don't count it, but if we see 2 newlins in a row, count it
-          if(*string != CE_NEWLINE ||
-             (*string == CE_NEWLINE && last_char == CE_NEWLINE)) len++;
-          last_char = *string;
-
-          // validate string doesn't early terminate
-          for(int64_t i = 0; i < byte_count; i++){
-               if(*string == 0) return -1;
-               string++;
-          }
      }
 
      return len;

@@ -283,7 +283,7 @@ bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVim
      ce_buffer_change(view->buffer, &change);
 
      // insert the yank
-     int64_t yank_len = ce_utf8_insertion_strlen(yank->text);
+     int64_t yank_len = ce_utf8_strlen(yank->text);
      if(!ce_buffer_insert_string(view->buffer, yank->text, motion_range.start)) return false;
      CePoint_t cursor_end = ce_buffer_advance_point(view->buffer, motion_range.start, yank_len);
 
