@@ -516,16 +516,9 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                ce_vim_apply_action(vim, &action, view, config_options);
                vim->current_command[0] = 0;
 
-               if(!vim->verb_last_action &&
-                  ((action.verb.function != ce_vim_verb_motion &&
-                    action.verb.function != ce_vim_verb_yank &&
-                    action.verb.function != ce_vim_verb_last_action &&
-                    action.verb.function != ce_vim_verb_undo &&
-                    action.verb.function != ce_vim_verb_redo &&
-                    action.verb.function != ce_vim_verb_normal_mode &&
-                    action.verb.function != ce_vim_verb_visual_mode) ||
-                  vim->mode == CE_VIM_MODE_INSERT)){
+               if(!vim->verb_last_action && action.repeatable){
                     vim->last_action = action;
+                    ce_rune_node_free(&vim->insert_rune_head);
                }
           }else if(result == CE_VIM_PARSE_INVALID ||
                    result == CE_VIM_PARSE_KEY_NOT_HANDLED){
@@ -1582,7 +1575,20 @@ CeVimParseResult_t ce_vim_parse_motion_match_pair(CeVimAction_t* action, CeRune_
      return parse_motion_direction(action, ce_vim_motion_match_pair);
 }
 
+CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, CeRune_t key){
+     action->motion.function = ce_vim_motion_search_word_forward;
+     action->verb.function = ce_vim_verb_motion;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* action, CeRune_t key){
+     action->motion.function = ce_vim_motion_search_word_backward;
+     action->verb.function = ce_vim_verb_motion;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
           action->yank_line = true;
@@ -1594,6 +1600,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key)
 }
 
 CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_delete;
      action->chain_undo = true;
@@ -1601,6 +1608,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
 }
 
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      if(action->verb.function == ce_vim_verb_change){
           action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
           return CE_VIM_PARSE_COMPLETE;
@@ -1612,6 +1620,7 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key)
 }
 
 CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_change;
      action->chain_undo = true;
@@ -1619,6 +1628,7 @@ CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action
 }
 
 CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      if(action->verb.function == NULL){
           action->verb.function = &ce_vim_verb_set_character;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1631,16 +1641,19 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune
 }
 
 CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_delete_character;
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_substitute_character;
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_substitute_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
      return CE_VIM_PARSE_COMPLETE;
 }
@@ -1658,23 +1671,27 @@ CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
 }
 
 CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_paste_before;
      if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_paste_after;
      if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_open_above(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_open_above;
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_open_below(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_open_below;
      return CE_VIM_PARSE_COMPLETE;
 }
@@ -1690,6 +1707,7 @@ CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key){
 }
 
 CeVimParseResult_t ce_vim_parse_verb_join(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      action->verb.function = &ce_vim_verb_join;
      return CE_VIM_PARSE_COMPLETE;
 }
@@ -1736,6 +1754,7 @@ CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t k
 }
 
 CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_indent;
           return CE_VIM_PARSE_IN_PROGRESS;
@@ -1747,6 +1766,7 @@ CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, CeRune_t key)
 }
 
 CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_unindent;
           return CE_VIM_PARSE_IN_PROGRESS;
@@ -1755,18 +1775,6 @@ CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t ke
      }
 
      return CE_VIM_PARSE_INVALID;
-}
-
-CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, CeRune_t key){
-     action->motion.function = ce_vim_motion_search_word_forward;
-     action->verb.function = ce_vim_verb_motion;
-     return CE_VIM_PARSE_COMPLETE;
-}
-
-CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* action, CeRune_t key){
-     action->motion.function = ce_vim_motion_search_word_backward;
-     action->verb.function = ce_vim_verb_motion;
-     return CE_VIM_PARSE_COMPLETE;
 }
 
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
@@ -2249,14 +2257,20 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
                                const CeConfigOptions_t* config_options){
      ce_vim_motion_range_sort(&motion_range);
 
-     // TODO: CE_NEWLINE doesn't work
-
      while(!ce_point_after(motion_range.start, motion_range.end)){
+          // do nothing if we aren't on the buffer, or the line is empty
+          if(!ce_buffer_contains_point(view->buffer, motion_range.start)){
+               motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+               continue;
+          }else if(view->buffer->lines[motion_range.start.y][0] == 0){
+               motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+               continue;
+          }
+
           // dupe previous rune
-          int64_t rune_len = 0;
-          char* str = ce_utf8_find_index(view->buffer->lines[view->cursor.y], motion_range.start.x);
           char* previous_string = malloc(5);
-          CeRune_t previous_rune = ce_utf8_decode(str, &rune_len);
+          CeRune_t previous_rune = ce_buffer_get_rune(view->buffer, motion_range.start);
+          int64_t rune_len = 0;
           ce_utf8_encode(previous_rune, previous_string, 5, &rune_len);
           previous_string[rune_len] = 0;
 
@@ -2595,6 +2609,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
 
      vim->verb_last_action = true;
      CeVimMode_t save_mode = vim->mode;
+     assert(vim->last_action.verb.function != ce_vim_verb_last_action);
      if(!ce_vim_apply_action(vim, &vim->last_action, view, config_options)){
           vim->verb_last_action = false;
           return false;
@@ -2607,7 +2622,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
           CeRune_t* itr = rune_string;
 
           while(*itr){
-               ce_vim_handle_key(vim, view, *itr, config_options);
+               insert_mode_handle_key(vim, view, *itr, config_options);
                itr++;
           }
 
