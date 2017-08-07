@@ -1355,6 +1355,7 @@ CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_insert_mode;
+     action->repeatable = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
