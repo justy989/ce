@@ -849,7 +849,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
                if(x < col_min) x = col_min;
 
                standend();
-               for(; x <= col_max + 1; x++) addch(' ');
+               for(; x <= col_max; x++) addch(' ');
           }
      }
 

@@ -1900,9 +1900,9 @@ bool ce_vim_motion_end_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t*
 
 bool ce_vim_motion_entire_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,
                                const CeConfigOptions_t* config_options, CeVimMotionRange_t* motion_range){
-     int64_t last_index = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+     int64_t line_length = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
      motion_range->start = (CePoint_t){0, motion_range->end.y};
-     motion_range->end = (CePoint_t){last_index, motion_range->end.y};
+     motion_range->end = (CePoint_t){line_length, motion_range->end.y};
      return true;
 }
 
@@ -1939,7 +1939,7 @@ bool ce_vim_motion_visual(CeVim_t* vim, CeVimAction_t* action, const CeView_t* v
           action->motion.integer = ce_buffer_range_len(view->buffer, motion_range->start, motion_range->end);
 
           if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
-               motion_range->start.x = 0;;
+               motion_range->start.x = 0;
                motion_range->end.x = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
                action->yank_line = true;
                action->motion.integer = motion_range->end.y - motion_range->start.y;
@@ -2356,7 +2356,6 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
      if(yank->text) free(yank->text);
      int64_t yank_len = 0;
      yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     if(action->yank_line) yank_len++;
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
      yank->line = action->yank_line;
      vim->mode = CE_VIM_MODE_NORMAL;

@@ -469,10 +469,7 @@ int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
                // count from the star to the end of the line
                length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x)) + 1;
           }else if(y == end.y){
-               // count up until the end
-               int64_t line_length = ce_utf8_strlen(buffer->lines[y]) + 1;
-               if(line_length == 0) length++;
-               else length += end.x + 1;
+               length += end.x + 1;
           }else{
                // count entire line
                int64_t line_length = ce_utf8_strlen(buffer->lines[y]) + 1;
