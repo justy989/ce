@@ -1,6 +1,10 @@
 #pragma once
 
+// completely STOLEN from st
+
 #include "ce.h"
+
+#include <pthread.h>
 
 #define CE_TERMINAL_TAB_SPACES 5 // TODO: use config_options
 #define CE_TERMINAL_NAME "xterm"
@@ -124,6 +128,7 @@ typedef struct{
      int32_t* tabs;
      CeTerminalCSIEscape_t csi_escape;
      CeTerminalSTREscape_t str_escape;
+     pthread_t thread;
 }CeTerminal_t;
 
 bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height);
