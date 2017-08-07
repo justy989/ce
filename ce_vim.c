@@ -288,35 +288,35 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                     ce_buffer_change(view->buffer, &change);
                }
                view->cursor = remove_loc;
-          }
 
-          // calc indentation
-          CePoint_t indentation_point = {0, view->cursor.y};
-          int64_t indentation = ce_vim_get_indentation(view->buffer, view->cursor, config_options->tab_width);
-          if(indentation > 0) indentation -= config_options->tab_width;
-          if(indentation < 0) indentation = 0;
-          CePoint_t cursor_end = {indentation, indentation_point.y};
+               // calc indentation
+               CePoint_t indentation_point = {0, view->cursor.y};
+               int64_t indentation = ce_vim_get_indentation(view->buffer, view->cursor, config_options->tab_width);
+               if(indentation > 0) indentation -= config_options->tab_width;
+               if(indentation < 0) indentation = 0;
+               CePoint_t cursor_end = {indentation, indentation_point.y};
 
-          if(indentation > 0){
-              // build indentation string
-               char* insert_string = malloc(indentation + 1);
-               memset(insert_string, ' ', indentation);
-               insert_string[indentation] = 0;
+               if(indentation > 0){
+                   // build indentation string
+                    char* insert_string = malloc(indentation + 1);
+                    memset(insert_string, ' ', indentation);
+                    insert_string[indentation] = 0;
 
-               // insert indentation
-               if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
+                    // insert indentation
+                    if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
-               // commit the change
-               CeBufferChange_t change = {};
-               change.chain = true;
-               change.insertion = true;
-               change.string = insert_string;
-               change.location = indentation_point;
-               change.cursor_before = view->cursor;
-               change.cursor_after = cursor_end;
-               ce_buffer_change(view->buffer, &change);
+                    // commit the change
+                    CeBufferChange_t change = {};
+                    change.chain = true;
+                    change.insertion = true;
+                    change.string = insert_string;
+                    change.location = indentation_point;
+                    change.cursor_before = view->cursor;
+                    change.cursor_after = cursor_end;
+                    ce_buffer_change(view->buffer, &change);
 
-               view->cursor = cursor_end;
+                    view->cursor = cursor_end;
+               }
           }
 
           if(!ce_buffer_insert_rune(view->buffer, key, view->cursor)) break;
