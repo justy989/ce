@@ -129,6 +129,7 @@ typedef struct{
      CeTerminalCSIEscape_t csi_escape;
      CeTerminalSTREscape_t str_escape;
      pthread_t thread;
+     pid_t pid;
 }CeTerminal_t;
 
 bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height);

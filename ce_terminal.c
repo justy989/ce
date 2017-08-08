@@ -6,6 +6,10 @@
 #include <ncurses.h>
 #include <assert.h>
 #include <limits.h>
+#include <ctype.h>
+#include <pty.h>
+#include <pwd.h>
+#include <signal.h>
 
 #define ELEM_COUNT(static_array) (sizeof(static_array) / sizeof(static_array[0]))
 #define DEFAULT(a, value) (a = (a == 0) ? value : a)
@@ -1166,7 +1170,7 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
           return;
      }
 
-     Glyph_t* current_glyph = terminal->lines[terminal->cursor.y] + terminal->cursor.x;
+     CeTerminalGlyph_t* current_glyph = terminal->lines[terminal->cursor.y] + terminal->cursor.x;
      if(terminal->mode & CE_TERMINAL_MODE_WRAP && terminal->cursor.state & CE_TERMINAL_CURSOR_STATE_WRAPNEXT){
           current_glyph->attributes |= CE_TERMINAL_GLYPH_ATTRIBUTE_WRAP;
           terminal_put_newline(terminal, true);
@@ -1230,6 +1234,10 @@ static void* tty_reader(void* data)
      return NULL;
 }
 
+static void handle_signal_child(int signal){
+     ce_log("%s(%d)\n", __FUNCTION__, signal);
+}
+
 static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descriptor){
      int master_file_descriptor;
      int slave_file_descriptor;
@@ -1262,7 +1270,7 @@ static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descript
           {
                const struct passwd* pw;
                char* shell = getenv("SHELL");
-               if(!shell) shell = DEFAULT_SHELL;
+               if(!shell) shell = CE_TERMINAL_DEFAULT_SHELL;
 
                pw = getpwuid(getuid());
                if(pw == NULL){
@@ -1279,7 +1287,7 @@ static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descript
                setenv("USER", pw->pw_name, 1);
                setenv("SHELL", shell, 1);
                setenv("HOME", pw->pw_dir, 1);
-               setenv("TERM", TERM_NAME, 1);
+               setenv("TERM", CE_TERMINAL_NAME, 1);
 
                signal(SIGCHLD, SIG_DFL);
                signal(SIGHUP, SIG_DFL);
@@ -1335,13 +1343,11 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
      terminal->dirty_lines = calloc(terminal->rows, sizeof(*terminal->dirty_lines));
      terminal_reset(terminal);
 
-     if(!tty_create(terminal->rows, terminal->columns, &tty_pid, &tty_file_descriptor)){
+     if(!tty_create(terminal->rows, terminal->columns, &terminal->pid, &terminal->file_descriptor)){
           return 1;
      }
 
-     terminal.file_descriptor = tty_file_descriptor;
-
-     int rc = pthread_create(&tty_read_thread, NULL, tty_reader, &terminal);
+     int rc = pthread_create(&terminal->thread, NULL, tty_reader, &terminal);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
           return 1;
