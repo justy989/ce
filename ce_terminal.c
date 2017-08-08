@@ -163,6 +163,24 @@ static void terminal_insert_blank(CeTerminal_t* terminal, int n){
      line = terminal->lines[terminal->cursor.y];
 
      memmove(&line[dst], &line[src], size * sizeof(*line));
+
+     // figure out our start and end
+     char* line_dst = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], dst);
+     char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], src);
+
+     // copy into tmp array
+     CeRune_t runes[size];
+     for(int i = 0; i < size; i++){
+          int64_t rune_len = 0;
+          runes[i] = ce_utf8_decode(line_src, &rune_len);
+     }
+
+     // overwrite dst
+     for(int i = 0; i < size; i++){
+          int64_t rune_len = 0;
+          ce_utf8_encode(runes[i], line_dst, strlen(line_dst), &rune_len);
+     }
+
      terminal_clear_region(terminal, src, terminal->cursor.y, dst - 1, terminal->cursor.y);
 }
 
@@ -280,6 +298,24 @@ static void terminal_delete_char(CeTerminal_t* terminal, int n){
      line = terminal->lines[terminal->cursor.y];
 
      memmove(&line[dst], &line[src], size * sizeof(*line));
+
+     // figure out our start and end
+     char* line_dst = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], dst);
+     char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], src);
+
+     // copy into tmp array
+     CeRune_t runes[size];
+     for(int i = 0; i < size; i++){
+          int64_t rune_len = 0;
+          runes[i] = ce_utf8_decode(line_src, &rune_len);
+     }
+
+     // overwrite dst
+     for(int i = 0; i < size; i++){
+          int64_t rune_len = 0;
+          ce_utf8_encode(runes[i], line_dst, strlen(line_dst), &rune_len);
+     }
+
      terminal_clear_region(terminal, terminal->columns - n, terminal->cursor.y, terminal->columns - 1, terminal->cursor.y);
 }
 
@@ -1198,8 +1234,26 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
           current_glyph = terminal->lines[terminal->cursor.y] + terminal->cursor.x;
      }
 
-     if(terminal->mode & CE_TERMINAL_MODE_INSERT && terminal->cursor.x + width < terminal->columns){
-          memmove(current_glyph + width, current_glyph, (terminal->columns - terminal->cursor.x - width) * sizeof(*current_glyph));
+     if(terminal->mode & CE_TERMINAL_MODE_INSERT && (terminal->cursor.x + width) < terminal->columns){
+          int size = (terminal->columns - terminal->cursor.x - width);
+          memmove(current_glyph + width, current_glyph, size * sizeof(*current_glyph));
+
+          // figure out our start and end
+          char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], terminal->cursor.x);
+          char* line_dst = line_src + width;
+
+          // copy into tmp array
+          CeRune_t runes[size];
+          for(int i = 0; i < size; i++){
+               int64_t rune_len = 0;
+               runes[i] = ce_utf8_decode(line_src, &rune_len);
+          }
+
+          // overwrite dst
+          for(int i = 0; i < size; i++){
+               int64_t rune_len = 0;
+               ce_utf8_encode(runes[i], line_dst, strlen(line_dst), &rune_len);
+          }
      }
 
      if(terminal->cursor.x + width > terminal->columns){
@@ -1361,11 +1415,17 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, vol
                terminal->lines[r][g].background = -1;
           }
 
+          // alloc buffer lines
           terminal->lines_buffer->lines[r] = malloc(terminal->columns + 1 * sizeof(CeRune_t));
           terminal->alternate_lines_buffer->lines[r] = malloc(terminal->columns + 1 * sizeof(CeRune_t));
 
+          // set them to blank
           memset(terminal->lines_buffer->lines[r], ' ', terminal->columns);
           memset(terminal->alternate_lines_buffer->lines[r], ' ', terminal->columns);
+
+          // null terminate
+          terminal->lines_buffer->lines[r][terminal->columns] = 0;
+          terminal->alternate_lines_buffer->lines[r][terminal->columns] = 0;
      }
 
      terminal->tabs = calloc(terminal->columns, sizeof(*terminal->tabs));

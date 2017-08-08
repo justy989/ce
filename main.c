@@ -185,11 +185,37 @@ CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRun
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
+void syntax_highlight_terminal(CeView_t* view, volatile CeTerminal_t* terminal, CeDrawColorList_t* draw_color_list,
+                               CeSyntaxDef_t* syntax_defs){
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+     int fg = COLOR_DEFAULT;
+     int bg = COLOR_DEFAULT;
+
+     for(int64_t y = min; y <= max; ++y){
+          for(int64_t x = 0; x < terminal->columns; ++x){
+               CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
+               if(glyph->foreground != fg || glyph->background != bg){
+                    fg = glyph->foreground;
+                    bg = glyph->background;
+                    ce_draw_color_list_insert(draw_color_list, fg, bg, (CePoint_t){x, y});
+               }
+          }
+     }
+}
+
 typedef struct{
      CeLayout_t* layout;
      CeVim_t* vim;
      int64_t tab_width;
      CeSyntaxDef_t* syntax_defs;
+     volatile CeTerminal_t* terminal;
      volatile bool ready_to_draw;
      volatile bool* input_mode;
      CeView_t* input_view;
@@ -345,7 +371,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeColorDefs_t* color_defs, i
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeColorDefs_t* color_defs, int64_t tab_width, CeLayout_t* current,
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* terminal, CeColorDefs_t* color_defs, int64_t tab_width, CeLayout_t* current,
                  CeSyntaxDef_t* syntax_defs, int64_t terminal_width){
      switch(layout->type){
      default:
@@ -353,7 +379,11 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeColorDefs_t* color_defs, in
      case CE_LAYOUT_TYPE_VIEW:
      {
           CeDrawColorList_t draw_color_list = {};
-          ce_syntax_highlight_c(&layout->view, vim, &draw_color_list, syntax_defs);
+          if(layout->view.buffer == terminal->buffer){
+               syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
+          }else{
+               ce_syntax_highlight_c(&layout->view, vim, &draw_color_list, syntax_defs);
+          }
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
           ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, color_defs, 0);
@@ -368,11 +398,11 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeColorDefs_t* color_defs, in
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               draw_layout(layout->list.layouts[i], vim, color_defs, tab_width, current, syntax_defs, terminal_width);
+               draw_layout(layout->list.layouts[i], vim, terminal, color_defs, tab_width, current, syntax_defs, terminal_width);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          draw_layout(layout->tab.root, vim, color_defs, tab_width, current, syntax_defs, terminal_width);
+          draw_layout(layout->tab.root, vim, terminal, color_defs, tab_width, current, syntax_defs, terminal_width);
           break;
      }
 }
@@ -441,14 +471,12 @@ void* draw_thread(void* thread_data){
           }
 
           standend();
-          draw_layout(tab_layout, data->vim, &color_defs, data->tab_width, tab_layout->tab.current, data->syntax_defs,
-                      tab_list_layout->tab_list.rect.right);
+          draw_layout(tab_layout, data->vim, data->terminal, &color_defs, data->tab_width, tab_layout->tab.current,
+                      data->syntax_defs, tab_list_layout->tab_list.rect.right);
 
           if(*data->input_mode){
                CeDrawColorList_t draw_color_list = {};
-               ce_syntax_highlight_c(data->input_view, data->vim, &draw_color_list, data->syntax_defs);
                draw_view(data->input_view, data->tab_width, &draw_color_list, &color_defs);
-               ce_draw_color_list_free(&draw_color_list);
                int64_t new_status_bar_offset = (data->input_view->rect.bottom - data->input_view->rect.top) + 1;
                draw_view_status(data->input_view, data->vim, &color_defs, 0);
                draw_view_status(&tab_layout->tab.current->view, NULL, &color_defs, -new_status_bar_offset);
@@ -492,6 +520,12 @@ void* draw_thread(void* thread_data){
                move(screen_cursor.y, screen_cursor.x);
           }else{
                CeView_t* view = &tab_layout->tab.current->view;
+
+               if(view->buffer == data->terminal->buffer && data->vim->mode == CE_VIM_MODE_INSERT){
+                    view->cursor.x = data->terminal->cursor.x;
+                    view->cursor.y = data->terminal->cursor.y;
+               }
+
                CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }
@@ -1181,6 +1215,7 @@ int main(int argc, char** argv){
           draw_thread_data->input_mode = &app.input_mode;
           draw_thread_data->input_view = &app.input_view;
           draw_thread_data->syntax_defs = syntax_defs;
+          draw_thread_data->terminal = &app.terminal;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
           draw_thread_data->ready_to_draw = true;
      }
