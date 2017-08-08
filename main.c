@@ -12,6 +12,7 @@
 #include "ce_vim.h"
 #include "ce_layout.h"
 #include "ce_command.h"
+#include "ce_syntax.h"
 #include "ce_terminal.h"
 
 typedef struct BufferNode_t{
@@ -38,131 +39,6 @@ void buffer_node_free(BufferNode_t** head){
           free(tmp);
      }
      *head = NULL;
-}
-
-typedef enum{
-     SYNTAX_COLOR_NORMAL,
-     SYNTAX_COLOR_TYPE,
-     SYNTAX_COLOR_KEYWORD,
-     SYNTAX_COLOR_CONTROL,
-     SYNTAX_COLOR_CAPS_VAR,
-     SYNTAX_COLOR_COMMENT,
-     SYNTAX_COLOR_STRING,
-     SYNTAX_COLOR_CHAR_LITERAL,
-     SYNTAX_COLOR_NUMBER_LITERAL,
-     SYNTAX_COLOR_LITERAL,
-     SYNTAX_COLOR_PREPROCESSOR,
-     SYNTAX_COLOR_TRAILING_WHITESPACE,
-     SYNTAX_COLOR_VISUAL,
-     SYNTAX_COLOR_MATCH,
-     SYNTAX_COLOR_CURRENT_LINE,
-     SYNTAX_COLOR_COUNT,
-}SyntaxColor_t;
-
-#define SYNTAX_USE_CURRENT_COLOR -2
-
-typedef struct{
-     int fg;
-     int bg;
-}SyntaxDef_t;
-
-int syntax_def_get_fg(SyntaxDef_t* syntax_defs, SyntaxColor_t syntax_color, int current_fg){
-     int new_color = syntax_defs[syntax_color].fg;
-     if(new_color == SYNTAX_USE_CURRENT_COLOR) return current_fg;
-     return new_color;
-}
-
-int syntax_def_get_bg(SyntaxDef_t* syntax_defs, SyntaxColor_t syntax_color, int current_bg){
-     int new_color = syntax_defs[syntax_color].bg;
-     if(new_color == SYNTAX_USE_CURRENT_COLOR) return current_bg;
-     return new_color;
-}
-
-typedef struct DrawColorNode_t{
-     int fg;
-     int bg;
-     CePoint_t point;
-     struct DrawColorNode_t* next;
-}DrawColorNode_t;
-
-typedef struct{
-     DrawColorNode_t* head;
-     DrawColorNode_t* tail;
-}DrawColorList_t;
-
-bool draw_color_list_insert(DrawColorList_t* list, int fg, int bg, CePoint_t point){
-     DrawColorNode_t* node = malloc(sizeof(*node));
-     if(!node) return false;
-     node->fg = fg;
-     node->bg = bg;
-     node->point = point;
-     node->next = NULL;
-     if(list->tail) list->tail->next = node;
-     list->tail = node;
-     if(!list->head) list->head = node;
-     return true;
-}
-
-void draw_color_list_free(DrawColorList_t* list){
-     DrawColorNode_t* itr = list->head;
-     while(itr){
-          DrawColorNode_t* tmp = itr;
-          itr = itr->next;
-          free(tmp);
-     }
-
-     list->head = NULL;
-     list->tail = NULL;
-}
-
-int draw_color_list_last_fg_color(DrawColorList_t* draw_color_list){
-     int fg = COLOR_DEFAULT;
-     if(draw_color_list->tail) fg = draw_color_list->tail->fg;
-     return fg;
-}
-
-int draw_color_list_last_bg_color(DrawColorList_t* draw_color_list){
-     int bg = COLOR_DEFAULT;
-     if(draw_color_list->tail) bg = draw_color_list->tail->bg;
-     return bg;
-}
-
-typedef struct{
-     int fg;
-     int bg;
-}ColorPair_t;
-
-typedef struct{
-     int32_t count;
-     int32_t current;
-     ColorPair_t pairs[256]; // NOTE: this is what COLOR_PAIRS was for me (which is for some reason not const?)
-}ColorDefs_t;
-
-int color_def_get(ColorDefs_t* color_defs, int fg, int bg){
-     // search for the already defined color
-     for(int32_t i = 0; i < color_defs->count; ++i){
-          if(color_defs->pairs[i].fg == fg && color_defs->pairs[i].bg == bg){
-               return i;
-          }
-     }
-
-     // increment the color pair we are going to define, but make sure it wraps around to 0 at the max
-     color_defs->current++;
-     color_defs->current %= 256;
-     if(color_defs->current <= 0) color_defs->current = 1; // when we wrap around, start at 1, because curses doesn't like 0 index color pairs
-
-     // create the pair definition
-     init_pair(color_defs->current, fg, bg);
-
-     // set our internal definition
-     color_defs->pairs[color_defs->current].fg = fg;
-     color_defs->pairs[color_defs->current].bg = bg;
-
-     if(color_defs->current >= color_defs->count){
-          color_defs->count = color_defs->current + 1;
-     }
-
-     return color_defs->current;
 }
 
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
@@ -305,483 +181,22 @@ bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVim
 
 CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRune_t key){
      action->verb.function = &custom_vim_verb_substitute;
+     action->repeatable = true;
      return CE_VIM_PARSE_IN_PROGRESS;
-}
-
-static int64_t match_words(const char* str, const char* beginning_of_line, const char** words, int64_t word_count){
-     for(int64_t i = 0; i < word_count; ++i){
-          int64_t word_len = strlen(words[i]);
-          if(strncmp(words[i], str, word_len) == 0){
-
-               // make sure word isn't in the middle of an identifier
-               char post_char = str[word_len];
-               if(isalnum(post_char) || post_char == '_') return 0;
-               if(str > beginning_of_line){
-                    char pre_char = *(str - 1);
-                    if(isalnum(pre_char) || pre_char == '_') return 0;
-               }
-
-               return word_len;
-          }
-     }
-
-     return 0;
-}
-
-static bool is_c_type_char(int ch){
-     return isalnum(ch) || ch == '_';
-}
-
-int64_t match_c_type(const char* str, const char* beginning_of_line){
-     if(!isalpha(*str)) return false;
-
-     const char* itr = str;
-     while(*itr){
-          if(!is_c_type_char(*itr)) break;
-          itr++;
-     }
-
-     int64_t len = itr - str;
-     if(len <= 2) return 0;
-
-     if(strncmp((itr - 2), "_t", 2) == 0) return len;
-
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
-
-     static const char* keywords[] = {
-          "bool",
-          "char",
-          "double",
-          "float",
-          "int",
-          "long",
-          "short",
-          "signed",
-          "unsigned",
-          "void",
-     };
-
-     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
-
-     return match_words(str, beginning_of_line, keywords, keyword_count);
-}
-
-int64_t match_c_keyword(const char* str, const char* beginning_of_line){
-     static const char* keywords[] = {
-          "__thread",
-          "auto",
-          "case",
-          "default",
-          "do",
-          "else",
-          "enum",
-          "extern",
-          "false",
-          "for",
-          "if",
-          "inline",
-          "register",
-          "sizeof",
-          "static",
-          "struct",
-          "switch",
-          "true",
-          "typedef",
-          "typeof",
-          "union",
-          "volatile",
-          "while",
-     };
-
-     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
-
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
-
-     return match_words(str, beginning_of_line, keywords, keyword_count);
-}
-
-int64_t match_c_control(const char* str, const char* beginning_of_line){
-     static const char* keywords [] = {
-          "break",
-          "const",
-          "continue",
-          "goto",
-          "return",
-     };
-
-     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
-
-     return match_words(str, beginning_of_line, keywords, keyword_count);
-}
-
-static bool is_caps_var_char(int ch){
-     return (ch >= 'A' && ch <= 'Z') || ch == '_';
-}
-
-int64_t match_caps_var(const char* str){
-     const char* itr = str;
-     while(*itr){
-          if(!is_caps_var_char(*itr)) break;
-          itr++;
-     }
-
-     int64_t len = itr - str;
-     if(len > 1) return len;
-     return 0;
-}
-
-int64_t match_c_preproc(const char* str){
-     if(*str == '#'){
-          const char* itr = str + 1;
-          while(*itr){
-               if(!isalpha(*itr)) break;
-               itr++;
-          }
-
-          return itr - str;
-     }
-
-     return 0;
-}
-
-int64_t match_c_comment(const char* str){
-     if(strncmp("//", str, 2) == 0) return ce_utf8_strlen(str);
-
-     return 0;
-}
-
-int64_t match_c_multiline_comment(const char* str){
-     if(strncmp("/*", str, 2) == 0){
-          char* matching_comment = strstr(str, "*/");
-          if(matching_comment) return (matching_comment - str);
-          return ce_utf8_strlen(str);
-     }
-
-     return 0;
-}
-
-int64_t match_c_multiline_comment_end(const char* str){
-     if(strncmp("*/", str, 2) == 0) return 2;
-
-     return 0;
-}
-
-int64_t match_c_string(const char* str){
-     if(*str == '"'){
-          const char* match = str;
-          while(match){
-               match = strchr(match + 1, '"');
-               if(match && *(match - 1) != '\\'){
-                    return (match - str) + 1;
-               }
-          }
-     }
-
-     return 0;
-}
-
-int64_t match_c_character_literal(const char* str){
-     if(*str == '\''){
-          const char* match = str;
-          while(match){
-               match = strchr(match + 1, '\'');
-               if(match && *(match - 1) != '\\'){
-                    int64_t len = (match - str) + 1;
-                    if(len == 3) return len;
-                    if(*(str + 1) == '\\') return len;
-                    return 0;
-               }
-          }
-     }
-
-     return 0;
-}
-
-static int64_t match_c_literal(const char* str, const char* beginning_of_line)
-{
-     const char* itr = str;
-     int64_t count = 0;
-     char ch = *itr;
-     bool seen_decimal = false;
-     bool seen_hex = false;
-     bool seen_u = false;
-     bool seen_digit = false;
-     int seen_l = 0;
-
-     while(ch != 0){
-          if(isdigit(ch)){
-               if(seen_u || seen_l) break;
-               seen_digit = true;
-               count++;
-          }else if(!seen_decimal && ch == '.'){
-               if(seen_u || seen_l) break;
-               seen_decimal = true;
-               count++;
-          }else if(ch == 'f' && seen_decimal){
-               if(seen_u || seen_l) break;
-               count++;
-               break;
-          }else if(ch == '-' && itr == str){
-               count++;
-          }else if(ch == 'x' && itr == (str + 1)){
-               seen_hex = true;
-               count++;
-          }else if((ch == 'u' || ch == 'U') && !seen_u){
-               seen_u = true;
-               count++;
-          }else if((ch == 'l' || ch == 'L') && seen_l < 2){
-               seen_l++;
-               count++;
-          }else if(seen_hex){
-               if(seen_u || seen_l) break;
-
-               bool valid_hex_char = false;
-
-               switch(ch){
-               default:
-                    break;
-               case 'a':
-               case 'b':
-               case 'c':
-               case 'd':
-               case 'e':
-               case 'f':
-               case 'A':
-               case 'B':
-               case 'C':
-               case 'D':
-               case 'E':
-               case 'F':
-                    count++;
-                    valid_hex_char = true;
-                    break;
-               }
-
-               if(!valid_hex_char) break;
-          }else{
-               break;
-          }
-
-          itr++;
-          ch = *itr;
-     }
-
-     if(count == 1 && (str[0] == '-' || str[0] == '.')) return 0;
-     if(!seen_digit) return 0;
-
-     // check if the previous character is not a delimiter
-     if(str > beginning_of_line){
-          const char* prev = str - 1;
-          if(is_caps_var_char(*prev) || isalpha(*prev)) return 0;
-     }
-
-     return count;
-}
-
-static int64_t match_trailing_whitespace(const char* str){
-     const char* itr = str;
-     while(*itr){
-          if(!isspace(*itr)) return 0;
-          itr++;
-     }
-
-     return (itr - str);
-}
-
-static void change_draw_color(DrawColorList_t* draw_color_list, SyntaxDef_t* syntax_defs, SyntaxColor_t syntax_color, CePoint_t point){
-     int fg = syntax_def_get_fg(syntax_defs, syntax_color, draw_color_list_last_fg_color(draw_color_list));
-     int bg = syntax_def_get_bg(syntax_defs, syntax_color, draw_color_list_last_bg_color(draw_color_list));
-     draw_color_list_insert(draw_color_list, fg, bg, point);
-}
-
-void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_list, SyntaxDef_t* syntax_defs){
-     if(!view->buffer) return;
-     if(view->buffer->line_count <= 0) return;
-     if(view->buffer->type != CE_BUFFER_FILE_TYPE_C) return;
-     int64_t min = view->scroll.y;
-     int64_t max = min + (view->rect.bottom - view->rect.top);
-     int64_t clamp_max = (view->buffer->line_count - 1);
-     if(clamp_max < 0) clamp_max = 0;
-     CE_CLAMP(min, 0, clamp_max);
-     CE_CLAMP(max, 0, clamp_max);
-     int64_t match_len = 0;
-     bool multiline_comment = false;
-     int bg_color = COLOR_DEFAULT; // TODO: eval bg_color to see if we can eliminate it since updating how visual mode is highlighted
-     CePoint_t visual_start;
-     CePoint_t visual_end;
-
-     if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
-          if(ce_point_after(view->cursor, vim->visual)){
-               visual_start = vim->visual;
-               visual_end = view->cursor;
-          }else{
-               visual_start = view->cursor;
-               visual_end = vim->visual;
-          }
-     }
-
-     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
-          if(view->cursor.x < vim->visual.x){
-               visual_start.x = view->cursor.x;
-               visual_end.x = vim->visual.x;
-          }else{
-               visual_start.x = vim->visual.x;
-               visual_end.x = view->cursor.x;
-          }
-
-          if(view->cursor.y < vim->visual.y){
-               visual_start.y = view->cursor.y;
-               visual_end.y = vim->visual.y;
-          }else{
-               visual_start.y = vim->visual.y;
-               visual_end.y = view->cursor.y;
-          }
-     }
-
-     for(int64_t y = min; y <= max; ++y){
-          char* line = view->buffer->lines[y];
-          int64_t line_len = strlen(line);
-          int64_t current_match_len = 1;
-          CePoint_t match_point = {0, y};
-
-          if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
-               if(match_point.y >= visual_start.y &&
-                  match_point.y <= visual_end.y){
-                    bg_color = COLOR_WHITE;
-                    change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
-               }else{
-                    if(bg_color == COLOR_WHITE){
-                         bg_color = COLOR_DEFAULT;
-                         draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
-                    }else{
-                         bg_color = COLOR_DEFAULT;
-                    }
-               }
-          }else if(vim->mode == CE_VIM_MODE_VISUAL){
-               if(ce_points_equal(match_point, visual_start) ||
-                  ce_points_equal(match_point, visual_end) ||
-                  (ce_point_after(match_point, visual_start) &&
-                   !ce_point_after(match_point, visual_end))){
-                    change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
-               }
-          }else if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
-               if(match_point.x >= visual_start.x && match_point.x <= visual_end.x &&
-                  match_point.y >= visual_start.y && match_point.y <= visual_end.y){
-                    change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
-               }
-          }
-
-          for(int64_t x = 0; x < line_len; ++x){
-               char* str = line + x;
-               match_point.x = x;
-
-               if(vim->mode == CE_VIM_MODE_VISUAL){
-                    if(ce_points_equal(match_point, visual_start) ||
-                       ce_points_equal(match_point, visual_end) ||
-                       (ce_point_after(match_point, visual_start) &&
-                        !ce_point_after(match_point, visual_end))){
-                         if(bg_color == COLOR_DEFAULT){
-                              bg_color = COLOR_WHITE;
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
-                         }else{
-                              bg_color = COLOR_WHITE;
-                         }
-                    }else{
-                         if(bg_color == COLOR_WHITE){
-                              bg_color = COLOR_DEFAULT;
-                              draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
-                         }else{
-                              bg_color = COLOR_DEFAULT;
-                         }
-                    }
-               }else if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
-                    if(match_point.x >= visual_start.x && match_point.x <= visual_end.x &&
-                       match_point.y >= visual_start.y && match_point.y <= visual_end.y){
-                         if(bg_color == COLOR_DEFAULT){
-                              bg_color = COLOR_WHITE;
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_VISUAL, match_point);
-                         }else{
-                              bg_color = COLOR_WHITE;
-                         }
-                    }else{
-                         if(bg_color == COLOR_WHITE){
-                              bg_color = COLOR_DEFAULT;
-                              draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
-                         }else{
-                              bg_color = COLOR_DEFAULT;
-                         }
-                    }
-               }
-
-               if(current_match_len <= 1){
-                    if(multiline_comment){
-                         if((match_len = match_c_multiline_comment_end(str))){
-                              multiline_comment = false;
-                         }
-                    }else{
-                         if((match_len = match_c_type(str, line))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_TYPE, match_point);
-                         }else if((match_len = match_c_keyword(str, line))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_KEYWORD, match_point);
-                         }else if((match_len = match_c_control(str, line))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_CONTROL, match_point);
-                         }else if((match_len = match_caps_var(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_CAPS_VAR, match_point);
-                         }else if((match_len = match_c_comment(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_COMMENT, match_point);
-                         }else if((match_len = match_c_string(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_STRING, match_point);
-                         }else if((match_len = match_c_character_literal(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_CHAR_LITERAL, match_point);
-                         }else if((match_len = match_c_literal(str, line))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_NUMBER_LITERAL, match_point);
-                         }else if((match_len = match_c_preproc(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_PREPROCESSOR, match_point);
-                         }else if((match_len = match_c_multiline_comment(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_COMMENT, match_point);
-                              multiline_comment = true;
-                         }else if(((view->cursor.y != y) || (x >= view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              draw_color_list_insert(draw_color_list, syntax_def_get_fg(syntax_defs, SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                     syntax_def_get_bg(syntax_defs, SYNTAX_COLOR_NORMAL, COLOR_DEFAULT), (CePoint_t){0, match_point.y + 1});
-                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != bg_color)){
-                              change_draw_color(draw_color_list, syntax_defs, SYNTAX_COLOR_NORMAL, match_point);
-                         }
-                    }
-
-                    if(match_len) current_match_len = match_len;
-               }else{
-                    current_match_len--;
-               }
-          }
-
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(vim->mode == CE_VIM_MODE_VISUAL && bg_color == COLOR_WHITE && ce_point_after(match_point, visual_end)){
-               bg_color = COLOR_DEFAULT;
-               draw_color_list_insert(draw_color_list, draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
-          }
-     }
 }
 
 typedef struct{
      CeLayout_t* layout;
      CeVim_t* vim;
      int64_t tab_width;
-     SyntaxDef_t* syntax_defs;
+     CeSyntaxDef_t* syntax_defs;
      volatile bool ready_to_draw;
      volatile bool* input_mode;
      CeView_t* input_view;
      bool done;
 }DrawThreadData_t;
 
-void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_list, ColorDefs_t* color_defs){
+void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs){
      pthread_mutex_lock(&view->buffer->lock);
 
      int64_t view_height = view->rect.bottom - view->rect.top;
@@ -794,7 +209,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
      memset(tab_str, ' ', tab_width);
      tab_str[tab_width] = 0;
 
-     DrawColorNode_t* draw_color_node = draw_color_list->head;
+     CeDrawColorNode_t* draw_color_node = draw_color_list->head;
 
      standend();
      if(view->buffer->line_count > 0){
@@ -817,7 +232,7 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
 
                          // check if we need to move to the next color
                          while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
-                              int change_color_pair = color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
+                              int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
                               attron(COLOR_PAIR(change_color_pair));
                               draw_color_node = draw_color_node->next;
                          }
@@ -858,10 +273,10 @@ void draw_view(CeView_t* view, int64_t tab_width, DrawColorList_t* draw_color_li
      pthread_mutex_unlock(&view->buffer->lock);
 }
 
-void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs, int64_t height_offset){
+void draw_view_status(CeView_t* view, CeVim_t* vim, CeColorDefs_t* color_defs, int64_t height_offset){
      // create bottom bar bg
      int64_t bottom = view->rect.bottom + height_offset;
-     int color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+     int color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
      attron(COLOR_PAIR(color_pair));
      int64_t width = (view->rect.right - view->rect.left) + 1;
      move(bottom, view->rect.left);
@@ -905,15 +320,15 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs, int
      }
 
      if(vim_mode_string){
-          color_pair = color_def_get(color_defs, vim_mode_fg, COLOR_BRIGHT_BLACK);
+          color_pair = ce_color_def_get(color_defs, vim_mode_fg, COLOR_BRIGHT_BLACK);
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", vim_mode_string);
 
-          color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
           attron(COLOR_PAIR(color_pair));
           printw(" %s", view->buffer->name);
      }else{
-          color_pair = color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", view->buffer->name);
      }
@@ -930,20 +345,20 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, ColorDefs_t* color_defs, int
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, ColorDefs_t* color_defs, int64_t tab_width, CeLayout_t* current,
-                 SyntaxDef_t* syntax_defs, int64_t terminal_width){
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeColorDefs_t* color_defs, int64_t tab_width, CeLayout_t* current,
+                 CeSyntaxDef_t* syntax_defs, int64_t terminal_width){
      switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
      {
-          DrawColorList_t draw_color_list = {};
-          syntax_highlight(&layout->view, vim, &draw_color_list, syntax_defs);
+          CeDrawColorList_t draw_color_list = {};
+          ce_syntax_highlight_c(&layout->view, vim, &draw_color_list, syntax_defs);
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
-          draw_color_list_free(&draw_color_list);
+          ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, color_defs, 0);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
-          int color_pair = color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_BLACK);
+          int color_pair = ce_color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_BLACK);
           attron(COLOR_PAIR(color_pair));
           if(layout->view.rect.right < (terminal_width - 1)){
                for(int i = 0; i < rect_height; i++){
@@ -979,7 +394,7 @@ void* draw_thread(void* thread_data){
      struct timeval previous_draw_time;
      struct timeval current_draw_time;
      uint64_t time_since_last_draw = 0;
-     ColorDefs_t color_defs = {};
+     CeColorDefs_t color_defs = {};
 
      while(!data->done){
           time_since_last_draw = 0;
@@ -998,7 +413,7 @@ void* draw_thread(void* thread_data){
           // draw a tab bar if there is more than 1 tab
           if(tab_list_layout->tab_list.tab_count > 1){
                move(0, 0);
-               int color_pair = color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+               int color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
                attron(COLOR_PAIR(color_pair));
                for(int64_t i = tab_list_layout->tab_list.rect.left; i <= tab_list_layout->tab_list.rect.right; i++){
                     addch(' ');
@@ -1008,10 +423,10 @@ void* draw_thread(void* thread_data){
 
                for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
                     if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
-                         color_pair = color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+                         color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
                          attron(COLOR_PAIR(color_pair));
                     }else{
-                         color_pair = color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+                         color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
                          attron(COLOR_PAIR(color_pair));
                     }
 
@@ -1030,10 +445,10 @@ void* draw_thread(void* thread_data){
                       tab_list_layout->tab_list.rect.right);
 
           if(*data->input_mode){
-               DrawColorList_t draw_color_list = {};
-               syntax_highlight(data->input_view, data->vim, &draw_color_list, data->syntax_defs);
+               CeDrawColorList_t draw_color_list = {};
+               ce_syntax_highlight_c(data->input_view, data->vim, &draw_color_list, data->syntax_defs);
                draw_view(data->input_view, data->tab_width, &draw_color_list, &color_defs);
-               draw_color_list_free(&draw_color_list);
+               ce_draw_color_list_free(&draw_color_list);
                int64_t new_status_bar_offset = (data->input_view->rect.bottom - data->input_view->rect.top) + 1;
                draw_view_status(data->input_view, data->vim, &color_defs, 0);
                draw_view_status(&tab_layout->tab.current->view, NULL, &color_defs, -new_status_bar_offset);
@@ -1059,7 +474,7 @@ void* draw_thread(void* thread_data){
                     break;
                }
 
-               int color_pair = color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+               int color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
                attron(COLOR_PAIR(color_pair));
                for(int i = 1; i < rect_height - 1; i++){
                     mvaddch(rect->top + i, rect->right, ACS_VLINE);
@@ -1165,7 +580,7 @@ typedef struct{
      CeView_t input_view;
      bool input_mode;
      CeLayout_t* tab_list_layout;
-     SyntaxDef_t* syntax_defs;
+     CeSyntaxDef_t* syntax_defs;
      BufferNode_t* buffer_node_head;
      CeCommandEntry_t* command_entries;
      int64_t command_entry_count;
@@ -1607,36 +1022,36 @@ int main(int argc, char** argv){
      App_t app = {};
 
      // init custon syntax highlighting
-     SyntaxDef_t syntax_defs[SYNTAX_COLOR_COUNT];
+     CeSyntaxDef_t syntax_defs[CE_SYNTAX_COLOR_COUNT];
      {
-          syntax_defs[SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
-          syntax_defs[SYNTAX_COLOR_NORMAL].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
-          syntax_defs[SYNTAX_COLOR_TYPE].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
-          syntax_defs[SYNTAX_COLOR_KEYWORD].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
-          syntax_defs[SYNTAX_COLOR_CONTROL].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
-          syntax_defs[SYNTAX_COLOR_CAPS_VAR].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
-          syntax_defs[SYNTAX_COLOR_COMMENT].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_STRING].fg = COLOR_RED;
-          syntax_defs[SYNTAX_COLOR_STRING].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
-          syntax_defs[SYNTAX_COLOR_CHAR_LITERAL].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
-          syntax_defs[SYNTAX_COLOR_NUMBER_LITERAL].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
-          syntax_defs[SYNTAX_COLOR_PREPROCESSOR].bg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
-          syntax_defs[SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
-          syntax_defs[SYNTAX_COLOR_VISUAL].fg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
-          syntax_defs[SYNTAX_COLOR_MATCH].fg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
-          syntax_defs[SYNTAX_COLOR_CURRENT_LINE].fg = SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[SYNTAX_COLOR_CURRENT_LINE].bg = COLOR_BRIGHT_BLACK;
+          syntax_defs[CE_SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
+          syntax_defs[CE_SYNTAX_COLOR_NORMAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
+          syntax_defs[CE_SYNTAX_COLOR_TYPE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
+          syntax_defs[CE_SYNTAX_COLOR_KEYWORD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
+          syntax_defs[CE_SYNTAX_COLOR_CONTROL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
+          syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
+          syntax_defs[CE_SYNTAX_COLOR_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_STRING].fg = COLOR_RED;
+          syntax_defs[CE_SYNTAX_COLOR_STRING].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
+          syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
+          syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
+          syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
+          syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
+          syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
+          syntax_defs[CE_SYNTAX_COLOR_MATCH].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
+          syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+          syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].bg = COLOR_BRIGHT_BLACK;
 
           app.syntax_defs = syntax_defs;
      }
@@ -1696,13 +1111,6 @@ int main(int argc, char** argv){
                CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
                ce_buffer_alloc(buffer, 1, "unnamed");
           }
-     }
-
-     // init terminal
-     {
-          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height);
-          buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
      }
 
      // init keybinds
@@ -1777,6 +1185,13 @@ int main(int argc, char** argv){
           draw_thread_data->ready_to_draw = true;
      }
 
+     // init terminal
+     {
+          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
+          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, &draw_thread_data->ready_to_draw);
+          buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
+     }
+
      // main loop
      while(!app.quit){
           // handle if terminal was resized
@@ -1805,8 +1220,12 @@ int main(int argc, char** argv){
           int key = getch();
           bool handled_key = false;
 
-          if(view && view->buffer == app.terminal.buffer){
-               ce_terminal_send_key(&app.terminal, key);
+          if(view && view->buffer == app.terminal.buffer && app.vim.mode == CE_VIM_MODE_INSERT){
+               if(key == 27){
+                    app.vim.mode = CE_VIM_MODE_NORMAL;
+               }else{
+                    ce_terminal_send_key(&app.terminal, key);
+               }
                handled_key = true;
           }
 
