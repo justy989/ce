@@ -114,6 +114,9 @@ typedef struct{
      int32_t columns;
      CeTerminalGlyph_t** lines;
      CeTerminalGlyph_t** alternate_lines;
+     CeBuffer_t* buffer; // current buffer
+     CeBuffer_t* lines_buffer;
+     CeBuffer_t* alternate_lines_buffer;
      bool* dirty_lines;
      CeTerminalCursor_t cursor;
      CeTerminalCursor_t save_cursor[2];

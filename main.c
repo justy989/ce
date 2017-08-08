@@ -12,6 +12,7 @@
 #include "ce_vim.h"
 #include "ce_layout.h"
 #include "ce_command.h"
+#include "ce_terminal.h"
 
 typedef struct BufferNode_t{
      CeBuffer_t* buffer;
@@ -602,6 +603,7 @@ static void change_draw_color(DrawColorList_t* draw_color_list, SyntaxDef_t* syn
 void syntax_highlight(CeView_t* view, CeVim_t* vim, DrawColorList_t* draw_color_list, SyntaxDef_t* syntax_defs){
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
+     if(view->buffer->type != CE_BUFFER_FILE_TYPE_C) return;
      int64_t min = view->scroll.y;
      int64_t max = min + (view->rect.bottom - view->rect.top);
      int64_t clamp_max = (view->buffer->line_count - 1);
@@ -1174,6 +1176,7 @@ typedef struct{
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
      char edit_yank_register;
+     CeTerminal_t terminal;
      bool quit;
 }App_t;
 
@@ -1695,6 +1698,13 @@ int main(int argc, char** argv){
           }
      }
 
+     // init terminal
+     {
+          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
+          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height);
+          buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
+     }
+
      // init keybinds
      {
           KeyBindDef_t normal_mode_bind_defs[] = {
@@ -1795,8 +1805,14 @@ int main(int argc, char** argv){
           int key = getch();
           bool handled_key = false;
 
+          if(view && view->buffer == app.terminal.buffer){
+               ce_terminal_send_key(&app.terminal, key);
+               handled_key = true;
+          }
+
           // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
-          if(app.last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
+          if(!handled_key &&
+             app.last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
              app.last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
              app.last_vim_handle_result != CE_VIM_PARSE_CONTINUE &&
              app.vim.mode != CE_VIM_MODE_INSERT){
@@ -2070,6 +2086,8 @@ int main(int argc, char** argv){
      draw_thread_data->done = true;
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
+
+     ce_terminal_free(&app.terminal);
 
      buffer_node_free(&app.buffer_node_head);
      ce_layout_free(&app.tab_list_layout);

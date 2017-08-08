@@ -81,7 +81,9 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
                glyph->foreground = terminal->cursor.attributes.foreground;
                glyph->background = terminal->cursor.attributes.background;
                glyph->attributes = 0;
-               // TODO: set rune in buffer
+               char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
+               int64_t rune_len;
+               ce_utf8_encode(' ', str, strlen(str), &rune_len);
           }
      }
 }
@@ -211,10 +213,13 @@ static void terminal_put_newline(CeTerminal_t* terminal, bool first_column){
 }
 
 static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminalGlyph_t* attributes, int x, int y){
+     assert(x >= 0 && x < terminal->columns);
+     assert(y >= 0 && y < terminal->rows);
      terminal->dirty_lines[y] = true;
      terminal->lines[y][x] = *attributes;
-     //terminal->lines[y][x].rune = rune;
-     // TODO: set rune
+     char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
+     int64_t rune_len;
+     ce_utf8_encode(rune, str, strlen(str), &rune_len);
 }
 
 static void terminal_cursor_save(CeTerminal_t* terminal){
@@ -237,6 +242,13 @@ static void terminal_swap_screen(CeTerminal_t* terminal){
 
      terminal->lines = terminal->alternate_lines;
      terminal->alternate_lines = tmp_lines;
+
+     if(terminal->buffer == terminal->lines_buffer){
+          terminal->buffer = terminal->alternate_lines_buffer;
+     }else{
+          terminal->buffer = terminal->lines_buffer;
+     }
+
      terminal->mode ^= CE_TERMINAL_MODE_ALTSCREEN;
      terminal_all_dirty(terminal);
 }
@@ -1315,28 +1327,34 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
      terminal->rows = height;
      terminal->bottom = terminal->rows - 1;
 
-     // allocate lines
+     // allocate lines and alternate lines
      terminal->lines = calloc(terminal->rows, sizeof(*terminal->lines));
-     if(!terminal->lines) return false;
+     terminal->alternate_lines = calloc(terminal->rows, sizeof(*terminal->alternate_lines));
+
+     // allocate buffers
+     terminal->lines_buffer = calloc(1, sizeof(*terminal->lines_buffer));
+     terminal->alternate_lines_buffer = calloc(1, sizeof(*terminal->alternate_lines_buffer));
+     ce_buffer_alloc(terminal->lines_buffer, terminal->rows, "terminal");
+     ce_buffer_alloc(terminal->alternate_lines_buffer, terminal->rows, "terminal");
+     terminal->lines_buffer->status = CE_BUFFER_STATUS_READONLY;
+     terminal->alternate_lines_buffer->status = CE_BUFFER_STATUS_READONLY;
+     terminal->buffer = terminal->lines_buffer;
 
      for(int r = 0; r < terminal->rows; ++r){
           terminal->lines[r] = calloc(terminal->columns, sizeof(*terminal->lines[r]));
-          if(!terminal->lines[r]) return false;
+          terminal->alternate_lines[r] = calloc(terminal->columns, sizeof(*terminal->alternate_lines[r]));
 
           // default fg and bg
           for(int g = 0; g < terminal->columns; ++g){
                terminal->lines[r][g].foreground = -1;
                terminal->lines[r][g].background = -1;
           }
-     }
 
-     // allocate alternate lines
-     terminal->alternate_lines = calloc(terminal->rows, sizeof(*terminal->alternate_lines));
-     if(!terminal->alternate_lines) return false;
+          terminal->lines_buffer->lines[r] = malloc(terminal->columns + 1 * sizeof(CeRune_t));
+          terminal->alternate_lines_buffer->lines[r] = malloc(terminal->columns + 1 * sizeof(CeRune_t));
 
-     for(int r = 0; r < terminal->rows; ++r){
-          terminal->alternate_lines[r] = calloc(terminal->columns, sizeof(*terminal->alternate_lines[r]));
-          if(!terminal->alternate_lines[r]) return false;
+          memset(terminal->lines_buffer->lines[r], ' ', terminal->columns);
+          memset(terminal->alternate_lines_buffer->lines[r], ' ', terminal->columns);
      }
 
      terminal->tabs = calloc(terminal->columns, sizeof(*terminal->tabs));
@@ -1344,19 +1362,22 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
      terminal_reset(terminal);
 
      if(!tty_create(terminal->rows, terminal->columns, &terminal->pid, &terminal->file_descriptor)){
-          return 1;
+          return false;
      }
 
-     int rc = pthread_create(&terminal->thread, NULL, tty_reader, &terminal);
+     int rc = pthread_create(&terminal->thread, NULL, tty_reader, terminal);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
-          return 1;
+          return false;
      }
 
      return true;
 }
 
 void ce_terminal_free(CeTerminal_t* terminal){
+     pthread_cancel(terminal->thread);
+     pthread_join(terminal->thread, NULL);
+
      for(int r = 0; r < terminal->rows; ++r){
           free(terminal->lines[r]);
      }
