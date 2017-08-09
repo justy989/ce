@@ -1303,7 +1303,7 @@ static void* tty_reader(void* data)
                }
           }
 
-          *terminal->ready_to_draw = true;
+          terminal->ready_to_draw = true;
           sleep(0);
      }
 
@@ -1386,11 +1386,10 @@ static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descript
      return true;
 }
 
-bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, volatile bool* ready_to_draw){
+bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
      terminal->columns = width;
      terminal->rows = height;
      terminal->bottom = terminal->rows - 1;
-     terminal->ready_to_draw = ready_to_draw;
 
      // allocate lines and alternate lines
      terminal->lines = calloc(terminal->rows, sizeof(*terminal->lines));

@@ -430,7 +430,7 @@ void* draw_thread(void* thread_data){
           time_since_last_draw = 0;
           gettimeofday(&previous_draw_time, NULL);
 
-          while(!data->ready_to_draw || time_since_last_draw < DRAW_USEC_LIMIT){
+          while((!data->ready_to_draw && !data->terminal->ready_to_draw) || time_since_last_draw < DRAW_USEC_LIMIT){
                gettimeofday(&current_draw_time, NULL);
                time_since_last_draw = (current_draw_time.tv_sec - previous_draw_time.tv_sec) * 1000000LL +
                                       (current_draw_time.tv_usec - previous_draw_time.tv_usec);
@@ -1223,7 +1223,7 @@ int main(int argc, char** argv){
      // init terminal
      {
           getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, &draw_thread_data->ready_to_draw);
+          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1);
           buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
      }
 
