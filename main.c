@@ -533,6 +533,7 @@ void* draw_thread(void* thread_data){
           refresh();
 
           data->ready_to_draw = false;
+          data->terminal->ready_to_draw = false;
      }
 
      return NULL;

@@ -1,4 +1,5 @@
 #include "ce_terminal.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -83,7 +84,7 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
                glyph->attributes = 0;
                char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
                int64_t rune_len;
-               ce_utf8_encode(' ', str, strlen(str), &rune_len);
+               ce_utf8_encode(' ', str, terminal->columns - x, &rune_len);
           }
      }
 }
@@ -176,9 +177,11 @@ static void terminal_insert_blank(CeTerminal_t* terminal, int n){
      }
 
      // overwrite dst
+     char* itr_dst = line_dst;
      for(int i = 0; i < size; i++){
           int64_t rune_len = 0;
-          ce_utf8_encode(runes[i], line_dst, strlen(line_dst), &rune_len);
+          ce_utf8_encode(runes[i], itr_dst, strlen(itr_dst), &rune_len);
+          itr_dst += rune_len;
      }
 
      terminal_clear_region(terminal, src, terminal->cursor.y, dst - 1, terminal->cursor.y);
@@ -311,9 +314,11 @@ static void terminal_delete_char(CeTerminal_t* terminal, int n){
      }
 
      // overwrite dst
+     char* itr_dst = line_dst;
      for(int i = 0; i < size; i++){
           int64_t rune_len = 0;
-          ce_utf8_encode(runes[i], line_dst, strlen(line_dst), &rune_len);
+          ce_utf8_encode(runes[i], itr_dst, strlen(itr_dst), &rune_len);
+          itr_dst += rune_len;
      }
 
      terminal_clear_region(terminal, terminal->columns - n, terminal->cursor.y, terminal->columns - 1, terminal->cursor.y);
@@ -1238,6 +1243,7 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
           int size = (terminal->columns - terminal->cursor.x - width);
           memmove(current_glyph + width, current_glyph, size * sizeof(*current_glyph));
 
+          // TODO: compress with similar code above
           // figure out our start and end
           char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], terminal->cursor.x);
           char* line_dst = line_src + width;
@@ -1250,9 +1256,11 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
           }
 
           // overwrite dst
+          char* itr_dst = line_dst;
           for(int i = 0; i < size; i++){
                int64_t rune_len = 0;
-               ce_utf8_encode(runes[i], line_dst, strlen(line_dst), &rune_len);
+               ce_utf8_encode(runes[i], itr_dst, strlen(itr_dst), &rune_len);
+               itr_dst += rune_len;
           }
      }
 
