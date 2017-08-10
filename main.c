@@ -223,8 +223,6 @@ typedef struct{
 }DrawThreadData_t;
 
 void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs){
-     pthread_mutex_lock(&view->buffer->lock);
-
      int64_t view_height = view->rect.bottom - view->rect.top;
      int64_t view_width = view->rect.right - view->rect.left;
      int64_t row_min = view->scroll.y;
@@ -295,8 +293,6 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
                for(; x <= col_max; x++) addch(' ');
           }
      }
-
-     pthread_mutex_unlock(&view->buffer->lock);
 }
 
 void draw_view_status(CeView_t* view, CeVim_t* vim, CeColorDefs_t* color_defs, int64_t height_offset){
@@ -379,12 +375,15 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* termin
      case CE_LAYOUT_TYPE_VIEW:
      {
           CeDrawColorList_t draw_color_list = {};
-          if(layout->view.buffer == terminal->buffer){
+          pthread_mutex_lock(&layout->view.buffer->lock);
+          if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
+               layout->view.buffer = terminal->buffer;
                syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
           }else{
                ce_syntax_highlight_c(&layout->view, vim, &draw_color_list, syntax_defs);
           }
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
+          pthread_mutex_unlock(&layout->view.buffer->lock);
           ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, color_defs, 0);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
@@ -427,14 +426,20 @@ void* draw_thread(void* thread_data){
      CeColorDefs_t color_defs = {};
 
      while(!data->done){
-          time_since_last_draw = 0;
           gettimeofday(&previous_draw_time, NULL);
 
-          while((!data->ready_to_draw && !data->terminal->ready_to_draw) || time_since_last_draw < DRAW_USEC_LIMIT){
+          while(true){
                gettimeofday(&current_draw_time, NULL);
                time_since_last_draw = (current_draw_time.tv_sec - previous_draw_time.tv_sec) * 1000000LL +
                                       (current_draw_time.tv_usec - previous_draw_time.tv_usec);
-               sleep(0);
+               if(data->ready_to_draw && time_since_last_draw >= DRAW_USEC_LIMIT){
+                    data->ready_to_draw = false;
+                    break;
+               }else if(data->terminal->ready_to_draw && time_since_last_draw >= DRAW_USEC_LIMIT){
+                    data->terminal->ready_to_draw = false;
+                    break;
+               }
+               usleep(0);
           }
 
           CeLayout_t* tab_list_layout = data->layout;
@@ -531,9 +536,6 @@ void* draw_thread(void* thread_data){
           }
 
           refresh();
-
-          data->ready_to_draw = false;
-          data->terminal->ready_to_draw = false;
      }
 
      return NULL;
@@ -1258,11 +1260,12 @@ int main(int argc, char** argv){
 
           if(view && (view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer) &&
                app.vim.mode == CE_VIM_MODE_INSERT){
-               // set the view's buffer to be whichever buffer the terminal is currently using
-               view->buffer = app.terminal.buffer;
-
                if(key == 27){
                     app.vim.mode = CE_VIM_MODE_NORMAL;
+               }else if(key == 1){ // ctrl + a
+                    // TODO: make this configurable
+                    // send escape
+                    ce_terminal_send_key(&app.terminal, 27);
                }else{
                     ce_terminal_send_key(&app.terminal, key);
                }

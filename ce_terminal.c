@@ -1431,17 +1431,20 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
                terminal->lines[r][g].background = -1;
           }
 
-          // alloc buffer lines
-          terminal->lines_buffer->lines[r] = malloc(terminal->columns + 1 * sizeof(CeRune_t));
-          terminal->alternate_lines_buffer->lines[r] = malloc(terminal->columns + 1 * sizeof(CeRune_t));
+          // alloc buffer lines, accounting for the fact that all characters could be in max UTF8 size
+          size_t bytes = (terminal->columns + 1) * CE_UTF8_SIZE;
+          terminal->lines_buffer->lines[r] = malloc(bytes);
+          terminal->alternate_lines_buffer->lines[r] = malloc(bytes);
 
           // set them to blank
           memset(terminal->lines_buffer->lines[r], ' ', terminal->columns);
           memset(terminal->alternate_lines_buffer->lines[r], ' ', terminal->columns);
 
-          // null terminate
-          terminal->lines_buffer->lines[r][terminal->columns] = 0;
-          terminal->alternate_lines_buffer->lines[r][terminal->columns] = 0;
+          // null terminate end of current string to end of entire string
+          for(size_t i = terminal->columns; i < bytes; i++){
+               terminal->lines_buffer->lines[r][i] = 0;
+               terminal->alternate_lines_buffer->lines[r][i] = 0;
+          }
      }
 
      terminal->tabs = calloc(terminal->columns, sizeof(*terminal->tabs));
