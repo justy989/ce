@@ -1256,7 +1256,11 @@ int main(int argc, char** argv){
           int key = getch();
           bool handled_key = false;
 
-          if(view && view->buffer == app.terminal.buffer && app.vim.mode == CE_VIM_MODE_INSERT){
+          if(view && (view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer) &&
+               app.vim.mode == CE_VIM_MODE_INSERT){
+               // set the view's buffer to be whichever buffer the terminal is currently using
+               view->buffer = app.terminal.buffer;
+
                if(key == 27){
                     app.vim.mode = CE_VIM_MODE_NORMAL;
                }else{

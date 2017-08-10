@@ -835,7 +835,7 @@ static void csi_parse(CeTerminalCSIEscape_t* csi){
      }
 
      csi->buffer[csi->buffer_length] = 0;
-     while(str < csi->buffer + csi->buffer_length){
+     while(str < (csi->buffer + csi->buffer_length)){
           end = NULL;
           value = strtol(str, &end, 10);
 
@@ -1019,8 +1019,8 @@ static void csi_handle(CeTerminal_t* terminal){
           break;
      case 'n':
           if(csi->arguments[0] == 6){
-               char buffer[BUFSIZ];
-               int len = snprintf(buffer, BUFSIZ, "\033[%i;%iR",
+               char buffer[64];
+               int len = snprintf(buffer, 64, "\033[%i;%iR",
                               terminal->cursor.x, terminal->cursor.y);
                tty_write(terminal->file_descriptor, buffer, len);
           }
