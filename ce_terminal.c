@@ -174,6 +174,7 @@ static void terminal_insert_blank(CeTerminal_t* terminal, int n){
      for(int i = 0; i < size; i++){
           int64_t rune_len = 0;
           runes[i] = ce_utf8_decode(line_src, &rune_len);
+          line_src += rune_len;
      }
 
      // overwrite dst
@@ -311,6 +312,7 @@ static void terminal_delete_char(CeTerminal_t* terminal, int n){
      for(int i = 0; i < size; i++){
           int64_t rune_len = 0;
           runes[i] = ce_utf8_decode(line_src, &rune_len);
+          line_src += rune_len;
      }
 
      // overwrite dst
@@ -1253,6 +1255,7 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
           for(int i = 0; i < size; i++){
                int64_t rune_len = 0;
                runes[i] = ce_utf8_decode(line_src, &rune_len);
+               line_src += rune_len;
           }
 
           // overwrite dst
@@ -1296,19 +1299,10 @@ static void* tty_reader(void* data)
 
           buffer_length = rc;
 
-          if(buffer_length < BUFSIZ){
-               buffer[buffer_length] = 0;
-          }else{
-               // TODO: do we ever hit this case?
-               buffer[BUFSIZ - 1] = 0;
-          }
-
           for(int i = 0; i < buffer_length; ++i){
                decoded = ce_utf8_decode(buffer + i, &decoded_length);
-               if(decoded != CE_UTF8_INVALID){
-                    terminal_put(terminal, decoded);
-                    i += (decoded_length - 1);
-               }
+               terminal_put(terminal, decoded);
+               i += (decoded_length - 1);
           }
 
           terminal->ready_to_draw = true;
@@ -1392,6 +1386,21 @@ static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descript
      }
 
      return true;
+}
+
+static void terminal_echo(CeTerminal_t* terminal, CeRune_t rune){
+     if(is_controller(rune)){
+          if(rune & 0x80){
+               rune &= 0x7f;
+               terminal_put(terminal, '^');
+               terminal_put(terminal, '[');
+          }else if(rune != '\n' && rune != '\r' && rune != '\t'){
+               rune ^= 0x40;
+               terminal_put(terminal, '^');
+          }
+     }
+
+     terminal_put(terminal, rune);
 }
 
 bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
@@ -1507,13 +1516,11 @@ bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key){
           return false;
      }
 
-#if 0
      if(terminal->mode & CE_TERMINAL_MODE_ECHO){
-          for(int i = 0; i < len; i++){
+          for(size_t i = 0; i < len; i++){
                terminal_echo(terminal, string[i]);
           }
      }
-#endif
 
      if(free_string) free(string);
      return true;

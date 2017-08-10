@@ -6,12 +6,12 @@
 
 #include <pthread.h>
 
-#define CE_TERMINAL_TAB_SPACES 5 // TODO: use config_options
 #define CE_TERMINAL_NAME "xterm"
 #define CE_TERMINAL_DEFAULT_SHELL "/bin/bash"
 #define CE_TERMINAL_ESCAPE_BUFFER_SIZE (128 * CE_UTF8_SIZE)
 #define CE_TERMINAL_ESCAPE_ARGUMENT_SIZE 16
 #define CE_TERMINAL_VT_IDENTIFIER "\033[?6c"
+#define CE_TERMINAL_TAB_SPACES 5 // TODO: use config_options
 
 typedef enum{
      CE_TERMINAL_GLYPH_ATTRIBUTE_NONE       = 0,
