@@ -1266,6 +1266,21 @@ bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes
      return true;
 }
 
+int64_t ce_utf8_rune_len(CeRune_t u){
+     // TODO: optimize
+     if(u < 0x80){
+          return 1;
+     }else if(u < 0x0800){
+          return 2;
+     }else if(u < 0x10000){
+          return 3;
+     }else if(u < 0x110000){
+          return 4;
+     }
+
+     return true;
+}
+
 int64_t ce_util_count_string_lines(const char* string){
      int64_t string_length = strlen(string);
      int64_t line_count = 0;

@@ -249,7 +249,14 @@ static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminal
      terminal->dirty_lines[y] = true;
      terminal->lines[y][x] = *attributes;
      char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
-     int64_t rune_len;
+     assert(str);
+     int64_t rune_len = ce_utf8_rune_len(rune);
+     if(rune_len > 1){
+          // shift over all the runes after it, we should have enough allocated room to grow to terminal->columns * CE_UTF8_SIZE
+          char* src = str;
+          char* dst = str + rune_len;
+          memmove(dst, src, strlen(src));
+     }
      ce_utf8_encode(rune, str, strlen(str), &rune_len);
 }
 
@@ -1295,17 +1302,18 @@ static void* tty_reader(void* data)
           if(rc < 0){
                ce_log("%s() failed to read from tty file descriptor: '%s'\n", __FUNCTION__, strerror(errno));
                return NULL;
+          }else if(rc > 0){
+               buffer_length = rc;
+
+               for(int i = 0; i < buffer_length; ++i){
+                    decoded = ce_utf8_decode(buffer + i, &decoded_length);
+                    terminal_put(terminal, decoded);
+                    i += (decoded_length - 1);
+               }
+
+               terminal->ready_to_draw = true;
           }
 
-          buffer_length = rc;
-
-          for(int i = 0; i < buffer_length; ++i){
-               decoded = ce_utf8_decode(buffer + i, &decoded_length);
-               terminal_put(terminal, decoded);
-               i += (decoded_length - 1);
-          }
-
-          terminal->ready_to_draw = true;
           sleep(0);
      }
 
