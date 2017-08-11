@@ -25,11 +25,17 @@ CeLayout_t* ce_layout_tab_list_add(CeLayout_t* tab_list_layout){
      return new_tabs[tab_list_layout->tab_list.tab_count - 1];
 }
 
-CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
+CeLayout_t* ce_layout_view_init(CeBuffer_t* buffer){
      CeLayout_t* view_layout = calloc(1, sizeof(*view_layout));
      if(!view_layout) return NULL;
      view_layout->type = CE_LAYOUT_TYPE_VIEW;
      view_layout->view.buffer = buffer;
+     pthread_mutex_init(&view_layout->view.lock, NULL);
+     return view_layout;
+}
+
+CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
+     CeLayout_t* view_layout = ce_layout_view_init(buffer);
 
      CeLayout_t* tab_layout = calloc(1, sizeof(*tab_layout));
      if(!tab_layout) return NULL; // LEAK: leak view_layout
@@ -106,10 +112,8 @@ bool ce_layout_split(CeLayout_t* layout, bool vertical){
                break;
           case CE_LAYOUT_TYPE_LIST:
                if(parent_of_current->list.vertical == vertical){
-                    CeLayout_t* new_layout = calloc(1, sizeof(*new_layout));
+                    CeLayout_t* new_layout = ce_layout_view_init(buffer);
                     if(!new_layout) return false;
-                    new_layout->type = CE_LAYOUT_TYPE_VIEW;
-                    new_layout->view.buffer = buffer;
 
                     int64_t new_layout_count = parent_of_current->list.layout_count + 1;
                     parent_of_current->list.layouts = realloc(parent_of_current->list.layouts,

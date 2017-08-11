@@ -121,7 +121,7 @@ static CeBuffer_t* load_new_file_into_view(BufferNode_t** buffer_node_head, CeVi
      return buffer;
 }
 
-// 60 fps
+// limit to 60 fps
 #define DRAW_USEC_LIMIT 16666
 
 bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view, \
@@ -219,7 +219,7 @@ typedef struct{
      volatile bool ready_to_draw;
      volatile bool* input_mode;
      CeView_t* input_view;
-     bool done;
+     volatile bool done;
 }DrawThreadData_t;
 
 void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs){
@@ -375,7 +375,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* termin
      case CE_LAYOUT_TYPE_VIEW:
      {
           CeDrawColorList_t draw_color_list = {};
-          pthread_mutex_lock(&layout->view.buffer->lock);
+          pthread_mutex_lock(&layout->view.lock);
           if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
                layout->view.buffer = terminal->buffer;
                syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
@@ -383,7 +383,6 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* termin
                ce_syntax_highlight_c(&layout->view, vim, &draw_color_list, syntax_defs);
           }
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
-          pthread_mutex_unlock(&layout->view.buffer->lock);
           ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, color_defs, 0);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
@@ -394,6 +393,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* termin
                     mvaddch(layout->view.rect.top + i, layout->view.rect.right, ' ');
                }
           }
+          pthread_mutex_unlock(&layout->view.lock);
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
@@ -432,15 +432,19 @@ void* draw_thread(void* thread_data){
                gettimeofday(&current_draw_time, NULL);
                time_since_last_draw = (current_draw_time.tv_sec - previous_draw_time.tv_sec) * 1000000LL +
                                       (current_draw_time.tv_usec - previous_draw_time.tv_usec);
-               if(data->ready_to_draw && time_since_last_draw >= DRAW_USEC_LIMIT){
-                    data->ready_to_draw = false;
-                    break;
-               }else if(data->terminal->ready_to_draw && time_since_last_draw >= DRAW_USEC_LIMIT){
-                    data->terminal->ready_to_draw = false;
-                    break;
+               if(time_since_last_draw >= DRAW_USEC_LIMIT){
+                    if(data->ready_to_draw){
+                         data->ready_to_draw = false;
+                         break;
+                    }else if(data->terminal->ready_to_draw){
+                         data->terminal->ready_to_draw = false;
+                         break;
+                    }
                }
-               usleep(0);
+               sleep(0);
           }
+
+          erase();
 
           CeLayout_t* tab_list_layout = data->layout;
           CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
@@ -790,14 +794,14 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
-     if(view) pthread_mutex_lock(&view->buffer->lock);
-     ce_layout_split(tab_layout, vertical);
      if(view){
-          pthread_mutex_unlock(&view->buffer->lock);
-          view = &tab_layout->tab.current->view;
+          ce_layout_split(tab_layout, vertical);
 
+          view = &tab_layout->tab.current->view;
           ce_layout_distribute_rect(tab_layout, app->terminal_rect, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
                                     app->config_options.tab_width);
+     }else{
+          ce_layout_split(tab_layout, vertical);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1198,6 +1202,11 @@ int main(int argc, char** argv){
      {
           CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
+
+          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
+          app.terminal_rect = (CeRect_t){0, app.terminal_width - 1, 0, app.terminal_height - 1};
+          ce_layout_distribute_rect(app.tab_list_layout, app.terminal_rect, app.config_options.horizontal_scroll_off,
+                                    app.config_options.vertical_scroll_off, app.config_options.tab_width);
      }
 
      // setup input buffer
@@ -1220,6 +1229,7 @@ int main(int argc, char** argv){
           draw_thread_data->syntax_defs = syntax_defs;
           draw_thread_data->terminal = &app.terminal;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
+
           draw_thread_data->ready_to_draw = true;
      }
 
@@ -1251,8 +1261,12 @@ int main(int argc, char** argv){
                break;
           }
 
-          // setup input view rect
-          if(app.input_mode && view) input_view_overlay(&app.input_view, view);
+          if(view){
+               pthread_mutex_lock(&view->lock);
+
+               // setup input view rect
+               if(app.input_mode) input_view_overlay(&app.input_view, view);
+          }
 
           // wait for input from the user
           int key = getch();
@@ -1541,6 +1555,8 @@ int main(int argc, char** argv){
                build_yank_list(app.yank_list_buffer, app.vim.yanks);
           }
 
+          if(view) pthread_mutex_unlock(&view->lock);
+
           draw_thread_data->ready_to_draw = true;
      }
 
@@ -1550,6 +1566,14 @@ int main(int argc, char** argv){
      pthread_join(thread_draw, NULL);
 
      ce_terminal_free(&app.terminal);
+
+     KeyBinds_t* binds = &app.key_binds[CE_VIM_MODE_NORMAL];
+     for(int64_t i = 0; i < binds->count; ++i){
+          ce_command_free(&binds->binds[i].command);
+          if(!binds->binds[i].key_count) continue;
+          free(binds->binds[i].keys);
+     }
+     free(binds->binds);
 
      buffer_node_free(&app.buffer_node_head);
      ce_layout_free(&app.tab_list_layout);

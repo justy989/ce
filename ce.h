@@ -94,8 +94,6 @@ typedef struct{
      CePoint_t cursor_save;
      CePoint_t scroll_save;
 
-     pthread_mutex_t lock;
-
      CeBufferChangeNode_t* change_node;
      CeBufferChangeNode_t* save_at_change_node;
 
@@ -111,6 +109,8 @@ typedef struct{
      CeBuffer_t* buffer;
 
      void* user_data;
+
+     pthread_mutex_t lock;
 }CeView_t;
 
 typedef struct{

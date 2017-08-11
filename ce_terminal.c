@@ -84,7 +84,14 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
                glyph->attributes = 0;
                char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
                int64_t rune_len;
-               ce_utf8_encode(' ', str, terminal->columns - x, &rune_len);
+               ce_utf8_decode(str, &rune_len);
+               if(rune_len > 1){
+                    // shift down to overwrite the current rune's extra bytes, leaving the current rune's first byte open for the space
+                    char* src = str + rune_len;
+                    char* dst = str + 1;
+                    memmove(dst, src, strlen(src) + 1); // include moving down the null terminator
+               }
+               *str = ' ';
           }
      }
 }
@@ -255,7 +262,7 @@ static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminal
           // shift over all the runes after it, we should have enough allocated room to grow to terminal->columns * CE_UTF8_SIZE
           char* src = str;
           char* dst = str + rune_len;
-          memmove(dst, src, strlen(src));
+          memmove(dst, src, strlen(src) + 1); // include null terminator
      }
      ce_utf8_encode(rune, str, strlen(str), &rune_len);
 }
@@ -1488,8 +1495,23 @@ void ce_terminal_free(CeTerminal_t* terminal){
      free(terminal->alternate_lines);
      terminal->alternate_lines = NULL;
 
+     free(terminal->tabs);
+     terminal->tabs = NULL;
+
      free(terminal->dirty_lines);
      terminal->dirty_lines = NULL;
+
+     // the main program will free the other one
+     if(terminal->buffer == terminal->lines_buffer){
+          ce_buffer_free(terminal->alternate_lines_buffer);
+          free(terminal->alternate_lines_buffer);
+     }else{
+          ce_buffer_free(terminal->lines_buffer);
+          free(terminal->lines_buffer);
+     }
+
+     terminal->lines_buffer = NULL;
+     terminal->alternate_lines_buffer = NULL;
 }
 
 bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key){

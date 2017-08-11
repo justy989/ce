@@ -107,7 +107,6 @@ bool ce_buffer_alloc(CeBuffer_t* buffer, int64_t line_count, const char* name){
      }
 
      buffer->status = CE_BUFFER_STATUS_MODIFIED;
-     pthread_mutex_init(&buffer->lock, NULL);
      return true;
 }
 
@@ -119,8 +118,6 @@ void ce_buffer_free(CeBuffer_t* buffer){
      free(buffer->lines);
      free(buffer->name);
      if(buffer->change_node) ce_buffer_change_node_free(&buffer->change_node);
-
-     pthread_mutex_destroy(&buffer->lock);
 
      memset(buffer, 0, sizeof(*buffer));
 }
@@ -201,7 +198,6 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
           }
      }
 
-     pthread_mutex_init(&buffer->lock, NULL);
      return true;
 }
 
@@ -626,8 +622,6 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
      if(string_lines == 0){
           return true; // sure, yeah, we inserted that empty string
      }else if(string_lines == 1){
-          pthread_mutex_lock(&buffer->lock);
-
           char* line = buffer->lines[point.y];
           size_t insert_len = strlen(string);
           size_t existing_len = strlen(line);
@@ -635,10 +629,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
 
           // re-alloc the new size
           line = realloc(line, total_len + 1);
-          if(!line){
-               pthread_mutex_unlock(&buffer->lock);
-               return false;
-          }
+          if(!line) return false;
 
           // figure out where to move from and to
           char* src = ce_utf8_find_index(line, point.x);
@@ -652,7 +643,6 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           // tidy up
           line[total_len] = 0;
           buffer->lines[point.y] = line;
-          pthread_mutex_unlock(&buffer->lock);
           buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return true;
      }
@@ -1037,8 +1027,6 @@ void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_
                                                                 view->cursor.x, tab_width);
      }
 
-     pthread_mutex_lock(&view->buffer->lock);
-
      if(visible_index < scroll_left){
           view->scroll.x -= (scroll_left - visible_index);
           if(view->scroll.x < 0) view->scroll.x = 0;
@@ -1056,8 +1044,6 @@ void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_
      int64_t max_scroll_y = (view->buffer->line_count - view_height);
      if(max_scroll_y < 0) max_scroll_y = 0;
      CE_CLAMP(view->scroll.y, 0, max_scroll_y);
-
-     pthread_mutex_unlock(&view->buffer->lock);
 }
 
 void ce_view_scroll_to(CeView_t* view, CePoint_t point){

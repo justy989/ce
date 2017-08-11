@@ -131,7 +131,7 @@ typedef struct{
      int32_t* tabs;
      CeTerminalCSIEscape_t csi_escape;
      CeTerminalSTREscape_t str_escape;
-     bool ready_to_draw;
+     volatile bool ready_to_draw;
      pthread_t thread;
      pid_t pid;
 }CeTerminal_t;
