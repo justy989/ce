@@ -595,7 +595,7 @@ void* draw_thread(void* thread_data){
                }else{
                     complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
                }
-               complete_view.rect.top = complete_view.rect.bottom - app->complete_list_buffer->line_count;
+               complete_view.rect.top = complete_view.rect.bottom - (app->complete_list_buffer->line_count - 1);
                if(complete_view.rect.top < view_layout->view.rect.top){
                     complete_view.rect.top = view_layout->view.rect.top;
                }

@@ -15,6 +15,7 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
      }
 
      complete->count = string_count;
+     complete->current = -1;
      return true;
 }
 
