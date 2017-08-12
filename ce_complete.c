@@ -18,6 +18,12 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
      return true;
 }
 
+void ce_complete_reset(CeComplete_t* complete){
+     free(complete->current_match);
+     complete->current_match = NULL;
+     complete->current = -1;
+}
+
 void ce_complete_match(CeComplete_t* complete, const char* match){
      for(int64_t i = 0; i < complete->count; i++){
           const char* str = strstr(complete->elements[i].string, match);

@@ -228,6 +228,93 @@ void syntax_highlight_terminal(CeView_t* view, volatile CeTerminal_t* terminal, 
      }
 }
 
+typedef struct{
+     int* keys;
+     int64_t key_count;
+     CeCommand_t command;
+     CeVimMode_t vim_mode;
+}KeyBind_t;
+
+typedef struct{
+     KeyBind_t* binds;
+     int64_t count;
+}KeyBinds_t;
+
+typedef struct{
+     int keys[4];
+     const char* command;
+}KeyBindDef_t;
+
+static void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count)
+{
+     binds->count = bind_def_count;
+     binds->binds = malloc(binds->count * sizeof(*binds->binds));
+
+     for(int64_t i = 0; i < binds->count; ++i){
+          ce_command_parse(&binds->binds[i].command, bind_defs[i].command);
+          binds->binds[i].key_count = 0;
+
+          for(int k = 0; k < 4; ++k){
+               if(bind_defs[i].keys[k] == 0) break;
+               binds->binds[i].key_count++;
+          }
+
+          if(!binds->binds[i].key_count) continue;
+
+          binds->binds[i].keys = malloc(binds->binds[i].key_count * sizeof(binds->binds[i].keys[0]));
+
+          for(int k = 0; k < binds->binds[i].key_count; ++k){
+               binds->binds[i].keys[k] = bind_defs[i].keys[k];
+          }
+     }
+}
+
+
+#define APP_MAX_KEY_COUNT 16
+
+typedef struct{
+     CeRect_t terminal_rect;
+     CeVim_t vim;
+     CeConfigOptions_t config_options;
+     int terminal_width;
+     int terminal_height;
+     CeView_t input_view;
+     bool input_mode;
+     CeLayout_t* tab_list_layout;
+     CeSyntaxDef_t* syntax_defs;
+     BufferNode_t* buffer_node_head;
+     CeCommandEntry_t* command_entries;
+     int64_t command_entry_count;
+     CeVimParseResult_t last_vim_handle_result;
+     CeBuffer_t* buffer_list_buffer;
+     CeBuffer_t* yank_list_buffer;
+     CeBuffer_t* complete_list_buffer;
+     CeComplete_t command_complete;
+     KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
+     CeRune_t keys[APP_MAX_KEY_COUNT];
+     int64_t key_count;
+     char edit_yank_register;
+     CeTerminal_t terminal;
+     bool ready_to_draw;
+     bool quit;
+}App_t;
+
+void app_update_terminal_view(App_t* app){
+     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
+     app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
+                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
+}
+
+CeComplete_t* app_is_completing(App_t* app){
+     if(app->input_mode && strcmp(app->input_view.buffer->name, "COMMAND") == 0){
+          return &app->command_complete;
+     }
+
+     return NULL;
+}
+
+
 void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs){
      int64_t view_height = view->rect.bottom - view->rect.top;
      int64_t view_width = view->rect.right - view->rect.left;
@@ -422,20 +509,8 @@ static CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width){
                         view->cursor.y - view->scroll.y + view->rect.top};
 }
 
-typedef struct{
-     CeLayout_t* layout;
-     CeVim_t* vim;
-     int64_t tab_width;
-     CeSyntaxDef_t* syntax_defs;
-     CeTerminal_t* terminal;
-     bool ready_to_draw;
-     bool* input_mode;
-     CeView_t* input_view;
-     bool done;
-}DrawThreadData_t;
-
 void* draw_thread(void* thread_data){
-     DrawThreadData_t* data = (DrawThreadData_t*)thread_data;
+     App_t* app = (App_t*)(thread_data);
      struct timeval previous_draw_time;
      struct timeval current_draw_time;
      uint64_t time_since_last_draw = 0;
@@ -443,17 +518,17 @@ void* draw_thread(void* thread_data){
 
      gettimeofday(&previous_draw_time, NULL);
 
-     while(!data->done){
+     while(!app->quit){
           while(true){
                gettimeofday(&current_draw_time, NULL);
                time_since_last_draw = (current_draw_time.tv_sec - previous_draw_time.tv_sec) * 1000000LL +
                                       (current_draw_time.tv_usec - previous_draw_time.tv_usec);
                if(time_since_last_draw >= DRAW_USEC_LIMIT){
-                    if(data->ready_to_draw){
-                         data->ready_to_draw = false;
+                    if(app->ready_to_draw){
+                         app->ready_to_draw = false;
                          break;
-                    }else if(data->terminal->ready_to_draw){
-                         data->terminal->ready_to_draw = false;
+                    }else if(app->terminal.ready_to_draw){
+                         app->terminal.ready_to_draw = false;
                          break;
                     }
                }
@@ -464,7 +539,7 @@ void* draw_thread(void* thread_data){
 
           erase();
 
-          CeLayout_t* tab_list_layout = data->layout;
+          CeLayout_t* tab_list_layout = app->tab_list_layout;
           CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
 
           // draw a tab bar if there is more than 1 tab
@@ -498,15 +573,35 @@ void* draw_thread(void* thread_data){
           }
 
           standend();
-          draw_layout(tab_layout, data->vim, data->terminal, &color_defs, data->tab_width, tab_layout->tab.current,
-                      data->syntax_defs, tab_list_layout->tab_list.rect.right);
+          draw_layout(tab_layout, &app->vim, &app->terminal, &color_defs, app->config_options.tab_width, tab_layout->tab.current,
+                      app->syntax_defs, tab_list_layout->tab_list.rect.right);
 
-          if(*data->input_mode){
+          if(app->input_mode){
                CeDrawColorList_t draw_color_list = {};
-               draw_view(data->input_view, data->tab_width, &draw_color_list, &color_defs);
-               int64_t new_status_bar_offset = (data->input_view->rect.bottom - data->input_view->rect.top) + 1;
-               draw_view_status(data->input_view, data->vim, &color_defs, 0);
+               draw_view(&app->input_view, app->config_options.tab_width, &draw_color_list, &color_defs);
+               int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
+               draw_view_status(&app->input_view, &app->vim, &color_defs, 0);
                draw_view_status(&tab_layout->tab.current->view, NULL, &color_defs, -new_status_bar_offset);
+          }
+
+          CeComplete_t* complete = app_is_completing(app);
+          if(complete && tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW && app->complete_list_buffer->line_count){
+               CeLayout_t* view_layout = tab_layout->tab.current;
+               CeView_t complete_view = {};
+               complete_view.rect.left = view_layout->view.rect.left;
+               complete_view.rect.right = view_layout->view.rect.right;
+               if(app->input_mode){
+                    complete_view.rect.bottom = app->input_view.rect.top - 1;
+               }else{
+                    complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
+               }
+               complete_view.rect.top = complete_view.rect.bottom - app->complete_list_buffer->line_count;
+               if(complete_view.rect.top < view_layout->view.rect.top){
+                    complete_view.rect.top = view_layout->view.rect.top;
+               }
+               complete_view.buffer = app->complete_list_buffer;
+               CeDrawColorList_t draw_color_list = {};
+               draw_view(&complete_view, app->config_options.tab_width, &draw_color_list, &color_defs);
           }
 
           // show border when non view is selected
@@ -542,18 +637,18 @@ void* draw_thread(void* thread_data){
                }
 
                move(0, 0);
-          }else if(*data->input_mode){
-               CePoint_t screen_cursor = view_cursor_on_screen(data->input_view, data->tab_width);
+          }else if(app->input_mode){
+               CePoint_t screen_cursor = view_cursor_on_screen(&app->input_view, app->config_options.tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }else{
                CeView_t* view = &tab_layout->tab.current->view;
 
-               if(view->buffer == data->terminal->buffer && data->vim->mode == CE_VIM_MODE_INSERT){
-                    view->cursor.x = data->terminal->cursor.x;
-                    view->cursor.y = data->terminal->cursor.y;
+               if(view->buffer == app->terminal.buffer && app->vim.mode == CE_VIM_MODE_INSERT){
+                    view->cursor.x = app->terminal.cursor.x;
+                    view->cursor.y = app->terminal.cursor.y;
                }
 
-               CePoint_t screen_cursor = view_cursor_on_screen(view, data->tab_width);
+               CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }
 
@@ -585,82 +680,6 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
      vim->mode = CE_VIM_MODE_INSERT;
 
      return success;
-}
-
-typedef struct{
-     int* keys;
-     int64_t key_count;
-     CeCommand_t command;
-     CeVimMode_t vim_mode;
-}KeyBind_t;
-
-typedef struct{
-     KeyBind_t* binds;
-     int64_t count;
-}KeyBinds_t;
-
-typedef struct{
-     int keys[4];
-     const char* command;
-}KeyBindDef_t;
-
-static void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count)
-{
-     binds->count = bind_def_count;
-     binds->binds = malloc(binds->count * sizeof(*binds->binds));
-
-     for(int64_t i = 0; i < binds->count; ++i){
-          ce_command_parse(&binds->binds[i].command, bind_defs[i].command);
-          binds->binds[i].key_count = 0;
-
-          for(int k = 0; k < 4; ++k){
-               if(bind_defs[i].keys[k] == 0) break;
-               binds->binds[i].key_count++;
-          }
-
-          if(!binds->binds[i].key_count) continue;
-
-          binds->binds[i].keys = malloc(binds->binds[i].key_count * sizeof(binds->binds[i].keys[0]));
-
-          for(int k = 0; k < binds->binds[i].key_count; ++k){
-               binds->binds[i].keys[k] = bind_defs[i].keys[k];
-          }
-     }
-}
-
-#define APP_MAX_KEY_COUNT 16
-
-typedef struct{
-     CeRect_t terminal_rect;
-     CeVim_t vim;
-     CeConfigOptions_t config_options;
-     int terminal_width;
-     int terminal_height;
-     CeView_t input_view;
-     bool input_mode;
-     CeLayout_t* tab_list_layout;
-     CeSyntaxDef_t* syntax_defs;
-     BufferNode_t* buffer_node_head;
-     CeCommandEntry_t* command_entries;
-     int64_t command_entry_count;
-     CeVimParseResult_t last_vim_handle_result;
-     CeBuffer_t* buffer_list_buffer;
-     CeBuffer_t* yank_list_buffer;
-     CeBuffer_t* complete_list_buffer;
-     CeComplete_t command_complete;
-     KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
-     CeRune_t keys[APP_MAX_KEY_COUNT];
-     int64_t key_count;
-     char edit_yank_register;
-     CeTerminal_t terminal;
-     bool quit;
-}App_t;
-
-void app_update_terminal_view(App_t* app){
-     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
-     app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
-                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
 }
 
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
@@ -1259,17 +1278,9 @@ int main(int argc, char** argv){
 
      // init draw thread
      pthread_t thread_draw;
-     DrawThreadData_t* draw_thread_data = calloc(1, sizeof(*draw_thread_data));
      {
-          draw_thread_data->layout = app.tab_list_layout;
-          draw_thread_data->vim = &app.vim;
-          draw_thread_data->tab_width = app.config_options.tab_width;
-          draw_thread_data->input_mode = &app.input_mode;
-          draw_thread_data->input_view = &app.input_view;
-          draw_thread_data->syntax_defs = syntax_defs;
-          draw_thread_data->terminal = &app.terminal;
-          pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
-          draw_thread_data->ready_to_draw = true;
+          pthread_create(&thread_draw, NULL, draw_thread, &app);
+          app.ready_to_draw = true;
      }
 
      // init terminal
@@ -1536,6 +1547,9 @@ int main(int argc, char** argv){
                }else if(key == 27 && app.input_mode){ // Escape
                     app.input_mode = false;
                     app.vim.mode = CE_VIM_MODE_NORMAL;
+
+                    CeComplete_t* complete = app_is_completing(&app);
+                    if(complete) ce_complete_reset(complete);
                }
 
                if(!handled_key){
@@ -1638,11 +1652,10 @@ int main(int argc, char** argv){
                build_yank_list(app.yank_list_buffer, app.vim.yanks);
           }
 
-          draw_thread_data->ready_to_draw = true;
+          app.ready_to_draw = true;
      }
 
      // cleanup
-     draw_thread_data->done = true;
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
 
@@ -1659,7 +1672,6 @@ int main(int argc, char** argv){
      buffer_node_free(&app.buffer_node_head);
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
-     free(draw_thread_data);
      endwin();
      return 0;
 }
