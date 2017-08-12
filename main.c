@@ -1485,15 +1485,28 @@ int main(int argc, char** argv){
                     }
                }else if(key == CE_TAB){ // TODO: configure auto complete key?
                     if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT && strcmp(app.input_view.buffer->name, "COMMAND") == 0){
-                         char* insertion = ce_complete_get(&app.command_complete);
+                         char* insertion = strdup(app.command_complete.elements[app.command_complete.current].string);
                          int64_t insertion_len = strlen(insertion);
-                         if(insertion_len > 0 && ce_buffer_insert_string(app.input_view.buffer, insertion, app.input_view.cursor)){
-                              CePoint_t new_cursor = ce_buffer_advance_point(app.input_view.buffer, app.input_view.cursor, insertion_len);
+                         int64_t delete_len = strlen(app.command_complete.current_match);
+                         CePoint_t delete_point = ce_buffer_advance_point(app.input_view.buffer, app.input_view.cursor, -delete_len);
+                         if(delete_len > 0 && ce_buffer_remove_string(app.input_view.buffer, delete_point, delete_len)){
                               CeBufferChange_t change = {};
-                              change.chain = false;
+                              change.chain = true;
+                              change.insertion = false;
+                              change.string = strdup(app.command_complete.current_match);
+                              change.location = delete_point;
+                              change.cursor_before = app.input_view.cursor;
+                              change.cursor_after = app.input_view.cursor;
+                              ce_buffer_change(view->buffer, &change);
+                         }
+
+                         if(insertion_len > 0 && ce_buffer_insert_string(app.input_view.buffer, insertion, delete_point)){
+                              CePoint_t new_cursor = ce_buffer_advance_point(app.input_view.buffer, delete_point, insertion_len);
+                              CeBufferChange_t change = {};
+                              change.chain = true;
                               change.insertion = true;
                               change.string = insertion;
-                              change.location = app.input_view.cursor;
+                              change.location = delete_point;
                               change.cursor_before = app.input_view.cursor;
                               change.cursor_after = new_cursor;
                               ce_buffer_change(view->buffer, &change);

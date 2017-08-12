@@ -80,12 +80,6 @@ void ce_complete_next_previous(CeComplete_t* complete){
      }
 }
 
-char* ce_complete_get(CeComplete_t* complete){
-     if(!complete->current_match || complete->current < 0) return NULL;
-     int64_t match_len = strlen(complete->current_match);
-     return strdup(complete->elements[complete->current].string + match_len);
-}
-
 void ce_complete_free(CeComplete_t* complete){
      for(int64_t i = 0; i < complete->count; i++){
           free(complete->elements[i].string);

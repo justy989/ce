@@ -19,5 +19,4 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
 void ce_complete_match(CeComplete_t* complete, const char* match);
 void ce_complete_next_match(CeComplete_t* complete);
 void ce_complete_next_previous(CeComplete_t* complete);
-char* ce_complete_get(CeComplete_t* complete);
 void ce_complete_free(CeComplete_t* complete);
