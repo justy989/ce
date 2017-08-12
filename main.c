@@ -14,6 +14,7 @@
 #include "ce_command.h"
 #include "ce_syntax.h"
 #include "ce_terminal.h"
+#include "ce_complete.h"
 
 typedef struct BufferNode_t{
      CeBuffer_t* buffer;
@@ -74,6 +75,17 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
           char reg = i + '!';
           snprintf(line, 256, "// register '%c': line: %s\n%s\n", reg, yank->line ? "true" : "false", yank->text);
           buffer_append_on_new_line(buffer, line);
+     }
+
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
+static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
+     ce_buffer_empty(buffer);
+     for(int64_t i = 0; i < complete->count; i++){
+          if(complete->elements[i].match){
+               buffer_append_on_new_line(buffer, complete->elements[i].string);
+          }
      }
 
      buffer->status = CE_BUFFER_STATUS_READONLY;
@@ -628,6 +640,8 @@ typedef struct{
      CeVimParseResult_t last_vim_handle_result;
      CeBuffer_t* buffer_list_buffer;
      CeBuffer_t* yank_list_buffer;
+     CeBuffer_t* complete_list_buffer;
+     CeComplete_t command_complete;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
@@ -1135,6 +1149,7 @@ int main(int argc, char** argv){
 
      app.buffer_list_buffer = calloc(1, sizeof(*app.buffer_list_buffer));
      app.yank_list_buffer = calloc(1, sizeof(*app.yank_list_buffer));
+     app.complete_list_buffer = calloc(1, sizeof(*app.complete_list_buffer));
 
      // init buffers
      {
@@ -1142,6 +1157,8 @@ int main(int argc, char** argv){
           buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
           ce_buffer_alloc(app.yank_list_buffer, 1, "yanks");
           buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
+          ce_buffer_alloc(app.complete_list_buffer, 1, "completions");
+          buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
@@ -1196,6 +1213,7 @@ int main(int argc, char** argv){
           ce_vim_init(&app.vim);
 
           // override 'S' key
+          // TODO: make function for this
           for(int64_t i = 0; i < app.vim.key_bind_count; ++i){
                CeVimKeyBind_t* key_bind = app.vim.key_binds + i;
                if(key_bind->key == 'S'){
@@ -1210,6 +1228,19 @@ int main(int argc, char** argv){
           CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
           app_update_terminal_view(&app);
+     }
+
+     // init complete
+     {
+          const char** commands = malloc(app.command_entry_count * sizeof(*commands));
+          for(int64_t i = 0; i < app.command_entry_count; i++){
+               commands[i] = strdup(app.command_entries[i].name);
+          }
+          ce_complete_init(&app.command_complete, commands, app.command_entry_count);
+          for(int64_t i = 0; i < app.command_entry_count; i++){
+               free((char*)(commands[i]));
+          }
+          free(commands);
      }
 
      // setup input buffer
@@ -1448,18 +1479,44 @@ int main(int argc, char** argv){
                          // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
                          app.input_mode = false;
                          app.vim.mode = CE_VIM_MODE_NORMAL;
+                         handled_key = true;
                     }else{
                          key = CE_NEWLINE;
+                    }
+               }else if(key == CE_TAB){ // TODO: configure auto complete key?
+                    if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT && strcmp(app.input_view.buffer->name, "COMMAND") == 0){
+                         char* insertion = ce_complete_get(&app.command_complete);
+                         int64_t insertion_len = strlen(insertion);
+                         if(insertion_len > 0 && ce_buffer_insert_string(app.input_view.buffer, insertion, app.input_view.cursor)){
+                              CePoint_t new_cursor = ce_buffer_advance_point(app.input_view.buffer, app.input_view.cursor, insertion_len);
+                              CeBufferChange_t change = {};
+                              change.chain = false;
+                              change.insertion = true;
+                              change.string = insertion;
+                              change.location = app.input_view.cursor;
+                              change.cursor_before = app.input_view.cursor;
+                              change.cursor_after = new_cursor;
+                              ce_buffer_change(view->buffer, &change);
+                              app.input_view.cursor = new_cursor;
+                         }
+                         handled_key = true;
                     }
                }else if(key == 27 && app.input_mode){ // Escape
                     app.input_mode = false;
                     app.vim.mode = CE_VIM_MODE_NORMAL;
                }
 
-               if(app.input_mode){
-                    app.last_vim_handle_result = ce_vim_handle_key(&app.vim, &app.input_view, key, &app.config_options);
-               }else{
-                    app.last_vim_handle_result = ce_vim_handle_key(&app.vim, view, key, &app.config_options);
+               if(!handled_key){
+                    if(app.input_mode){
+                         app.last_vim_handle_result = ce_vim_handle_key(&app.vim, &app.input_view, key, &app.config_options);
+                         if(app.vim.mode == CE_VIM_MODE_INSERT && strcmp(app.input_view.buffer->name, "COMMAND") == 0 &&
+                            app.input_view.buffer->line_count && strlen(app.input_view.buffer->lines[0])){
+                              ce_complete_match(&app.command_complete, app.input_view.buffer->lines[0]);
+                              build_complete_list(app.complete_list_buffer, &app.command_complete);
+                         }
+                    }else{
+                         app.last_vim_handle_result = ce_vim_handle_key(&app.vim, view, key, &app.config_options);
+                    }
                }
           }
 
