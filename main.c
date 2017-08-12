@@ -210,18 +210,6 @@ void syntax_highlight_terminal(CeView_t* view, volatile CeTerminal_t* terminal, 
      }
 }
 
-typedef struct{
-     CeLayout_t* layout;
-     CeVim_t* vim;
-     int64_t tab_width;
-     CeSyntaxDef_t* syntax_defs;
-     volatile CeTerminal_t* terminal;
-     volatile bool ready_to_draw;
-     volatile bool* input_mode;
-     CeView_t* input_view;
-     volatile bool done;
-}DrawThreadData_t;
-
 void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs){
      int64_t view_height = view->rect.bottom - view->rect.top;
      int64_t view_width = view->rect.right - view->rect.left;
@@ -375,7 +363,6 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* termin
      case CE_LAYOUT_TYPE_VIEW:
      {
           CeDrawColorList_t draw_color_list = {};
-          pthread_mutex_lock(&layout->view.lock);
           if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
                layout->view.buffer = terminal->buffer;
                syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
@@ -393,7 +380,6 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, volatile CeTerminal_t* termin
                     mvaddch(layout->view.rect.top + i, layout->view.rect.right, ' ');
                }
           }
-          pthread_mutex_unlock(&layout->view.lock);
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
@@ -418,6 +404,18 @@ static CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width){
                         view->cursor.y - view->scroll.y + view->rect.top};
 }
 
+typedef struct{
+     CeLayout_t* layout;
+     CeVim_t* vim;
+     int64_t tab_width;
+     CeSyntaxDef_t* syntax_defs;
+     CeTerminal_t* terminal;
+     bool ready_to_draw;
+     bool* input_mode;
+     CeView_t* input_view;
+     bool done;
+}DrawThreadData_t;
+
 void* draw_thread(void* thread_data){
      DrawThreadData_t* data = (DrawThreadData_t*)thread_data;
      struct timeval previous_draw_time;
@@ -425,9 +423,9 @@ void* draw_thread(void* thread_data){
      uint64_t time_since_last_draw = 0;
      CeColorDefs_t color_defs = {};
 
-     while(!data->done){
-          gettimeofday(&previous_draw_time, NULL);
+     gettimeofday(&previous_draw_time, NULL);
 
+     while(!data->done){
           while(true){
                gettimeofday(&current_draw_time, NULL);
                time_since_last_draw = (current_draw_time.tv_sec - previous_draw_time.tv_sec) * 1000000LL +
@@ -443,6 +441,8 @@ void* draw_thread(void* thread_data){
                }
                sleep(0);
           }
+
+          previous_draw_time = current_draw_time;
 
           erase();
 
@@ -635,6 +635,13 @@ typedef struct{
      CeTerminal_t terminal;
      bool quit;
 }App_t;
+
+void app_update_terminal_view(App_t* app){
+     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
+     app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
+                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
+}
 
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
@@ -1202,11 +1209,7 @@ int main(int argc, char** argv){
      {
           CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
-
-          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          app.terminal_rect = (CeRect_t){0, app.terminal_width - 1, 0, app.terminal_height - 1};
-          ce_layout_distribute_rect(app.tab_list_layout, app.terminal_rect, app.config_options.horizontal_scroll_off,
-                                    app.config_options.vertical_scroll_off, app.config_options.tab_width);
+          app_update_terminal_view(&app);
      }
 
      // setup input buffer
@@ -1229,7 +1232,6 @@ int main(int argc, char** argv){
           draw_thread_data->syntax_defs = syntax_defs;
           draw_thread_data->terminal = &app.terminal;
           pthread_create(&thread_draw, NULL, draw_thread, draw_thread_data);
-
           draw_thread_data->ready_to_draw = true;
      }
 
@@ -1242,12 +1244,8 @@ int main(int argc, char** argv){
 
      // main loop
      while(!app.quit){
-          // handle if terminal was resized
           // TODO: we can optimize by only doing this at the start and when we see a resized event
-          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          app.terminal_rect = (CeRect_t){0, app.terminal_width - 1, 0, app.terminal_height - 1};
-          ce_layout_distribute_rect(app.tab_list_layout, app.terminal_rect, app.config_options.horizontal_scroll_off,
-                                    app.config_options.vertical_scroll_off, app.config_options.tab_width);
+          app_update_terminal_view(&app);
 
           // figure out our current view rect
           CeView_t* view = NULL;
@@ -1261,12 +1259,8 @@ int main(int argc, char** argv){
                break;
           }
 
-          if(view){
-               pthread_mutex_lock(&view->lock);
-
-               // setup input view rect
-               if(app.input_mode) input_view_overlay(&app.input_view, view);
-          }
+          // setup input view rect
+          if(view && app.input_mode) input_view_overlay(&app.input_view, view);
 
           // wait for input from the user
           int key = getch();
@@ -1554,8 +1548,6 @@ int main(int argc, char** argv){
           if(ce_layout_buffer_in_view(tab_layout, app.yank_list_buffer)){
                build_yank_list(app.yank_list_buffer, app.vim.yanks);
           }
-
-          if(view) pthread_mutex_unlock(&view->lock);
 
           draw_thread_data->ready_to_draw = true;
      }

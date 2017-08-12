@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <pthread.h>
 #include <regex.h>
 
 #define CE_NEWLINE '\n'
@@ -109,8 +108,6 @@ typedef struct{
      CeBuffer_t* buffer;
 
      void* user_data;
-
-     pthread_mutex_t lock;
 }CeView_t;
 
 typedef struct{

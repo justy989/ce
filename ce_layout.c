@@ -30,7 +30,6 @@ CeLayout_t* ce_layout_view_init(CeBuffer_t* buffer){
      if(!view_layout) return NULL;
      view_layout->type = CE_LAYOUT_TYPE_VIEW;
      view_layout->view.buffer = buffer;
-     pthread_mutex_init(&view_layout->view.lock, NULL);
      return view_layout;
 }
 
