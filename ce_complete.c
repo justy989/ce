@@ -60,7 +60,7 @@ void ce_complete_next_match(CeComplete_t* complete){
      if(complete->current < 0) return;
 
      for(int64_t i = complete->current + 1; i != complete->current; i++){
-          if(i > complete->count) i = 0;
+          if(i >= complete->count) i = 0;
           if(complete->elements[i].match){
                complete->current = i;
                break;
@@ -68,7 +68,7 @@ void ce_complete_next_match(CeComplete_t* complete){
      }
 }
 
-void ce_complete_next_previous(CeComplete_t* complete){
+void ce_complete_previous_match(CeComplete_t* complete){
      if(complete->current < 0) return;
 
      for(int64_t i = complete->current - 1; i != complete->current; i--){

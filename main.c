@@ -82,9 +82,15 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
 
 static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
      ce_buffer_empty(buffer);
+     char line[256];
      for(int64_t i = 0; i < complete->count; i++){
           if(complete->elements[i].match){
-               buffer_append_on_new_line(buffer, complete->elements[i].string);
+               if(i == complete->current){
+                    snprintf(line, 256, "*%s", complete->elements[i].string);
+               }else{
+                    snprintf(line, 256, " %s", complete->elements[i].string);
+               }
+               buffer_append_on_new_line(buffer, line);
           }
      }
 
@@ -1512,6 +1518,19 @@ int main(int argc, char** argv){
                               ce_buffer_change(view->buffer, &change);
                               app.input_view.cursor = new_cursor;
                          }
+
+                         handled_key = true;
+                    }
+               }else if(key == 14){ // ctrl + n
+                    if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT &&  strcmp(app.input_view.buffer->name, "COMMAND") == 0){
+                         ce_complete_next_match(&app.command_complete);
+                         build_complete_list(app.complete_list_buffer, &app.command_complete);
+                         handled_key = true;
+                    }
+               }else if(key == 16){ // ctrl + p
+                    if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT &&  strcmp(app.input_view.buffer->name, "COMMAND") == 0){
+                         ce_complete_previous_match(&app.command_complete);
+                         build_complete_list(app.complete_list_buffer, &app.command_complete);
                          handled_key = true;
                     }
                }else if(key == 27 && app.input_mode){ // Escape
