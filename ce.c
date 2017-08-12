@@ -1041,7 +1041,7 @@ void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_
           view->scroll.y += (view->cursor.y - scroll_bottom);
      }
 
-     int64_t max_scroll_y = (view->buffer->line_count - view_height);
+     int64_t max_scroll_y = ((view->buffer->line_count - 1) + view_height);
      if(max_scroll_y < 0) max_scroll_y = 0;
      CE_CLAMP(view->scroll.y, 0, max_scroll_y);
 }
