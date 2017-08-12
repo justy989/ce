@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// NOTE: assumes all entries are unique
+
 typedef struct{
      char* string;
      bool match;

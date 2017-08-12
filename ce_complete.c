@@ -22,6 +22,9 @@ void ce_complete_match(CeComplete_t* complete, const char* match){
      for(int64_t i = 0; i < complete->count; i++){
           const char* str = strstr(complete->elements[i].string, match);
           complete->elements[i].match = (str != NULL);
+
+          // any options that are an identical match, override the current selection
+          if(strcmp(match, complete->elements[i].string) == 0) complete->current = i;
      }
 
      // if our current no longer matches, find another that matches
