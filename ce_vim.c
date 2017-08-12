@@ -94,6 +94,10 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, '%', &ce_vim_parse_motion_match_pair);
      ce_vim_add_key_bind(vim, '*', &ce_vim_parse_motion_search_word_forward);
      ce_vim_add_key_bind(vim, '#', &ce_vim_parse_motion_search_word_backward);
+     ce_vim_add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
+     ce_vim_add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
+     ce_vim_add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
+     ce_vim_add_key_bind(vim, 4, &ce_vim_parse_motion_half_page_down);
      ce_vim_add_key_bind(vim, 'i', &ce_vim_parse_verb_insert_mode);
      ce_vim_add_key_bind(vim, 'R', &ce_vim_parse_verb_replace_mode);
      ce_vim_add_key_bind(vim, 'v', &ce_vim_parse_verb_visual_mode);
@@ -123,10 +127,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim, '>', &ce_vim_parse_verb_indent);
      ce_vim_add_key_bind(vim, '<', &ce_vim_parse_verb_unindent);
      ce_vim_add_key_bind(vim, 'J', &ce_vim_parse_verb_join);
-     ce_vim_add_key_bind(vim, 2, &ce_vim_parse_motion_page_up);
-     ce_vim_add_key_bind(vim, 6, &ce_vim_parse_motion_page_down);
-     ce_vim_add_key_bind(vim, 21, &ce_vim_parse_motion_half_page_up);
-     ce_vim_add_key_bind(vim, 4, &ce_vim_parse_motion_half_page_down);
+     ce_vim_add_key_bind(vim, '~', &ce_vim_parse_verb_flip_case);
 
      return true;
 }
@@ -1780,6 +1781,13 @@ CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t ke
      return CE_VIM_PARSE_INVALID;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_flip_case(CeVimAction_t* action, CeRune_t key){
+     action->repeatable = true;
+     action->motion.function = ce_vim_motion_right;
+     action->verb.function = ce_vim_verb_flip_case;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
                              CeVimMotionRange_t* motion_range){
      CePoint_t destination = ce_buffer_move_point(view->buffer, motion_range->end, delta, config_options->tab_width, CE_CLAMP_X_NONE);
@@ -2256,10 +2264,52 @@ bool ce_vim_verb_change(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      return true;
 }
 
+static bool change_character(CeView_t* view, CePoint_t point, CeRune_t new_rune, bool chain_undo){
+     // dupe previous rune
+     char* previous_string = malloc(5);
+     CeRune_t previous_rune = ce_buffer_get_rune(view->buffer, point);
+     int64_t rune_len = 0;
+     ce_utf8_encode(previous_rune, previous_string, 5, &rune_len);
+     previous_string[rune_len] = 0;
+
+     // delete
+     if(!ce_buffer_remove_string(view->buffer, point, 1)) return false; // NOTE: leak previous_string
+
+     // commit the deletion
+     CeBufferChange_t change = {};
+     change.chain = chain_undo;
+     change.insertion = false;
+     change.string = previous_string;
+     change.location = point;
+     change.cursor_before = view->cursor;
+     change.cursor_after = view->cursor;
+     ce_buffer_change(view->buffer, &change);
+
+     // dupe current rune
+     char* current_string = malloc(5);
+     ce_utf8_encode(new_rune, current_string, 5, &rune_len);
+     current_string[rune_len] = 0;
+
+     // insert
+     if(!ce_buffer_insert_string(view->buffer, current_string, point)) return false; // NOTE: leak previous_string
+
+     // commit the insertion
+     change.chain = true;
+     change.insertion = true;
+     change.string = current_string;
+     change.location = point;
+     change.cursor_before = view->cursor;
+     change.cursor_after = view->cursor;
+     ce_buffer_change(view->buffer, &change);
+
+     return true;
+}
+
 bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                                const CeConfigOptions_t* config_options){
      ce_vim_motion_range_sort(&motion_range);
 
+     bool chain_undo = false;
      while(!ce_point_after(motion_range.start, motion_range.end)){
           // do nothing if we aren't on the buffer, or the line is empty
           if(!ce_buffer_contains_point(view->buffer, motion_range.start)){
@@ -2270,45 +2320,11 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
                continue;
           }
 
-          // dupe previous rune
-          char* previous_string = malloc(5);
-          CeRune_t previous_rune = ce_buffer_get_rune(view->buffer, motion_range.start);
-          int64_t rune_len = 0;
-          ce_utf8_encode(previous_rune, previous_string, 5, &rune_len);
-          previous_string[rune_len] = 0;
-
-          // delete
-          if(!ce_buffer_remove_string(view->buffer, motion_range.start, 1)) return false; // NOTE: leak previous_string
-
-          // commit the deletion
-          CeBufferChange_t change = {};
-          change.chain = false;
-          change.insertion = false;
-          change.string = previous_string;
-          change.location = view->cursor;
-          change.cursor_before = view->cursor;
-          change.cursor_after = view->cursor;
-          ce_buffer_change(view->buffer, &change);
-
-          // dupe current rune
-          char* current_string = malloc(5);
-          ce_utf8_encode(action->verb.integer, current_string, 5, &rune_len);
-          current_string[rune_len] = 0;
-
-          // insert
-          if(!ce_buffer_insert_string(view->buffer, current_string, motion_range.start)) return false; // NOTE: leak previous_string
-
-          // commit the insertion
-          change.chain = true;
-          change.insertion = true;
-          change.string = current_string;
-          change.location = view->cursor;
-          change.cursor_before = view->cursor;
-          change.cursor_after = view->cursor;
-          ce_buffer_change(view->buffer, &change);
+          if(!change_character(view, motion_range.start, action->motion.integer, chain_undo)) return false;
 
           motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
           if(motion_range.start.x == -1) return false;
+          chain_undo = true;
      }
 
      return true;
@@ -2791,5 +2807,38 @@ bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
           view->cursor = point;
      }
 
+     return true;
+}
+
+bool ce_vim_verb_flip_case(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                           const CeConfigOptions_t* config_options){
+     bool chain_undo = false;
+     while(!ce_point_after(motion_range.start, motion_range.end)){
+          // do nothing if we aren't on the buffer, or the line is empty
+          if(!ce_buffer_contains_point(view->buffer, motion_range.start)){
+               motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+               continue;
+          }else if(view->buffer->lines[motion_range.start.y][0] == 0){
+               motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+               continue;
+          }
+
+          CeRune_t flipped = ce_buffer_get_rune(view->buffer, motion_range.start);
+          if(flipped == CE_UTF8_INVALID) return false;
+
+          if(isupper(flipped)){
+               flipped = tolower(flipped);
+          }else{
+               flipped = toupper(flipped);
+          }
+
+          if(!change_character(view, motion_range.start, flipped, chain_undo)) return false;
+
+          motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+          if(motion_range.start.x == -1) return false;
+          chain_undo = true;
+     }
+
+     view->cursor = motion_range.end;
      return true;
 }
