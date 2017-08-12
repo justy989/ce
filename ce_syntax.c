@@ -419,7 +419,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
-          int64_t line_len = strlen(line);
+          int64_t line_len = ce_utf8_strlen(line);
           int64_t current_match_len = 1;
           CePoint_t match_point = {0, y};
 
