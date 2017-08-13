@@ -1598,6 +1598,11 @@ int main(int argc, char** argv){
                               app.input_view.cursor = new_cursor;
                          }
 
+                         if(complete == &app.load_file_complete){
+                              complete_files(&app.load_file_complete, app.input_view.buffer->lines[0]);
+                              build_complete_list(app.complete_list_buffer, &app.load_file_complete);
+                         }
+
                          handled_key = true;
                     }
                }else if(key == 14){ // ctrl + n
