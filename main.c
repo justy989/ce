@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +9,8 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <assert.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include "ce.h"
 #include "ce_vim.h"
@@ -290,6 +294,7 @@ typedef struct{
      CeBuffer_t* yank_list_buffer;
      CeBuffer_t* complete_list_buffer;
      CeComplete_t command_complete;
+     CeComplete_t load_file_complete;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
@@ -307,13 +312,75 @@ void app_update_terminal_view(App_t* app){
 }
 
 CeComplete_t* app_is_completing(App_t* app){
-     if(app->input_mode && strcmp(app->input_view.buffer->name, "COMMAND") == 0){
-          return &app->command_complete;
+     if(app->input_mode){
+          if(strcmp(app->input_view.buffer->name, "COMMAND") == 0) return &app->command_complete;
+          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
      }
 
      return NULL;
 }
 
+void complete_files(CeComplete_t* complete, const char* line){
+     // figure out the directory to complete
+     const char* last_slash = strrchr(line, '/');
+     char* directory = NULL;
+
+     if(last_slash){
+          directory = strndup(line, (last_slash - line) + 1);
+     }else{
+          directory = strdup(".");
+     }
+
+     // build list of files to complete
+     struct dirent *node;
+     DIR* os_dir = opendir(directory);
+     if(!os_dir) return; // TODO: leak directory
+
+     int64_t file_count = 0;
+     char** files = malloc(sizeof(*files));
+
+     char tmp[PATH_MAX];
+     struct stat info;
+     while((node = readdir(os_dir)) != NULL){
+          snprintf(tmp, PATH_MAX, "%s/%s", directory, node->d_name);
+          stat(tmp, &info);
+          file_count++;
+          files = realloc(files, file_count * sizeof(*files));
+          if(S_ISDIR(info.st_mode)){
+               asprintf(&files[file_count - 1], "%s/", node->d_name);
+          }else{
+               files[file_count - 1] = strdup(node->d_name);
+          }
+     }
+
+     closedir(os_dir);
+
+     // check for exact match
+     bool exact_match = true;
+     if(complete->count != file_count){
+          exact_match = false;
+     }else{
+          for(int64_t i = 0; i < file_count; i++){
+               if(strcmp(files[i], complete->elements[i].string) != 0){
+                    exact_match = false;
+                    break;
+               }
+          }
+     }
+
+     if(!exact_match) ce_complete_init(complete, (const char**)(files), file_count);
+
+     for(int64_t i = 0; i < file_count; i++){
+          free(files[i]);
+     }
+     free(files);
+
+     if(last_slash){
+          ce_complete_match(complete, last_slash + 1);
+     }else{
+          ce_complete_match(complete, line);
+     }
+}
 
 void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs){
      int64_t view_height = view->rect.bottom - view->rect.top;
@@ -1255,7 +1322,7 @@ int main(int argc, char** argv){
           app_update_terminal_view(&app);
      }
 
-     // init complete
+     // init command complete
      {
           const char** commands = malloc(app.command_entry_count * sizeof(*commands));
           for(int64_t i = 0; i < app.command_entry_count; i++){
@@ -1501,16 +1568,17 @@ int main(int argc, char** argv){
                          key = CE_NEWLINE;
                     }
                }else if(key == CE_TAB){ // TODO: configure auto complete key?
-                    if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT && strcmp(app.input_view.buffer->name, "COMMAND") == 0){
-                         char* insertion = strdup(app.command_complete.elements[app.command_complete.current].string);
+                    CeComplete_t* complete = app_is_completing(&app);
+                    if(app.vim.mode == CE_VIM_MODE_INSERT && complete && complete->current >= 0){
+                         char* insertion = strdup(complete->elements[complete->current].string);
                          int64_t insertion_len = strlen(insertion);
-                         int64_t delete_len = strlen(app.command_complete.current_match);
+                         int64_t delete_len = strlen(complete->current_match);
                          CePoint_t delete_point = ce_buffer_advance_point(app.input_view.buffer, app.input_view.cursor, -delete_len);
                          if(delete_len > 0 && ce_buffer_remove_string(app.input_view.buffer, delete_point, delete_len)){
                               CeBufferChange_t change = {};
                               change.chain = true;
                               change.insertion = false;
-                              change.string = strdup(app.command_complete.current_match);
+                              change.string = strdup(complete->current_match);
                               change.location = delete_point;
                               change.cursor_before = app.input_view.cursor;
                               change.cursor_after = app.input_view.cursor;
@@ -1533,15 +1601,17 @@ int main(int argc, char** argv){
                          handled_key = true;
                     }
                }else if(key == 14){ // ctrl + n
-                    if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT &&  strcmp(app.input_view.buffer->name, "COMMAND") == 0){
-                         ce_complete_next_match(&app.command_complete);
-                         build_complete_list(app.complete_list_buffer, &app.command_complete);
+                    CeComplete_t* complete = app_is_completing(&app);
+                    if(app.vim.mode == CE_VIM_MODE_INSERT && complete){
+                         ce_complete_next_match(complete);
+                         build_complete_list(app.complete_list_buffer, complete);
                          handled_key = true;
                     }
                }else if(key == 16){ // ctrl + p
-                    if(app.input_mode && app.vim.mode == CE_VIM_MODE_INSERT &&  strcmp(app.input_view.buffer->name, "COMMAND") == 0){
-                         ce_complete_previous_match(&app.command_complete);
-                         build_complete_list(app.complete_list_buffer, &app.command_complete);
+                    CeComplete_t* complete = app_is_completing(&app);
+                    if(app.vim.mode == CE_VIM_MODE_INSERT && complete){
+                         ce_complete_previous_match(complete);
+                         build_complete_list(app.complete_list_buffer, complete);
                          handled_key = true;
                     }
                }else if(key == 27 && app.input_mode){ // Escape
@@ -1555,10 +1625,15 @@ int main(int argc, char** argv){
                if(!handled_key){
                     if(app.input_mode){
                          app.last_vim_handle_result = ce_vim_handle_key(&app.vim, &app.input_view, key, &app.config_options);
-                         if(app.vim.mode == CE_VIM_MODE_INSERT && strcmp(app.input_view.buffer->name, "COMMAND") == 0 &&
-                            app.input_view.buffer->line_count && strlen(app.input_view.buffer->lines[0])){
-                              ce_complete_match(&app.command_complete, app.input_view.buffer->lines[0]);
-                              build_complete_list(app.complete_list_buffer, &app.command_complete);
+
+                         if(app.vim.mode == CE_VIM_MODE_INSERT && app.input_view.buffer->line_count && strlen(app.input_view.buffer->lines[0])){
+                              if(strcmp(app.input_view.buffer->name, "COMMAND") == 0){
+                                   ce_complete_match(&app.command_complete, app.input_view.buffer->lines[0]);
+                                   build_complete_list(app.complete_list_buffer, &app.command_complete);
+                              }else if(strcmp(app.input_view.buffer->name, "LOAD FILE") == 0){
+                                   complete_files(&app.load_file_complete, app.input_view.buffer->lines[0]);
+                                   build_complete_list(app.complete_list_buffer, &app.load_file_complete);
+                              }
                          }
                     }else{
                          app.last_vim_handle_result = ce_vim_handle_key(&app.vim, view, key, &app.config_options);
