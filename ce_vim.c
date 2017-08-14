@@ -462,6 +462,29 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           vim->chain_undo = false;
           view->cursor = ce_buffer_advance_point(view->buffer, view->cursor, -1);
      } break;
+     case KEY_REDO:
+     {
+          CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
+          if(!yank) break;
+
+          if(!ce_buffer_insert_string(view->buffer, yank->text, view->cursor)) break;
+
+          int64_t yank_len = ce_utf8_strlen(yank->text);
+          CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, yank_len);
+
+          CeBufferChange_t change = {};
+          change.chain = vim->chain_undo;
+          change.insertion = true;
+          change.string = strdup(yank->text);
+          change.location = view->cursor;
+          change.cursor_before = view->cursor;
+          change.cursor_after = end_cursor;
+          ce_buffer_change(view->buffer, &change);
+
+          view->cursor = end_cursor;
+
+          vim->chain_undo = true;
+     } break;
      }
 
      return CE_VIM_PARSE_COMPLETE;
