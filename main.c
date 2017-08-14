@@ -1232,7 +1232,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
      }
 
      if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
-          app->vim.mode == CE_VIM_MODE_INSERT){
+        app->vim.mode == CE_VIM_MODE_INSERT && !app->input_mode){
           if(key == KEY_ESCAPE){
                app->vim.mode = CE_VIM_MODE_NORMAL;
           }else if(key == 1){ // ctrl + a
