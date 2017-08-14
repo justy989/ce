@@ -12,6 +12,7 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
      for(int64_t i = 0; i < string_count; i++){
           complete->elements[i].string = strdup(strings[i]);
           if(!complete->elements[i].string) return false;
+          complete->elements[i].match = true;
      }
 
      complete->count = string_count;
@@ -40,7 +41,7 @@ void ce_complete_match(CeComplete_t* complete, const char* match){
                bool found_match = false;
 
                for(int64_t i = complete->current + 1; i != complete->current; i++){
-                    if(i > complete->count) i = 0;
+                    if(i >= complete->count) i = 0;
                     if(complete->elements[i].match){
                          complete->current = i;
                          found_match = true;
