@@ -1242,6 +1242,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
 
                                    switch(cs){
                                    default:
+                                        app->key_count = 0;
                                         return;
                                    case CE_COMMAND_NO_ACTION:
                                         break;
