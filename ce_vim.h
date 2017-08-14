@@ -2,8 +2,6 @@
 
 #include "ce.h"
 
-#define ASCII_PRINTABLE_CHARACTERS 95
-
 #define CE_VIM_MAX_COMMAND_LEN 16
 #define CE_VIM_MAX_KEY_BINDS 256
 
@@ -103,7 +101,7 @@ typedef struct CeVim_t{
      CeVimKeyBind_t key_binds[CE_VIM_MAX_KEY_BINDS];
      int64_t key_bind_count;
      CeRune_t current_command[CE_VIM_MAX_COMMAND_LEN];
-     CeVimYank_t yanks[ASCII_PRINTABLE_CHARACTERS];
+     CeVimYank_t yanks[CE_ASCII_PRINTABLE_CHARACTERS];
      int64_t motion_column;
      CePoint_t visual;
      CeVimAction_t last_action;

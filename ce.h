@@ -8,6 +8,7 @@
 #define CE_TAB '\t'
 #define CE_UTF8_INVALID -1
 #define CE_UTF8_SIZE 4
+#define CE_ASCII_PRINTABLE_CHARACTERS 95
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 

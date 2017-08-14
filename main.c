@@ -73,7 +73,7 @@ static void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
 static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
      char line[256];
      ce_buffer_empty(buffer);
-     for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
+     for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           CeVimYank_t* yank = yanks + i;
           if(yank->text == NULL) continue;
           char reg = i + '!';
@@ -1480,7 +1480,7 @@ int main(int argc, char** argv){
                          app.edit_yank_register = -1;
                          int64_t line = view->cursor.y;
                          CeVimYank_t* selected_yank = NULL;
-                         for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
+                         for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
                               CeVimYank_t* yank = app.vim.yanks + i;
                               if(yank->text != NULL){
                                    int64_t line_count = 2;

@@ -133,7 +133,7 @@ bool ce_vim_init(CeVim_t* vim){
 }
 
 bool ce_vim_free(CeVim_t* vim){
-     for(int64_t i = 0; i < ASCII_PRINTABLE_CHARACTERS; i++){
+     for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           CeVimYank_t* yank = vim->yanks + i;
           if(yank->text){
                free(yank->text);
@@ -1398,6 +1398,7 @@ CeVimParseResult_t ce_vim_parse_verb_append(CeVimAction_t* action, CeRune_t key)
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_append;
+     action->repeatable = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1405,6 +1406,7 @@ CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_append_at_end_of_line;
+     action->repeatable = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1607,7 +1609,6 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_delete;
-     action->chain_undo = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1619,7 +1620,6 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key)
      }
 
      action->verb.function = &ce_vim_verb_change;
-     action->chain_undo = true;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
@@ -1627,7 +1627,6 @@ CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_change;
-     action->chain_undo = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -2260,6 +2259,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
 bool ce_vim_verb_change(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                         const CeConfigOptions_t* config_options){
      if(!ce_vim_verb_delete(vim, action, motion_range, view, config_options)) return false;
+     vim->chain_undo = true;
      insert_mode(vim);
      return true;
 }
