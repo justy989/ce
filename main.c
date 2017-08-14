@@ -102,6 +102,37 @@ static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
+static void build_macro_list(CeBuffer_t* buffer, CeMacros_t* macros){
+     ce_buffer_empty(buffer);
+     char line[256];
+     for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
+          CeRuneNode_t* rune_head = macros->rune_head[i];
+          if(!rune_head) continue;
+          CeRune_t* rune_string = ce_rune_node_string(rune_head);
+          char* string = ce_rune_string_to_char_string(rune_string);
+          char reg = i + '!';
+          snprintf(line, 256, "// register '%c'\n%s\n", reg, string);
+          free(rune_string);
+          free(string);
+          buffer_append_on_new_line(buffer, line);
+     }
+
+     // NOTE: must keep this in sync with ce_rune_string_to_char_string()
+     buffer_append_on_new_line(buffer, "");
+     buffer_append_on_new_line(buffer, "// escape conversions");
+     buffer_append_on_new_line(buffer, "// \\b -> KEY_BACKSPACE");
+     buffer_append_on_new_line(buffer, "// \\e -> KEY_ESCAPE");
+     buffer_append_on_new_line(buffer, "// \\r -> KEY_ENTER");
+     buffer_append_on_new_line(buffer, "// \\t -> KEY_TAB");
+     buffer_append_on_new_line(buffer, "// \\u -> KEY_UP");
+     buffer_append_on_new_line(buffer, "// \\d -> KEY_DOWN");
+     buffer_append_on_new_line(buffer, "// \\l -> KEY_LEFT");
+     buffer_append_on_new_line(buffer, "// \\i -> KEY_RIGHT");
+     buffer_append_on_new_line(buffer, "// \\\\ -> \\"); // HAHAHAHAHA
+
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
 void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
      // save the cursor on the old buffer
      view->buffer->cursor_save = view->cursor;
@@ -294,6 +325,7 @@ typedef struct{
      CeBuffer_t* buffer_list_buffer;
      CeBuffer_t* yank_list_buffer;
      CeBuffer_t* complete_list_buffer;
+     CeBuffer_t* macro_list_buffer;
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
@@ -1197,12 +1229,12 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
 
      if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
           app->vim.mode == CE_VIM_MODE_INSERT){
-          if(key == 27){
+          if(key == KEY_ESCAPE){
                app->vim.mode = CE_VIM_MODE_NORMAL;
           }else if(key == 1){ // ctrl + a
                // TODO: make this configurable
                // send escape
-               ce_terminal_send_key(&app->terminal, 27);
+               ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
           }else{
                ce_terminal_send_key(&app->terminal, key);
           }
@@ -1432,7 +1464,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     build_complete_list(app->complete_list_buffer, complete);
                     return;
                }
-          }else if(key == 27 && app->input_mode){ // Escape
+          }else if(key == KEY_ESCAPE && app->input_mode){ // Escape
                app->input_mode = false;
                app->vim.mode = CE_VIM_MODE_NORMAL;
 
@@ -1636,6 +1668,7 @@ int main(int argc, char** argv){
      app.buffer_list_buffer = calloc(1, sizeof(*app.buffer_list_buffer));
      app.yank_list_buffer = calloc(1, sizeof(*app.yank_list_buffer));
      app.complete_list_buffer = calloc(1, sizeof(*app.complete_list_buffer));
+     app.macro_list_buffer = calloc(1, sizeof(*app.macro_list_buffer));
 
      // init buffers
      {
@@ -1645,6 +1678,8 @@ int main(int argc, char** argv){
           buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
           ce_buffer_alloc(app.complete_list_buffer, 1, "completions");
           buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
+          ce_buffer_alloc(app.macro_list_buffer, 1, "macros");
+          buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
@@ -1781,6 +1816,10 @@ int main(int argc, char** argv){
 
           if(ce_layout_buffer_in_view(tab_layout, app.yank_list_buffer)){
                build_yank_list(app.yank_list_buffer, app.vim.yanks);
+          }
+
+          if(ce_layout_buffer_in_view(tab_layout, app.macro_list_buffer)){
+               build_macro_list(app.macro_list_buffer, &app.macros);
           }
 
           app.ready_to_draw = true;

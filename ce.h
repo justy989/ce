@@ -22,6 +22,8 @@
 #define COLOR_BRIGHT_CYAN 14
 #define COLOR_BRIGHT_WHITE 15
 
+#define KEY_ESCAPE 27
+
 typedef int32_t CeRune_t;
 
 typedef enum{
@@ -187,3 +189,6 @@ bool ce_point_in_rect(CePoint_t a, CeRect_t r);
 bool ce_rune_node_insert(CeRuneNode_t** head, CeRune_t rune);
 CeRune_t* ce_rune_node_string(CeRuneNode_t* head);
 void ce_rune_node_free(CeRuneNode_t** head);
+
+char* ce_rune_string_to_char_string(const CeRune_t* int_str);
+CeRune_t* ce_char_string_to_rune_string(const char* char_str);

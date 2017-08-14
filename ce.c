@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
+#include <ctype.h>
+#include <ncurses.h>
 
 FILE* g_ce_log = NULL;
 
@@ -1392,4 +1394,160 @@ void ce_rune_node_free(CeRuneNode_t** head){
      }
 
      *head = NULL;
+}
+
+char* ce_rune_string_to_char_string(const CeRune_t* int_str){
+     // build length
+     size_t len = 1; // account for NULL terminator
+     const int* int_itr = int_str;
+     while(*int_itr){
+          if(isprint(*int_itr)){
+               len++;
+          }else{
+               switch(*int_itr){
+               default:
+                    len++; // going to fill in with '~' for now
+                    break;
+               case KEY_BACKSPACE:
+               case KEY_ESCAPE:
+               case KEY_ENTER:
+               case CE_TAB:
+               case KEY_UP:
+               case KEY_DOWN:
+               case KEY_LEFT:
+               case KEY_RIGHT:
+               case '\\':
+                    len += 2;
+                    break;
+               }
+          }
+
+          int_itr++;
+     }
+
+     char* char_str = malloc(len);
+     if(!char_str) return NULL;
+
+     char* char_itr = char_str;
+     int_itr = int_str;
+     while(*int_itr){
+          if(isprint(*int_itr)){
+               *char_itr = *int_itr;
+               char_itr++;
+          }else{
+               switch(*int_itr){
+               default:
+                    *char_itr = '~';
+                    char_itr++;
+                    break;
+               case KEY_BACKSPACE:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'b'; char_itr++;
+                    break;
+               case KEY_ESCAPE:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'e'; char_itr++;
+                    break;
+               case KEY_ENTER:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'r'; char_itr++;
+                    break;
+               case CE_TAB:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 't'; char_itr++;
+                    break;
+               case KEY_UP:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'u'; char_itr++;
+                    break;
+               case KEY_DOWN:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'd'; char_itr++;
+                    break;
+               case KEY_LEFT:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'l'; char_itr++;
+                    break;
+               case KEY_RIGHT:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = 'i'; char_itr++; // NOTE: not happy with 'i'
+                    break;
+               case '\\':
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = '\\'; char_itr++;
+                    break;
+               }
+          }
+
+          int_itr++;
+     }
+
+     char_str[len - 1] = 0;
+
+     return char_str;
+}
+
+CeRune_t* ce_char_string_to_rune_string(const char* char_str){
+     // we can just use the strlen, and it'll be over allocated because the command string will always be
+     // the same size or small than the char string
+     size_t str_len = strlen(char_str);
+
+     int* int_str = malloc((str_len + 1) * sizeof(*int_str));
+     if(!int_str) return NULL;
+
+     int* int_itr = int_str;
+     const char* char_itr = char_str;
+     while(*char_itr){
+          if(!isprint(*char_itr)){
+               free(int_str);
+               return NULL;
+          }
+
+          if(*char_itr == '\\'){
+               char_itr++;
+               switch(*char_itr){
+               default:
+                    free(int_str);
+                    return NULL;
+               case 'b':
+                    *int_itr = KEY_BACKSPACE;
+                    break;
+               case 'e':
+                    *int_itr = KEY_ESCAPE;
+                    break;
+               case 'r':
+                    *int_itr = KEY_ENTER;
+                    break;
+               case 't':
+                    *int_itr = CE_TAB;
+                    break;
+               case 'u':
+                    *int_itr = KEY_UP;
+                    break;
+               case 'd':
+                    *int_itr = KEY_DOWN;
+                    break;
+               case 'l':
+                    *int_itr = KEY_LEFT;
+                    break;
+               case 'i':
+                    *int_itr = KEY_RIGHT;
+                    break;
+               case '\\':
+                    *int_itr = '\\';
+                    break;
+               }
+
+               char_itr++;
+               int_itr++;
+          }else{
+               *int_itr = *char_itr;
+               char_itr++;
+               int_itr++;
+          }
+     }
+
+     *int_itr = 0; // NULL terminate
+
+     return int_str;
 }
