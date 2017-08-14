@@ -1230,6 +1230,14 @@ static int int_strneq(int* a, int* b, size_t len)
      return true;
 }
 
+static char* view_base_directory(CeView_t* view, App_t* app){
+     if(view->buffer == app->terminal.buffer){
+          return ce_terminal_get_current_directory(&app->terminal);
+     }
+
+     return directory_from_filename(view->buffer->name);
+}
+
 void app_handle_key(App_t* app, CeView_t* view, int key){
      if(app->key_count == 0 &&
         app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
@@ -1425,18 +1433,18 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }else if(app->input_mode){
                     if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                         char* directory = directory_from_filename(view->buffer->name);
+                         char* base_directory = view_base_directory(view, app);
                          char filepath[PATH_MAX];
                          for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-                              if(directory){
-                                   snprintf(filepath, PATH_MAX, "%s/%s", directory, app->input_view.buffer->lines[i]);
+                              if(base_directory){
+                                   snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
                               }else{
                                    strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
                               }
                               load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
                          }
 
-                         free(directory);
+                         free(base_directory);
                     }else if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
                              strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
                              strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
@@ -1542,9 +1550,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
 
                     if(complete == &app->load_file_complete){
-                         char* directory = directory_from_filename(view->buffer->name);
-                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], directory);
-                         free(directory);
+                         char* base_directory = view_base_directory(view, app);
+                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
+                         free(base_directory);
                          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
                     }
 
@@ -1581,9 +1589,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                          ce_complete_match(&app->command_complete, app->input_view.buffer->lines[0]);
                          build_complete_list(app->complete_list_buffer, &app->command_complete);
                     }else if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                         char* directory = directory_from_filename(view->buffer->name);
-                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], directory);
-                         free(directory);
+                         char* base_directory = view_base_directory(view, app);
+                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
+                         free(base_directory);
                          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
                     }
                }

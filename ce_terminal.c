@@ -1558,3 +1558,9 @@ bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key){
      if(free_string) free(string);
      return true;
 }
+
+char* ce_terminal_get_current_directory(CeTerminal_t* terminal){
+     char cwd_file[BUFSIZ];
+     snprintf(cwd_file, BUFSIZ, "/proc/%d/cwd", terminal->pid);
+     return realpath(cwd_file, NULL);
+}

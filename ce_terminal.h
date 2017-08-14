@@ -139,3 +139,4 @@ typedef struct{
 bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height);
 void ce_terminal_free(CeTerminal_t* terminal);
 bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key);
+char* ce_terminal_get_current_directory(CeTerminal_t* terminal);
