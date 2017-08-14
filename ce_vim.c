@@ -1228,6 +1228,45 @@ CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t
      return range;
 }
 
+CeVimMotionRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, char string_char){
+     CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
+     char* line_start = buffer->lines[start.y];
+     char* itr = ce_utf8_find_index(line_start, start.x);
+     char* save_start = itr;
+
+     CeRune_t previous_rune = CE_UTF8_INVALID;
+     int64_t end_x = start.x;
+     while(*itr){
+          int64_t rune_len = 0;
+          CeRune_t rune = ce_utf8_decode(itr, &rune_len);
+          if(rune == string_char && previous_rune != '\\') break;
+          previous_rune = rune;
+          end_x++;
+          itr += rune_len;
+     }
+
+     int64_t start_x = start.x + 1;
+     itr = save_start;
+     previous_rune = CE_UTF8_INVALID;
+     while(itr > line_start){
+          int64_t rune_len = 0;
+          CeRune_t rune = previous_rune;
+          previous_rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
+          if(rune == string_char && previous_rune != '\\') break;
+          start_x--;
+          itr -= rune_len;
+     }
+
+     if(start_x > end_x) return range;
+
+     range.start.x = start_x;
+     range.start.y = start.y;
+     range.end.x = end_x;
+     range.end.y = start.y;
+
+     return range;
+}
+
 CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool inside){
      CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
      if(!ce_buffer_point_is_valid(buffer, start)) return range;
@@ -1252,6 +1291,17 @@ CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_
           left_match = '[';
           right_match = ']';
           break;
+     case '"':
+     case '\'':
+     {
+          CeVimMotionRange_t string_range = ce_vim_find_string_boundaries(buffer, start, rune);
+          if(inside && string_range.start.x >= 0){
+               string_range.start = ce_buffer_advance_point(buffer, string_range.start, 1);
+               string_range.end = ce_buffer_advance_point(buffer, string_range.end, -1);
+               if(ce_point_after(string_range.start, string_range.end)) return range; // empty in between
+          }
+          return string_range;
+     }
      case 'w':
           return ce_vim_find_little_word_boundaries(buffer, start);
      case 'W':
