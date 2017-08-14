@@ -21,6 +21,13 @@
 #include "ce_complete.h"
 #include "ce_macros.h"
 
+char* directory_from_filename(const char* filename){
+     const char* last_slash = strrchr(filename, '/');
+     char* directory = NULL;
+     if(last_slash) directory = strndup(filename, last_slash - filename);
+     return directory;
+}
+
 typedef struct BufferNode_t{
      CeBuffer_t* buffer;
      struct BufferNode_t* next;
@@ -111,7 +118,7 @@ static void build_macro_list(CeBuffer_t* buffer, CeMacros_t* macros){
           CeRune_t* rune_string = ce_rune_node_string(rune_head);
           char* string = ce_rune_string_to_char_string(rune_string);
           char reg = i + '!';
-          snprintf(line, 256, "// register '%c'\n%s\n", reg, string);
+          snprintf(line, 256, "// register '%c'\n%s", reg, string);
           free(rune_string);
           free(string);
           buffer_append_on_new_line(buffer, line);
@@ -357,13 +364,20 @@ CeComplete_t* app_is_completing(App_t* app){
      return NULL;
 }
 
-void complete_files(CeComplete_t* complete, const char* line){
+void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
+     char full_path[PATH_MAX];
+     if(base_directory){
+          snprintf(full_path, PATH_MAX, "%s/%s", base_directory, line);
+     }else{
+          strncpy(full_path, line, PATH_MAX);
+     }
+
      // figure out the directory to complete
-     const char* last_slash = strrchr(line, '/');
+     const char* last_slash = strrchr(full_path, '/');
      char* directory = NULL;
 
      if(last_slash){
-          directory = strndup(line, (last_slash - line) + 1);
+          directory = strndup(full_path, (last_slash - full_path) + 1);
      }else{
           directory = strdup(".");
      }
@@ -1411,9 +1425,18 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }else if(app->input_mode){
                     if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
+                         char* directory = directory_from_filename(view->buffer->name);
+                         char filepath[PATH_MAX];
                          for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-                              load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, app->input_view.buffer->lines[i]);
+                              if(directory){
+                                   snprintf(filepath, PATH_MAX, "%s/%s", directory, app->input_view.buffer->lines[i]);
+                              }else{
+                                   strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
+                              }
+                              load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
                          }
+
+                         free(directory);
                     }else if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
                              strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
                              strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
@@ -1519,7 +1542,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
 
                     if(complete == &app->load_file_complete){
-                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0]);
+                         char* directory = directory_from_filename(view->buffer->name);
+                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], directory);
+                         free(directory);
                          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
                     }
 
@@ -1556,7 +1581,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                          ce_complete_match(&app->command_complete, app->input_view.buffer->lines[0]);
                          build_complete_list(app->complete_list_buffer, &app->command_complete);
                     }else if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0]);
+                         char* directory = directory_from_filename(view->buffer->name);
+                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], directory);
+                         free(directory);
                          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
                     }
                }
