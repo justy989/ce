@@ -2320,7 +2320,7 @@ bool ce_vim_verb_set_character(CeVim_t* vim, const CeVimAction_t* action, CeVimM
                continue;
           }
 
-          if(!change_character(view, motion_range.start, action->motion.integer, chain_undo)) return false;
+          if(!change_character(view, motion_range.start, action->verb.integer, chain_undo)) return false;
 
           motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
           if(motion_range.start.x == -1) return false;
