@@ -334,6 +334,7 @@ typedef struct{
      char edit_register;
      CeTerminal_t terminal;
      CeMacros_t macros;
+     CePoint_t search_start;
      bool record_macro;
      bool replay_macro;
      bool ready_to_draw;
@@ -1105,9 +1106,11 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
      if(strcmp(command->args[0].string, "forward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_FORWARD;
+          app->search_start = view->cursor;
      }else if(strcmp(command->args[0].string, "backward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REVERSE SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_BACKWARD;
+          app->search_start = view->cursor;
      }else{
           ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
@@ -1135,9 +1138,11 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      if(strcmp(command->args[0].string, "forward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REGEX SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_FORWARD;
+          app->search_start = view->cursor;
      }else if(strcmp(command->args[0].string, "backward") == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REGEX REVERSE SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_BACKWARD;
+          app->search_start = view->cursor;
      }else{
           ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
@@ -1574,7 +1579,11 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               int64_t view_height = view->rect.bottom - view->rect.top;
                               ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
                          }
+                    }else{
+                         view->cursor = app->search_start;
                     }
+               }else{
+                    view->cursor = app->search_start;
                }
           }else if(strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
@@ -1588,7 +1597,11 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               int64_t view_height = view->rect.bottom - view->rect.top;
                               ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
                          }
+                    }else{
+                         view->cursor = app->search_start;
                     }
+               }else{
+                    view->cursor = app->search_start;
                }
           }else if(strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
@@ -1610,8 +1623,12 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                                    int64_t view_height = view->rect.bottom - view->rect.top;
                                    ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
                               }
+                         }else{
+                              view->cursor = app->search_start;
                          }
                     }
+               }else{
+                    view->cursor = app->search_start;
                }
           }else if(strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
@@ -1632,8 +1649,12 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                                    int64_t view_height = view->rect.bottom - view->rect.top;
                                    ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
                               }
+                         }else{
+                              view->cursor = app->search_start;
                          }
                     }
+               }else{
+                    view->cursor = app->search_start;
                }
           }
      }
