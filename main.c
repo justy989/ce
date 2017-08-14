@@ -331,7 +331,7 @@ typedef struct{
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
-     char edit_yank_register;
+     char edit_register;
      CeTerminal_t terminal;
      CeMacros_t macros;
      bool record_macro;
@@ -1322,7 +1322,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }else if(!app->input_mode && view->buffer == app->yank_list_buffer){
                     // TODO: move to command
-                    app->edit_yank_register = -1;
+                    app->edit_register = -1;
                     int64_t line = view->cursor.y;
                     CeVimYank_t* selected_yank = NULL;
                     for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
@@ -1332,19 +1332,46 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               line_count += ce_util_count_string_lines(yank->text);
                               line -= line_count;
                               if(line <= 0){
-                                   app->edit_yank_register = i;
+                                   app->edit_register = i;
                                    selected_yank = yank;
                                    break;
                               }
                          }
                     }
 
-                    if(app->edit_yank_register >= 0){
+                    if(app->edit_register >= 0){
                          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "EDIT YANK");
                          ce_buffer_insert_string(app->input_view.buffer, selected_yank->text, (CePoint_t){0, 0});
                          app->input_view.cursor.y = app->input_view.buffer->line_count;
                          if(app->input_view.cursor.y) app->input_view.cursor.y--;
                          app->input_view.cursor.x = ce_utf8_strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
+                    }
+               }else if(!app->input_mode && view->buffer == app->macro_list_buffer){
+                    // TODO: move to command
+                    app->edit_register = -1;
+                    int64_t line = view->cursor.y;
+                    char* macro_string = NULL;
+                    for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
+                         CeRuneNode_t* rune_node = app->macros.rune_head[i];
+                         if(rune_node){
+                              line -= 2;
+                              if(line <= 2){
+                                   app->edit_register = i;
+                                   CeRune_t* rune_string = ce_rune_node_string(rune_node);
+                                   macro_string = ce_rune_string_to_char_string(rune_string);
+                                   free(rune_string);
+                                   break;
+                              }
+                         }
+                    }
+
+                    if(app->edit_register >= 0){
+                         app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "EDIT MACRO");
+                         ce_buffer_insert_string(app->input_view.buffer, macro_string, (CePoint_t){0, 0});
+                         app->input_view.cursor.y = app->input_view.buffer->line_count;
+                         if(app->input_view.cursor.y) app->input_view.cursor.y--;
+                         app->input_view.cursor.x = ce_utf8_strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
+                         free(macro_string);
                     }
                }else if(app->input_mode){
                     if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
@@ -1399,10 +1426,22 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               }
                          }
                     }else if(strcmp(app->input_view.buffer->name, "EDIT YANK") == 0){
-                         CeVimYank_t* yank = app->vim.yanks + app->edit_yank_register;
+                         CeVimYank_t* yank = app->vim.yanks + app->edit_register;
                          free(yank->text);
                          yank->text = ce_buffer_dupe(app->input_view.buffer);
                          yank->line = false;
+                    }else if(strcmp(app->input_view.buffer->name, "EDIT MACRO") == 0){
+                         CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
+                         if(rune_string){
+                              ce_rune_node_free(app->macros.rune_head + app->edit_register);
+                              CeRune_t* itr = rune_string;
+                              while(*itr){
+                                   ce_rune_node_insert(app->macros.rune_head + app->edit_register, *itr);
+                                   itr++;
+                              }
+
+                              free(rune_string);
+                         }
                     }
 
                     // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
