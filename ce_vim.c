@@ -2813,7 +2813,7 @@ bool ce_vim_verb_join(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRang
 bool ce_vim_verb_flip_case(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
                            const CeConfigOptions_t* config_options){
      bool chain_undo = false;
-     while(!ce_point_after(motion_range.start, motion_range.end)){
+     while(!ce_points_equal(motion_range.start, motion_range.end)){
           // do nothing if we aren't on the buffer, or the line is empty
           if(!ce_buffer_contains_point(view->buffer, motion_range.start)){
                motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);

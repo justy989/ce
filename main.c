@@ -1185,7 +1185,11 @@ static int int_strneq(int* a, int* b, size_t len)
 }
 
 void app_handle_key(App_t* app, CeView_t* view, int key){
-     if(app->key_count == 0){ // TODO: account for vim state as well?
+     if(app->key_count == 0 &&
+        app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
+        app->last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
+        app->last_vim_handle_result != CE_VIM_PARSE_CONTINUE &&
+        app->vim.mode != CE_VIM_MODE_INSERT){
           if(key == 'q' && !app->replay_macro){ // TODO: make configurable
                if(ce_macros_is_recording(&app->macros)){
                     ce_macros_end_recording(&app->macros);
