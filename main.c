@@ -1166,6 +1166,33 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
+     if(terminal_layout){
+          tab_layout->tab.current = terminal_layout;
+     }else{
+          view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
+     }
+
+     app->vim.mode = CE_VIM_MODE_INSERT;
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
      clear();
      return CE_COMMAND_SUCCESS;
@@ -1704,6 +1731,7 @@ int main(int argc, char** argv){
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_command, "command", "interactively send a commmand"},
           {command_redraw, "redraw", "redraw the entire editor"},
+          {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
@@ -1767,6 +1795,7 @@ int main(int argc, char** argv){
                {{'\\', '?'}, "regex_search backward"},
                {{'"', '?'}, "show_yanks"},
                {{'\\', 'r'}, "redraw"},
+               {{24}, "switch_to_terminal"}, // ctrl x
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
