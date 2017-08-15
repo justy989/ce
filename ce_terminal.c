@@ -1371,7 +1371,7 @@ static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descript
                     return false;
                }
 
-               char** args = (char *[]){NULL};
+               char** args = (char *[]){shell, NULL};
 
                unsetenv("COLUMNS");
                unsetenv("LINES");

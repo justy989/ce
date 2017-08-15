@@ -4,5 +4,5 @@ SOURCES=(main.c ce.c ce_vim.c ce_layout.c ce_command.c ce_syntax.c ce_terminal.c
 FLAGS='-Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3'
 EXE='ce'
 LINK='-lpthread -lncursesw -lutil'
-gcc $FLAGS ${SOURCES[*]} -o $EXE $LINK
+clang $FLAGS ${SOURCES[*]} -o $EXE $LINK
 
