@@ -1430,8 +1430,8 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
      // allocate buffers
      terminal->lines_buffer = calloc(1, sizeof(*terminal->lines_buffer));
      terminal->alternate_lines_buffer = calloc(1, sizeof(*terminal->alternate_lines_buffer));
-     ce_buffer_alloc(terminal->lines_buffer, terminal->rows, "terminal");
-     ce_buffer_alloc(terminal->alternate_lines_buffer, terminal->rows, "terminal");
+     ce_buffer_alloc(terminal->lines_buffer, terminal->rows, "[terminal]");
+     ce_buffer_alloc(terminal->alternate_lines_buffer, terminal->rows, "[terminal]");
      terminal->lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->alternate_lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->buffer = terminal->lines_buffer;

@@ -1345,11 +1345,12 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      CeDestination_t destination = scan_line_for_destination(view->buffer->lines[view->cursor.y]);
      if(destination.point.x < 0) return CE_COMMAND_NO_ACTION;
 
-     load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, destination.filepath);
+     CeBuffer_t* buffer = load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, destination.filepath);
+     if(!buffer) return CE_COMMAND_NO_ACTION;
 
-     if(destination.point.y < view->buffer->line_count){
+     if(destination.point.y < buffer->line_count){
           view->cursor.y = destination.point.y;
-          int64_t line_len = ce_utf8_strlen(view->buffer->lines[view->cursor.y]);
+          int64_t line_len = ce_utf8_strlen(buffer->lines[view->cursor.y]);
           if(destination.point.x < line_len) view->cursor.x = destination.point.x;
      }
 
@@ -1954,13 +1955,13 @@ int main(int argc, char** argv){
 
      // init buffers
      {
-          ce_buffer_alloc(app.buffer_list_buffer, 1, "buffers");
+          ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
           buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
-          ce_buffer_alloc(app.yank_list_buffer, 1, "yanks");
+          ce_buffer_alloc(app.yank_list_buffer, 1, "[yanks]");
           buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
-          ce_buffer_alloc(app.complete_list_buffer, 1, "completions");
+          ce_buffer_alloc(app.complete_list_buffer, 1, "[completions]");
           buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
-          ce_buffer_alloc(app.macro_list_buffer, 1, "macros");
+          ce_buffer_alloc(app.macro_list_buffer, 1, "[macros]");
           buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
 
           if(argc > 1){
