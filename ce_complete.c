@@ -53,6 +53,8 @@ void ce_complete_match(CeComplete_t* complete, const char* match){
                          found_match = true;
                          break;
                     }
+
+                    if(i == 0 && complete->current == 0) break;
                }
 
                // if no matches, use invalid index
@@ -82,6 +84,8 @@ void ce_complete_next_match(CeComplete_t* complete){
                complete->current = i;
                break;
           }
+
+          if(i == 0 && complete->current == 0) break;
      }
 }
 
@@ -94,6 +98,8 @@ void ce_complete_previous_match(CeComplete_t* complete){
                complete->current = i;
                break;
           }
+
+          if(i == complete->count - 1 && complete->current == complete->count - 1) break;
      }
 }
 
