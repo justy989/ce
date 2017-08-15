@@ -95,9 +95,11 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
 static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
      ce_buffer_empty(buffer);
      char line[256];
+     int64_t cursor = 0;
      for(int64_t i = 0; i < complete->count; i++){
           if(complete->elements[i].match){
                if(i == complete->current){
+                    cursor = buffer->line_count;
                     snprintf(line, 256, "*%s", complete->elements[i].string);
                }else{
                     snprintf(line, 256, " %s", complete->elements[i].string);
@@ -106,11 +108,7 @@ static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
           }
      }
 
-     if(complete->current >= 0){
-          buffer->cursor_save = (CePoint_t){0, complete->current};
-     }else{
-          buffer->cursor_save = (CePoint_t){0, 0};
-     }
+     buffer->cursor_save = (CePoint_t){0, cursor};
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
@@ -766,7 +764,7 @@ void* draw_thread(void* thread_data){
                app->complete_view.buffer = app->complete_list_buffer;
                app->complete_view.cursor.y = app->complete_list_buffer->cursor_save.y;
                app->complete_view.cursor.x = 0;
-               //ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
+               ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
                CeDrawColorList_t draw_color_list = {};
                draw_view(&app->complete_view, app->config_options.tab_width, &draw_color_list, &color_defs);
                if(app->input_mode){
