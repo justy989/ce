@@ -1396,10 +1396,6 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                return;
           }
 
-          if(ce_macros_is_recording(&app->macros)){
-               ce_macros_record_key(&app->macros, key);
-          }
-
           if(app->replay_macro){
                app->replay_macro = false;
                CeRune_t* rune_string = ce_macros_get_register_string(&app->macros, key);
@@ -1414,6 +1410,10 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                free(rune_string);
                return;
           }
+     }
+
+     if(ce_macros_is_recording(&app->macros)){
+          ce_macros_record_key(&app->macros, key);
      }
 
      if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
