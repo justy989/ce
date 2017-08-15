@@ -163,7 +163,8 @@ void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConf
      vim->mode = CE_VIM_MODE_NORMAL;
 }
 
-static CeBuffer_t* load_new_file_into_view(BufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
+static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t* view,
+                                       CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
      // have we already loaded this file?
      BufferNode_t* itr = *buffer_node_head;
      while(itr){
@@ -610,18 +611,25 @@ CeDestination_t scan_line_for_destination(const char* line){
      char* file_end = strchr(line, ':');
      if(!file_end) return destination;
      char* row_end = strchr(file_end + 1, ':');
-     if(!row_end) return destination;
-     char* col_end = strchr(row_end + 1, ':');
-     // col_end is not always present
+     char* col_end = NULL;
+     if(row_end) col_end = strchr(row_end + 1, ':');
+     // col_end and row_end is not always present
 
-     strncpy(destination.filepath, line, PATH_MAX);
+     int64_t filepath_len = file_end - line;
+     if(filepath_len >= PATH_MAX) return destination;
+     strncpy(destination.filepath, line, filepath_len);
+     destination.filepath[filepath_len] = 0;
      char* end = NULL;
 
-     destination.point.y = strtol(file_end + 1, &end, 10);
-     if(col_end){
-          destination.point.x = strtol(row_end + 1, &end, 10);
+     if(row_end){
+          destination.point.y = strtol(file_end + 1, &end, 10);
+          if(col_end){
+               destination.point.x = strtol(row_end + 1, &end, 10);
+          }else{
+               destination.point.x = 0;
+          }
      }else{
-          destination.point.x = 0;
+          destination.point = (CePoint_t){0, 0};
      }
 
      return destination;
@@ -1089,7 +1097,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, command->args[0].string);
+          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, command->args[0].string);
      }else{ // it's 0
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
 
@@ -1318,6 +1326,36 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(view->buffer->line_count == 0) return CE_COMMAND_NO_ACTION;
+
+     CeDestination_t destination = scan_line_for_destination(view->buffer->lines[view->cursor.y]);
+     if(destination.point.x < 0) return CE_COMMAND_NO_ACTION;
+
+     load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, destination.filepath);
+
+     if(destination.point.y < view->buffer->line_count){
+          view->cursor.y = destination.point.y;
+          int64_t line_len = ce_utf8_strlen(view->buffer->lines[view->cursor.y]);
+          if(destination.point.x < line_len) view->cursor.x = destination.point.x;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len)
 {
      for(size_t i = 0; i < len; ++i){
@@ -1534,7 +1572,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               }else{
                                    strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
                               }
-                              load_new_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
+                              load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
                          }
 
                          free(base_directory);
@@ -1579,7 +1617,13 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                                    }
 
                                    if(command_func){
+                                        // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
+                                        app->input_mode = false;
+                                        app->vim.mode = CE_VIM_MODE_NORMAL;
+
                                         command_func(&command, app);
+
+                                        return;
                                    }else{
                                         ce_log("unknown command: '%s'\n", command.name);
                                    }
@@ -1898,6 +1942,7 @@ int main(int argc, char** argv){
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
+          {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
@@ -1963,6 +2008,7 @@ int main(int argc, char** argv){
                {{'\\', 'r'}, "redraw"},
                {{24}, "switch_to_terminal"}, // ctrl x
                {{2}, "switch_buffer"}, // ctrl b
+               {{343}, "goto_destination_in_line"}, // return
           };
 
           convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
