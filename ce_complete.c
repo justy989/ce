@@ -16,7 +16,7 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
      }
 
      complete->count = string_count;
-     complete->current = -1;
+     complete->current = 0;
      return true;
 }
 
@@ -27,12 +27,18 @@ void ce_complete_reset(CeComplete_t* complete){
 }
 
 void ce_complete_match(CeComplete_t* complete, const char* match){
-     for(int64_t i = 0; i < complete->count; i++){
-          const char* str = strstr(complete->elements[i].string, match);
-          complete->elements[i].match = (str != NULL);
+     if(strlen(match)){
+          for(int64_t i = 0; i < complete->count; i++){
+               const char* str = strstr(complete->elements[i].string, match);
+               complete->elements[i].match = (str != NULL);
 
-          // any options that are an identical match, override the current selection
-          if(strcmp(match, complete->elements[i].string) == 0) complete->current = i;
+               // any options that are an identical match, override the current selection
+               if(strcmp(match, complete->elements[i].string) == 0) complete->current = i;
+          }
+     }else{
+          for(int64_t i = 0; i < complete->count; i++){
+               complete->elements[i].match = true;
+          }
      }
 
      // if our current no longer matches, find another that matches

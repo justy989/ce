@@ -58,7 +58,9 @@ bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
      int64_t last_line = buffer->line_count;
      if(last_line) last_line--;
      int64_t line_len = ce_utf8_strlen(buffer->lines[last_line]);
-     if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     if(line_len){
+          if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     }
      int64_t next_line = last_line;
      if(line_len) next_line++;
      return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
@@ -107,6 +109,9 @@ static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
                buffer_append_on_new_line(buffer, line);
           }
      }
+
+     // TODO: figure out why we have to account for this case
+     if(buffer->line_count == 1 && cursor == 1) cursor = 0;
 
      buffer->cursor_save = (CePoint_t){0, cursor};
      buffer->status = CE_BUFFER_STATUS_READONLY;
@@ -593,7 +598,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      }
 
      char cursor_pos_string[32];
-     int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x, view->cursor.y);
+     int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x + 1, view->cursor.y + 1);
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
@@ -757,7 +762,7 @@ void* draw_thread(void* thread_data){
                }else{
                     app->complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
                }
-               app->complete_view.rect.top = app->complete_view.rect.bottom - (app->complete_list_buffer->line_count - 1);
+               app->complete_view.rect.top = app->complete_view.rect.bottom - app->complete_list_buffer->line_count;
                if(app->complete_view.rect.top <= view_layout->view.rect.top){
                     app->complete_view.rect.top = view_layout->view.rect.top + 1; // account for current view's status bar
                }
@@ -1232,6 +1237,7 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      }
 
      app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "COMMAND");
+     build_complete_list(app->complete_list_buffer, &app->command_complete);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1616,42 +1622,44 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                }
           }else if(key == CE_TAB){ // TODO: configure auto complete key?
                CeComplete_t* complete = app_is_completing(app);
-               if(app->vim.mode == CE_VIM_MODE_INSERT && complete && complete->current >= 0){
-                    char* insertion = strdup(complete->elements[complete->current].string);
-                    int64_t insertion_len = strlen(insertion);
-                    int64_t delete_len = strlen(complete->current_match);
-                    CePoint_t delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
-                    if(delete_len > 0 && ce_buffer_remove_string(app->input_view.buffer, delete_point, delete_len)){
-                         CeBufferChange_t change = {};
-                         change.chain = true;
-                         change.insertion = false;
-                         change.string = strdup(complete->current_match);
-                         change.location = delete_point;
-                         change.cursor_before = app->input_view.cursor;
-                         change.cursor_after = app->input_view.cursor;
-                         ce_buffer_change(view->buffer, &change);
-                    }
+               if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
+                    if(complete->current >= 0){
+                         char* insertion = strdup(complete->elements[complete->current].string);
+                         int64_t insertion_len = strlen(insertion);
+                         int64_t delete_len = strlen(complete->current_match);
+                         CePoint_t delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
+                         if(delete_len > 0 && ce_buffer_remove_string(app->input_view.buffer, delete_point, delete_len)){
+                              CeBufferChange_t change = {};
+                              change.chain = true;
+                              change.insertion = false;
+                              change.string = strdup(complete->current_match);
+                              change.location = delete_point;
+                              change.cursor_before = app->input_view.cursor;
+                              change.cursor_after = app->input_view.cursor;
+                              ce_buffer_change(view->buffer, &change);
+                         }
 
-                    if(insertion_len > 0 && ce_buffer_insert_string(app->input_view.buffer, insertion, delete_point)){
-                         CePoint_t new_cursor = ce_buffer_advance_point(app->input_view.buffer, delete_point, insertion_len);
-                         CeBufferChange_t change = {};
-                         change.chain = true;
-                         change.insertion = true;
-                         change.string = insertion;
-                         change.location = delete_point;
-                         change.cursor_before = app->input_view.cursor;
-                         change.cursor_after = new_cursor;
-                         ce_buffer_change(view->buffer, &change);
-                         app->input_view.cursor = new_cursor;
-                    }
+                         if(insertion_len > 0 && ce_buffer_insert_string(app->input_view.buffer, insertion, delete_point)){
+                              CePoint_t new_cursor = ce_buffer_advance_point(app->input_view.buffer, delete_point, insertion_len);
+                              CeBufferChange_t change = {};
+                              change.chain = true;
+                              change.insertion = true;
+                              change.string = insertion;
+                              change.location = delete_point;
+                              change.cursor_before = app->input_view.cursor;
+                              change.cursor_after = new_cursor;
+                              ce_buffer_change(view->buffer, &change);
+                              app->input_view.cursor = new_cursor;
+                         }
 
-                    // if completion was load_file, continue auto completing since we could have completed a directory
-                    // and want to see what is in it
-                    if(complete == &app->load_file_complete){
-                         char* base_directory = view_base_directory(view, app);
-                         complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
-                         free(base_directory);
-                         build_complete_list(app->complete_list_buffer, &app->load_file_complete);
+                         // if completion was load_file, continue auto completing since we could have completed a directory
+                         // and want to see what is in it
+                         if(complete == &app->load_file_complete){
+                              char* base_directory = view_base_directory(view, app);
+                              complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
+                              free(base_directory);
+                              build_complete_list(app->complete_list_buffer, &app->load_file_complete);
+                         }
                     }
 
                     return;
@@ -1682,7 +1690,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
           if(app->input_mode){
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &app->config_options);
 
-               if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+               if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count){
                     if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
                          ce_complete_match(&app->command_complete, app->input_view.buffer->lines[0]);
                          build_complete_list(app->complete_list_buffer, &app->command_complete);
