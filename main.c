@@ -106,7 +106,11 @@ static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
           }
      }
 
-     buffer->cursor_save = (CePoint_t){0, complete->current};
+     if(complete->current >= 0){
+          buffer->cursor_save = (CePoint_t){0, complete->current};
+     }else{
+          buffer->cursor_save = (CePoint_t){0, 0};
+     }
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
@@ -595,6 +599,31 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
+CeDestination_t scan_line_for_destination(const char* line){
+     CeDestination_t destination = {};
+     destination.point = (CePoint_t){-1, -1};
+
+     // grep/gcc format
+     char* file_end = strchr(line, ':');
+     if(!file_end) return destination;
+     char* row_end = strchr(file_end + 1, ':');
+     if(!row_end) return destination;
+     char* col_end = strchr(row_end + 1, ':');
+     // col_end is not always present
+
+     strncpy(destination.filepath, line, PATH_MAX);
+     char* end = NULL;
+
+     destination.point.y = strtol(file_end + 1, &end, 10);
+     if(col_end){
+          destination.point.x = strtol(row_end + 1, &end, 10);
+     }else{
+          destination.point.x = 0;
+     }
+
+     return destination;
+}
+
 void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminal_t* terminal,
                  CeColorDefs_t* color_defs, int64_t tab_width, CeLayout_t* current, CeSyntaxDef_t* syntax_defs,
                  int64_t terminal_width){
@@ -726,19 +755,24 @@ void* draw_thread(void* thread_data){
                app->complete_view.rect.left = view_layout->view.rect.left;
                app->complete_view.rect.right = view_layout->view.rect.right;
                if(app->input_mode){
-                    app->complete_view.rect.bottom = app->input_view.rect.top - 1;
+                    app->complete_view.rect.bottom = app->input_view.rect.top;
                }else{
                     app->complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
                }
                app->complete_view.rect.top = app->complete_view.rect.bottom - (app->complete_list_buffer->line_count - 1);
-               if(app->complete_view.rect.top < view_layout->view.rect.top){
-                    app->complete_view.rect.top = view_layout->view.rect.top;
+               if(app->complete_view.rect.top <= view_layout->view.rect.top){
+                    app->complete_view.rect.top = view_layout->view.rect.top + 1; // account for current view's status bar
                }
                app->complete_view.buffer = app->complete_list_buffer;
                app->complete_view.cursor.y = app->complete_list_buffer->cursor_save.y;
-               ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
+               app->complete_view.cursor.x = 0;
+               //ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
                CeDrawColorList_t draw_color_list = {};
                draw_view(&app->complete_view, app->config_options.tab_width, &draw_color_list, &color_defs);
+               if(app->input_mode){
+                    int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
+                    draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
+               }
           }
 
           // show border when non view is selected

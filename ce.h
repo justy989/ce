@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <regex.h>
+#include <dirent.h>
 
 #define CE_NEWLINE '\n'
 #define CE_TAB '\t'
@@ -129,6 +130,11 @@ typedef struct{
      CePoint_t point;
      int64_t length;
 }CeRegexSearchResult_t;
+
+typedef struct{
+     CePoint_t point;
+     char filepath[PATH_MAX];
+}CeDestination_t;
 
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);
