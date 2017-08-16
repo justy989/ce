@@ -1785,6 +1785,30 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
           }else{
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &app->config_options);
           }
+     }else{
+          if(key == KEY_ESCAPE){
+               CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+               CeLayout_t* current_layout = tab_layout->tab.current;
+               CeRect_t layout_rect = {};
+
+               switch(current_layout->type){
+               default:
+                    assert(!"unexpected current layout type");
+                    return;
+               case CE_LAYOUT_TYPE_LIST:
+                    layout_rect = current_layout->list.rect;
+                    break;
+               case CE_LAYOUT_TYPE_TAB:
+                    layout_rect = current_layout->tab.rect;
+                    break;
+               case CE_LAYOUT_TYPE_TAB_LIST:
+                    layout_rect = current_layout->tab_list.rect;
+                    break;
+               }
+
+               tab_layout->tab.current = ce_layout_find_at(tab_layout, (CePoint_t){layout_rect.left, layout_rect.top});
+               return;
+          }
      }
 
      // incremental search
