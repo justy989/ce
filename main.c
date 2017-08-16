@@ -866,6 +866,101 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
      return success;
 }
 
+void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match, const char* replacement, CePoint_t start, CePoint_t end,
+                        bool regex_search){
+     bool chain_undo = false;
+     int64_t match_len = 0;
+     if(!regex_search) match_len = strlen(match);
+     regex_t regex = {};
+     int rc = regcomp(&regex, match, REG_EXTENDED);
+     if(rc != 0){
+          char error_buffer[BUFSIZ];
+          regerror(rc, &regex, error_buffer, BUFSIZ);
+          ce_log("regcomp() failed: '%s'", error_buffer);
+          return;
+     }
+     while(true){
+          CePoint_t match_point;
+
+          // find the match
+          if(regex_search){
+               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, &regex);
+               match_point = result.point;
+               match_len = result.length;
+          }else{
+               match_point = ce_buffer_search_forward(buffer, start, match);
+          }
+
+          if(match_point.x < 0) break;
+          if(ce_point_after(match_point, end)) break;
+
+          // delete match
+          char* removed_string = ce_buffer_dupe_string(buffer, match_point, match_len);
+          if(!ce_buffer_remove_string(buffer, match_point, match_len)){
+               free(removed_string);
+               break;
+          }
+
+          CeBufferChange_t change = {};
+          change.chain = chain_undo;
+          change.insertion = false;
+          change.string = removed_string;
+          change.location = match_point;
+          change.cursor_before = cursor;
+          change.cursor_after = cursor;
+          ce_buffer_change(buffer, &change);
+
+          chain_undo = true;
+
+          // insert match
+          if(!ce_buffer_insert_string(buffer, replacement, match_point)){
+               break;
+          }
+
+          // commit the insertion
+          change.chain = chain_undo;
+          change.insertion = true;
+          change.string = strdup(replacement);
+          change.location = match_point;
+          change.cursor_before = cursor;
+          change.cursor_after = cursor;
+          ce_buffer_change(buffer, &change);
+     }
+}
+
+void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* replace){
+     CePoint_t start;
+     CePoint_t end;
+     if(vim->mode == CE_VIM_MODE_VISUAL){
+          if(ce_point_after(view->cursor, vim->visual)){
+               start = vim->visual;
+               end = view->cursor;
+          }else{
+               start = view->cursor;
+               end = vim->visual;
+          }
+     }else if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
+          if(ce_point_after(view->cursor, vim->visual)){
+               start = (CePoint_t){0, vim->visual.y};
+               end = (CePoint_t){ce_utf8_last_index(view->buffer->lines[view->cursor.y]), view->cursor.y};
+          }else{
+               start = (CePoint_t){0, view->cursor.y};
+               end = (CePoint_t){ce_utf8_last_index(view->buffer->lines[vim->visual.y]), vim->visual.y};
+          }
+     }else{
+          start = view->cursor;
+          end = (CePoint_t){0, view->buffer->line_count};
+          if(end.y > 0){
+               end.y--;
+               end.x = ce_utf8_last_index(view->buffer->lines[end.y]);
+          }
+     }
+
+     if(ce_point_after(end, start)){
+          buffer_replace_all(view->buffer, view->cursor, match, replace, start, end, false);
+     }
+}
+
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
@@ -1385,6 +1480,34 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(command->arg_count == 0){
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REPLACE ALL");
+     }else if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING){
+          int64_t index = ce_vim_yank_register_index('/');
+          CeVimYank_t* yank = app->vim.yanks + index;
+          if(yank->text){
+               replace_all(view, &app->vim, yank->text, command->args[0].string);
+          }
+     }else{
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len)
 {
      for(size_t i = 0; i < len; ++i){
@@ -1592,102 +1715,110 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                          free(macro_string);
                     }
                }else if(app->input_mode){
-                    if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                         char* base_directory = view_base_directory(view, app);
-                         char filepath[PATH_MAX];
-                         for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-                              if(base_directory){
-                                   snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
-                              }else{
-                                   strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
+                    if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+                         if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
+                              char* base_directory = view_base_directory(view, app);
+                              char filepath[PATH_MAX];
+                              for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
+                                   if(base_directory){
+                                        snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
+                                   }else{
+                                        strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
+                                   }
+                                   load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
                               }
-                              load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
-                         }
 
-                         free(base_directory);
-                    }else if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
-                             strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
-                             strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
-                             strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0){
-                         // update yanks
-                         int64_t index = ce_vim_yank_register_index('/');
-                         CeVimYank_t* yank = app->vim.yanks + index;
-                         free(yank->text);
-                         yank->text = strdup(app->input_view.buffer->lines[0]);
-                         yank->line = false;
-                    }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
-                         char* end_of_number = app->input_view.buffer->lines[0];
-                         int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
-                         if(end_of_number > app->input_view.buffer->lines[0]){
-                              // if the command entered was a number, go to that line
-                              if(line_number >= 0 && line_number < view->buffer->line_count){
-                                   view->cursor.y = line_number - 1;
-                                   view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
-                                   // TODO: compress with other view centering code I've seen
-                                   int64_t view_height = view->rect.bottom - view->rect.top;
-                                   ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
-                                                         app->config_options.vertical_scroll_off,
-                                                         app->config_options.tab_width);
-                                   ce_view_scroll_to(view, (CePoint_t){view->cursor.x, view->cursor.y - (view_height / 2)});
-                              }
-                         }else{
-                              // convert and run the command
-                              CeCommand_t command = {};
-                              if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
-                                   ce_log("failed to parse command: '%s'\n", app->input_view.buffer->lines[0]);
+                              free(base_directory);
+                         }else if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
+                                  strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
+                                  strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
+                                  strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0){
+                              // update yanks
+                              int64_t index = ce_vim_yank_register_index('/');
+                              CeVimYank_t* yank = app->vim.yanks + index;
+                              free(yank->text);
+                              yank->text = strdup(app->input_view.buffer->lines[0]);
+                              yank->line = false;
+                         }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
+                              char* end_of_number = app->input_view.buffer->lines[0];
+                              int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
+                              if(end_of_number > app->input_view.buffer->lines[0]){
+                                   // if the command entered was a number, go to that line
+                                   if(line_number >= 0 && line_number < view->buffer->line_count){
+                                        view->cursor.y = line_number - 1;
+                                        view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+                                        // TODO: compress with other view centering code I've seen
+                                        int64_t view_height = view->rect.bottom - view->rect.top;
+                                        ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
+                                                              app->config_options.vertical_scroll_off,
+                                                              app->config_options.tab_width);
+                                        ce_view_scroll_to(view, (CePoint_t){view->cursor.x, view->cursor.y - (view_height / 2)});
+                                   }
                               }else{
-                                   CeCommandFunc_t* command_func = NULL;
-                                   for(int64_t i = 0; i < app->command_entry_count; i++){
-                                        CeCommandEntry_t* entry = app->command_entries + i;
-                                        if(strcmp(entry->name, command.name) == 0){
-                                             command_func = entry->func;
-                                             break;
+                                   // convert and run the command
+                                   CeCommand_t command = {};
+                                   if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
+                                        ce_log("failed to parse command: '%s'\n", app->input_view.buffer->lines[0]);
+                                   }else{
+                                        CeCommandFunc_t* command_func = NULL;
+                                        for(int64_t i = 0; i < app->command_entry_count; i++){
+                                             CeCommandEntry_t* entry = app->command_entries + i;
+                                             if(strcmp(entry->name, command.name) == 0){
+                                                  command_func = entry->func;
+                                                  break;
+                                             }
+                                        }
+
+                                        if(command_func){
+                                             // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
+                                             app->input_mode = false;
+                                             app->vim.mode = CE_VIM_MODE_NORMAL;
+
+                                             command_func(&command, app);
+
+                                             return;
+                                        }else{
+                                             ce_log("unknown command: '%s'\n", command.name);
                                         }
                                    }
-
-                                   if(command_func){
-                                        // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
-                                        app->input_mode = false;
-                                        app->vim.mode = CE_VIM_MODE_NORMAL;
-
-                                        command_func(&command, app);
-
-                                        return;
-                                   }else{
-                                        ce_log("unknown command: '%s'\n", command.name);
+                              }
+                         }else if(strcmp(app->input_view.buffer->name, "EDIT YANK") == 0){
+                              CeVimYank_t* yank = app->vim.yanks + app->edit_register;
+                              free(yank->text);
+                              yank->text = ce_buffer_dupe(app->input_view.buffer);
+                              yank->line = false;
+                         }else if(strcmp(app->input_view.buffer->name, "EDIT MACRO") == 0){
+                              CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
+                              if(rune_string){
+                                   ce_rune_node_free(app->macros.rune_head + app->edit_register);
+                                   CeRune_t* itr = rune_string;
+                                   while(*itr){
+                                        ce_rune_node_insert(app->macros.rune_head + app->edit_register, *itr);
+                                        itr++;
                                    }
-                              }
-                         }
-                    }else if(strcmp(app->input_view.buffer->name, "EDIT YANK") == 0){
-                         CeVimYank_t* yank = app->vim.yanks + app->edit_register;
-                         free(yank->text);
-                         yank->text = ce_buffer_dupe(app->input_view.buffer);
-                         yank->line = false;
-                    }else if(strcmp(app->input_view.buffer->name, "EDIT MACRO") == 0){
-                         CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
-                         if(rune_string){
-                              ce_rune_node_free(app->macros.rune_head + app->edit_register);
-                              CeRune_t* itr = rune_string;
-                              while(*itr){
-                                   ce_rune_node_insert(app->macros.rune_head + app->edit_register, *itr);
-                                   itr++;
-                              }
 
-                              free(rune_string);
-                         }
-                    }else if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0){
-                         BufferNode_t* itr = app->buffer_node_head;
-                         while(itr){
-                              if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-                                   view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
-                                   break;
+                                   free(rune_string);
                               }
-                              itr = itr->next;
-                         }
-                    }else if(strcmp(app->input_view.buffer->name, UNSAVED_BUFFERS_DIALOGUE) == 0){
-                         if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
-                            strcmp(app->input_view.buffer->lines[0], "Y") == 0){
-                              app->quit = true;
+                         }else if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0){
+                              BufferNode_t* itr = app->buffer_node_head;
+                              while(itr){
+                                   if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
+                                        view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                                        break;
+                                   }
+                                   itr = itr->next;
+                              }
+                         }else if(strcmp(app->input_view.buffer->name, UNSAVED_BUFFERS_DIALOGUE) == 0){
+                              if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
+                                 strcmp(app->input_view.buffer->lines[0], "Y") == 0){
+                                   app->quit = true;
+                              }
+                         }else if(strcmp(app->input_view.buffer->name, "REPLACE ALL") == 0){
+                              int64_t index = ce_vim_yank_register_index('/');
+                              CeVimYank_t* yank = app->vim.yanks + index;
+                              if(yank->text){
+                                   replace_all(view, &app->vim, yank->text, app->input_view.buffer->lines[0]);
+                              }
                          }
                     }
 
@@ -1756,7 +1887,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     build_complete_list(app->complete_list_buffer, complete);
                     return;
                }
-          }else if(key == KEY_ESCAPE && app->input_mode){ // Escape
+          }else if(key == KEY_ESCAPE && app->input_mode && app->vim.mode == CE_VIM_MODE_NORMAL){ // Escape
                app->input_mode = false;
                app->vim.mode = CE_VIM_MODE_NORMAL;
 
@@ -2001,6 +2132,7 @@ int main(int argc, char** argv){
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
+          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
      };
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

@@ -2770,6 +2770,9 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
                         const CeConfigOptions_t* config_options){
      bool chain = false;
      ce_vim_motion_range_sort(&motion_range);
+
+     CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, config_options->tab_width);
+
      for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
           if(view->buffer->lines[i][0] == 0) continue;
 
@@ -2791,11 +2794,12 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           change.string = insert_string;
           change.location = indentation_point;
           change.cursor_before = view->cursor;
-          change.cursor_after = view->cursor;
+          change.cursor_after = end_cursor;
           ce_buffer_change(view->buffer, &change);
           chain = true;
      }
 
+     if(chain) view->cursor = end_cursor; // if we did any indentation at all, update the cursor
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }
@@ -2804,6 +2808,7 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
                           const CeConfigOptions_t* config_options){
      bool chain = false;
      ce_vim_motion_range_sort(&motion_range);
+     CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, -config_options->tab_width);
      for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
           // calc indentation
           CePoint_t indentation_point = {0, i};
@@ -2832,6 +2837,7 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
           }
      }
 
+     if(chain) view->cursor = end_cursor; // if we did any indentation at all, update the cursor
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }
