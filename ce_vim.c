@@ -239,7 +239,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                          }
                     }
                }
-          }else if(key == '\t'){
+          }else if(key == CE_TAB){
                // build a string to insert
                int64_t insert_len = 1;
                if(config_options->insert_spaces_on_tab){

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -x
 SOURCES=(main.c ce.c ce_vim.c ce_layout.c ce_command.c ce_syntax.c ce_terminal.c ce_complete.c ce_macros.c)
-FLAGS='-Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3'
+FLAGS='-Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3 -pthread'
 EXE='ce'
-LINK='-lpthread -lncursesw -lutil'
+LINK='-lncursesw -lutil'
 clang $FLAGS ${SOURCES[*]} -o $EXE $LINK
 

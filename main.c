@@ -21,6 +21,8 @@
 #include "ce_complete.h"
 #include "ce_macros.h"
 
+#define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
+
 char* directory_from_filename(const char* filename){
      const char* last_slash = strrchr(filename, '/');
      char* directory = NULL;
@@ -868,7 +870,33 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      App_t* app = user_data;
-     app->quit = true;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     bool unsaved_buffers = false;
+     BufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(itr->buffer->status == CE_BUFFER_STATUS_MODIFIED){
+               unsaved_buffers = true;
+               break;
+          }
+          itr = itr->next;
+     }
+
+     if(unsaved_buffers){
+          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, UNSAVED_BUFFERS_DIALOGUE);
+     }else{
+          app->quit = true;
+     }
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1655,6 +1683,11 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                                    break;
                               }
                               itr = itr->next;
+                         }
+                    }else if(strcmp(app->input_view.buffer->name, UNSAVED_BUFFERS_DIALOGUE) == 0){
+                         if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
+                            strcmp(app->input_view.buffer->lines[0], "Y") == 0){
+                              app->quit = true;
                          }
                     }
 
