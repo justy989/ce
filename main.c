@@ -884,7 +884,7 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      bool unsaved_buffers = false;
      BufferNode_t* itr = app->buffer_node_head;
      while(itr){
-          if(itr->buffer->status == CE_BUFFER_STATUS_MODIFIED){
+          if(itr->buffer->status == CE_BUFFER_STATUS_MODIFIED && itr->buffer != app->input_view.buffer){
                unsaved_buffers = true;
                break;
           }
@@ -2020,6 +2020,11 @@ int main(int argc, char** argv){
           buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
           ce_buffer_alloc(app.macro_list_buffer, 1, "[macros]");
           buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
+
+          app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
