@@ -521,10 +521,10 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
                     }
                }
 
-               if(x < col_min) x = col_min;
+               if(x < col_min) x = col_min + 1;
 
                standend();
-               for(; x <= col_max; x++) addch(' ');
+               for(; x <= col_max + 1; x++) addch(' ');
           }
      }
 }
