@@ -389,31 +389,33 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
      CePoint_t visual_start;
      CePoint_t visual_end;
 
-     if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
-          if(ce_point_after(view->cursor, vim->visual)){
-               visual_start = vim->visual;
-               visual_end = view->cursor;
-          }else{
-               visual_start = view->cursor;
-               visual_end = vim->visual;
-          }
-     }
-
-     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
-          if(view->cursor.x < vim->visual.x){
-               visual_start.x = view->cursor.x;
-               visual_end.x = vim->visual.x;
-          }else{
-               visual_start.x = vim->visual.x;
-               visual_end.x = view->cursor.x;
+     if(vim){
+          if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
+               if(ce_point_after(view->cursor, vim->visual)){
+                    visual_start = vim->visual;
+                    visual_end = view->cursor;
+               }else{
+                    visual_start = view->cursor;
+                    visual_end = vim->visual;
+               }
           }
 
-          if(view->cursor.y < vim->visual.y){
-               visual_start.y = view->cursor.y;
-               visual_end.y = vim->visual.y;
-          }else{
-               visual_start.y = vim->visual.y;
-               visual_end.y = view->cursor.y;
+          if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
+               if(view->cursor.x < vim->visual.x){
+                    visual_start.x = view->cursor.x;
+                    visual_end.x = vim->visual.x;
+               }else{
+                    visual_start.x = vim->visual.x;
+                    visual_end.x = view->cursor.x;
+               }
+
+               if(view->cursor.y < vim->visual.y){
+                    visual_start.y = view->cursor.y;
+                    visual_end.y = vim->visual.y;
+               }else{
+                    visual_start.y = vim->visual.y;
+                    visual_end.y = view->cursor.y;
+               }
           }
      }
 
@@ -423,30 +425,32 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
           int64_t current_match_len = 1;
           CePoint_t match_point = {0, y};
 
-          if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
-               if(match_point.y >= visual_start.y &&
-                  match_point.y <= visual_end.y){
-                    bg_color = COLOR_WHITE;
-                    change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
-               }else{
-                    if(bg_color == COLOR_WHITE){
-                         bg_color = COLOR_DEFAULT;
-                         ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
+          if(vim){
+               if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
+                    if(match_point.y >= visual_start.y &&
+                       match_point.y <= visual_end.y){
+                         bg_color = COLOR_WHITE;
+                         change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
                     }else{
-                         bg_color = COLOR_DEFAULT;
+                         if(bg_color == COLOR_WHITE){
+                              bg_color = COLOR_DEFAULT;
+                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
+                         }else{
+                              bg_color = COLOR_DEFAULT;
+                         }
                     }
-               }
-          }else if(vim->mode == CE_VIM_MODE_VISUAL){
-               if(ce_points_equal(match_point, visual_start) ||
-                  ce_points_equal(match_point, visual_end) ||
-                  (ce_point_after(match_point, visual_start) &&
-                   !ce_point_after(match_point, visual_end))){
-                    change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
-               }
-          }else if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
-               if(match_point.x >= visual_start.x && match_point.x <= visual_end.x &&
-                  match_point.y >= visual_start.y && match_point.y <= visual_end.y){
-                    change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+               }else if(vim->mode == CE_VIM_MODE_VISUAL){
+                    if(ce_points_equal(match_point, visual_start) ||
+                       ce_points_equal(match_point, visual_end) ||
+                       (ce_point_after(match_point, visual_start) &&
+                        !ce_point_after(match_point, visual_end))){
+                         change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+                    }
+               }else if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
+                    if(match_point.x >= visual_start.x && match_point.x <= visual_end.x &&
+                       match_point.y >= visual_start.y && match_point.y <= visual_end.y){
+                         change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+                    }
                }
           }
 
@@ -454,40 +458,42 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
                char* str = ce_utf8_find_index(line, x);
                match_point.x = x;
 
-               if(vim->mode == CE_VIM_MODE_VISUAL){
-                    if(ce_points_equal(match_point, visual_start) ||
-                       ce_points_equal(match_point, visual_end) ||
-                       (ce_point_after(match_point, visual_start) &&
-                        !ce_point_after(match_point, visual_end))){
-                         if(bg_color == COLOR_DEFAULT){
-                              bg_color = COLOR_WHITE;
-                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+               if(vim){
+                    if(vim->mode == CE_VIM_MODE_VISUAL){
+                         if(ce_points_equal(match_point, visual_start) ||
+                            ce_points_equal(match_point, visual_end) ||
+                            (ce_point_after(match_point, visual_start) &&
+                             !ce_point_after(match_point, visual_end))){
+                              if(bg_color == COLOR_DEFAULT){
+                                   bg_color = COLOR_WHITE;
+                                   change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+                              }else{
+                                   bg_color = COLOR_WHITE;
+                              }
                          }else{
-                              bg_color = COLOR_WHITE;
+                              if(bg_color == COLOR_WHITE){
+                                   bg_color = COLOR_DEFAULT;
+                                   ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
+                              }else{
+                                   bg_color = COLOR_DEFAULT;
+                              }
                          }
-                    }else{
-                         if(bg_color == COLOR_WHITE){
-                              bg_color = COLOR_DEFAULT;
-                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
+                    }else if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
+                         if(match_point.x >= visual_start.x && match_point.x <= visual_end.x &&
+                            match_point.y >= visual_start.y && match_point.y <= visual_end.y){
+                              if(bg_color == COLOR_DEFAULT){
+                                   bg_color = COLOR_WHITE;
+                                   change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+                              }else{
+                                   bg_color = COLOR_WHITE;
+                              }
                          }else{
-                              bg_color = COLOR_DEFAULT;
-                         }
-                    }
-               }else if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK){
-                    if(match_point.x >= visual_start.x && match_point.x <= visual_end.x &&
-                       match_point.y >= visual_start.y && match_point.y <= visual_end.y){
-                         if(bg_color == COLOR_DEFAULT){
-                              bg_color = COLOR_WHITE;
-                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
-                         }else{
-                              bg_color = COLOR_WHITE;
-                         }
-                    }else{
-                         if(bg_color == COLOR_WHITE){
-                              bg_color = COLOR_DEFAULT;
-                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
-                         }else{
-                              bg_color = COLOR_DEFAULT;
+                              if(bg_color == COLOR_WHITE){
+                                   bg_color = COLOR_DEFAULT;
+                                   ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
+                              }else{
+                                   bg_color = COLOR_DEFAULT;
+                              }
                          }
                     }
                }
@@ -519,7 +525,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
                          }else if((match_len = match_c_multiline_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
                               multiline_comment = true;
-                         }else if(((view->cursor.y != y) || (x >= view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
+                         }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
                               ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
                                                         ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
@@ -537,7 +543,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
 
           // handle case where visual mode ends at the end of the line
           match_point.x = line_len;
-          if(vim->mode == CE_VIM_MODE_VISUAL && bg_color == COLOR_WHITE && ce_point_after(match_point, visual_end)){
+          if(vim && vim->mode == CE_VIM_MODE_VISUAL && bg_color == COLOR_WHITE && ce_point_after(match_point, visual_end)){
                bg_color = COLOR_DEFAULT;
                ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg_color, match_point);
           }

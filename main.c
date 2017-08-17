@@ -650,7 +650,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                layout->view.buffer = terminal->buffer;
                syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
           }else{
-               ce_syntax_highlight_c(&layout->view, vim, &draw_color_list, syntax_defs);
+               ce_syntax_highlight_c(&layout->view, layout == current ? vim : NULL, &draw_color_list, syntax_defs);
           }
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
           ce_draw_color_list_free(&draw_color_list);
