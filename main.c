@@ -165,6 +165,17 @@ void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConf
      vim->mode = CE_VIM_MODE_NORMAL;
 }
 
+typedef struct{
+     CeVimBufferData_t vim;
+}BufferUserData_t;
+
+CeBuffer_t* new_buffer(){
+     CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+     if(!buffer) return buffer;
+     buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+     return buffer;
+}
+
 static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t* view,
                                        CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
      // have we already loaded this file?
@@ -178,7 +189,7 @@ static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t
      }
 
      // load file
-     CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+     CeBuffer_t* buffer = new_buffer();
      if(ce_buffer_load_file(buffer, filepath)){
           buffer_node_insert(buffer_node_head, buffer);
           view_switch_buffer(view, buffer, vim, config_options);
@@ -196,8 +207,8 @@ static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t
 // limit to 60 fps
 #define DRAW_USEC_LIMIT 16666
 
-bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view, \
-                                const CeConfigOptions_t* config_options){
+bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
+                                CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      char reg = action->verb.character;
      if(reg == 0) reg = '"';
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(reg);
@@ -1835,17 +1846,20 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     if(complete->current >= 0){
                          char* insertion = strdup(complete->elements[complete->current].string);
                          int64_t insertion_len = strlen(insertion);
-                         int64_t delete_len = strlen(complete->current_match);
-                         CePoint_t delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
-                         if(delete_len > 0 && ce_buffer_remove_string(app->input_view.buffer, delete_point, delete_len)){
-                              CeBufferChange_t change = {};
-                              change.chain = true;
-                              change.insertion = false;
-                              change.string = strdup(complete->current_match);
-                              change.location = delete_point;
-                              change.cursor_before = app->input_view.cursor;
-                              change.cursor_after = app->input_view.cursor;
-                              ce_buffer_change(view->buffer, &change);
+                         CePoint_t delete_point = app->input_view.cursor;
+                         if(complete->current_match){
+                              int64_t delete_len = strlen(complete->current_match);
+                              delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
+                              if(delete_len > 0 && ce_buffer_remove_string(app->input_view.buffer, delete_point, delete_len)){
+                                   CeBufferChange_t change = {};
+                                   change.chain = true;
+                                   change.insertion = false;
+                                   change.string = strdup(complete->current_match);
+                                   change.location = delete_point;
+                                   change.cursor_before = app->input_view.cursor;
+                                   change.cursor_after = app->input_view.cursor;
+                                   ce_buffer_change(view->buffer, &change);
+                              }
                          }
 
                          if(insertion_len > 0 && ce_buffer_insert_string(app->input_view.buffer, insertion, delete_point)){
@@ -1897,7 +1911,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
           }
 
           if(app->input_mode){
-               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &app->config_options);
+               BufferUserData_t* buffer_data = app->input_view.buffer->user_data;
+
+               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &buffer_data->vim, &app->config_options);
 
                if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count){
                     if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
@@ -1914,7 +1930,8 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }
           }else{
-               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &app->config_options);
+               BufferUserData_t* buffer_data = view->buffer->user_data;
+               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
           }
      }else{
           if(key == KEY_ESCAPE){
@@ -2137,10 +2154,10 @@ int main(int argc, char** argv){
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
 
-     app.buffer_list_buffer = calloc(1, sizeof(*app.buffer_list_buffer));
-     app.yank_list_buffer = calloc(1, sizeof(*app.yank_list_buffer));
-     app.complete_list_buffer = calloc(1, sizeof(*app.complete_list_buffer));
-     app.macro_list_buffer = calloc(1, sizeof(*app.macro_list_buffer));
+     app.buffer_list_buffer = new_buffer();
+     app.yank_list_buffer = new_buffer();
+     app.complete_list_buffer = new_buffer();
+     app.macro_list_buffer = new_buffer();
 
      // init buffers
      {
@@ -2160,7 +2177,7 @@ int main(int argc, char** argv){
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
-                    CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+                    CeBuffer_t* buffer = new_buffer();
                     if(ce_buffer_load_file(buffer, argv[i])){
                          buffer_node_insert(&app.buffer_node_head, buffer);
 
@@ -2171,7 +2188,7 @@ int main(int argc, char** argv){
                     }
                }
           }else{
-               CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+               CeBuffer_t* buffer = new_buffer();
                ce_buffer_alloc(buffer, 1, "unnamed");
           }
      }
@@ -2246,7 +2263,7 @@ int main(int argc, char** argv){
 
      // setup input buffer
      {
-          CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+          CeBuffer_t* buffer = new_buffer();
           ce_buffer_alloc(buffer, 1, "input");
           app.input_view.buffer = buffer;
           buffer_node_insert(&app.buffer_node_head, buffer);
