@@ -2068,7 +2068,7 @@ bool ce_vim_motion_visual(CeVim_t* vim, CeVimAction_t* action, const CeView_t* v
           if(action->yank_line){
                motion_range->start = (CePoint_t){0, view->cursor.y};
                motion_range->end.y = view->cursor.y + action->motion.integer;
-               motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
+               motion_range->end.x = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
           }else{
                motion_range->start = view->cursor;
                motion_range->end = ce_buffer_advance_point(view->buffer, view->cursor, action->motion.integer);

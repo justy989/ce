@@ -9,6 +9,5 @@ todo:
 bug:
 - crash trying to delete last lines in file that are blank
 - got stuck in visual block mode once, but not recently
-- Vjd then dot doesn't delete entirely 2 lines below
 - drawing lines below the buffer on the right causes overwriting spaces on the left
 - occasional crash where vim verb gets motion of -1, -1
