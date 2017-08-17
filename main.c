@@ -74,7 +74,7 @@ void buffer_node_free(BufferNode_t** head){
      while(itr){
           BufferNode_t* tmp = itr;
           itr = itr->next;
-          free(itr->buffer->user_data);
+          free(tmp->buffer->user_data);
           ce_buffer_free(tmp->buffer);
           free(tmp->buffer);
           free(tmp);
@@ -2044,7 +2044,15 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     itr = itr->next;
                }
 
-               if(buffer_index == view->cursor.y){
+               if(buffer_index == view->cursor.y && itr->buffer != app->buffer_list_buffer){
+                    // find all the views showing this buffer and switch to a different view
+                    for(int64_t t = 0; t < app->tab_list_layout->tab_list.tab_count; t++){
+                         CeLayout_t* layout = NULL;
+                         while((layout = ce_layout_buffer_in_view(app->tab_list_layout->tab_list.tabs[t], itr->buffer))){
+                              layout->view.buffer = app->buffer_list_buffer;
+                         }
+                    }
+
                     buffer_node_delete(&app->buffer_node_head, itr->buffer);
                }
           }
