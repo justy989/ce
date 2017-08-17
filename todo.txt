@@ -5,9 +5,10 @@ todo:
 - terminal scrollback
 - goto next/prev terminal output file destination
 - multiple terminals
+- add config option for log destination
 
 bug:
 - crash trying to delete last lines in file that are blank
 - got stuck in visual block mode once, but not recently
-- drawing lines below the buffer on the right causes overwriting spaces on the left
 - occasional crash where vim verb gets motion of -1, -1
+- crash when visual highlighting all the lines in test.txt and deleting them

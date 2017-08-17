@@ -609,8 +609,6 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
 
      standend();
      if(view->buffer->line_count > 0){
-          move(0, 0);
-
           for(int64_t y = 0; y < view_height; y++){
                int64_t index = 0;
                int64_t x = 0;
@@ -657,12 +655,14 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
                          line += rune_len;
                          index++;
                     }
+
+                    x--;
                }
 
-               if(x < col_min) x = col_min + 1;
+               if(x < col_min) x = col_min;
 
                standend();
-               for(; x <= col_max + 1; x++) addch(' ');
+               for(; x <= col_max; x++) addch(' ');
           }
      }
 }
