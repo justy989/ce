@@ -56,6 +56,85 @@ void buffer_node_free(BufferNode_t** head){
      *head = NULL;
 }
 
+typedef struct StringNode_t{
+     char* string;
+     struct StringNode_t* next;
+     struct StringNode_t* prev;
+}StringNode_t;
+
+StringNode_t* string_node_insert(StringNode_t** head, const char* string){
+     StringNode_t* tail = *head;
+     StringNode_t* node;
+     if(tail){
+          while(tail->next){
+               tail = tail->next;
+          }
+
+          // NOTE: we probably don't want this if we want the linked list to be general
+          // skip the insertion if the string matches the previous string
+          if(strcmp(string, tail->string) == 0) return NULL;
+
+          node = calloc(1, sizeof(*node));
+          if(!node) return node;
+          node->string = strdup(string);
+
+          tail->next = node;
+          node->prev = tail;
+     }else{
+          node = calloc(1, sizeof(*node));
+          if(!node) return node;
+          node->string = strdup(string);
+
+          *head = node;
+     }
+
+     return node;
+}
+
+void string_node_free(StringNode_t** head){
+     StringNode_t* itr = *head;
+     while(itr){
+          StringNode_t* tmp = itr;
+          itr = itr->next;
+          free(tmp->string);
+          free(tmp);
+     }
+
+     *head = NULL;
+}
+
+typedef struct{
+     StringNode_t* head;
+     StringNode_t* current;
+}History_t;
+
+bool history_insert(History_t* history, const char* string){
+     StringNode_t* new_node = string_node_insert(&history->head, string);
+     if(new_node){
+          history->current = new_node;
+          return true;
+     }
+     return false;
+}
+
+char* history_previous(History_t* history){
+     if(history->current && history->current->prev){
+          history->current = history->current->prev;
+          return history->current->string;
+     }
+
+     return NULL;
+}
+
+char* history_next(History_t* history){
+     if(history->current && history->current->next){
+          history->current = history->current->next;
+          return history->current->string;
+     }
+
+     return NULL;
+}
+
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
      int64_t last_line = buffer->line_count;
      if(last_line) last_line--;
@@ -374,6 +453,7 @@ typedef struct{
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
      CeComplete_t switch_buffer_complete;
+     History_t command_history;
      KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
@@ -1802,6 +1882,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                                              app->vim.mode = CE_VIM_MODE_NORMAL;
 
                                              command_func(&command, app);
+                                             history_insert(&app->command_history, app->input_view.buffer->lines[0]);
 
                                              return;
                                         }else{
