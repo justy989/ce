@@ -44,11 +44,37 @@ bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
+bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer){
+     BufferNode_t* prev = NULL;
+     BufferNode_t* itr = *head;
+     while(itr){
+          if(itr->buffer == buffer) break;
+          prev = itr;
+          itr = itr->next;
+     }
+
+     if(!itr) return false;
+
+     if(prev){
+          prev->next = itr->next;
+     }else{
+          *head = (*head)->next;
+     }
+
+     // TODO: compress with below
+     free(itr->buffer->user_data);
+     ce_buffer_free(itr->buffer);
+     free(itr->buffer);
+     free(itr);
+     return true;
+}
+
 void buffer_node_free(BufferNode_t** head){
      BufferNode_t* itr = *head;
      while(itr){
           BufferNode_t* tmp = itr;
           itr = itr->next;
+          free(itr->buffer->user_data);
           ce_buffer_free(tmp->buffer);
           free(tmp->buffer);
           free(tmp);
@@ -963,7 +989,6 @@ void input_view_overlay(CeView_t* input_view, CeView_t* view){
      if(height <= 0) height = 1;
      if(height > max_height) height = max_height;
      input_view->rect.top = view->rect.bottom - height;
-
 }
 
 bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue){
@@ -2010,6 +2035,18 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                CeComplete_t* complete = app_is_completing(app);
                if(complete) ce_complete_reset(complete);
                return;
+          }else if(key == 'd' && view->buffer == app->buffer_list_buffer){ // Escape
+               BufferNode_t* itr = app->buffer_node_head;
+               int64_t buffer_index = 0;
+               while(itr){
+                    if(buffer_index == view->cursor.y) break;
+                    buffer_index++;
+                    itr = itr->next;
+               }
+
+               if(buffer_index == view->cursor.y){
+                    buffer_node_delete(&app->buffer_node_head, itr->buffer);
+               }
           }
 
           if(app->input_mode){
@@ -2299,7 +2336,7 @@ int main(int argc, char** argv){
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
-          app.marks_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
@@ -2411,7 +2448,7 @@ int main(int argc, char** argv){
 
      // main loop
      while(!app.quit){
-          // TODO: we can optimize by only doing this at the start and when we see a resized event
+          // TODO: we can optimize by only resizing when we see a resized event
           app_update_terminal_view(&app);
 
           // figure out our current view rect
@@ -2426,13 +2463,14 @@ int main(int argc, char** argv){
                break;
           }
 
-          // setup input view rect
-          if(view && app.input_mode) input_view_overlay(&app.input_view, view);
-
+          // handle input from the user
           int key = getch();
           app_handle_key(&app, view, key);
 
-          // wait for input from the user
+          // setup input view overlay if we are
+          if(view && app.input_mode) input_view_overlay(&app.input_view, view);
+
+          // update any list buffers if they are in view
           if(ce_layout_buffer_in_view(tab_layout, app.buffer_list_buffer)){
                build_buffer_list(app.buffer_list_buffer, app.buffer_node_head);
           }
@@ -2450,6 +2488,7 @@ int main(int argc, char** argv){
                build_mark_list(app.mark_list_buffer, &buffer_data->vim);
           }
 
+          // tell the draw thread we are ready to draw
           app.ready_to_draw = true;
      }
 
