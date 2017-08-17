@@ -150,6 +150,21 @@ static void build_macro_list(CeBuffer_t* buffer, CeMacros_t* macros){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
+static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
+     ce_buffer_empty(buffer);
+     char line[256];
+          buffer_append_on_new_line(buffer, "reg point:\n");
+     for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
+          CePoint_t* point = buffer_data->marks + i;
+          if(point->x == 0 && point->y == 0) continue;
+          char reg = i + '!';
+          snprintf(line, 256, "'%c' %ld, %ld\n", reg, point->x, point->y);
+          buffer_append_on_new_line(buffer, line);
+     }
+
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
 void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
      // save the cursor on the old buffer
      view->buffer->cursor_save = view->cursor;
@@ -355,6 +370,7 @@ typedef struct{
      CeBuffer_t* yank_list_buffer;
      CeBuffer_t* complete_list_buffer;
      CeBuffer_t* macro_list_buffer;
+     CeBuffer_t* mark_list_buffer;
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
      CeComplete_t switch_buffer_complete;
@@ -2158,6 +2174,7 @@ int main(int argc, char** argv){
      app.yank_list_buffer = new_buffer();
      app.complete_list_buffer = new_buffer();
      app.macro_list_buffer = new_buffer();
+     app.mark_list_buffer = new_buffer();
 
      // init buffers
      {
@@ -2169,6 +2186,8 @@ int main(int argc, char** argv){
           buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
           ce_buffer_alloc(app.macro_list_buffer, 1, "[macros]");
           buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
+          ce_buffer_alloc(app.mark_list_buffer, 1, "[marks]");
+          buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
@@ -2317,6 +2336,11 @@ int main(int argc, char** argv){
 
           if(ce_layout_buffer_in_view(tab_layout, app.macro_list_buffer)){
                build_macro_list(app.macro_list_buffer, &app.macros);
+          }
+
+          if(view && ce_layout_buffer_in_view(tab_layout, app.mark_list_buffer)){
+               BufferUserData_t* buffer_data = view->buffer->user_data;
+               build_mark_list(app.mark_list_buffer, &buffer_data->vim);
           }
 
           app.ready_to_draw = true;
