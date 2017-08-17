@@ -2224,7 +2224,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
 int main(int argc, char** argv){
      setlocale(LC_ALL, "");
 
-     if(!ce_log_init("ce.log")){
+     char log_filepath[PATH_MAX];
+     snprintf(log_filepath, PATH_MAX, "%s/ce.log", getenv("HOME"));
+     if(!ce_log_init(log_filepath)){
           return 1;
      }
 
