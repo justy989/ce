@@ -66,9 +66,7 @@ StringNode_t* string_node_insert(StringNode_t** head, const char* string){
      StringNode_t* tail = *head;
      StringNode_t* node;
      if(tail){
-          while(tail->next){
-               tail = tail->next;
-          }
+          while(tail->next) tail = tail->next;
 
           // NOTE: we probably don't want this if we want the linked list to be general
           // skip the insertion if the string matches the previous string
@@ -110,25 +108,32 @@ typedef struct{
 
 bool history_insert(History_t* history, const char* string){
      StringNode_t* new_node = string_node_insert(&history->head, string);
-     if(new_node){
-          history->current = new_node;
-          return true;
-     }
+     if(new_node) return true;
      return false;
 }
 
 char* history_previous(History_t* history){
-     if(history->current && history->current->prev){
-          history->current = history->current->prev;
+     if(history->current){
+          if(history->current->prev){
+               history->current = history->current->prev;
+          }
           return history->current->string;
      }
 
-     return NULL;
+     StringNode_t* tail = history->head;
+     if(!tail) return NULL;
+
+     while(tail->next) tail = tail->next;
+     history->current = tail;
+
+     return tail->string;
 }
 
 char* history_next(History_t* history){
-     if(history->current && history->current->next){
-          history->current = history->current->next;
+     if(history->current){
+          if(history->current->next){
+               history->current = history->current->next;
+          }
           return history->current->string;
      }
 
@@ -2008,6 +2013,26 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
           }
 
           if(app->input_mode){
+               if(strcmp(app->input_view.buffer->name, "COMMAND") == 0 && app->input_view.buffer->line_count){
+                    if(key == KEY_UP){
+                         char* prev = history_previous(&app->command_history);
+                         if(prev){
+                              ce_buffer_remove_string(app->input_view.buffer, (CePoint_t){0, 0}, ce_utf8_strlen(app->input_view.buffer->lines[0]));
+                              ce_buffer_insert_string(app->input_view.buffer, prev, (CePoint_t){0, 0});
+                         }
+                         return;
+                    }
+
+                    if(key == KEY_DOWN){
+                         char* next = history_next(&app->command_history);
+                         if(next){
+                              ce_buffer_remove_string(app->input_view.buffer, (CePoint_t){0, 0}, ce_utf8_strlen(app->input_view.buffer->lines[0]));
+                              ce_buffer_insert_string(app->input_view.buffer, next, (CePoint_t){0, 0});
+                         }
+                         return;
+                    }
+               }
+
                BufferUserData_t* buffer_data = app->input_view.buffer->user_data;
 
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &buffer_data->vim, &app->config_options);
@@ -2274,6 +2299,7 @@ int main(int argc, char** argv){
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.marks_list_buffer->status = CE_BUFFER_STATUS_NONE;
 
           if(argc > 1){
                for(int64_t i = 1; i < argc; i++){
