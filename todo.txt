@@ -1,0 +1,14 @@
+todo:
+- have drawing a view take in a highlight range, rather than taking vim in
+- have drawing take in a pattern string for searching to also highlight
+- jump list
+- terminal scrollback
+- goto next/prev terminal output file destination
+- multiple terminals
+- delete buffer
+
+bug:
+- crash trying to delete last lines in file that are blank
+- got stuck in visual block mode
+- Vjd then dot doesn't delete entirely 2 lines below
+- multiline commends don't seem to syntax highlight properly
