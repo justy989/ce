@@ -113,4 +113,3 @@ void ce_complete_free(CeComplete_t* complete){
      memset(complete, 0, sizeof(*complete));
      complete->current = -1;
 }
-

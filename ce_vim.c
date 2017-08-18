@@ -2342,7 +2342,8 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           if(motion_range.end.x == ce_utf8_strlen(view->buffer->lines[motion_range.end.y])) yank_line = true;
      }
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     if(ce_points_equal(motion_range.end, ce_buffer_end_point(view->buffer))){
+     // if the end of the range is at the end of the buffer, take off the extra newline, unless the line is empty
+     if(ce_points_equal(motion_range.end, ce_buffer_end_point(view->buffer)) && motion_range.end.x != 0){
           delete_len--;
      }
      char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
@@ -2351,6 +2352,8 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           return false;
      }
 
+     CePoint_t end_cursor = ce_buffer_clamp_point(view->buffer, motion_range.start, CE_CLAMP_X_INSIDE);
+
      // commit the change
      CeBufferChange_t change = {};
      change.chain = action->chain_undo;
@@ -2358,10 +2361,10 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      change.string = removed_string;
      change.location = motion_range.start;
      change.cursor_before = view->cursor;
-     change.cursor_after = motion_range.start;
+     change.cursor_after = end_cursor;
      ce_buffer_change(view->buffer, &change);
 
-     view->cursor = motion_range.start;
+     view->cursor = end_cursor;
      vim->chain_undo = action->chain_undo;
      vim->mode = CE_VIM_MODE_NORMAL;
 
