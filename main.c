@@ -608,7 +608,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
      CeDrawColorNode_t* draw_color_node = draw_color_list->head;
 
      standend();
-     if(view->buffer->line_count > 0){
+     if(view->buffer->line_count >= 0){
           for(int64_t y = 0; y < view_height; y++){
                int64_t index = 0;
                int64_t x = 0;
@@ -1086,11 +1086,7 @@ void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* re
           }
      }else{
           start = view->cursor;
-          end = (CePoint_t){0, view->buffer->line_count};
-          if(end.y > 0){
-               end.y--;
-               end.x = ce_utf8_last_index(view->buffer->lines[end.y]);
-          }
+          end = ce_buffer_end_point(view->buffer);
      }
 
      if(ce_point_after(end, start)){
@@ -2454,6 +2450,8 @@ int main(int argc, char** argv){
           getmaxyx(stdscr, app.terminal_height, app.terminal_width);
           ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1);
           buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
+          app.terminal.lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+          app.terminal.alternate_lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
      }
 
      // main loop
@@ -2506,7 +2504,6 @@ int main(int argc, char** argv){
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
 
-     ce_terminal_free(&app.terminal);
      ce_macros_free(&app.macros);
 
      KeyBinds_t* binds = &app.key_binds[CE_VIM_MODE_NORMAL];
@@ -2518,6 +2515,7 @@ int main(int argc, char** argv){
      free(binds->binds);
 
      buffer_node_free(&app.buffer_node_head);
+     ce_terminal_free(&app.terminal);
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
      endwin();

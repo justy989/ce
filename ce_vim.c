@@ -2130,13 +2130,7 @@ bool ce_vim_motion_around(CeVim_t* vim, CeVimAction_t* action, const CeView_t* v
 
 bool ce_vim_motion_end_of_file(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                CeVimBufferData_t* buffer_data, CeVimMotionRange_t* motion_range){
-     // TODO: compress with searching in main, make 'CePoint_t ce_buffer_end()'
-     motion_range->end.x = 0;
-     motion_range->end.y = view->buffer->line_count;
-     if(motion_range->end.y){
-          motion_range->end.y--;
-          motion_range->end.x = ce_utf8_last_index(view->buffer->lines[motion_range->end.y]);
-     }
+     motion_range->end = ce_buffer_end_point(view->buffer);
      return true;
 }
 
@@ -2330,6 +2324,10 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
                         CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      bool do_not_include_end = ce_vim_motion_range_sort(&motion_range);
 
+     if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
+          do_not_include_end = false;
+     }
+
      if(action->motion.function == ce_vim_motion_little_word ||
         action->motion.function == ce_vim_motion_big_word ||
         action->motion.function == ce_vim_motion_begin_little_word ||
@@ -2344,6 +2342,9 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           if(motion_range.end.x == ce_utf8_strlen(view->buffer->lines[motion_range.end.y])) yank_line = true;
      }
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
+     if(ce_points_equal(motion_range.end, ce_buffer_end_point(view->buffer))){
+          delete_len--;
+     }
      char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
      if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len)){
           free(removed_string);

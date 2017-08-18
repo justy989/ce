@@ -233,7 +233,7 @@ bool ce_buffer_empty(CeBuffer_t* buffer){
 
      // re allocate it down to a single blank line
      buffer->lines = realloc(buffer->lines, sizeof(*buffer->lines));
-     buffer->lines[0] = realloc(buffer->lines[0], sizeof(buffer->lines[0]));
+     buffer->lines[0] = malloc(sizeof(buffer->lines[0]));
      buffer->lines[0][0] = 0;
      buffer->line_count = 1;
      buffer->status = CE_BUFFER_STATUS_NONE;
@@ -604,6 +604,15 @@ CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t 
      return point;
 }
 
+CePoint_t ce_buffer_end_point(CeBuffer_t* buffer){
+     CePoint_t point = {0, buffer->line_count};
+     if(point.y > 0){
+          point.y--;
+          point.x = ce_utf8_last_index(buffer->lines[point.y]);
+     }
+     return point;
+}
+
 bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t point){
      if(buffer->status == CE_BUFFER_STATUS_READONLY) return false;
 
@@ -839,7 +848,11 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
 
      // update line count, and shrink our allocation
      buffer->line_count -= lines_to_remove;
-     buffer->lines = realloc(buffer->lines, buffer->line_count * sizeof(*buffer->lines));
+     if(buffer->line_count > 0){
+          buffer->lines = realloc(buffer->lines, buffer->line_count * sizeof(*buffer->lines));
+     }else{
+          ce_buffer_empty(buffer);
+     }
 
      buffer->status = CE_BUFFER_STATUS_MODIFIED;
      return buffer->lines != NULL;
