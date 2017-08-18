@@ -645,45 +645,52 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
         action->verb.function != ce_vim_verb_motion){
           bool success = true;
           if(action->verb.function){
-               // sort y
-               if(vim->visual.y < view->cursor.y){
-                    vim->visual_block_top_left.y = vim->visual.y;
-                    vim->visual_block_bottom_right.y = view->cursor.y;
-               }else{
-                    vim->visual_block_top_left.y = view->cursor.y;
-                    vim->visual_block_bottom_right.y = vim->visual.y;
-               }
-
-               // sort x
-               if(vim->visual.x < view->cursor.x){
-                    vim->visual_block_top_left.x = vim->visual.x;
-                    vim->visual_block_bottom_right.x = view->cursor.x;
-               }else{
-                    vim->visual_block_top_left.x = view->cursor.x;
-                    vim->visual_block_bottom_right.x = vim->visual.x;
-               }
-
-               // run verb for each line in range
-               for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
-                    CeVimMotionRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
-                                                       (CePoint_t){vim->visual_block_bottom_right.x, i}};
-                    int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
-
-                    // clamp the range to the line length
-                    if(motion_range.start.x > line_last_index) motion_range.start.x = line_last_index;
-                    if(motion_range.end.x > line_last_index) motion_range.end.x = line_last_index;
-                    if(motion_range.end.x == 0) continue;
-
-                    if(!action->verb.function(vim, action, motion_range, view, buffer_data, config_options)){
-                         success = false;
-                    }else if(i != vim->visual_block_top_left.y){
-                         if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
+               if(action->visual_block_applies){
+                    // sort y
+                    if(vim->visual.y < view->cursor.y){
+                         vim->visual_block_top_left.y = vim->visual.y;
+                         vim->visual_block_bottom_right.y = view->cursor.y;
+                    }else{
+                         vim->visual_block_top_left.y = view->cursor.y;
+                         vim->visual_block_bottom_right.y = vim->visual.y;
                     }
-               }
 
-               if(vim->mode != CE_VIM_MODE_INSERT){
-                    vim->visual_block_top_left = (CePoint_t){0, 0};
-                    vim->visual_block_bottom_right = (CePoint_t){0, 0};
+                    // sort x
+                    if(vim->visual.x < view->cursor.x){
+                         vim->visual_block_top_left.x = vim->visual.x;
+                         vim->visual_block_bottom_right.x = view->cursor.x;
+                    }else{
+                         vim->visual_block_top_left.x = view->cursor.x;
+                         vim->visual_block_bottom_right.x = vim->visual.x;
+                    }
+
+                    // run verb for each line in range
+                    for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
+                         CeVimMotionRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
+                                                            (CePoint_t){vim->visual_block_bottom_right.x, i}};
+                         int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
+
+                         // clamp the range to the line length
+                         if(motion_range.start.x > line_last_index) motion_range.start.x = line_last_index;
+                         if(motion_range.end.x > line_last_index) motion_range.end.x = line_last_index;
+                         if(motion_range.end.x == 0 && line_last_index == 0) continue;
+
+                         if(!action->verb.function(vim, action, motion_range, view, buffer_data, config_options)){
+                              success = false;
+                         }else if(i != vim->visual_block_top_left.y){
+                              if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
+                         }
+                    }
+
+                    if(vim->mode != CE_VIM_MODE_INSERT){
+                         vim->visual_block_top_left = (CePoint_t){0, 0};
+                         vim->visual_block_bottom_right = (CePoint_t){0, 0};
+                    }
+               }else{
+                    CeVimMotionRange_t motion_range = {view->cursor, view->cursor};
+                    if(!action->verb.function(vim, action, motion_range, view, buffer_data, config_options)){
+                         return false;
+                    }
                }
           }
 
@@ -1436,6 +1443,7 @@ CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t
 
      action->verb.function = &ce_vim_verb_insert_mode;
      action->repeatable = true;
+     action->visual_block_applies = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1672,6 +1680,7 @@ CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* actio
 
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
+     action->visual_block_applies = true;
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
           action->yank_line = true;
@@ -1691,6 +1700,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
 
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
+     action->visual_block_applies = true;
      if(action->verb.function == ce_vim_verb_change){
           action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
           return CE_VIM_PARSE_COMPLETE;

@@ -9,6 +9,4 @@ todo:
 
 bug:
 - crash trying to delete last lines in file that are blank
-- got stuck in visual block mode once, but not recently
 - occasional crash where vim verb gets motion of -1, -1
-- crash when visual highlighting all the lines in test.txt and deleting them

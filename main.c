@@ -390,6 +390,7 @@ bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVim
 CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRune_t key){
      action->verb.function = &custom_vim_verb_substitute;
      action->repeatable = true;
+     action->visual_block_applies = true;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 

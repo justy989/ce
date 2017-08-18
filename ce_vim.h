@@ -78,6 +78,7 @@ typedef struct CeVimAction_t{
      bool yank_line; // TODO: consider rename as more than just yanking looks at this
      bool chain_undo;
      bool repeatable;
+     bool visual_block_applies;
 }CeVimAction_t;
 
 typedef struct{
