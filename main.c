@@ -946,17 +946,19 @@ void* draw_thread(void* thread_data){
                     break;
                }
 
-               int color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+               int color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_BRIGHT_WHITE);
                attron(COLOR_PAIR(color_pair));
-               for(int i = 1; i < rect_height - 1; i++){
-                    mvaddch(rect->top + i, rect->right, ACS_VLINE);
-                    mvaddch(rect->top + i, rect->left, ACS_VLINE);
+               for(int i = 0; i < rect_height; i++){
+                    mvaddch(rect->top + i, rect->right, ' ');
+                    mvaddch(rect->top + i, rect->left, ' ');
                }
 
-               for(int i = 1; i < rect_width - 1; i++){
-                    mvaddch(rect->top, rect->left + i, ACS_HLINE);
-                    mvaddch(rect->bottom, rect->left + i, ACS_HLINE);
+               for(int i = 0; i < rect_width; i++){
+                    mvaddch(rect->top, rect->left + i, ' ');
+                    mvaddch(rect->bottom, rect->left + i, ' ');
                }
+
+               mvaddch(rect->bottom, rect->right, ' ');
 
                move(0, 0);
           }else if(app->input_mode){
