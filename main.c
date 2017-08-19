@@ -15,8 +15,6 @@
 
 #include "ce_app.h"
 
-FILE* g_ce_log = NULL;
-
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
 typedef struct{
