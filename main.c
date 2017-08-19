@@ -15,6 +15,8 @@
 
 #include "ce_app.h"
 
+FILE* g_ce_log = NULL;
+
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
 typedef struct{
@@ -25,7 +27,7 @@ typedef struct{
 }UserConfig_t;
 
 bool user_config_init(UserConfig_t* user_config, const char* filepath){
-     user_config->handle = dlopen(filepath, RTLD_NOW);
+     user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
           //ce_log("dlopen('%s', RTLD_NOW) failed: '%s'\n", filepath, dlerror());
           ce_log("dlopen() failed: '%s'\n", dlerror());

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <regex.h>
@@ -199,3 +200,5 @@ void ce_rune_node_free(CeRuneNode_t** head);
 
 char* ce_rune_string_to_char_string(const CeRune_t* int_str);
 CeRune_t* ce_char_string_to_rune_string(const char* char_str);
+
+extern FILE* g_ce_log;
