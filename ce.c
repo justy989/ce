@@ -11,7 +11,7 @@
 #include <ctype.h>
 #include <ncurses.h>
 
-FILE* g_ce_log = NULL;
+extern FILE* g_ce_log;
 
 static void ce_buffer_change_node_free(CeBufferChangeNode_t** head){
      CeBufferChangeNode_t* itr = *head;

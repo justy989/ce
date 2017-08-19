@@ -15,6 +15,8 @@
 
 #include "ce_app.h"
 
+FILE* g_ce_log = NULL;
+
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
 typedef struct{
@@ -24,10 +26,11 @@ typedef struct{
      CeUserConfigFunc* free_func;
 }UserConfig_t;
 
-bool user_config_open(UserConfig_t* user_config, const char* filepath){
+bool user_config_init(UserConfig_t* user_config, const char* filepath){
      user_config->handle = dlopen(filepath, RTLD_NOW);
      if(!user_config->handle){
-          ce_log("dlopen('%s', RTLD_NOW) failed: '%s'\n", filepath, dlerror());
+          //ce_log("dlopen('%s', RTLD_NOW) failed: '%s'\n", filepath, dlerror());
+          ce_log("dlopen() failed: '%s'\n", dlerror());
           return false;
      }
 
@@ -2252,6 +2255,12 @@ int main(int argc, char** argv){
      }
 
      // init user config
+     UserConfig_t user_config = {};
+     {
+          const char* config_filepath = "/home/jtardiff/repos/ce_config/ce_config.so";
+          if(!user_config_init(&user_config, config_filepath)) return 1;
+          user_config.init_func(&app);
+     }
 
      // main loop
      while(!app.quit){
@@ -2300,6 +2309,8 @@ int main(int argc, char** argv){
      }
 
      // cleanup
+     user_config.free_func(&app);
+     user_config_free(&user_config);
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
 
