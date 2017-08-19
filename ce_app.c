@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <ncurses.h>
 
 bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      BufferNode_t* node = malloc(sizeof(*node));
@@ -118,6 +119,46 @@ char* history_next(History_t* history){
                history->current = history->current->next;
           }
           return history->current->string;
+     }
+
+     return NULL;
+}
+
+void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count){
+     binds->count = bind_def_count;
+     binds->binds = malloc(binds->count * sizeof(*binds->binds));
+
+     for(int64_t i = 0; i < binds->count; ++i){
+          ce_command_parse(&binds->binds[i].command, bind_defs[i].command);
+          binds->binds[i].key_count = 0;
+
+          for(int k = 0; k < 4; ++k){
+               if(bind_defs[i].keys[k] == 0) break;
+               binds->binds[i].key_count++;
+          }
+
+          if(!binds->binds[i].key_count) continue;
+
+          binds->binds[i].keys = malloc(binds->binds[i].key_count * sizeof(binds->binds[i].keys[0]));
+
+          for(int k = 0; k < binds->binds[i].key_count; ++k){
+               binds->binds[i].keys[k] = bind_defs[i].keys[k];
+          }
+     }
+}
+
+void app_update_terminal_view(App_t* app){
+     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
+     app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
+                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
+}
+
+CeComplete_t* app_is_completing(App_t* app){
+     if(app->input_mode){
+          if(strcmp(app->input_view.buffer->name, "COMMAND") == 0) return &app->command_complete;
+          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
+          if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0) return &app->switch_buffer_complete;
      }
 
      return NULL;

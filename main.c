@@ -13,13 +13,6 @@
 #include <sys/stat.h>
 
 #include "ce_app.h"
-#include "ce_vim.h"
-#include "ce_layout.h"
-#include "ce_command.h"
-#include "ce_syntax.h"
-#include "ce_terminal.h"
-#include "ce_complete.h"
-#include "ce_macros.h"
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
@@ -154,10 +147,6 @@ void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConf
      vim->mode = CE_VIM_MODE_NORMAL;
 }
 
-typedef struct{
-     CeVimBufferData_t vim;
-}BufferUserData_t;
-
 CeBuffer_t* new_buffer(){
      CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
      if(!buffer) return buffer;
@@ -281,103 +270,6 @@ void syntax_highlight_terminal(CeView_t* view, volatile CeTerminal_t* terminal, 
                }
           }
      }
-}
-
-typedef struct{
-     int* keys;
-     int64_t key_count;
-     CeCommand_t command;
-     CeVimMode_t vim_mode;
-}KeyBind_t;
-
-typedef struct{
-     KeyBind_t* binds;
-     int64_t count;
-}KeyBinds_t;
-
-typedef struct{
-     int keys[4];
-     const char* command;
-}KeyBindDef_t;
-
-static void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count)
-{
-     binds->count = bind_def_count;
-     binds->binds = malloc(binds->count * sizeof(*binds->binds));
-
-     for(int64_t i = 0; i < binds->count; ++i){
-          ce_command_parse(&binds->binds[i].command, bind_defs[i].command);
-          binds->binds[i].key_count = 0;
-
-          for(int k = 0; k < 4; ++k){
-               if(bind_defs[i].keys[k] == 0) break;
-               binds->binds[i].key_count++;
-          }
-
-          if(!binds->binds[i].key_count) continue;
-
-          binds->binds[i].keys = malloc(binds->binds[i].key_count * sizeof(binds->binds[i].keys[0]));
-
-          for(int k = 0; k < binds->binds[i].key_count; ++k){
-               binds->binds[i].keys[k] = bind_defs[i].keys[k];
-          }
-     }
-}
-
-#define APP_MAX_KEY_COUNT 16
-
-typedef struct{
-     CeRect_t terminal_rect;
-     CeVim_t vim;
-     CeConfigOptions_t config_options;
-     int terminal_width;
-     int terminal_height;
-     CeView_t input_view;
-     CeView_t complete_view;
-     bool input_mode;
-     CeLayout_t* tab_list_layout;
-     CeSyntaxDef_t* syntax_defs;
-     BufferNode_t* buffer_node_head;
-     CeCommandEntry_t* command_entries;
-     int64_t command_entry_count;
-     CeVimParseResult_t last_vim_handle_result;
-     CeBuffer_t* buffer_list_buffer;
-     CeBuffer_t* yank_list_buffer;
-     CeBuffer_t* complete_list_buffer;
-     CeBuffer_t* macro_list_buffer;
-     CeBuffer_t* mark_list_buffer;
-     CeComplete_t command_complete;
-     CeComplete_t load_file_complete;
-     CeComplete_t switch_buffer_complete;
-     History_t command_history;
-     KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
-     CeRune_t keys[APP_MAX_KEY_COUNT];
-     int64_t key_count;
-     char edit_register;
-     CeTerminal_t terminal;
-     CeMacros_t macros;
-     CePoint_t search_start;
-     bool record_macro;
-     bool replay_macro;
-     bool ready_to_draw;
-     bool quit;
-}App_t;
-
-void app_update_terminal_view(App_t* app){
-     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
-     app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
-                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
-}
-
-CeComplete_t* app_is_completing(App_t* app){
-     if(app->input_mode){
-          if(strcmp(app->input_view.buffer->name, "COMMAND") == 0) return &app->command_complete;
-          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
-          if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0) return &app->switch_buffer_complete;
-     }
-
-     return NULL;
 }
 
 void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
