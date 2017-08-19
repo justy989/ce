@@ -20,7 +20,7 @@ struct CeVimMotionRange_t;
 struct CeVimBufferData_t;
 enum CeVimParseResult_t;
 
-typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, CeRune_t key);
+typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, CeRune_t);
 typedef bool CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*, const CeConfigOptions_t*,
                                struct CeVimBufferData_t*, struct CeVimMotionRange_t*);
 typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struct CeVimMotionRange_t, CeView_t*,

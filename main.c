@@ -10,11 +10,49 @@
 #include <ctype.h>
 #include <assert.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <sys/stat.h>
 
 #include "ce_app.h"
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
+
+typedef struct{
+     void* handle;
+     char* filepath;
+     CeUserConfigFunc* init_func;
+     CeUserConfigFunc* free_func;
+}UserConfig_t;
+
+bool user_config_open(UserConfig_t* user_config, const char* filepath){
+     user_config->handle = dlopen(filepath, RTLD_NOW);
+     if(!user_config->handle){
+          ce_log("dlopen('%s', RTLD_NOW) failed: '%s'\n", filepath, dlerror());
+          return false;
+     }
+
+     user_config->filepath = strdup(filepath);
+     user_config->init_func = dlsym(user_config->handle, "ce_init");
+     if(!user_config->init_func){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+
+     user_config->free_func = dlsym(user_config->handle, "ce_free");
+     if(!user_config->free_func){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+
+     return true;
+}
+
+void user_config_free(UserConfig_t* user_config){
+     free(user_config->filepath);
+     // NOTE: comment out dlclose() so valgrind can get a helpful stack frame
+     dlclose(user_config->handle);
+     memset(user_config, 0, sizeof(*user_config));
+}
 
 char* directory_from_filename(const char* filename){
      const char* last_slash = strrchr(filename, '/');
@@ -2212,6 +2250,8 @@ int main(int argc, char** argv){
           app.terminal.lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
           app.terminal.alternate_lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
      }
+
+     // init user config
 
      // main loop
      while(!app.quit){

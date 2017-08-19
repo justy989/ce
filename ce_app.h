@@ -80,11 +80,14 @@ typedef struct{
      CeTerminal_t terminal;
      CeMacros_t macros;
      CePoint_t search_start;
+     void* user_config_data;
      bool record_macro;
      bool replay_macro;
      bool ready_to_draw;
      bool quit;
 }App_t;
+
+typedef bool CeUserConfigFunc(App_t*);
 
 bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer);
 bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer);

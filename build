@@ -3,6 +3,6 @@ set -x
 SOURCES=(main.c ce.c ce_vim.c ce_layout.c ce_command.c ce_syntax.c ce_terminal.c ce_complete.c ce_macros.c ce_app.c)
 FLAGS='-Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3 -pthread'
 EXE='ce'
-LINK='-lncursesw -lutil'
+LINK='-lncursesw -lutil -ldl'
 clang $FLAGS ${SOURCES[*]} -o $EXE $LINK
 
