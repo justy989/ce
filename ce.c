@@ -986,6 +986,27 @@ bool ce_buffer_insert_string_change_at_cursor(CeBuffer_t* buffer, char* alloced_
      return true;
 }
 
+bool ce_buffer_remove_string_change(CeBuffer_t* buffer, CePoint_t point, int64_t remove_len, CePoint_t* cursor_before,
+                                    CePoint_t cursor_after, bool chain_undo){
+     char* remove_string = ce_buffer_dupe_string(buffer, point, remove_len);
+     if(!ce_buffer_remove_string(buffer, point, remove_len)){
+          free(remove_string);
+          return false;
+     }
+
+     CeBufferChange_t change = {};
+     change.chain = chain_undo;
+     change.insertion = false;
+     change.string = remove_string;
+     change.location = point;
+     change.cursor_before = *cursor_before;
+     change.cursor_after = cursor_after;
+     ce_buffer_change(buffer, &change);
+
+     *cursor_before = cursor_after;
+     return true;
+}
+
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
      CeBufferChangeNode_t* node = calloc(1, sizeof(*node));
      node->change = *change;
