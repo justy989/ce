@@ -19,6 +19,9 @@ FILE* g_ce_log = NULL;
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
+// limit to 60 fps
+#define DRAW_USEC_LIMIT 16666
+
 bool user_config_init(UserConfig_t* user_config, const char* filepath){
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
@@ -214,71 +217,6 @@ static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t
      }
 
      return buffer;
-}
-
-// limit to 60 fps
-#define DRAW_USEC_LIMIT 16666
-
-bool custom_vim_verb_substitute(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view,
-                                CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
-     char reg = action->verb.character;
-     if(reg == 0) reg = '"';
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(reg);
-     if(!yank->text) return false;
-
-     bool do_not_include_end = ce_vim_motion_range_sort(&motion_range);
-
-     if(action->motion.function == ce_vim_motion_little_word ||
-        action->motion.function == ce_vim_motion_big_word ||
-        action->motion.function == ce_vim_motion_begin_little_word ||
-        action->motion.function == ce_vim_motion_begin_big_word){
-          do_not_include_end = true;
-     }
-
-     // delete the range
-     if(do_not_include_end) motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
-     int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
-     char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
-     if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len)){
-          free(removed_string);
-          return false;
-     }
-
-     // commit the change
-     CeBufferChange_t change = {};
-     change.chain = false;
-     change.insertion = false;
-     change.string = removed_string;
-     change.location = motion_range.start;
-     change.cursor_before = view->cursor;
-     change.cursor_after = motion_range.start;
-     ce_buffer_change(view->buffer, &change);
-
-     // insert the yank
-     int64_t yank_len = ce_utf8_strlen(yank->text);
-     if(!ce_buffer_insert_string(view->buffer, yank->text, motion_range.start)) return false;
-     CePoint_t cursor_end = ce_buffer_advance_point(view->buffer, motion_range.start, yank_len);
-
-     // commit the change
-     change.chain = true;
-     change.insertion = true;
-     change.string = strdup(yank->text);
-     change.location = motion_range.start;
-     change.cursor_before = view->cursor;
-     change.cursor_after = cursor_end;
-     ce_buffer_change(view->buffer, &change);
-
-     view->cursor = cursor_end;
-     vim->chain_undo = action->chain_undo;
-
-     return true;
-}
-
-CeVimParseResult_t custom_vim_parse_verb_substitute(CeVimAction_t* action, CeRune_t key){
-     action->verb.function = &custom_vim_verb_substitute;
-     action->repeatable = true;
-     action->visual_block_applies = true;
-     return CE_VIM_PARSE_IN_PROGRESS;
 }
 
 void syntax_highlight_terminal(CeView_t* view, volatile CeTerminal_t* terminal, CeDrawColorList_t* draw_color_list,
@@ -824,37 +762,10 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
           if(match_point.x < 0) break;
           if(ce_point_after(match_point, end)) break;
 
-          // delete match
-          char* removed_string = ce_buffer_dupe_string(buffer, match_point, match_len);
-          if(!ce_buffer_remove_string(buffer, match_point, match_len)){
-               free(removed_string);
-               break;
-          }
-
-          CeBufferChange_t change = {};
-          change.chain = chain_undo;
-          change.insertion = false;
-          change.string = removed_string;
-          change.location = match_point;
-          change.cursor_before = cursor;
-          change.cursor_after = cursor;
-          ce_buffer_change(buffer, &change);
-
+          ce_buffer_remove_string_change(buffer, match_point, match_len, &cursor, cursor, chain_undo);
           chain_undo = true;
 
-          // insert match
-          if(!ce_buffer_insert_string(buffer, replacement, match_point)){
-               break;
-          }
-
-          // commit the insertion
-          change.chain = chain_undo;
-          change.insertion = true;
-          change.string = strdup(replacement);
-          change.location = match_point;
-          change.cursor_before = cursor;
-          change.cursor_after = cursor;
-          ce_buffer_change(buffer, &change);
+          ce_buffer_insert_string_change(buffer, strdup(replacement), match_point, &cursor, cursor, chain_undo);
      }
 }
 
@@ -1814,29 +1725,16 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                          if(complete->current_match){
                               int64_t delete_len = strlen(complete->current_match);
                               delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
-                              if(delete_len > 0 && ce_buffer_remove_string(app->input_view.buffer, delete_point, delete_len)){
-                                   CeBufferChange_t change = {};
-                                   change.chain = true;
-                                   change.insertion = false;
-                                   change.string = strdup(complete->current_match);
-                                   change.location = delete_point;
-                                   change.cursor_before = app->input_view.cursor;
-                                   change.cursor_after = app->input_view.cursor;
-                                   ce_buffer_change(view->buffer, &change);
+                              if(delete_len > 0){
+                                   ce_buffer_remove_string_change(app->input_view.buffer, delete_point, delete_len,
+                                                                  &app->input_view.cursor, app->input_view.cursor, true);
                               }
                          }
 
-                         if(insertion_len > 0 && ce_buffer_insert_string(app->input_view.buffer, insertion, delete_point)){
-                              CePoint_t new_cursor = ce_buffer_advance_point(app->input_view.buffer, delete_point, insertion_len);
-                              CeBufferChange_t change = {};
-                              change.chain = true;
-                              change.insertion = true;
-                              change.string = insertion;
-                              change.location = delete_point;
-                              change.cursor_before = app->input_view.cursor;
-                              change.cursor_after = new_cursor;
-                              ce_buffer_change(view->buffer, &change);
-                              app->input_view.cursor = new_cursor;
+                         if(insertion_len > 0){
+                              CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
+                              ce_buffer_insert_string_change(app->input_view.buffer, insertion, delete_point, &app->input_view.cursor,
+                                                             cursor_end, true);
                          }
 
                          // if completion was load_file, continue auto completing since we could have completed a directory
