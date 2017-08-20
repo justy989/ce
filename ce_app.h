@@ -112,6 +112,8 @@ char* history_next(History_t* history);
 
 void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count);
 void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
+void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
+                     int64_t new_command_entry_count);
 
 void app_update_terminal_view(App_t* app);
 CeComplete_t* app_is_completing(App_t* app);

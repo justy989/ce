@@ -2117,8 +2117,12 @@ int main(int argc, char** argv){
           {command_reload_config, "reload_config", "reload the config shared object"},
      };
 
-     app.command_entries = command_entries;
-     app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
+     int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
+     app.command_entries = malloc(command_entry_count * sizeof(*app.command_entries));
+     app.command_entry_count = command_entry_count;
+     for(int64_t i = 0; i < command_entry_count; i++){
+          app.command_entries[i] = command_entries[i];
+     }
 
      app.buffer_list_buffer = new_buffer();
      app.yank_list_buffer = new_buffer();
@@ -2281,6 +2285,7 @@ int main(int argc, char** argv){
      }
      free(binds->binds);
 
+     free(app.command_entries);
      buffer_node_free(&app.buffer_node_head);
      ce_terminal_free(&app.terminal);
      ce_layout_free(&app.tab_list_layout);

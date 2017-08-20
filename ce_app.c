@@ -183,3 +183,13 @@ void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune
      // we didn't find the key to override it, so we add the binding
      ce_vim_add_key_bind(key_binds, key_bind_count, key, parse_func);
 }
+
+void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
+                     int64_t new_command_entry_count){
+     int64_t final_command_entry_count = *command_entry_count + new_command_entry_count;
+     *command_entries = realloc(*command_entries, final_command_entry_count * sizeof(**command_entries));
+     for(int64_t i = 0; i < new_command_entry_count; i++){
+          (*command_entries)[i + *command_entry_count] = new_command_entries[i];
+     }
+     *command_entry_count = final_command_entry_count;
+}
