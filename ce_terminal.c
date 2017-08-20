@@ -49,10 +49,6 @@ static void terminal_set_dirt(CeTerminal_t* terminal, int top, int bottom){
 
      CE_CLAMP(top, 0, terminal->rows - 1);
      CE_CLAMP(bottom, 0, terminal->rows - 1);
-
-     for(int i = top; i <= bottom; ++i){
-          terminal->dirty_lines[i] = true;
-     }
 }
 
 static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int right, int bottom){
@@ -75,8 +71,6 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
      CE_CLAMP(bottom, 0, terminal->rows - 1);
 
      for(int y = top; y <= bottom; ++y){
-          terminal->dirty_lines[y] = true;
-
           for(int x = left; x <= right; ++x){
                CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
                glyph->foreground = terminal->cursor.attributes.foreground;
@@ -247,13 +241,11 @@ static void terminal_put_newline(CeTerminal_t* terminal, bool first_column){
      }
 
      terminal_move_cursor_to(terminal, first_column ? 0 : terminal->cursor.x, y);
-     terminal->dirty_lines[y] = true;
 }
 
 static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminalGlyph_t* attributes, int x, int y){
      assert(x >= 0 && x < terminal->columns);
      assert(y >= 0 && y < terminal->rows);
-     terminal->dirty_lines[y] = true;
      terminal->lines[y][x] = *attributes;
      char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
      assert(str);
@@ -1418,25 +1410,26 @@ static void terminal_echo(CeTerminal_t* terminal, CeRune_t rune){
      terminal_put(terminal, rune);
 }
 
-bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
+bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int64_t line_count){
      terminal->columns = width;
      terminal->rows = height;
      terminal->bottom = terminal->rows - 1;
+     terminal->line_count = line_count;
 
      // allocate lines and alternate lines
-     terminal->lines = calloc(terminal->rows, sizeof(*terminal->lines));
-     terminal->alternate_lines = calloc(terminal->rows, sizeof(*terminal->alternate_lines));
+     terminal->lines = calloc(line_count, sizeof(*terminal->lines));
+     terminal->alternate_lines = calloc(line_count, sizeof(*terminal->alternate_lines));
 
      // allocate buffers
      terminal->lines_buffer = calloc(1, sizeof(*terminal->lines_buffer));
      terminal->alternate_lines_buffer = calloc(1, sizeof(*terminal->alternate_lines_buffer));
-     ce_buffer_alloc(terminal->lines_buffer, terminal->rows, "[terminal]");
-     ce_buffer_alloc(terminal->alternate_lines_buffer, terminal->rows, "[terminal]");
+     ce_buffer_alloc(terminal->lines_buffer, line_count, "[terminal]");
+     ce_buffer_alloc(terminal->alternate_lines_buffer, line_count, "[terminal]");
      terminal->lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->alternate_lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->buffer = terminal->lines_buffer;
 
-     for(int r = 0; r < terminal->rows; ++r){
+     for(int r = 0; r < line_count; ++r){
           terminal->lines[r] = calloc(terminal->columns, sizeof(*terminal->lines[r]));
           terminal->alternate_lines[r] = calloc(terminal->columns, sizeof(*terminal->alternate_lines[r]));
 
@@ -1463,7 +1456,6 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height){
      }
 
      terminal->tabs = calloc(terminal->columns, sizeof(*terminal->tabs));
-     terminal->dirty_lines = calloc(terminal->rows, sizeof(*terminal->dirty_lines));
      terminal_reset(terminal);
 
      if(!tty_create(terminal->rows, terminal->columns, &terminal->pid, &terminal->file_descriptor)){
@@ -1497,9 +1489,6 @@ void ce_terminal_free(CeTerminal_t* terminal){
 
      free(terminal->tabs);
      terminal->tabs = NULL;
-
-     free(terminal->dirty_lines);
-     terminal->dirty_lines = NULL;
 
      // the main program will free the other one
      if(terminal->buffer == terminal->lines_buffer){

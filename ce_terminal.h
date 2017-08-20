@@ -112,12 +112,12 @@ typedef struct{
      int file_descriptor;
      int32_t rows;
      int32_t columns;
+     int64_t line_count;
      CeTerminalGlyph_t** lines;
      CeTerminalGlyph_t** alternate_lines;
      CeBuffer_t* buffer; // current buffer
      CeBuffer_t* lines_buffer;
      CeBuffer_t* alternate_lines_buffer;
-     bool* dirty_lines;
      CeTerminalCursor_t cursor;
      CeTerminalCursor_t save_cursor[2];
      int32_t top;
@@ -136,7 +136,7 @@ typedef struct{
      pid_t pid;
 }CeTerminal_t;
 
-bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height);
+bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int64_t line_count);
 void ce_terminal_free(CeTerminal_t* terminal);
 bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key);
 char* ce_terminal_get_current_directory(CeTerminal_t* terminal);

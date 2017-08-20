@@ -6,6 +6,8 @@ todo:
 - goto next/prev terminal output file destination
 - multiple terminals
 - add config option for log destination
+- when viewing terminal, use horizontal and vertical scroll off of 1
+- dired mode
 
 bug:
 - crash trying to delete last lines in file that are blank

@@ -119,6 +119,7 @@ typedef struct{
      int64_t tab_width;
      int64_t horizontal_scroll_off;
      int64_t vertical_scroll_off;
+     int64_t terminal_scroll_back;
      bool insert_spaces_on_tab;
 }CeConfigOptions_t;
 
