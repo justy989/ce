@@ -2827,7 +2827,7 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      bool chain = false;
      ce_vim_motion_range_sort(&motion_range);
 
-     CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, config_options->tab_width);
+     CePoint_t end_cursor = view->cursor;
 
      for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
           if(view->buffer->lines[i][0] == 0) continue;
@@ -2843,6 +2843,10 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           // insert indentation
           if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
 
+          if(view->cursor.y == i){
+               end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, config_options->tab_width);
+          }
+
           // commit the change
           CeBufferChange_t change = {};
           change.chain = chain;
@@ -2855,6 +2859,7 @@ bool ce_vim_verb_indent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
           chain = true;
      }
 
+     if(vim->mode == CE_VIM_MODE_VISUAL_LINE) end_cursor.y = motion_range.start.y;
      if(chain) view->cursor = end_cursor; // if we did any indentation at all, update the cursor
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
@@ -2864,7 +2869,8 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
                           CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      bool chain = false;
      ce_vim_motion_range_sort(&motion_range);
-     CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, -config_options->tab_width);
+     CePoint_t end_cursor = {view->cursor.x - config_options->tab_width, view->cursor.y};
+     if(end_cursor.x < 0) end_cursor.x = 0;
      for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
           // calc indentation
           CePoint_t indentation_point = {0, i};
@@ -2893,6 +2899,7 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
           }
      }
 
+     if(vim->mode == CE_VIM_MODE_VISUAL_LINE) end_cursor.y = motion_range.start.y;
      if(chain) view->cursor = end_cursor; // if we did any indentation at all, update the cursor
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
