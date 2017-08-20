@@ -10,3 +10,4 @@ todo:
 bug:
 - crash trying to delete last lines in file that are blank
 - occasional crash where vim verb gets motion of -1, -1
+- indenting can leave you on the next line if your cursor starts at eol

@@ -2179,19 +2179,6 @@ int main(int argc, char** argv){
           app_update_terminal_view(&app);
      }
 
-     // init command complete
-     {
-          const char** commands = malloc(app.command_entry_count * sizeof(*commands));
-          for(int64_t i = 0; i < app.command_entry_count; i++){
-               commands[i] = strdup(app.command_entries[i].name);
-          }
-          ce_complete_init(&app.command_complete, commands, app.command_entry_count);
-          for(int64_t i = 0; i < app.command_entry_count; i++){
-               free((char*)(commands[i]));
-          }
-          free(commands);
-     }
-
      // setup input buffer
      {
           CeBuffer_t* buffer = new_buffer();
@@ -2214,6 +2201,19 @@ int main(int argc, char** argv){
           const char* config_filepath = "/home/jtardiff/repos/ce_config/ce_config.so";
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
           app.user_config.init_func(&app);
+     }
+
+     // init command complete
+     {
+          const char** commands = malloc(app.command_entry_count * sizeof(*commands));
+          for(int64_t i = 0; i < app.command_entry_count; i++){
+               commands[i] = strdup(app.command_entries[i].name);
+          }
+          ce_complete_init(&app.command_complete, commands, app.command_entry_count);
+          for(int64_t i = 0; i < app.command_entry_count; i++){
+               free((char*)(commands[i]));
+          }
+          free(commands);
      }
 
      // init draw thread
