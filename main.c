@@ -1435,6 +1435,35 @@ CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     // TODO: seriously... compress
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(access(view->buffer->name, F_OK) == -1){
+          ce_log("'%s' is not file backed, unable to reload\n", view->buffer->name);
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     char* filename = strdup(view->buffer->name);
+     ce_buffer_free(view->buffer);
+     ce_buffer_load_file(view->buffer, filename);
+     free(filename);
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      App_t* app = user_data;
@@ -2084,8 +2113,8 @@ int main(int argc, char** argv){
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
+          {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},
-          // TODO: reload buffer
      };
 
      app.command_entries = command_entries;
@@ -2137,7 +2166,6 @@ int main(int argc, char** argv){
      // init vim
      {
           ce_vim_init(&app.vim);
-          set_vim_key_bind(app.vim.key_binds, &app.vim.key_bind_count, 'S', &custom_vim_parse_verb_substitute);
      }
 
      // init layout
