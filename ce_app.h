@@ -49,7 +49,18 @@ typedef struct{
      int64_t last_goto_destination; // TODO: use
 }BufferUserData_t;
 
+struct App_t;
+
+typedef bool CeUserConfigFunc(struct App_t*);
+
 typedef struct{
+     void* handle;
+     char* filepath;
+     CeUserConfigFunc* init_func;
+     CeUserConfigFunc* free_func;
+}UserConfig_t;
+
+typedef struct App_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
      CeConfigOptions_t config_options;
@@ -85,9 +96,8 @@ typedef struct{
      bool replay_macro;
      bool ready_to_draw;
      bool quit;
+     UserConfig_t user_config;
 }App_t;
-
-typedef bool CeUserConfigFunc(App_t*);
 
 bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer);
 bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer);
@@ -101,6 +111,7 @@ char* history_previous(History_t* history);
 char* history_next(History_t* history);
 
 void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count);
+void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
 
 void app_update_terminal_view(App_t* app);
 CeComplete_t* app_is_completing(App_t* app);

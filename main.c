@@ -19,13 +19,6 @@ FILE* g_ce_log = NULL;
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
-typedef struct{
-     void* handle;
-     char* filepath;
-     CeUserConfigFunc* init_func;
-     CeUserConfigFunc* free_func;
-}UserConfig_t;
-
 bool user_config_init(UserConfig_t* user_config, const char* filepath){
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
@@ -1414,6 +1407,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
 }
 
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      App_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
@@ -1437,6 +1431,24 @@ CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      }else{
           return CE_COMMAND_PRINT_HELP;
      }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+
+     char* filepath = strdup(app->user_config.filepath);
+     app->user_config.free_func(app);
+     user_config_free(&app->user_config);
+
+     if(!user_config_init(&app->user_config, filepath)){
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     app->user_config.init_func(app);
+     free(filepath);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -2051,49 +2063,6 @@ int main(int argc, char** argv){
      // TODO: allocate this on the heap when/if it gets too big?
      App_t app = {};
 
-     // init custon syntax highlighting
-     CeSyntaxDef_t syntax_defs[CE_SYNTAX_COLOR_COUNT];
-     {
-          syntax_defs[CE_SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
-          syntax_defs[CE_SYNTAX_COLOR_NORMAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
-          syntax_defs[CE_SYNTAX_COLOR_TYPE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
-          syntax_defs[CE_SYNTAX_COLOR_KEYWORD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
-          syntax_defs[CE_SYNTAX_COLOR_CONTROL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
-          syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
-          syntax_defs[CE_SYNTAX_COLOR_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_STRING].fg = COLOR_RED;
-          syntax_defs[CE_SYNTAX_COLOR_STRING].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
-          syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
-          syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
-          syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
-          syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
-          syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
-          syntax_defs[CE_SYNTAX_COLOR_MATCH].fg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
-          syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].fg = CE_SYNTAX_USE_CURRENT_COLOR;
-          syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].bg = COLOR_BRIGHT_BLACK;
-
-          app.syntax_defs = syntax_defs;
-     }
-
-     // init config options
-     {
-          app.config_options.tab_width = 5;
-          app.config_options.horizontal_scroll_off = 10;
-          app.config_options.vertical_scroll_off = 5;
-          app.config_options.insert_spaces_on_tab = true;
-     }
-
      // init commands
      CeCommandEntry_t command_entries[] = {
           {command_quit, "quit", "quit ce"},
@@ -2115,7 +2084,10 @@ int main(int argc, char** argv){
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
+          {command_reload_config, "reload_config", "reload the config shared object"},
+          // TODO: reload buffer
      };
+
      app.command_entries = command_entries;
      app.command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
 
@@ -2162,52 +2134,10 @@ int main(int argc, char** argv){
           }
      }
 
-     // init keybinds
-     {
-          KeyBindDef_t normal_mode_bind_defs[] = {
-               {{'\\', 'q'}, "quit"},
-               {{8}, "select_adjacent_layout left"}, // ctrl h
-               {{12}, "select_adjacent_layout right"}, // ctrl l
-               {{11}, "select_adjacent_layout up"}, // ctrl k
-               {{10}, "select_adjacent_layout down"}, // ctrl j
-               {{23}, "save_buffer"}, // ctrl w
-               {{'g', 'b'}, "show_buffers"},
-               {{22}, "split_layout horizontal"}, // ctrl s
-               {{19}, "split_layout vertical"}, // ctrl v
-               {{16}, "select_parent_layout"}, // ctrl p
-               {{KEY_CLOSE}, "delete_layout"}, // ctrl q
-               {{6}, "load_file"}, // ctrl f
-               {{20}, "new_tab"}, // ctrl t
-               {{'/'}, "search forward"},
-               {{'?'}, "search backward"},
-               {{':'}, "command"},
-               {{'g', 't'}, "select_adjacent_tab right"},
-               {{'g', 'T'}, "select_adjacent_tab left"},
-               {{'\\', '/'}, "regex_search forward"},
-               {{'\\', '?'}, "regex_search backward"},
-               {{'"', '?'}, "show_yanks"},
-               {{'\\', 'r'}, "redraw"},
-               {{24}, "switch_to_terminal"}, // ctrl x
-               {{2}, "switch_buffer"}, // ctrl b
-               {{343}, "goto_destination_in_line"}, // return
-          };
-
-          convert_bind_defs(&app.key_binds[CE_VIM_MODE_NORMAL], normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
-     }
-
      // init vim
      {
           ce_vim_init(&app.vim);
-
-          // override 'S' key
-          // TODO: make function for this
-          for(int64_t i = 0; i < app.vim.key_bind_count; ++i){
-               CeVimKeyBind_t* key_bind = app.vim.key_binds + i;
-               if(key_bind->key == 'S'){
-                    key_bind->function = &custom_vim_parse_verb_substitute;
-                    break;
-               }
-          }
+          set_vim_key_bind(app.vim.key_binds, &app.vim.key_bind_count, 'S', &custom_vim_parse_verb_substitute);
      }
 
      // init layout
@@ -2238,13 +2168,6 @@ int main(int argc, char** argv){
           buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
-     // init draw thread
-     pthread_t thread_draw;
-     {
-          pthread_create(&thread_draw, NULL, draw_thread, &app);
-          app.ready_to_draw = true;
-     }
-
      // init terminal
      {
           getmaxyx(stdscr, app.terminal_height, app.terminal_width);
@@ -2255,11 +2178,17 @@ int main(int argc, char** argv){
      }
 
      // init user config
-     UserConfig_t user_config = {};
      {
           const char* config_filepath = "/home/jtardiff/repos/ce_config/ce_config.so";
-          if(!user_config_init(&user_config, config_filepath)) return 1;
-          user_config.init_func(&app);
+          if(!user_config_init(&app.user_config, config_filepath)) return 1;
+          app.user_config.init_func(&app);
+     }
+
+     // init draw thread
+     pthread_t thread_draw;
+     {
+          pthread_create(&thread_draw, NULL, draw_thread, &app);
+          app.ready_to_draw = true;
      }
 
      // main loop
@@ -2309,8 +2238,8 @@ int main(int argc, char** argv){
      }
 
      // cleanup
-     user_config.free_func(&app);
-     user_config_free(&user_config);
+     app.user_config.free_func(&app);
+     user_config_free(&app.user_config);
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
 

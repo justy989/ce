@@ -125,6 +125,13 @@ char* history_next(History_t* history){
 }
 
 void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count){
+     if(binds->count){
+          for(int64_t i = 0; i < binds->count; ++i){
+               free(binds->binds[i].keys);
+          }
+          free(binds->binds);
+     }
+
      binds->count = bind_def_count;
      binds->binds = malloc(binds->count * sizeof(*binds->binds));
 
@@ -162,4 +169,17 @@ CeComplete_t* app_is_completing(App_t* app){
      }
 
      return NULL;
+}
+
+void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func){
+     for(int64_t i = 0; i < *key_bind_count; ++i){
+          CeVimKeyBind_t* key_bind = key_binds + i;
+          if(key_bind->key == key){
+               key_bind->function = parse_func;
+               return;
+          }
+     }
+
+     // we didn't find the key to override it, so we add the binding
+     ce_vim_add_key_bind(key_binds, key_bind_count, key, parse_func);
 }
