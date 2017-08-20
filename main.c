@@ -2065,9 +2065,6 @@ int main(int argc, char** argv){
           }
      }
 
-     // TODO: deleteme, temporary
-     app.config_options.terminal_scroll_back = 200;
-
      // init vim
      {
           ce_vim_init(&app.vim);
@@ -2088,20 +2085,23 @@ int main(int argc, char** argv){
           buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
-     // init terminal
-     {
-          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, app.config_options.terminal_scroll_back);
-          buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
-          app.terminal.lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
-          app.terminal.alternate_lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
-     }
-
      // init user config
      {
           const char* config_filepath = "/home/jtardiff/repos/ce_config/ce_config.so";
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
           app.user_config.init_func(&app);
+     }
+
+     // init terminal
+     {
+          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
+          if(app.config_options.terminal_scroll_back < app.terminal_height){
+               app.config_options.terminal_scroll_back = app.terminal_height - 1;
+          }
+          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, app.config_options.terminal_scroll_back);
+          buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
+          app.terminal.lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+          app.terminal.alternate_lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
      }
 
      // init command complete
