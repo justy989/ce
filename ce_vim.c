@@ -209,17 +209,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                               memset(insert_string, ' ', indentation);
                               insert_string[indentation] = 0;
 
-                              // insert indentation
-                              if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
-
-                              // commit the change
-                              change.chain = true;
-                              change.insertion = true;
-                              change.string = insert_string;
-                              change.location = indentation_point;
-                              change.cursor_before = view->cursor;
-                              change.cursor_after = cursor_end;
-                              ce_buffer_change(view->buffer, &change);
+                              if(!ce_buffer_insert_string_change(view->buffer, insert_string, indentation_point,
+                                                                 &view->cursor, cursor_end, true)){
+                                   return false;
+                              }
                          }
 
                          view->cursor = cursor_end;
@@ -255,20 +248,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                }
                insert_string[insert_len] = 0;
 
-               CePoint_t new_cursor = {view->cursor.x + insert_len, view->cursor.y};
+               if(!ce_buffer_insert_string_change_at_cursor(view->buffer, insert_string, &view->cursor, vim->chain_undo)){
+                    break;
+               }
 
-               if(!ce_buffer_insert_string(view->buffer, insert_string, view->cursor)) break;
-
-               CeBufferChange_t change = {};
-               change.chain = vim->chain_undo;
-               change.insertion = true;
-               change.string = insert_string;
-               change.location = view->cursor;
-               change.cursor_before = view->cursor;
-               change.cursor_after = new_cursor;
-               ce_buffer_change(view->buffer, &change);
-
-               view->cursor = new_cursor;
                vim->chain_undo = true;
           }else{
                return CE_VIM_PARSE_KEY_NOT_HANDLED;
@@ -305,20 +288,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                     memset(insert_string, ' ', indentation);
                     insert_string[indentation] = 0;
 
-                    // insert indentation
-                    if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
-
-                    // commit the change
-                    CeBufferChange_t change = {};
-                    change.chain = true;
-                    change.insertion = true;
-                    change.string = insert_string;
-                    change.location = indentation_point;
-                    change.cursor_before = view->cursor;
-                    change.cursor_after = cursor_end;
-                    ce_buffer_change(view->buffer, &change);
-
-                    view->cursor = cursor_end;
+                    if(!ce_buffer_insert_string_change(view->buffer, insert_string, indentation_point,
+                                                       &view->cursor, cursor_end, true)){
+                         break;
+                    }
                }
           }
 
@@ -469,21 +442,9 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
           if(!yank) break;
 
-          if(!ce_buffer_insert_string(view->buffer, yank->text, view->cursor)) break;
-
-          int64_t yank_len = ce_utf8_strlen(yank->text);
-          CePoint_t end_cursor = ce_buffer_advance_point(view->buffer, view->cursor, yank_len);
-
-          CeBufferChange_t change = {};
-          change.chain = vim->chain_undo;
-          change.insertion = true;
-          change.string = strdup(yank->text);
-          change.location = view->cursor;
-          change.cursor_before = view->cursor;
-          change.cursor_after = end_cursor;
-          ce_buffer_change(view->buffer, &change);
-
-          view->cursor = end_cursor;
+          if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text), &view->cursor, vim->chain_undo)){
+               break;
+          }
 
           vim->chain_undo = true;
      } break;
@@ -2419,17 +2380,10 @@ static bool change_character(CeView_t* view, CePoint_t point, CeRune_t new_rune,
      ce_utf8_encode(new_rune, current_string, 5, &rune_len);
      current_string[rune_len] = 0;
 
-     // insert
-     if(!ce_buffer_insert_string(view->buffer, current_string, point)) return false; // NOTE: leak previous_string
-
-     // commit the insertion
-     change.chain = true;
-     change.insertion = true;
-     change.string = current_string;
-     change.location = point;
-     change.cursor_before = view->cursor;
-     change.cursor_after = view->cursor;
-     ce_buffer_change(view->buffer, &change);
+     if(!ce_buffer_insert_string_change(view->buffer, current_string, point,
+                                        &view->cursor, view->cursor, true)){
+          return false;
+     }
 
      return true;
 }
@@ -2601,17 +2555,11 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      // insert newline on next line
      char* insert_string = strdup("\n");
      motion_range.start.x = 0;
-     if(!ce_buffer_insert_string(view->buffer, insert_string, motion_range.start)) return false;
 
-     // commit the change
-     CeBufferChange_t change = {};
-     change.chain = action->chain_undo;
-     change.insertion = true;
-     change.string = insert_string;
-     change.location = motion_range.start;
-     change.cursor_before = view->cursor;
-     change.cursor_after = view->cursor;
-     ce_buffer_change(view->buffer, &change);
+     if(!ce_buffer_insert_string_change(view->buffer, insert_string, motion_range.start, &view->cursor, view->cursor,
+                                        false)){
+          return false;
+     }
 
      // TODO: compress what we can with open_below
      // calc indentation
@@ -2626,20 +2574,14 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
           memset(insert_string, ' ', indentation);
           insert_string[indentation] = 0;
 
-          // insert indentation
-          if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
-
-          // commit the change
-          change.chain = true;
-          change.insertion = true;
-          change.string = insert_string;
-          change.location = indentation_point;
-          change.cursor_before = view->cursor;
-          change.cursor_after = cursor_end;
-          ce_buffer_change(view->buffer, &change);
+          if(!ce_buffer_insert_string_change(view->buffer, insert_string, indentation_point, &view->cursor, cursor_end,
+                                             true)){
+               return false;
+          }
+     }else{
+          view->cursor = cursor_end;
      }
 
-     view->cursor = cursor_end;
      vim->chain_undo = true;
      insert_mode(vim);
      return true;
@@ -2650,17 +2592,10 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
      // insert newline at the end of the current line
      char* insert_string = strdup("\n");
      motion_range.start.x = ce_utf8_strlen(view->buffer->lines[motion_range.start.y]);
-     if(!ce_buffer_insert_string(view->buffer, insert_string, motion_range.start)) return false;
-
-     // commit the change
-     CeBufferChange_t change = {};
-     change.chain = false;
-     change.insertion = true;
-     change.string = insert_string;
-     change.location = motion_range.start;
-     change.cursor_before = view->cursor;
-     change.cursor_after = view->cursor;
-     ce_buffer_change(view->buffer, &change);
+     if(!ce_buffer_insert_string_change(view->buffer, insert_string, motion_range.start, &view->cursor, view->cursor,
+                                        false)){
+          return false;
+     }
 
      // calc indentation
      CePoint_t indentation_point = {0, motion_range.start.y + 1};
@@ -2674,20 +2609,14 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeVimMoti
           memset(insert_string, ' ', indentation);
           insert_string[indentation] = 0;
 
-          // insert indentation
-          if(!ce_buffer_insert_string(view->buffer, insert_string, indentation_point)) return false;
-
-          // commit the change
-          change.chain = true;
-          change.insertion = true;
-          change.string = insert_string;
-          change.location = indentation_point;
-          change.cursor_before = view->cursor;
-          change.cursor_after = cursor_end;
-          ce_buffer_change(view->buffer, &change);
+          if(!ce_buffer_insert_string_change(view->buffer, insert_string, indentation_point, &view->cursor, cursor_end,
+                                             true)){
+               return false;
+          }
+     }else{
+          view->cursor = cursor_end;
      }
 
-     view->cursor = cursor_end;
      vim->chain_undo = true;
      insert_mode(vim);
      return true;

@@ -170,6 +170,11 @@ bool ce_buffer_insert_rune(CeBuffer_t* buffer, CeRune_t rune, CePoint_t point); 
 bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
 bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t lines_to_remove); // TODO: remove from view?
 
+// helper functions for common things I do
+bool ce_buffer_insert_string_change(CeBuffer_t* buffer, char* alloced_string, CePoint_t point, CePoint_t* cursor_before,
+                                    CePoint_t cursor_after, bool chain_undo);
+bool ce_buffer_insert_string_change_at_cursor(CeBuffer_t* buffer, char* alloced_string, CePoint_t* cursor, bool chain_undo);
+
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change); // TODO: unittest
 bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest

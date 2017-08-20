@@ -952,6 +952,40 @@ char* ce_buffer_dupe(CeBuffer_t* buffer){
      return NULL;
 }
 
+bool ce_buffer_insert_string_change(CeBuffer_t* buffer, char* alloced_string, CePoint_t point, CePoint_t* cursor_before,
+                                    CePoint_t cursor_after, bool chain_undo){
+     if(!ce_buffer_insert_string(buffer, alloced_string, point)) return false;
+
+     CeBufferChange_t change = {};
+     change.chain = chain_undo;
+     change.insertion = true;
+     change.string = alloced_string;
+     change.location = point;
+     change.cursor_before = *cursor_before;
+     change.cursor_after = cursor_after;
+     ce_buffer_change(buffer, &change);
+
+     *cursor_before = cursor_after;
+     return true;
+}
+
+bool ce_buffer_insert_string_change_at_cursor(CeBuffer_t* buffer, char* alloced_string, CePoint_t* cursor, bool chain_undo){
+     if(!ce_buffer_insert_string(buffer, alloced_string, *cursor)) return false;
+     CePoint_t cursor_after = ce_buffer_advance_point(buffer, *cursor, strlen(alloced_string));
+
+     CeBufferChange_t change = {};
+     change.chain = chain_undo;
+     change.insertion = true;
+     change.string = alloced_string;
+     change.location = *cursor;
+     change.cursor_before = *cursor;
+     change.cursor_after = cursor_after;
+     ce_buffer_change(buffer, &change);
+
+     *cursor = cursor_after;
+     return true;
+}
+
 bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
      CeBufferChangeNode_t* node = calloc(1, sizeof(*node));
      node->change = *change;
