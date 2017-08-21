@@ -1416,8 +1416,8 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int
      terminal->buffer = terminal->lines_buffer;
 
      for(int r = 0; r < line_count; ++r){
-          terminal->lines[r] = calloc(terminal->columns, sizeof(*terminal->lines[r]));
-          terminal->alternate_lines[r] = calloc(terminal->columns, sizeof(*terminal->alternate_lines[r]));
+          terminal->lines[r] = malloc(terminal->columns * sizeof(*terminal->lines[r]));
+          terminal->alternate_lines[r] = malloc(terminal->columns * sizeof(*terminal->alternate_lines[r]));
 
           // default fg and bg
           for(int g = 0; g < terminal->columns; ++g){
@@ -1427,18 +1427,17 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int
 
           // alloc buffer lines, accounting for the fact that all characters could be in max UTF8 size
           size_t bytes = (terminal->columns + 1) * CE_UTF8_SIZE;
-          terminal->lines_buffer->lines[r] = malloc(bytes);
-          terminal->alternate_lines_buffer->lines[r] = malloc(bytes);
+          terminal->lines_buffer->lines[r] = realloc(terminal->lines_buffer->lines[r], bytes);
+          terminal->alternate_lines_buffer->lines[r] = realloc(terminal->alternate_lines_buffer->lines[r], bytes);
 
           // set them to blank
           memset(terminal->lines_buffer->lines[r], ' ', terminal->columns);
           memset(terminal->alternate_lines_buffer->lines[r], ' ', terminal->columns);
 
           // null terminate end of current string to end of entire string
-          for(size_t i = terminal->columns; i < bytes; i++){
-               terminal->lines_buffer->lines[r][i] = 0;
-               terminal->alternate_lines_buffer->lines[r][i] = 0;
-          }
+          int64_t rest_of_the_bytes = bytes - terminal->columns;
+          memset(terminal->lines_buffer->lines[r] + terminal->columns, 0, rest_of_the_bytes);
+          memset(terminal->alternate_lines_buffer->lines[r] + terminal->columns, 0, rest_of_the_bytes);
      }
 
      terminal->tabs = calloc(terminal->columns, sizeof(*terminal->tabs));
@@ -1461,13 +1460,13 @@ void ce_terminal_free(CeTerminal_t* terminal){
      pthread_cancel(terminal->thread);
      pthread_join(terminal->thread, NULL);
 
-     for(int r = 0; r < terminal->rows; ++r){
+     for(int r = 0; r < terminal->line_count; ++r){
           free(terminal->lines[r]);
      }
      free(terminal->lines);
      terminal->lines = NULL;
 
-     for(int r = 0; r < terminal->rows; ++r){
+     for(int r = 0; r < terminal->line_count; ++r){
           free(terminal->alternate_lines[r]);
      }
      free(terminal->alternate_lines);
@@ -1476,14 +1475,13 @@ void ce_terminal_free(CeTerminal_t* terminal){
      free(terminal->tabs);
      terminal->tabs = NULL;
 
-     // the main program will free the other one
-     if(terminal->buffer == terminal->lines_buffer){
-          ce_buffer_free(terminal->alternate_lines_buffer);
-          free(terminal->alternate_lines_buffer);
-     }else{
-          ce_buffer_free(terminal->lines_buffer);
-          free(terminal->lines_buffer);
-     }
+     free(terminal->lines_buffer->user_data);
+     ce_buffer_free(terminal->lines_buffer);
+     free(terminal->lines_buffer);
+
+     free(terminal->alternate_lines_buffer->user_data);
+     ce_buffer_free(terminal->alternate_lines_buffer);
+     free(terminal->alternate_lines_buffer);
 
      terminal->lines_buffer = NULL;
      terminal->alternate_lines_buffer = NULL;

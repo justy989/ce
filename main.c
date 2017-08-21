@@ -25,7 +25,6 @@ FILE* g_ce_log = NULL;
 bool user_config_init(UserConfig_t* user_config, const char* filepath){
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
-          //ce_log("dlopen('%s', RTLD_NOW) failed: '%s'\n", filepath, dlerror());
           ce_log("dlopen() failed: '%s'\n", dlerror());
           return false;
      }
@@ -2171,12 +2170,15 @@ int main(int argc, char** argv){
      }
 
      // cleanup
-     app.user_config.free_func(&app);
-     user_config_free(&app.user_config);
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
+     app.user_config.free_func(&app);
+     user_config_free(&app.user_config);
 
      ce_macros_free(&app.macros);
+     ce_complete_free(&app.command_complete);
+     ce_complete_free(&app.load_file_complete);
+     ce_complete_free(&app.switch_buffer_complete);
 
      KeyBinds_t* binds = &app.key_binds[CE_VIM_MODE_NORMAL];
      for(int64_t i = 0; i < binds->count; ++i){
@@ -2187,6 +2189,25 @@ int main(int argc, char** argv){
      free(binds->binds);
 
      free(app.command_entries);
+
+     // unlink terminal node from buffer no list
+     {
+          BufferNode_t* itr = app.buffer_node_head;
+          BufferNode_t* prev = NULL;
+          while(itr){
+               if(itr->buffer == app.terminal.buffer){
+                    if(prev){
+                         prev->next = itr->next;
+                    }else{
+                         app.buffer_node_head = itr->next;
+                    }
+                    free(itr);
+                    break;
+               }
+               itr = itr->next;
+          }
+     }
+
      buffer_node_free(&app.buffer_node_head);
      ce_terminal_free(&app.terminal);
      ce_layout_free(&app.tab_list_layout);
