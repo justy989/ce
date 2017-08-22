@@ -46,7 +46,7 @@ typedef struct{
 
 typedef struct{
      CeVimBufferData_t vim;
-     int64_t last_goto_destination; // TODO: use
+     int64_t last_goto_destination;
 }BufferUserData_t;
 
 struct App_t;
@@ -80,6 +80,7 @@ typedef struct App_t{
      CeBuffer_t* complete_list_buffer;
      CeBuffer_t* macro_list_buffer;
      CeBuffer_t* mark_list_buffer;
+     CeBuffer_t* last_goto_buffer;
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
      CeComplete_t switch_buffer_complete;

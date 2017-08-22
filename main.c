@@ -491,8 +491,12 @@ CeDestination_t scan_line_for_destination(const char* line){
 
      if(row_end){
           destination.point.y = strtol(file_end + 1, &end, 10);
+
+          if(destination.point.y > 0) destination.point.y--; // account for format which is 1 indexed
+
           if(col_end){
                destination.point.x = strtol(row_end + 1, &end, 10);
+               if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
           }else{
                destination.point.x = 0;
           }
@@ -1285,6 +1289,20 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeBuffer_t* load_destination_into_view(BufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
+                                CeVim_t* vim, CeDestination_t* destination){
+     CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim, destination->filepath);
+     if(!load_buffer) return load_buffer;
+
+     if(destination->point.y < load_buffer->line_count){
+          view->cursor.y = destination->point.y;
+          int64_t line_len = ce_utf8_strlen(load_buffer->lines[view->cursor.y]);
+          if(destination->point.x < line_len) view->cursor.x = destination->point.x;
+     }
+
+     return load_buffer;
+}
+
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      App_t* app = user_data;
@@ -1304,13 +1322,106 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      CeDestination_t destination = scan_line_for_destination(view->buffer->lines[view->cursor.y]);
      if(destination.point.x < 0) return CE_COMMAND_NO_ACTION;
 
-     CeBuffer_t* buffer = load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, destination.filepath);
-     if(!buffer) return CE_COMMAND_NO_ACTION;
+     CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                                     &destination);
 
-     if(destination.point.y < buffer->line_count){
-          view->cursor.y = destination.point.y;
-          int64_t line_len = ce_utf8_strlen(buffer->lines[view->cursor.y]);
-          if(destination.point.x < line_len) view->cursor.x = destination.point.x;
+     BufferUserData_t* buffer_data = buffer->user_data;
+     buffer_data->last_goto_destination = view->cursor.y;
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     CeBuffer_t* buffer = app->last_goto_buffer;
+     if(!buffer) buffer = app->terminal.buffer;
+     if(buffer->line_count == 0) return CE_COMMAND_SUCCESS;
+
+     BufferUserData_t* buffer_data = buffer->user_data;
+
+     int64_t save_destination = buffer_data->last_goto_destination;
+     for(int64_t i = buffer_data->last_goto_destination + 1; i != buffer_data->last_goto_destination; i++){
+          if(i >= buffer->line_count){
+               i = 0;
+               if(i == buffer_data->last_goto_destination) break;
+          }
+
+          CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
+          if(destination.point.x < 0) continue;
+          if(access(destination.filepath, F_OK) == -1) continue;
+
+          CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                                          &destination);
+          if(loaded_buffer) buffer_data->last_goto_destination = i;
+          break;
+     }
+
+     // we didn't find anything, and since the user asked for a destination, find this one
+     if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
+          CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
+          if(destination.point.x >= 0){
+               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
+          }
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     CeBuffer_t* buffer = app->last_goto_buffer;
+     if(!buffer) buffer = app->terminal.buffer;
+     if(buffer->line_count == 0) return CE_COMMAND_SUCCESS;
+
+     BufferUserData_t* buffer_data = buffer->user_data;
+
+     int64_t save_destination = buffer_data->last_goto_destination;
+     for(int64_t i = buffer_data->last_goto_destination - 1; i != buffer_data->last_goto_destination; i--){
+          if(i < 0){
+               i = buffer->line_count - 1;
+               if(i == buffer_data->last_goto_destination) break;
+          }
+
+          CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
+          if(destination.point.x < 0) continue;
+          if(access(destination.filepath, F_OK) == -1) continue;
+
+          CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                                          &destination);
+          if(loaded_buffer) buffer_data->last_goto_destination = i;
+          break;
+     }
+
+     // we didn't find anything, and since the user asked for a destination, find this one
+     if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
+          CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
+          if(destination.point.x >= 0){
+               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
+          }
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1461,6 +1572,10 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                // send escape
                ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
           }else{
+               if(key == KEY_ENTER){
+                    BufferUserData_t* buffer_data = app->terminal.buffer->user_data;
+                    buffer_data->last_goto_destination = app->terminal.cursor.y;
+               }
                ce_terminal_send_key(&app->terminal, key);
           }
           return;
@@ -2009,6 +2124,8 @@ int main(int argc, char** argv){
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
+          {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
+          {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},

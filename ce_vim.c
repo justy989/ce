@@ -2721,8 +2721,6 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeVimMotion
                ce_buffer_remove_string_change(view->buffer, indentation_point, strlen(remove_string), &view->cursor,
                                               view->cursor, chain);
                chain = true;
-          }else{
-               free(remove_string);
           }
      }
 
