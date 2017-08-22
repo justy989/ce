@@ -1197,11 +1197,15 @@ char* ce_utf8_find_index(char* string, int64_t index){
           }else if((*string & 0xF8) == 0xF0){
                bytes = 4;
           }else{
+               assert(!"tacos");
                return NULL;
           }
 
           for(int64_t i = 0; i < bytes; ++i){
-               if(*string == 0) return NULL;
+               if(*string == 0){
+                    assert(!"burritos");
+                    return NULL;
+               }
                string++;
           }
 
@@ -1300,6 +1304,12 @@ bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes
 
           // third byte:  10klmnop
           string[2] = 0x80 | (u & 0x3F);
+
+          // for(int i = 0; i < 3; i++){
+          //      if(string[i] == -67){
+          //           assert(!"we wrote it!");
+          //      }
+          // }
      }else if(u < 0x110000){
           if(string_len < 4) return false;
           *bytes_written = 4;

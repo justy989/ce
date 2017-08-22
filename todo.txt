@@ -2,7 +2,6 @@ todo:
 - have drawing a view take in a highlight range, rather than taking vim in
 - have drawing take in a pattern string for searching to also highlight
 - jump list
-- terminal scrollback
 - goto next/prev terminal output file destination
 - multiple terminals
 - add config option for log destination
@@ -10,6 +9,5 @@ todo:
 - dired mode
 
 bug:
-- crash trying to delete last lines in file that are blank
 - occasional crash where vim verb gets motion of -1, -1
-- indenting can leave you on the next line if your cursor starts at eol
+- slow to start, wtf

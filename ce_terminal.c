@@ -241,12 +241,26 @@ static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminal
      char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
      assert(str);
      int64_t rune_len = ce_utf8_rune_len(rune);
-     if(rune_len > 1){
-          // shift over all the runes after it, we should have enough allocated room to grow to terminal->columns * CE_UTF8_SIZE
+     int64_t replacing_len = 0;
+     ce_utf8_decode(str, &replacing_len);
+
+     // shift over line if necessary
+     if(rune_len == replacing_len){
+          // pass
+     }else if(rune_len < replacing_len){
+          // the current rune takes up more space than we need, so shift left
+          int64_t diff = replacing_len - rune_len;
+          char* dst = str;
+          char* src = str + diff;
+          memmove(dst, src, strlen(src) + 1); // include null terminator
+     }else if(rune_len > replacing_len){
+          // the current rune is smaller than we need, so shift right
+          int64_t diff = rune_len - replacing_len;
           char* src = str;
-          char* dst = str + rune_len;
+          char* dst = str + diff;
           memmove(dst, src, strlen(src) + 1); // include null terminator
      }
+
      ce_utf8_encode(rune, str, strlen(str), &rune_len);
 }
 
@@ -1155,6 +1169,9 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
 
      if(terminal->mode & CE_TERMINAL_MODE_UTF8){
           ce_utf8_encode(rune, characters, CE_UTF8_SIZE, &len);
+          if(rune == 9661){
+               ce_log("buttcheeks\n");
+          }
      }else{
           characters[0] = rune;
           width = 1;
