@@ -2078,6 +2078,7 @@ void print_help(char* program){
 
 int main(int argc, char** argv){
      const char* config_filepath = NULL;
+     int last_arg_index = 0;
 
      // parse args
      {
@@ -2093,6 +2094,8 @@ int main(int argc, char** argv){
                     return 1;
                }
           }
+
+          last_arg_index = optind;
      }
 
      // validate args
@@ -2197,7 +2200,7 @@ int main(int argc, char** argv){
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
 
           if(argc > 1){
-               for(int64_t i = 1; i < argc; i++){
+               for(int64_t i = last_arg_index; i < argc; i++){
                     CeBuffer_t* buffer = new_buffer();
                     if(ce_buffer_load_file(buffer, argv[i])){
                          buffer_node_insert(&app.buffer_node_head, buffer);
