@@ -633,7 +633,8 @@ void* draw_thread(void* thread_data){
           }
 
           CeComplete_t* complete = app_is_completing(app);
-          if(complete && tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW && app->complete_list_buffer->line_count){
+          if(complete && tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW && app->complete_list_buffer->line_count &&
+             strlen(app->complete_list_buffer->lines[0])){
                CeLayout_t* view_layout = tab_layout->tab.current;
                app->complete_view.rect.left = view_layout->view.rect.left;
                app->complete_view.rect.right = view_layout->view.rect.right;
