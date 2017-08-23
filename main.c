@@ -2070,7 +2070,40 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
      }
 }
 
+void print_help(char* program){
+     printf("usage  : %s [options]\n", program);
+     printf("options:\n");
+     printf("  -c <config file> path to shared object configuration\n");
+}
+
 int main(int argc, char** argv){
+     const char* config_filepath = NULL;
+
+     // parse args
+     {
+          char c;
+          while((c = getopt(argc, argv, "c:h")) != -1){
+               switch(c){
+               case 'c':
+                    config_filepath = optarg;
+                    break;
+               case 'h':
+               default:
+                    print_help(argv[0]);
+                    return 1;
+               }
+          }
+     }
+
+     // validate args
+     {
+          if(!config_filepath){
+               printf("error: please specify a config file\n\n");
+               print_help(argv[0]);
+               return 1;
+          }
+     }
+
      setlocale(LC_ALL, "");
 
      char log_filepath[PATH_MAX];
@@ -2203,7 +2236,6 @@ int main(int argc, char** argv){
 
      // init user config
      {
-          const char* config_filepath = "/home/jtardiff/repos/ce_config/ce_config.so";
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
           app.user_config.init_func(&app);
      }

@@ -4,8 +4,9 @@ todo:
 - jump list
 - goto next/prev terminal output file destination
 - multiple terminals
-- add config option for log destination
+- add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
 - when viewing terminal, use horizontal and vertical scroll off of 1
+- resize terminal when layout changes are made and terminal is in view
 - dired mode
 
 bug:
