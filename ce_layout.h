@@ -46,6 +46,11 @@ typedef struct CeLayout_t{
      };
 }CeLayout_t;
 
+typedef struct{
+     CeLayout_t** layouts;
+     int64_t layout_count;
+}CeLayoutBufferInViewsResult_t;
+
 CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout);
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer);
 CeLayout_t* ce_layout_tab_list_add(CeLayout_t* tab_list_layout);
@@ -57,3 +62,4 @@ CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point);
 CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node);
 bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node);
 CeLayout_t* ce_layout_buffer_in_view(CeLayout_t* root, CeBuffer_t* buffer);
+CeLayoutBufferInViewsResult_t ce_layout_buffer_in_views(CeLayout_t* root, CeBuffer_t* buffer);

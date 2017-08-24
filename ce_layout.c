@@ -362,3 +362,56 @@ CeLayout_t* ce_layout_buffer_in_view(CeLayout_t* layout, CeBuffer_t* buffer){
 
      return NULL;
 }
+
+int64_t count_buffer_in_views(CeLayout_t* layout, CeBuffer_t* buffer, int64_t count){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          if(layout->view.buffer == buffer) return 1;
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               count = count_buffer_in_views(layout->list.layouts[i], buffer, count);
+          }
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          return count_buffer_in_views(layout->tab.root, buffer, count);
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          return count_buffer_in_views(layout->tab_list.current, buffer, count);
+     }
+
+     return count;
+}
+
+void build_buffer_in_views(CeLayout_t* layout, CeBuffer_t* buffer, CeLayoutBufferInViewsResult_t* result){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          if(layout->view.buffer == buffer){
+               result->layouts[result->layout_count] = layout;
+               result->layout_count++;
+          }
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               build_buffer_in_views(layout->list.layouts[i], buffer, result);
+          }
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          build_buffer_in_views(layout->tab.root, buffer, result);
+          break;
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          build_buffer_in_views(layout->tab_list.current, buffer, result);
+          break;
+     }
+}
+
+CeLayoutBufferInViewsResult_t ce_layout_buffer_in_views(CeLayout_t* layout, CeBuffer_t* buffer){
+     CeLayoutBufferInViewsResult_t result = {};
+     int64_t count = count_buffer_in_views(layout, buffer, 0);
+     result.layouts = malloc(count * sizeof(*result.layouts));
+     build_buffer_in_views(layout, buffer, &result);
+     return result;
+}

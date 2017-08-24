@@ -612,7 +612,7 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
                }
           }
      }
-     if(action->verb.function){
+     if(action->verb.function && motion_range.start.x >= 0){
           if(!action->verb.function(vim, action, motion_range, view, buffer_data, config_options)){
                return false;
           }

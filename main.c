@@ -996,13 +996,6 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           ce_layout_split(tab_layout, vertical);
      }
 
-     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
-     if(terminal_layout){
-          int64_t width = terminal_layout->view.rect.right - terminal_layout->view.rect.left;
-          int64_t height = terminal_layout->view.rect.bottom - terminal_layout->view.rect.top;
-          ce_terminal_resize(&app->terminal, width, height);
-     }
-
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1240,10 +1233,11 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
           tab_layout->tab.current = terminal_layout;
      }else{
           view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
-          int64_t width = view->rect.right - view->rect.left;
-          int64_t height = view->rect.bottom - view->rect.top;
-          ce_terminal_resize(&app->terminal, width, height);
      }
+
+     int64_t width = view->rect.right - view->rect.left;
+     int64_t height = view->rect.bottom - view->rect.top;
+     ce_terminal_resize(&app->terminal, width, height);
 
      app->vim.mode = CE_VIM_MODE_INSERT;
 
@@ -1815,6 +1809,11 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
                                         view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                                        if(itr->buffer == app->terminal.buffer){
+                                             int64_t width = view->rect.right - view->rect.left;
+                                             int64_t height = view->rect.bottom - view->rect.top;
+                                             ce_terminal_resize(&app->terminal, width, height);
+                                        }
                                         break;
                                    }
                                    itr = itr->next;
@@ -1907,9 +1906,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                if(buffer_index == view->cursor.y && itr->buffer != app->buffer_list_buffer){
                     // find all the views showing this buffer and switch to a different view
                     for(int64_t t = 0; t < app->tab_list_layout->tab_list.tab_count; t++){
-                         CeLayout_t* layout = NULL;
-                         while((layout = ce_layout_buffer_in_view(app->tab_list_layout->tab_list.tabs[t], itr->buffer))){
-                              layout->view.buffer = app->buffer_list_buffer;
+                         CeLayoutBufferInViewsResult_t result = ce_layout_buffer_in_views(app->tab_list_layout->tab_list.tabs[t], itr->buffer);
+                         for(int64_t i = 0; i < result.layout_count; i++){
+                              result.layouts[i]->view.buffer = app->buffer_list_buffer;
                          }
                     }
 
