@@ -188,7 +188,8 @@ void ce_view_scroll_to(CeView_t* view, CePoint_t point);
 int64_t ce_utf8_strlen(const char* string);
 int64_t ce_utf8_strlen_between(const char* start, const char* end); // inclusive
 int64_t ce_utf8_last_index(const char* string);
-char* ce_utf8_find_index(char* string, int64_t index); // TODO: rename? ce_utf8_iterate_to()?
+char* ce_utf8_iterate_to(char* string, int64_t index);
+char* ce_utf8_iterate_to_include_end(char* string, int64_t index);
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed);
 CeRune_t ce_utf8_decode_reverse(const char* string, const char* string_start, int64_t* bytes_consumed);
 bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes_written);

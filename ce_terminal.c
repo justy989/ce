@@ -69,7 +69,7 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
                glyph->foreground = terminal->cursor.attributes.foreground;
                glyph->background = terminal->cursor.attributes.background;
                glyph->attributes = 0;
-               char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
+               char* str = ce_utf8_iterate_to(terminal->buffer->lines[y], x);
                int64_t rune_len;
                ce_utf8_decode(str, &rune_len);
                if(rune_len > 1){
@@ -158,8 +158,8 @@ static void terminal_insert_blank(CeTerminal_t* terminal, int n){
      memmove(&line[dst], &line[src], size * sizeof(*line));
 
      // figure out our start and end
-     char* line_dst = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], dst);
-     char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], src);
+     char* line_dst = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], dst);
+     char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], src);
 
      // copy into tmp array
      CeRune_t runes[size];
@@ -238,7 +238,7 @@ static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminal
      assert(x >= 0 && x < terminal->columns);
      assert(y >= 0 && y < terminal->line_count);
      terminal->lines[y][x] = *attributes;
-     char* str = ce_utf8_find_index(terminal->buffer->lines[y], x);
+     char* str = ce_utf8_iterate_to(terminal->buffer->lines[y], x);
      assert(str);
      int64_t rune_len = ce_utf8_rune_len(rune);
      int64_t replacing_len = 0;
@@ -310,8 +310,8 @@ static void terminal_delete_char(CeTerminal_t* terminal, int n){
      memmove(&line[dst], &line[src], size * sizeof(*line));
 
      // figure out our start and end
-     char* line_dst = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], dst);
-     char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], src);
+     char* line_dst = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], dst);
+     char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], src);
 
      // copy into tmp array
      CeRune_t runes[size];
@@ -1256,7 +1256,7 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
 
           // TODO: compress with similar code above
           // figure out our start and end
-          char* line_src = ce_utf8_find_index(terminal->buffer->lines[terminal->cursor.y], terminal->cursor.x);
+          char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], terminal->cursor.x);
           char* line_dst = line_src + width;
 
           // copy into tmp array
@@ -1490,9 +1490,9 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
                terminal->alternate_lines_buffer->lines[i] = realloc(terminal->alternate_lines_buffer->lines[i], bytes);
 
                // find the end and null terminal it
-               char* end = ce_utf8_find_index(terminal->lines_buffer->lines[i], width);
+               char* end = ce_utf8_iterate_to(terminal->lines_buffer->lines[i], width);
                if(end) *end = 0;
-               end = ce_utf8_find_index(terminal->alternate_lines_buffer->lines[i], width);
+               end = ce_utf8_iterate_to(terminal->alternate_lines_buffer->lines[i], width);
                if(end) *end = 0;
           }
      }else if(terminal->columns < width){
@@ -1507,12 +1507,12 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
 
                // append spaces and null terminator with the new columns
                int64_t diff = width - terminal->columns;
-               char* end = ce_utf8_find_index(terminal->lines_buffer->lines[i], width);
+               char* end = ce_utf8_iterate_to_include_end(terminal->lines_buffer->lines[i], width);
                memset(end, ' ', diff);
                end += diff;
                *end = 0;
 
-               end = ce_utf8_find_index(terminal->alternate_lines_buffer->lines[i], width);
+               end = ce_utf8_iterate_to_include_end(terminal->alternate_lines_buffer->lines[i], width);
                memset(end, ' ', diff);
                end += diff;
                *end = 0;

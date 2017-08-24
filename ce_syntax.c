@@ -459,7 +459,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeVim_t* vim, CeDrawColorList_t* draw
           }
 
           for(int64_t x = 0; x < line_len; ++x){
-               char* str = ce_utf8_find_index(line, x);
+               char* str = ce_utf8_iterate_to(line, x);
                match_point.x = x;
 
                if(vim){

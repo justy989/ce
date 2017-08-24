@@ -263,7 +263,7 @@ int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point){
 CeRune_t ce_buffer_get_rune(CeBuffer_t* buffer, CePoint_t point){
      if(!ce_buffer_point_is_valid(buffer, point)) return CE_UTF8_INVALID;
 
-     char* str = ce_utf8_find_index(buffer->lines[point.y], point.x);
+     char* str = ce_utf8_iterate_to(buffer->lines[point.y], point.x);
      int64_t rune_len = 0;
      return ce_utf8_decode(str, &rune_len);
 }
@@ -274,7 +274,7 @@ CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const ch
      if(!ce_buffer_point_is_valid(buffer, start)) return result;
 
      int64_t save_y = start.y;
-     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+     char* itr = ce_utf8_iterate_to(buffer->lines[start.y], start.x);
      char* match = NULL;
 
      // try to match the pattern on each line to the end
@@ -314,7 +314,7 @@ CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const c
      if(!ce_buffer_point_is_valid(buffer, start)) return result;
 
      char* beginning_of_line = buffer->lines[start.y];
-     char* itr = ce_utf8_find_index(beginning_of_line, start.x);
+     char* itr = ce_utf8_iterate_to(beginning_of_line, start.x);
      bool match = false;
      size_t pattern_len = strlen(pattern);
 
@@ -463,7 +463,7 @@ int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      for(int64_t y = start.y; y <= end.y; ++y){
           if(y == start.y){
                // count from the star to the end of the line
-               length = ce_utf8_strlen(ce_utf8_find_index(buffer->lines[y], start.x)) + 1;
+               length = ce_utf8_strlen(ce_utf8_iterate_to(buffer->lines[y], start.x)) + 1;
           }else if(y == end.y){
                length += end.x + 1;
           }else{
@@ -641,7 +641,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           if(!line) return false;
 
           // figure out where to move from and to
-          char* src = ce_utf8_find_index(line, point.x);
+          char* src = ce_utf8_iterate_to(line, point.x);
           char* dst = src + insert_len;
           size_t src_len = strlen(src);
           memmove(dst, src, src_len);
@@ -730,14 +730,14 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      if(buffer->status == CE_BUFFER_STATUS_READONLY) return false;
      if(!ce_buffer_point_is_valid(buffer, point)) return false;
 
-     char* first_line_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
+     char* first_line_start = ce_utf8_iterate_to(buffer->lines[point.y], point.x);
      int64_t length_left_on_line = ce_utf8_strlen(first_line_start) + 1;
 
      if(length_left_on_line > length){
           // case: glue together left and right sides and cut out the middle
-          char* end_of_start = ce_utf8_find_index(buffer->lines[point.y], point.x);
+          char* end_of_start = ce_utf8_iterate_to(buffer->lines[point.y], point.x);
           assert(end_of_start);
-          char* beginning_of_end = ce_utf8_find_index(buffer->lines[point.y], point.x + length);
+          char* beginning_of_end = ce_utf8_iterate_to(buffer->lines[point.y], point.x + length);
           assert(beginning_of_end);
 
           // figure out how big of a line to allocate
@@ -810,7 +810,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
 
      // join the rest of the last line in the deletion, to the first line
      if(last_line_offset){
-          char* end_to_join = ce_utf8_find_index(buffer->lines[current_line], last_line_offset);
+          char* end_to_join = ce_utf8_iterate_to(buffer->lines[current_line], last_line_offset);
           int64_t join_len = strlen(end_to_join);
           int64_t new_len = point.x + join_len;
           buffer->lines[point.y] = realloc(buffer->lines[point.y], new_len + 1);
@@ -859,14 +859,14 @@ bool ce_buffer_remove_lines(CeBuffer_t* buffer, int64_t line_start, int64_t line
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length){
      if(!ce_buffer_point_is_valid(buffer, point)) return NULL;
 
-     char* start = ce_utf8_find_index(buffer->lines[point.y], point.x);
+     char* start = ce_utf8_iterate_to(buffer->lines[point.y], point.x);
      // NOTE: would a function that returns both utf8 len and byte len be helpful here?
      int64_t buffer_utf8_length = ce_utf8_strlen(start) + 1;
      int64_t real_length = strlen(start) + 1;
 
      // exit early if the whole string is just on this line
      if(buffer_utf8_length > length){
-          char* end = ce_utf8_find_index(start, length);
+          char* end = ce_utf8_iterate_to(start, length);
           return strndup(start, end - start);
      }else if(buffer_utf8_length == length){
           char* new_string = malloc(real_length + 1);
@@ -887,7 +887,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length)
           buffer_utf8_length += line_utf8_length;
           if(buffer_utf8_length > length){
                int64_t diff = buffer_utf8_length - length;
-               char* end_of_dupe = ce_utf8_find_index(buffer->lines[current_line], line_utf8_length - diff);
+               char* end_of_dupe = ce_utf8_iterate_to(buffer->lines[current_line], line_utf8_length - diff);
                real_length += end_of_dupe - buffer->lines[current_line];
                break;
           }
@@ -1185,7 +1185,7 @@ int64_t ce_utf8_last_index(const char* string){
      return len;
 }
 
-char* ce_utf8_find_index(char* string, int64_t index){
+char* ce_utf8_iterate_to(char* string, int64_t index){
      int64_t bytes = 0;
      while(index){
           if((*string & 0x80) == 0){
@@ -1206,6 +1206,36 @@ char* ce_utf8_find_index(char* string, int64_t index){
           }
 
           index--;
+     }
+
+     return string;
+}
+
+char* ce_utf8_iterate_to_include_end(char* string, int64_t index){
+     int64_t bytes = 0;
+     while(index){
+          if((*string & 0x80) == 0){
+               bytes = 1;
+          }else if((*string & 0xE0) == 0xC0){
+               bytes = 2;
+          }else if((*string & 0xF0) == 0xE0){
+               bytes = 3;
+          }else if((*string & 0xF8) == 0xF0){
+               bytes = 4;
+          }else{
+               return NULL;
+          }
+
+          index--;
+
+          for(int64_t i = 0; i < bytes; ++i){
+               if(*string == 0){
+                    if(index == 0) return string;
+                    return NULL;
+               }
+               string++;
+          }
+
      }
 
      return string;

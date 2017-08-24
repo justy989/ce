@@ -585,7 +585,7 @@ void* draw_thread(void* thread_data){
 
           previous_draw_time = current_draw_time;
 
-          //erase();
+          erase();
 
           CeLayout_t* tab_list_layout = app->tab_list_layout;
           CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
@@ -618,6 +618,17 @@ void* draw_thread(void* thread_data){
                          printw(" selection ");
                     }
                }
+          }
+
+          CeView_t* view = &tab_layout->tab.current->view;
+
+          // update cursor if it is on a terminal
+          if((view->buffer == app->terminal.lines_buffer ||
+              view->buffer == app->terminal.alternate_lines_buffer) &&
+             app->vim.mode == CE_VIM_MODE_INSERT){
+               view->cursor.x = app->terminal.cursor.x;
+               view->cursor.y = app->terminal.cursor.y;
+               ce_view_follow_cursor(view, 1, 1, app->config_options.tab_width);
           }
 
           standend();
@@ -698,13 +709,6 @@ void* draw_thread(void* thread_data){
                CePoint_t screen_cursor = view_cursor_on_screen(&app->input_view, app->config_options.tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }else{
-               CeView_t* view = &tab_layout->tab.current->view;
-
-               if(view->buffer == app->terminal.buffer && app->vim.mode == CE_VIM_MODE_INSERT){
-                    view->cursor.x = app->terminal.cursor.x;
-                    view->cursor.y = app->terminal.cursor.y;
-               }
-
                CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width);
                move(screen_cursor.y, screen_cursor.x);
           }
@@ -969,13 +973,8 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      App_t* app = user_data;
-     CeView_t* view = NULL;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
      bool vertical = false;
-
-     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-          view = &tab_layout->tab.current->view;
-     }
 
      if(strcmp(command->args[0].string, "vertical") == 0){
           vertical = true;
@@ -986,15 +985,11 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
-     if(view){
-          ce_layout_split(tab_layout, vertical);
-
-          view = &tab_layout->tab.current->view;
-          ce_layout_distribute_rect(tab_layout, app->terminal_rect, app->config_options.horizontal_scroll_off, app->config_options.vertical_scroll_off,
-                                    app->config_options.tab_width);
-     }else{
-          ce_layout_split(tab_layout, vertical);
-     }
+     ce_layout_split(tab_layout, vertical);
+     ce_layout_distribute_rect(tab_layout, app->terminal_rect);
+     ce_layout_view_follow_cursor(tab_layout, app->config_options.horizontal_scroll_off,
+                                  app->config_options.vertical_scroll_off, app->config_options.tab_width,
+                                  app->terminal.buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1036,8 +1031,10 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      CePoint_t cursor = {0, 0};
      if(view) cursor = view_cursor_on_screen(view, app->config_options.tab_width);
      ce_layout_delete(tab_layout, tab_layout->tab.current);
-     ce_layout_distribute_rect(tab_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
-                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     ce_layout_distribute_rect(tab_layout, app->terminal_rect);
+     ce_layout_view_follow_cursor(tab_layout, app->config_options.horizontal_scroll_off,
+                                  app->config_options.vertical_scroll_off, app->config_options.tab_width,
+                                  app->terminal.buffer);
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 
@@ -2305,6 +2302,13 @@ int main(int argc, char** argv){
           // handle input from the user
           int key = getch();
           app_handle_key(&app, view, key);
+
+          if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+               ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+          }else{
+               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                     app.config_options.tab_width);
+          }
 
           // setup input view overlay if we are
           if(view && app.input_mode) input_view_overlay(&app.input_view, view);

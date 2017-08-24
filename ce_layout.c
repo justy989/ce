@@ -165,14 +165,12 @@ bool ce_layout_split(CeLayout_t* layout, bool vertical){
      return false;
 }
 
-void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect, int64_t horizontal_scroll_off, int64_t vertical_scroll_off,
-                               int64_t tab_width){
+void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
      switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
           layout->view.rect = rect;
-          ce_view_follow_cursor(&layout->view, horizontal_scroll_off, vertical_scroll_off, tab_width);
           break;
      case CE_LAYOUT_TYPE_LIST:
      {
@@ -192,8 +190,7 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect, int64_t horizo
                          sliced_rect.bottom++;
                     }
 
-                    ce_layout_distribute_rect(layout->list.layouts[i], sliced_rect, horizontal_scroll_off, vertical_scroll_off,
-                                              tab_width);
+                    ce_layout_distribute_rect(layout->list.layouts[i], sliced_rect);
 
                     sliced_rect.top = sliced_rect.bottom + 1;
                     sliced_rect.bottom = sliced_rect.top + slice_height;
@@ -210,8 +207,7 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect, int64_t horizo
                          sliced_rect.right++;
                     }
 
-                    ce_layout_distribute_rect(layout->list.layouts[i], sliced_rect, horizontal_scroll_off, vertical_scroll_off,
-                                              tab_width);
+                    ce_layout_distribute_rect(layout->list.layouts[i], sliced_rect);
 
                     sliced_rect.left = sliced_rect.right + 1;
                     sliced_rect.right = sliced_rect.left + slice_width;
@@ -220,12 +216,40 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect, int64_t horizo
      } break;
      case CE_LAYOUT_TYPE_TAB:
           layout->tab.rect = rect;
-          ce_layout_distribute_rect(layout->tab.root, rect, horizontal_scroll_off, vertical_scroll_off, tab_width);
+          ce_layout_distribute_rect(layout->tab.root, rect);
           break;
      case CE_LAYOUT_TYPE_TAB_LIST:
           layout->tab_list.rect = rect;
           if(layout->tab_list.tab_count > 1) rect.top++; // leave space for a tab bar, this probably doesn't want to be built in?
-          ce_layout_distribute_rect(layout->tab_list.current, rect, horizontal_scroll_off, vertical_scroll_off, tab_width);
+          ce_layout_distribute_rect(layout->tab_list.current, rect);
+          break;
+     }
+}
+
+void ce_layout_view_follow_cursor(CeLayout_t* layout, int64_t horizontal_scroll_off, int64_t vertical_scroll_off,
+                                  int64_t tab_width, CeBuffer_t* terminal_buffer){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          if(layout->view.buffer == terminal_buffer){
+               ce_view_follow_cursor(&layout->view, 1, 1, tab_width);
+          }else{
+               ce_view_follow_cursor(&layout->view, horizontal_scroll_off, vertical_scroll_off, tab_width);
+          }
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+     {
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               ce_layout_view_follow_cursor(layout->list.layouts[i], horizontal_scroll_off, vertical_scroll_off, tab_width,
+                                            terminal_buffer);
+          }
+     } break;
+     case CE_LAYOUT_TYPE_TAB:
+          ce_layout_view_follow_cursor(layout->tab.root, horizontal_scroll_off, vertical_scroll_off, tab_width, terminal_buffer);
+          break;
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          ce_layout_view_follow_cursor(layout->tab_list.current, horizontal_scroll_off, vertical_scroll_off, tab_width, terminal_buffer);
           break;
      }
 }

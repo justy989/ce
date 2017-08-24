@@ -157,8 +157,7 @@ void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_
 void app_update_terminal_view(App_t* app){
      getmaxyx(stdscr, app->terminal_height, app->terminal_width);
      app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect, app->config_options.horizontal_scroll_off,
-                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 }
 
 CeComplete_t* app_is_completing(App_t* app){

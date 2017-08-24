@@ -320,29 +320,21 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
      case KEY_LEFT:
           view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0},
                                               config_options->tab_width, CE_CLAMP_X_ON);
-          ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
-                                config_options->tab_width);
           vim->chain_undo = false;
           break;
      case KEY_DOWN:
           view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, 1},
                                               config_options->tab_width, CE_CLAMP_X_ON);
-          ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
-                                config_options->tab_width);
           vim->chain_undo = false;
           break;
      case KEY_UP:
           view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){0, -1},
                                               config_options->tab_width, CE_CLAMP_X_ON);
-          ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
-                                config_options->tab_width);
           vim->chain_undo = false;
           break;
      case KEY_RIGHT:
           view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){1, 0},
                                               config_options->tab_width, CE_CLAMP_X_ON);
-          ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
-                                config_options->tab_width);
           vim->chain_undo = false;
           break;
      case 27: // escape
@@ -652,7 +644,7 @@ int64_t ce_vim_soft_begin_line(CeBuffer_t* buffer, int64_t line){
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
      if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
 
-     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+     char* itr = ce_utf8_iterate_to(buffer->lines[start.y], start.x);
 
      int64_t rune_len = 0;
      CeRune_t rune = ce_utf8_decode(itr, &rune_len);
@@ -711,7 +703,7 @@ END_LOOP:
 CePoint_t ce_vim_move_big_word(CeBuffer_t* buffer, CePoint_t start){
      if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
 
-     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+     char* itr = ce_utf8_iterate_to(buffer->lines[start.y], start.x);
 
      int64_t rune_len = 0;
      CeRune_t rune = ce_utf8_decode(itr, &rune_len);
@@ -769,7 +761,7 @@ CePoint_t ce_vim_move_end_little_word(CeBuffer_t* buffer, CePoint_t start){
           }
      }
 
-     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+     char* itr = ce_utf8_iterate_to(buffer->lines[start.y], start.x);
      int64_t rune_len = 0;
      CeRune_t rune = 0;
      WordState_t state = WORD_INSIDE_OTHER;
@@ -853,7 +845,7 @@ CePoint_t ce_vim_move_end_big_word(CeBuffer_t* buffer, CePoint_t start){
           }
      }
 
-     char* itr = ce_utf8_find_index(buffer->lines[start.y], start.x);
+     char* itr = ce_utf8_iterate_to(buffer->lines[start.y], start.x);
 
      int64_t rune_len = 0;
      CeRune_t rune = 0;
@@ -920,7 +912,7 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
 
 
      char* line_start = buffer->lines[start.y];
-     char* itr = ce_utf8_find_index(line_start, start.x); // start one character back
+     char* itr = ce_utf8_iterate_to(line_start, start.x); // start one character back
 
      int64_t rune_len = 0;
      CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
@@ -973,7 +965,7 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start){
                if(start.x > 0) start.x--;
                else break;
                line_start = buffer->lines[start.y];
-               itr = ce_utf8_find_index(line_start, start.x); // start one character back
+               itr = ce_utf8_iterate_to(line_start, start.x); // start one character back
                state = WORD_NEW_LINE;
           }
      }
@@ -997,7 +989,7 @@ CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start){
      }
 
      char* line_start = buffer->lines[start.y];
-     char* itr = ce_utf8_find_index(line_start, start.x); // start one character back
+     char* itr = ce_utf8_iterate_to(line_start, start.x); // start one character back
 
      int64_t rune_len = 0;
      CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
@@ -1042,7 +1034,7 @@ CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start){
                start.x = ce_utf8_strlen(buffer->lines[start.y]);
                if(start.x == 0) break;
                line_start = buffer->lines[start.y];
-               itr = ce_utf8_find_index(line_start, start.x);
+               itr = ce_utf8_iterate_to(line_start, start.x);
                state = WORD_NEW_LINE;
                start.x++;
           }
@@ -1056,7 +1048,7 @@ END_LOOP:
 CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeRune_t match_rune, bool until){
      if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
      int64_t match_x = until ? start.x + 2 : start.x + 1;
-     char* str = ce_utf8_find_index(buffer->lines[start.y], match_x);
+     char* str = ce_utf8_iterate_to(buffer->lines[start.y], match_x);
 
      while(*str){
           int64_t rune_len = 0;
@@ -1074,7 +1066,7 @@ CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, Ce
      if(start.x == 0) return (CePoint_t){-1, -1};
 
      char* start_of_line = buffer->lines[start.y];
-     char* str = ce_utf8_find_index(start_of_line, start.x);
+     char* str = ce_utf8_iterate_to(start_of_line, start.x);
      int64_t match_x = start.x - 1;
      str--;
 
@@ -1099,7 +1091,7 @@ CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, Ce
 CeVimMotionRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start){
      CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
      char* line_start = buffer->lines[start.y];
-     char* itr = ce_utf8_find_index(line_start, start.x);
+     char* itr = ce_utf8_iterate_to(line_start, start.x);
      char* save_start = itr;
      if(!is_little_word_character(*itr)) return range;
 
@@ -1135,7 +1127,7 @@ CeVimMotionRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoin
 CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start){
      CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
      char* line_start = buffer->lines[start.y];
-     char* itr = ce_utf8_find_index(line_start, start.x);
+     char* itr = ce_utf8_iterate_to(line_start, start.x);
      char* save_start = itr;
      if(!is_little_word_character(*itr)) return range;
 
@@ -1171,7 +1163,7 @@ CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t
 CeVimMotionRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, char string_char){
      CeVimMotionRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
      char* line_start = buffer->lines[start.y];
-     char* itr = ce_utf8_find_index(line_start, start.x);
+     char* itr = ce_utf8_iterate_to(line_start, start.x);
      char* save_start = itr;
 
      CeRune_t previous_rune = CE_UTF8_INVALID;
@@ -2212,8 +2204,6 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRa
      view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_ON);
      if(ce_points_equal(motion_range.end, view->cursor)) buffer_data->motion_column = view->cursor.x;
      CePoint_t before_follow = view->scroll;
-     ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off,
-                           config_options->tab_width);
 
      // if we are searching, and our cursor goes off the screen, center it
      if(!ce_points_equal(before_follow, view->scroll) &&
@@ -2600,7 +2590,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeVimMot
           return false;
      }
 
-     if(change_node->next) change_node->next->change.chain = false;
+     if(change_node && change_node->next) change_node->next->change.chain = false;
 
      if(vim->insert_rune_head){
           CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
