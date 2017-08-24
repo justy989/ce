@@ -12,3 +12,4 @@ todo:
 bug:
 - occasional crash where vim verb gets motion of -1, -1
 - slow to start, wtf
+- handle ctrl + c, we want to be able to send it to the terminal

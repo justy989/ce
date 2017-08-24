@@ -1474,9 +1474,6 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int
 }
 
 void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
-     terminal->columns = width;
-     terminal->rows = height;
-
      // TODO: realloc lines
      if(height > terminal->line_count){
 
@@ -1485,7 +1482,7 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
      if(terminal->columns > width){
           for(int64_t i = 0; i < terminal->line_count; i++){
                terminal->lines[i] = realloc(terminal->lines[i], width * sizeof(*terminal->lines[0]));
-               terminal->alternate_lines[i] = realloc(terminal->lines[i], width * sizeof(*terminal->alternate_lines[0]));
+               terminal->alternate_lines[i] = realloc(terminal->alternate_lines[i], width * sizeof(*terminal->alternate_lines[0]));
 
                // realloc buffer lines so they are smaller
                size_t bytes = (width + 1) * CE_UTF8_SIZE;
@@ -1494,14 +1491,14 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
 
                // find the end and null terminal it
                char* end = ce_utf8_find_index(terminal->lines_buffer->lines[i], width);
-               if(end){*end = 0;}
+               if(end) *end = 0;
                end = ce_utf8_find_index(terminal->alternate_lines_buffer->lines[i], width);
-               if(end){*end = 0;}
+               if(end) *end = 0;
           }
      }else if(terminal->columns < width){
           for(int64_t i = 0; i < terminal->line_count; i++){
                terminal->lines[i] = realloc(terminal->lines[i], width * sizeof(*terminal->lines[0]));
-               terminal->alternate_lines[i] = realloc(terminal->lines[i], width * sizeof(*terminal->alternate_lines[0]));
+               terminal->alternate_lines[i] = realloc(terminal->alternate_lines[i], width * sizeof(*terminal->alternate_lines[0]));
 
                // realloc buffer lines so they are smaller
                size_t bytes = (width + 1) * CE_UTF8_SIZE;
@@ -1511,16 +1508,19 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
                // append spaces and null terminator with the new columns
                int64_t diff = width - terminal->columns;
                char* end = ce_utf8_find_index(terminal->lines_buffer->lines[i], width);
-               memset(end, ' ', diff * CE_UTF8_SIZE);
+               memset(end, ' ', diff);
                end += diff;
                *end = 0;
 
                end = ce_utf8_find_index(terminal->alternate_lines_buffer->lines[i], width);
-               memset(end, ' ', diff * CE_UTF8_SIZE);
+               memset(end, ' ', diff);
                end += diff;
                *end = 0;
           }
      }
+
+     terminal->columns = width;
+     terminal->rows = height;
 
      struct winsize window_size = {};
 

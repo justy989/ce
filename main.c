@@ -996,6 +996,13 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           ce_layout_split(tab_layout, vertical);
      }
 
+     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
+     if(terminal_layout){
+          int64_t width = terminal_layout->view.rect.right - terminal_layout->view.rect.left;
+          int64_t height = terminal_layout->view.rect.bottom - terminal_layout->view.rect.top;
+          ce_terminal_resize(&app->terminal, width, height);
+     }
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1233,6 +1240,9 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
           tab_layout->tab.current = terminal_layout;
      }else{
           view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
+          int64_t width = view->rect.right - view->rect.left;
+          int64_t height = view->rect.bottom - view->rect.top;
+          ce_terminal_resize(&app->terminal, width, height);
      }
 
      app->vim.mode = CE_VIM_MODE_INSERT;
@@ -2348,7 +2358,8 @@ int main(int argc, char** argv){
           BufferNode_t* itr = app.buffer_node_head;
           BufferNode_t* prev = NULL;
           while(itr){
-               if(itr->buffer == app.terminal.buffer){
+               if(itr->buffer == app.terminal.lines_buffer ||
+                  itr->buffer == app.terminal.alternate_lines_buffer){
                     if(prev){
                          prev->next = itr->next;
                     }else{
