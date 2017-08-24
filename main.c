@@ -218,7 +218,7 @@ static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t
      return buffer;
 }
 
-void syntax_highlight_terminal(CeView_t* view, volatile CeTerminal_t* terminal, CeDrawColorList_t* draw_color_list,
+void syntax_highlight_terminal(CeView_t* view, CeTerminal_t* terminal, CeDrawColorList_t* draw_color_list,
                                CeSyntaxDef_t* syntax_defs){
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
@@ -520,7 +520,46 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                layout->view.buffer = terminal->buffer;
                syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
           }else{
-               ce_syntax_highlight_c(&layout->view, layout == current ? vim : NULL, &draw_color_list, syntax_defs);
+               CeRangeList_t range_list = {};
+               switch(vim->mode){
+               default:
+                    break;
+               case CE_VIM_MODE_VISUAL:
+               {
+                    CeRange_t range = {vim->visual, layout->view.cursor};
+                    ce_range_sort(&range);
+                    ce_range_list_insert(&range_list, range.start, range.end);
+               } break;
+               case CE_VIM_MODE_VISUAL_LINE:
+               {
+                    CeRange_t range = {vim->visual, layout->view.cursor};
+                    ce_range_sort(&range);
+                    range.start.x = 0;
+                    range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]);
+                    ce_range_list_insert(&range_list, range.start, range.end);
+               } break;
+               case CE_VIM_MODE_VISUAL_BLOCK:
+               {
+                    CeRange_t range = {vim->visual, layout->view.cursor};
+                    if(range.start.x > range.end.x){
+                         int64_t tmp = range.start.x;
+                         range.start.x = range.end.x;
+                         range.end.x = tmp;
+                    }
+                    if(range.start.y > range.end.y){
+                         int64_t tmp = range.start.y;
+                         range.start.y = range.end.y;
+                         range.end.y = tmp;
+                    }
+                    for(int64_t i = range.start.y; i <= range.end.y; i++){
+                         CePoint_t start = {range.start.x, i};
+                         CePoint_t end = {range.end.x, i};
+                         ce_range_list_insert(&range_list, start, end);
+                    }
+               } break;
+               }
+               ce_syntax_highlight_c(&layout->view, &range_list, &draw_color_list, syntax_defs);
+               ce_range_list_free(&range_list);
           }
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
           ce_draw_color_list_free(&draw_color_list);

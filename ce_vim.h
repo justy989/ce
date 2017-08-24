@@ -7,23 +7,22 @@
 
 #define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                                                      \
 bool function_name(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options, \
-                   CeVimBufferData_t* buffer_data, CeVimMotionRange_t* motion_range);
+                   CeVimBufferData_t* buffer_data, CeRange_t* motion_range);
 
 #define CE_VIM_DECLARE_VERB_FUNC(function_name)                                                                \
-bool function_name(CeVim_t* vim, const CeVimAction_t* action, CeVimMotionRange_t motion_range, CeView_t* view, \
+bool function_name(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view, \
                    CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
 
 
 struct CeVimAction_t;
 struct CeVim_t;
-struct CeVimMotionRange_t;
 struct CeVimBufferData_t;
 enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, CeRune_t);
 typedef bool CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*, const CeConfigOptions_t*,
-                               struct CeVimBufferData_t*, struct CeVimMotionRange_t*);
-typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, struct CeVimMotionRange_t, CeView_t*,
+                               struct CeVimBufferData_t*, CeRange_t*);
+typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, CeRange_t, CeView_t*,
                              struct CeVimBufferData_t*, const CeConfigOptions_t*);
 
 typedef enum CeVimParseResult_t{
@@ -44,11 +43,6 @@ typedef enum{
      CE_VIM_MODE_REPLACE,
      CE_VIM_MODE_COUNT,
 }CeVimMode_t;
-
-typedef struct CeVimMotionRange_t{
-     CePoint_t start;
-     CePoint_t end;
-}CeVimMotionRange_t;
 
 typedef struct{
      int64_t multiplier;
@@ -145,10 +139,9 @@ CePoint_t ce_vim_move_begin_little_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_begin_big_word(CeBuffer_t* buffer, CePoint_t start);
 CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
 CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool until);
-CeVimMotionRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
-CeVimMotionRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
-CeVimMotionRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool inside);
-bool ce_vim_motion_range_sort(CeVimMotionRange_t* motion_range);
+CeRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
+CeRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start); // returns -1
+CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool inside);
 void ce_vim_add_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* function);
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length);
 bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, bool chain_undo);

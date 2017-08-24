@@ -1647,3 +1647,14 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
 
      return int_str;
 }
+
+bool ce_range_sort(CeRange_t* range){
+     if(ce_point_after(range->start, range->end)){
+          CePoint_t tmp = range->start;
+          range->start = range->end;
+          range->end = tmp;
+          return true;
+     }
+
+     return false;
+}

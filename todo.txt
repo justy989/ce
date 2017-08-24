@@ -4,10 +4,12 @@ todo:
 - jump list
 - multiple terminals
 - add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
-- when viewing terminal, use horizontal and vertical scroll off of 1
 - dired mode
+- python, bash, maybe java syntax highlighting
 
 bug:
 - occasional crash where vim verb gets motion of -1, -1
 - slow to start, wtf
 - handle ctrl + c, we want to be able to send it to the terminal
+- indentation sux in a lot of places right now
+- visual delete on the same line deletes and extra character when doing '.'

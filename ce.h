@@ -138,6 +138,11 @@ typedef struct{
      char filepath[PATH_MAX];
 }CeDestination_t;
 
+typedef struct{
+     CePoint_t start;
+     CePoint_t end;
+}CeRange_t;
+
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);
 // lol we should have a ce_log_free() but honestly, whatever
@@ -209,5 +214,7 @@ void ce_rune_node_free(CeRuneNode_t** head);
 
 char* ce_rune_string_to_char_string(const CeRune_t* int_str);
 CeRune_t* ce_char_string_to_rune_string(const char* char_str);
+
+bool ce_range_sort(CeRange_t* range);
 
 extern FILE* g_ce_log;
