@@ -1193,3 +1193,62 @@ void ce_syntax_highlight_diff(CeView_t* view, CeRangeList_t* highlight_range_lis
           }
      }
 }
+
+void ce_syntax_highlight_plain(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                               CeSyntaxDef_t* syntax_defs, void* user_data){
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+     bool in_visual = false;
+     CeRangeNode_t* range_node = highlight_range_list->head;
+
+     for(int64_t y = min; y <= max; ++y){
+          char* line = view->buffer->lines[y];
+          int64_t line_len = ce_utf8_strlen(line);
+          CePoint_t match_point = {0, y};
+
+          if(in_visual){
+               int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_VISUAL, ce_draw_color_list_last_bg_color(draw_color_list));
+               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg, match_point);
+          }
+
+          for(int64_t x = 0; x < line_len; ++x){
+               match_point.x = x;
+
+               // TODO: compress
+               if(range_node){
+                    if(in_visual){
+                         if(ce_point_after(match_point, range_node->range.end)){
+                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
+                              range_node = range_node->next;
+                              in_visual = false;
+                         }
+                    }else{
+                         if(ce_points_equal(match_point, range_node->range.start)){
+                              int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_VISUAL, ce_draw_color_list_last_bg_color(draw_color_list));
+                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg, match_point);
+                              in_visual = true;
+                         }else if(ce_point_after(match_point, range_node->range.end)){
+                              range_node = range_node->next;
+                         }
+                    }
+               }
+          }
+
+          // handle case where visual mode ends at the end of the line
+          match_point.x = line_len;
+          if(range_node && in_visual){
+               // TODO: compress with above
+               if(ce_point_after(match_point, range_node->range.end)){
+                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
+                    range_node = range_node->next;
+                    in_visual = false;
+               }
+          }
+     }
+}

@@ -1,11 +1,8 @@
 todo:
-- have drawing a view take in a highlight range, rather than taking vim in
-- have drawing take in a pattern string for searching to also highlight
 - jump list
 - multiple terminals
 - add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
 - dired mode
-- python, bash, maybe java syntax highlighting
 
 bug:
 - occasional crash where vim verb gets motion of -1, -1

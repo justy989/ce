@@ -228,6 +228,8 @@ void determine_buffer_type(CeBuffer_t* buffer){
           buffer_data->syntax_function = ce_syntax_highlight_diff;
      }else{
           buffer->type = CE_BUFFER_FILE_TYPE_PLAIN;
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
      }
 }
 

@@ -91,3 +91,5 @@ void ce_syntax_highlight_config(CeView_t* view, CeRangeList_t* highlight_range_l
                                 CeSyntaxDef_t* syntax_defs, void* user_data);
 void ce_syntax_highlight_diff(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                               CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_plain(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                               CeSyntaxDef_t* syntax_defs, void* user_data);
