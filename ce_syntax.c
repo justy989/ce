@@ -575,7 +575,7 @@ static int64_t match_python_string(const char* str){
           while(match){
                match = strchr(match + 1, *str);
                if(match && *(match - 1) != '\\'){
-                    return ce_utf8_strlen_between(match, str) + 1;
+                    return ce_utf8_strlen_between(str, match) + 1;
                }
           }
      }
@@ -593,14 +593,14 @@ static int64_t match_python_docstring(const char* str, PythonDocstring_t* python
      if(strncmp(str, "\"\"\"", 3) == 0){
           *python_docstring = PYTHON_DOCSTRING_DOUBLE_QUOTE;
           char* match = strstr(str, "\"\"\"");
-          if(match) return ce_utf8_strlen_between(match, str) + 3;
+          if(match) return ce_utf8_strlen_between(str, match) + 3;
           return ce_utf8_strlen(str);
      }
 
      if(strncmp(str, "'''", 3) == 0){
           *python_docstring = PYTHON_DOCSTRING_SINGLE_QUOTE;
           char* match = strstr(str, "'''");
-          if(match) return ce_utf8_strlen_between(match, str) + 3;
+          if(match) return ce_utf8_strlen_between(str, match) + 3;
           return ce_utf8_strlen(str);
      }
 
