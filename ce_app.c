@@ -192,3 +192,29 @@ void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_
      }
      *command_entry_count = final_command_entry_count;
 }
+
+void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                  CeSyntaxDef_t* syntax_defs, void* user_data){
+     CeTerminal_t* terminal = user_data;
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+     int fg = COLOR_DEFAULT;
+     int bg = COLOR_DEFAULT;
+
+     for(int64_t y = min; y <= max; ++y){
+          for(int64_t x = 0; x < terminal->columns; ++x){
+               CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
+               if(glyph->foreground != fg || glyph->background != bg){
+                    fg = glyph->foreground;
+                    bg = glyph->background;
+                    ce_draw_color_list_insert(draw_color_list, fg, bg, (CePoint_t){x, y});
+               }
+          }
+     }
+}

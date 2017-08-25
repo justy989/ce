@@ -13,3 +13,4 @@ bug:
 - handle ctrl + c, we want to be able to send it to the terminal
 - indentation sux in a lot of places right now
 - visual delete on the same line deletes and extra character when doing '.'
+- divide by zero in ce_layout_distribute_rect()

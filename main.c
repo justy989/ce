@@ -199,6 +199,8 @@ void determine_buffer_type(CeBuffer_t* buffer){
           buffer_data->syntax_function = ce_syntax_highlight_c;
      }else if(strstr(buffer->name, ".py")){
           buffer->type = CE_BUFFER_FILE_TYPE_PYTHON;
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_python;
      }else if(strstr(buffer->name, ".java")){
           buffer->type = CE_BUFFER_FILE_TYPE_JAVA;
      }else if(strstr(buffer->name, ".sh")){

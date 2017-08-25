@@ -228,6 +228,8 @@ static int64_t match_caps_var(const char* str){
           itr++;
      }
 
+     if(is_c_type_char(*itr)) return 0;
+
      int64_t len = itr - str;
      if(len > 1) return len;
      return 0;
@@ -401,7 +403,6 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                            CeSyntaxDef_t* syntax_defs, void* user_data){
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
-     if(view->buffer->type != CE_BUFFER_FILE_TYPE_C) return;
      int64_t min = view->scroll.y;
      int64_t max = min + (view->rect.bottom - view->rect.top);
      int64_t clamp_max = (view->buffer->line_count - 1);
@@ -472,6 +473,214 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                          }else if((match_len = match_c_multiline_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
                               multiline_comment = true;
+                         }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        (CePoint_t){0, match_point.y + 1});
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
+                         }
+                    }
+
+                    if(match_len) current_match_len = match_len;
+               }else{
+                    current_match_len--;
+               }
+          }
+
+          // handle case where visual mode ends at the end of the line
+          match_point.x = line_len;
+          if(range_node && in_visual){
+               // TODO: compress with above
+               if(ce_point_after(match_point, range_node->range.end)){
+                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
+                    range_node = range_node->next;
+                    in_visual = false;
+               }
+          }
+     }
+}
+
+static int64_t match_python_keyword(const char* str, const char* beginning_of_line){
+     static const char* keywords[] = {
+          "and",
+          "del",
+          "from",
+          "not",
+          "while",
+          "as",
+          "elif",
+          "global",
+          "or",
+          "with",
+          "assert",
+          "else",
+          "if",
+          "pass",
+          "import",
+          "print",
+          "class",
+          "exec",
+          "in",
+          "finally",
+          "is",
+          "def",
+          "for",
+          "lambda",
+          "self",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     // weed out middle of words
+     if(str > beginning_of_line){
+          if(is_c_type_char(*(str - 1))) return 0;
+     }
+
+     return match_words(str, beginning_of_line, keywords, keyword_count);
+}
+
+static int64_t match_python_control(const char* str, const char* beginning_of_line){
+     static const char* keywords[] = {
+          "yield",
+          "break",
+          "except",
+          "raise",
+          "continue",
+          "finally",
+          "return",
+          "try",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     // weed out middle of words
+     if(str > beginning_of_line){
+          if(is_c_type_char(*(str - 1))) return 0;
+     }
+
+     return match_words(str, beginning_of_line, keywords, keyword_count);
+}
+
+static int64_t match_python_comment(const char* str){
+     if(*str == '#') return ce_utf8_strlen(str);
+
+     return 0;
+}
+
+static int64_t match_python_string(const char* str){
+     if(*str == '\'' || *str == '"'){
+          const char* match = str;
+          while(match){
+               match = strchr(match + 1, *str);
+               if(match && *(match - 1) != '\\'){
+                    return ce_utf8_strlen_between(match, str) + 1;
+               }
+          }
+     }
+
+     return 0;
+}
+
+typedef enum{
+     PYTHON_DOCSTRING_NONE,
+     PYTHON_DOCSTRING_SINGLE_QUOTE,
+     PYTHON_DOCSTRING_DOUBLE_QUOTE,
+}PythonDocstring_t;
+
+static int64_t match_python_docstring(const char* str, PythonDocstring_t* python_docstring){
+     if(strncmp(str, "\"\"\"", 3) == 0){
+          *python_docstring = PYTHON_DOCSTRING_DOUBLE_QUOTE;
+          char* match = strstr(str, "\"\"\"");
+          if(match) return ce_utf8_strlen_between(match, str) + 3;
+          return ce_utf8_strlen(str);
+     }
+
+     if(strncmp(str, "'''", 3) == 0){
+          *python_docstring = PYTHON_DOCSTRING_SINGLE_QUOTE;
+          char* match = strstr(str, "'''");
+          if(match) return ce_utf8_strlen_between(match, str) + 3;
+          return ce_utf8_strlen(str);
+     }
+
+     return 0;
+}
+
+void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                CeSyntaxDef_t* syntax_defs, void* user_data){
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+     int64_t match_len = 0;
+     bool in_visual = false;
+     PythonDocstring_t docstring = PYTHON_DOCSTRING_NONE;
+     CeRangeNode_t* range_node = highlight_range_list->head;
+
+     for(int64_t y = min; y <= max; ++y){
+          char* line = view->buffer->lines[y];
+          int64_t line_len = ce_utf8_strlen(line);
+          int64_t current_match_len = 1;
+          CePoint_t match_point = {0, y};
+
+          if(docstring){
+               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_STRING, match_point);
+          }
+
+          for(int64_t x = 0; x < line_len; ++x){
+               char* str = ce_utf8_iterate_to(line, x);
+               match_point.x = x;
+
+               // TODO: compress
+               if(range_node){
+                    if(in_visual){
+                         if(ce_point_after(match_point, range_node->range.end)){
+                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
+                              range_node = range_node->next;
+                              in_visual = false;
+                         }
+                    }else{
+                         if(ce_points_equal(match_point, range_node->range.start)){
+                              int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_VISUAL, ce_draw_color_list_last_bg_color(draw_color_list));
+                              ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg, match_point);
+                              in_visual = true;
+                         }else if(ce_point_after(match_point, range_node->range.end)){
+                              range_node = range_node->next;
+                         }
+                    }
+               }
+
+               if(current_match_len <= 1){
+                    if(docstring){
+                         if(docstring == PYTHON_DOCSTRING_DOUBLE_QUOTE && strncmp(str, "\"\"\"", 3) == 0){
+                              docstring = PYTHON_DOCSTRING_NONE;
+                              match_len = 3;
+                         }else if(docstring == PYTHON_DOCSTRING_SINGLE_QUOTE && strncmp(str, "'''", 3) == 0){
+                              docstring = PYTHON_DOCSTRING_NONE;
+                              match_len = 3;
+                         }
+                    }else{
+                         if((match_len = match_c_type(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
+                         }else if((match_len = match_python_keyword(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
+                         }else if((match_len = match_python_control(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
+                         }else if((match_len = match_caps_var(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
+                         }else if((match_len = match_python_comment(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
+                         }else if((match_len = match_python_docstring(str, &docstring))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_STRING, match_point);
+                         }else if((match_len = match_python_string(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_STRING, match_point);
+                         }else if((match_len = match_c_literal(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NUMBER_LITERAL, match_point);
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
                               ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),

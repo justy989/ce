@@ -77,3 +77,5 @@ int ce_color_def_get(CeColorDefs_t* color_defs, int fg, int bg);
 
 void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                            CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                CeSyntaxDef_t* syntax_defs, void* user_data);

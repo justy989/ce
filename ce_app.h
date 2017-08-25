@@ -119,3 +119,6 @@ void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_
 
 void app_update_terminal_view(App_t* app);
 CeComplete_t* app_is_completing(App_t* app);
+
+void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                  CeSyntaxDef_t* syntax_defs, void* user_data);
