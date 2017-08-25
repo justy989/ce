@@ -102,6 +102,7 @@ typedef struct{
      CeBufferChangeNode_t* save_at_change_node;
 
      void* user_data;
+     void* syntax_data;
 }CeBuffer_t;
 
 typedef struct{

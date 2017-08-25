@@ -62,7 +62,7 @@ typedef struct{
      CeColorPair_t pairs[256]; // NOTE: this is what COLOR_PAIRS was for me (which is for some reason not const?)
 }CeColorDefs_t;
 
-typedef void CeSyntaxHighlightFunc_t(CeView_t*, CeVim_t*, CeDrawColorList_t*, CeSyntaxDef_t*);
+typedef void CeSyntaxHighlightFunc_t(CeView_t*, CeRangeList_t*, CeDrawColorList_t*, CeSyntaxDef_t*, void*);
 
 int ce_syntax_def_get_fg(CeSyntaxDef_t* syntax_defs, CeSyntaxColor_t syntax_color, int current_fg);
 int ce_syntax_def_get_bg(CeSyntaxDef_t* syntax_defs, CeSyntaxColor_t syntax_color, int current_bg);
@@ -76,4 +76,4 @@ int ce_draw_color_list_last_bg_color(CeDrawColorList_t* draw_color_list);
 int ce_color_def_get(CeColorDefs_t* color_defs, int fg, int bg);
 
 void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
-                           CeSyntaxDef_t* syntax_defs);
+                           CeSyntaxDef_t* syntax_defs, void* user_data);

@@ -141,3 +141,5 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height);
 void ce_terminal_free(CeTerminal_t* terminal);
 bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key);
 char* ce_terminal_get_current_directory(CeTerminal_t* terminal);
+void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                  CeSyntaxDef_t* syntax_defs, void* user_data){

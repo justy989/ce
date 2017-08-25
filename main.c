@@ -190,6 +190,24 @@ CeBuffer_t* new_buffer(){
      return buffer;
 }
 
+void determine_buffer_type(CeBuffer_t* buffer){
+     // TODO: figure out type based on extention
+     if(strstr(buffer->name, ".c") ||
+        strstr(buffer->name, ".h")){
+          buffer->type = CE_BUFFER_FILE_TYPE_C;
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+     }else if(strstr(buffer->name, ".py")){
+          buffer->type = CE_BUFFER_FILE_TYPE_PYTHON;
+     }else if(strstr(buffer->name, ".java")){
+          buffer->type = CE_BUFFER_FILE_TYPE_JAVA;
+     }else if(strstr(buffer->name, ".sh")){
+          buffer->type = CE_BUFFER_FILE_TYPE_BASH;
+     }else{
+          buffer->type = CE_BUFFER_FILE_TYPE_PLAIN;
+     }
+}
+
 static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t* view,
                                        CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
      // have we already loaded this file?
@@ -207,40 +225,13 @@ static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t
      if(ce_buffer_load_file(buffer, filepath)){
           buffer_node_insert(buffer_node_head, buffer);
           view_switch_buffer(view, buffer, vim, config_options);
-
-          // TODO: figure out type based on extention
-          buffer->type = CE_BUFFER_FILE_TYPE_C;
+          determine_buffer_type(buffer);
      }else{
           free(buffer);
           return NULL;
      }
 
      return buffer;
-}
-
-void syntax_highlight_terminal(CeView_t* view, CeTerminal_t* terminal, CeDrawColorList_t* draw_color_list,
-                               CeSyntaxDef_t* syntax_defs){
-     if(!view->buffer) return;
-     if(view->buffer->line_count <= 0) return;
-     int64_t min = view->scroll.y;
-     int64_t max = min + (view->rect.bottom - view->rect.top);
-     int64_t clamp_max = (view->buffer->line_count - 1);
-     if(clamp_max < 0) clamp_max = 0;
-     CE_CLAMP(min, 0, clamp_max);
-     CE_CLAMP(max, 0, clamp_max);
-     int fg = COLOR_DEFAULT;
-     int bg = COLOR_DEFAULT;
-
-     for(int64_t y = min; y <= max; ++y){
-          for(int64_t x = 0; x < terminal->columns; ++x){
-               CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
-               if(glyph->foreground != fg || glyph->background != bg){
-                    fg = glyph->foreground;
-                    bg = glyph->background;
-                    ce_draw_color_list_insert(draw_color_list, fg, bg, (CePoint_t){x, y});
-               }
-          }
-     }
 }
 
 void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
@@ -518,49 +509,56 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
           CeDrawColorList_t draw_color_list = {};
           if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
                layout->view.buffer = terminal->buffer;
-               syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
+               ce_syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
           }else{
-               CeRangeList_t range_list = {};
-               switch(vim->mode){
-               default:
-                    break;
-               case CE_VIM_MODE_VISUAL:
-               {
-                    CeRange_t range = {vim->visual, layout->view.cursor};
-                    ce_range_sort(&range);
-                    ce_range_list_insert(&range_list, range.start, range.end);
-               } break;
-               case CE_VIM_MODE_VISUAL_LINE:
-               {
-                    CeRange_t range = {vim->visual, layout->view.cursor};
-                    ce_range_sort(&range);
-                    range.start.x = 0;
-                    range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]);
-                    ce_range_list_insert(&range_list, range.start, range.end);
-               } break;
-               case CE_VIM_MODE_VISUAL_BLOCK:
-               {
-                    CeRange_t range = {vim->visual, layout->view.cursor};
-                    if(range.start.x > range.end.x){
-                         int64_t tmp = range.start.x;
-                         range.start.x = range.end.x;
-                         range.end.x = tmp;
+               BufferUserData_t* buffer_data = layout->view.buffer->user_data;
+
+               if(buffer_data->syntax_function){
+                    CeRangeList_t range_list = {};
+                    switch(vim->mode){
+                    default:
+                         break;
+                    case CE_VIM_MODE_VISUAL:
+                    {
+                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         ce_range_sort(&range);
+                         ce_range_list_insert(&range_list, range.start, range.end);
+                    } break;
+                    case CE_VIM_MODE_VISUAL_LINE:
+                    {
+                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         ce_range_sort(&range);
+                         range.start.x = 0;
+                         range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]);
+                         ce_range_list_insert(&range_list, range.start, range.end);
+                    } break;
+                    case CE_VIM_MODE_VISUAL_BLOCK:
+                    {
+                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         if(range.start.x > range.end.x){
+                              int64_t tmp = range.start.x;
+                              range.start.x = range.end.x;
+                              range.end.x = tmp;
+                         }
+                         if(range.start.y > range.end.y){
+                              int64_t tmp = range.start.y;
+                              range.start.y = range.end.y;
+                              range.end.y = tmp;
+                         }
+                         for(int64_t i = range.start.y; i <= range.end.y; i++){
+                              CePoint_t start = {range.start.x, i};
+                              CePoint_t end = {range.end.x, i};
+                              ce_range_list_insert(&range_list, start, end);
+                         }
+                    } break;
                     }
-                    if(range.start.y > range.end.y){
-                         int64_t tmp = range.start.y;
-                         range.start.y = range.end.y;
-                         range.end.y = tmp;
-                    }
-                    for(int64_t i = range.start.y; i <= range.end.y; i++){
-                         CePoint_t start = {range.start.x, i};
-                         CePoint_t end = {range.end.x, i};
-                         ce_range_list_insert(&range_list, start, end);
-                    }
-               } break;
+
+                    buffer_data->syntax_function(&layout->view, &range_list, &draw_color_list, syntax_defs,
+                                                 layout->view.buffer->syntax_data);
+                    ce_range_list_free(&range_list);
                }
-               ce_syntax_highlight_c(&layout->view, &range_list, &draw_color_list, syntax_defs);
-               ce_range_list_free(&range_list);
           }
+
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
           ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, macros, color_defs, 0);
@@ -2250,9 +2248,7 @@ int main(int argc, char** argv){
                     CeBuffer_t* buffer = new_buffer();
                     if(ce_buffer_load_file(buffer, argv[i])){
                          buffer_node_insert(&app.buffer_node_head, buffer);
-
-                         // TODO: figure out type based on extention
-                         buffer->type = CE_BUFFER_FILE_TYPE_C;
+                         determine_buffer_type(buffer);
                     }else{
                          free(buffer);
                     }

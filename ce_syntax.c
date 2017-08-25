@@ -398,7 +398,7 @@ static void change_draw_color(CeDrawColorList_t* draw_color_list, CeSyntaxDef_t*
 }
 
 void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
-                           CeSyntaxDef_t* syntax_defs){
+                           CeSyntaxDef_t* syntax_defs, void* user_data){
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
      if(view->buffer->type != CE_BUFFER_FILE_TYPE_C) return;
@@ -500,4 +500,3 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
           }
      }
 }
-
