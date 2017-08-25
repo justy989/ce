@@ -69,10 +69,12 @@ typedef struct CeVimAction_t{
      int64_t multiplier;
      CeVimMotion_t motion;
      CeVimVerb_t verb;
+     // NOTE: after enough bools, should we just make some bit flags?
      bool yank_line; // TODO: consider rename as more than just yanking looks at this
      bool chain_undo;
      bool repeatable;
      bool visual_block_applies;
+     bool exclude_end;
 }CeVimAction_t;
 
 typedef struct{

@@ -105,17 +105,20 @@ int ce_color_def_get(CeColorDefs_t* color_defs, int fg, int bg){
      return color_defs->current;
 }
 
+static bool is_c_type_char(int ch){
+     return isalnum(ch) || ch == '_';
+}
+
 static int64_t match_words(const char* str, const char* beginning_of_line, const char** words, int64_t word_count){
      for(int64_t i = 0; i < word_count; ++i){
           int64_t word_len = strlen(words[i]);
           if(strncmp(words[i], str, word_len) == 0){
-
                // make sure word isn't in the middle of an identifier
                char post_char = str[word_len];
-               if(isalnum(post_char) || post_char == '_') return 0;
+               if(is_c_type_char(post_char)) return 0;
                if(str > beginning_of_line){
                     char pre_char = *(str - 1);
-                    if(isalnum(pre_char) || pre_char == '_') return 0;
+                    if(is_c_type_char(pre_char)) return 0;
                }
 
                return word_len;
@@ -123,10 +126,6 @@ static int64_t match_words(const char* str, const char* beginning_of_line, const
      }
 
      return 0;
-}
-
-static bool is_c_type_char(int ch){
-     return isalnum(ch) || ch == '_';
 }
 
 static int64_t match_c_type(const char* str, const char* beginning_of_line){
@@ -142,11 +141,6 @@ static int64_t match_c_type(const char* str, const char* beginning_of_line){
      if(len <= 2) return 0;
 
      if(strncmp((itr - 2), "_t", 2) == 0) return len;
-
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
 
      static const char* keywords[] = {
           "bool",
@@ -195,11 +189,6 @@ static int64_t match_c_keyword(const char* str, const char* beginning_of_line){
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
-
      return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
@@ -221,13 +210,17 @@ static bool is_caps_var_char(int ch){
      return (ch >= 'A' && ch <= 'Z') || ch == '_';
 }
 
-static int64_t match_caps_var(const char* str){
+static int64_t match_caps_var(const char* str, const char* beginning_of_line){
      const char* itr = str;
      while(*itr){
           if(!is_caps_var_char(*itr)) break;
           itr++;
      }
 
+     // check before and after the match for non c type chars
+     if(str > beginning_of_line){
+          if(is_c_type_char(*(str - 1))) return 0;
+     }
      if(is_c_type_char(*itr)) return 0;
 
      int64_t len = itr - str;
@@ -458,7 +451,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
                          }else if((match_len = match_c_control(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
-                         }else if((match_len = match_caps_var(str))){
+                         }else if((match_len = match_caps_var(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
                          }else if((match_len = match_c_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
@@ -557,11 +550,6 @@ static int64_t match_java_keyword(const char* str, const char* beginning_of_line
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
-
      return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
@@ -653,7 +641,7 @@ void ce_syntax_highlight_java(CeView_t* view, CeRangeList_t* highlight_range_lis
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
                          }else if((match_len = match_java_control(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
-                         }else if((match_len = match_caps_var(str))){
+                         }else if((match_len = match_caps_var(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
                          }else if((match_len = match_c_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
@@ -726,11 +714,6 @@ static int64_t match_python_keyword(const char* str, const char* beginning_of_li
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
-
      return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
@@ -747,11 +730,6 @@ static int64_t match_python_control(const char* str, const char* beginning_of_li
      };
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
-
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
 
      return match_words(str, beginning_of_line, keywords, keyword_count);
 }
@@ -864,7 +842,7 @@ void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_l
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
                          }else if((match_len = match_python_control(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
-                         }else if((match_len = match_caps_var(str))){
+                         }else if((match_len = match_caps_var(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
                          }else if((match_len = match_python_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
@@ -926,11 +904,6 @@ static int64_t match_bash_keyword(const char* str, const char* beginning_of_line
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
-
      return match_words(str, beginning_of_line, keywords, keyword_count);
 }
 
@@ -980,7 +953,7 @@ void ce_syntax_highlight_bash(CeView_t* view, CeRangeList_t* highlight_range_lis
                if(current_match_len <= 1){
                     if((match_len = match_bash_keyword(str, line))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
-                    }else if((match_len = match_caps_var(str))){
+                    }else if((match_len = match_caps_var(str, line))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
                     }else if((match_len = match_python_comment(str))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
@@ -1023,11 +996,6 @@ static int64_t match_config_keyword(const char* str, const char* beginning_of_li
      };
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
-
-     // weed out middle of words
-     if(str > beginning_of_line){
-          if(is_c_type_char(*(str - 1))) return 0;
-     }
 
      return match_words(str, beginning_of_line, keywords, keyword_count);
 }
@@ -1078,7 +1046,7 @@ void ce_syntax_highlight_config(CeView_t* view, CeRangeList_t* highlight_range_l
                if(current_match_len <= 1){
                     if((match_len = match_config_keyword(str, line))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
-                    }else if((match_len = match_caps_var(str))){
+                    }else if((match_len = match_caps_var(str, line))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
                     }else if((match_len = match_python_comment(str))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
