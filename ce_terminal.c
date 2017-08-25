@@ -1,5 +1,4 @@
 #include "ce_terminal.h"
-#include "ce_syntax.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1640,4 +1639,3 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
           }
      }
 }
-

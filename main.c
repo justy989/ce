@@ -507,14 +507,12 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      case CE_LAYOUT_TYPE_VIEW:
      {
           CeDrawColorList_t draw_color_list = {};
-          if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
-               layout->view.buffer = terminal->buffer;
-               ce_syntax_highlight_terminal(&layout->view, terminal, &draw_color_list, syntax_defs);
-          }else{
-               BufferUserData_t* buffer_data = layout->view.buffer->user_data;
+          BufferUserData_t* buffer_data = layout->view.buffer->user_data;
 
-               if(buffer_data->syntax_function){
-                    CeRangeList_t range_list = {};
+          if(buffer_data->syntax_function){
+               CeRangeList_t range_list = {};
+               // add to the highlight range list only if this is the current view
+               if(layout == current){
                     switch(vim->mode){
                     default:
                          break;
@@ -552,11 +550,11 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                          }
                     } break;
                     }
-
-                    buffer_data->syntax_function(&layout->view, &range_list, &draw_color_list, syntax_defs,
-                                                 layout->view.buffer->syntax_data);
-                    ce_range_list_free(&range_list);
                }
+
+               buffer_data->syntax_function(&layout->view, &range_list, &draw_color_list, syntax_defs,
+                                            layout->view.buffer->syntax_data);
+               ce_range_list_free(&range_list);
           }
 
           draw_view(&layout->view, tab_width, &draw_color_list, color_defs);
@@ -2293,8 +2291,16 @@ int main(int argc, char** argv){
           }
           ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, app.config_options.terminal_scroll_back);
           buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
+
           app.terminal.lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+          BufferUserData_t* buffer_data = app.terminal.lines_buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_terminal;
+          app.terminal.lines_buffer->syntax_data = &app.terminal;
+
           app.terminal.alternate_lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+          buffer_data = app.terminal.alternate_lines_buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_terminal;
+          app.terminal.alternate_lines_buffer->syntax_data = &app.terminal;
      }
 
      // init command complete
