@@ -21,6 +21,10 @@ typedef enum{
      CE_SYNTAX_COLOR_VISUAL,
      CE_SYNTAX_COLOR_MATCH,
      CE_SYNTAX_COLOR_CURRENT_LINE,
+     CE_SYNTAX_COLOR_DIFF_ADD,
+     CE_SYNTAX_COLOR_DIFF_REMOVE,
+     CE_SYNTAX_COLOR_DIFF_HEADER,
+     CE_SYNTAX_COLOR_DIFF_COMMENT,
      CE_SYNTAX_COLOR_COUNT,
 }CeSyntaxColor_t;
 
@@ -77,5 +81,13 @@ int ce_color_def_get(CeColorDefs_t* color_defs, int fg, int bg);
 
 void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                            CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_java(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                              CeSyntaxDef_t* syntax_defs, void* user_data);
 void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                 CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_bash(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                              CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_config(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_diff(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                              CeSyntaxDef_t* syntax_defs, void* user_data);

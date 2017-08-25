@@ -14,3 +14,4 @@ bug:
 - indentation sux in a lot of places right now
 - visual delete on the same line deletes and extra character when doing '.'
 - divide by zero in ce_layout_distribute_rect()
+- all caps var preceded by valid c identifier is still highlighted, so in 'senderCompID', 'ID' would be highlighted

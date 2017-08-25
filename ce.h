@@ -55,7 +55,6 @@ typedef enum{
      CE_BUFFER_FILE_TYPE_BASH,
      CE_BUFFER_FILE_TYPE_CONFIG,
      CE_BUFFER_FILE_TYPE_DIFF,
-     CE_BUFFER_FILE_TYPE_TERMINAL,
 }CeBufferFileType_t;
 
 typedef struct{

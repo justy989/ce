@@ -190,21 +190,42 @@ CeBuffer_t* new_buffer(){
      return buffer;
 }
 
+static bool string_ends_with(const char* str, const char* pattern){
+     int64_t str_len = strlen(str);
+     int64_t pattern_len = strlen(pattern);
+     if(str_len < pattern_len) return false;
+
+     return strncmp(str + (str_len - pattern_len), pattern, pattern_len) == 0;
+}
+
 void determine_buffer_type(CeBuffer_t* buffer){
-     // TODO: figure out type based on extention
-     if(strstr(buffer->name, ".c") ||
-        strstr(buffer->name, ".h")){
+     if(string_ends_with(buffer->name, ".c") ||
+        string_ends_with(buffer->name, ".h")){
           buffer->type = CE_BUFFER_FILE_TYPE_C;
           BufferUserData_t* buffer_data = buffer->user_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
-     }else if(strstr(buffer->name, ".py")){
+     }else if(string_ends_with(buffer->name, ".py")){
           buffer->type = CE_BUFFER_FILE_TYPE_PYTHON;
           BufferUserData_t* buffer_data = buffer->user_data;
           buffer_data->syntax_function = ce_syntax_highlight_python;
-     }else if(strstr(buffer->name, ".java")){
+     }else if(string_ends_with(buffer->name, ".java")){
           buffer->type = CE_BUFFER_FILE_TYPE_JAVA;
-     }else if(strstr(buffer->name, ".sh")){
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_java;
+     }else if(string_ends_with(buffer->name, ".sh")){
           buffer->type = CE_BUFFER_FILE_TYPE_BASH;
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_bash;
+     }else if(string_ends_with(buffer->name, ".cfg")){
+          buffer->type = CE_BUFFER_FILE_TYPE_CONFIG;
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_config;
+     }else if(string_ends_with(buffer->name, ".diff") ||
+              string_ends_with(buffer->name, ".patch") ||
+              string_ends_with(buffer->name, "COMMIT_EDITMSG")){
+          buffer->type = CE_BUFFER_FILE_TYPE_DIFF;
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_diff;
      }else{
           buffer->type = CE_BUFFER_FILE_TYPE_PLAIN;
      }
