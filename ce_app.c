@@ -225,6 +225,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
      CeComplete_t* complete = user_data;
+     if(!complete->current_match) return;
      int64_t min = view->scroll.y;
      int64_t max = min + (view->rect.bottom - view->rect.top);
      int64_t clamp_max = (view->buffer->line_count - 1);

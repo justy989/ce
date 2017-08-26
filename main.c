@@ -111,10 +111,8 @@ static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
      int64_t cursor = 0;
      for(int64_t i = 0; i < complete->count; i++){
           if(complete->elements[i].match){
-               if(i == complete->current){
-                    cursor = buffer->line_count;
-               }
-               snprintf(line, 256, " %s", complete->elements[i].string);
+               if(i == complete->current) cursor = buffer->line_count;
+               snprintf(line, 256, "%s", complete->elements[i].string);
                buffer_append_on_new_line(buffer, line);
           }
      }
@@ -202,38 +200,55 @@ static bool string_ends_with(const char* str, const char* pattern){
      return strncmp(str + (str_len - pattern_len), pattern, pattern_len) == 0;
 }
 
+void set_buffer_type(CeBuffer_t* buffer, CeBufferFileType_t buffer_type){
+     BufferUserData_t* buffer_data = buffer->user_data;
+     buffer->type = buffer_type;
+
+     switch(buffer_type){
+     default:
+          break;
+     case CE_BUFFER_FILE_TYPE_C:
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          break;
+     case CE_BUFFER_FILE_TYPE_PYTHON:
+          buffer_data->syntax_function = ce_syntax_highlight_python;
+          break;
+     case CE_BUFFER_FILE_TYPE_JAVA:
+          buffer_data->syntax_function = ce_syntax_highlight_java;
+          break;
+     case CE_BUFFER_FILE_TYPE_BASH:
+          buffer_data->syntax_function = ce_syntax_highlight_bash;
+          break;
+     case CE_BUFFER_FILE_TYPE_CONFIG:
+          buffer_data->syntax_function = ce_syntax_highlight_config;
+          break;
+     case CE_BUFFER_FILE_TYPE_DIFF:
+          buffer_data->syntax_function = ce_syntax_highlight_diff;
+          break;
+     case CE_BUFFER_FILE_TYPE_PLAIN:
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
+          break;
+     }
+}
+
 void determine_buffer_type(CeBuffer_t* buffer){
      if(string_ends_with(buffer->name, ".c") ||
         string_ends_with(buffer->name, ".h")){
-          buffer->type = CE_BUFFER_FILE_TYPE_C;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_c;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_C);
      }else if(string_ends_with(buffer->name, ".py")){
-          buffer->type = CE_BUFFER_FILE_TYPE_PYTHON;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_python;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_PYTHON);
      }else if(string_ends_with(buffer->name, ".java")){
-          buffer->type = CE_BUFFER_FILE_TYPE_JAVA;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_java;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_JAVA);
      }else if(string_ends_with(buffer->name, ".sh")){
-          buffer->type = CE_BUFFER_FILE_TYPE_BASH;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_bash;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_BASH);
      }else if(string_ends_with(buffer->name, ".cfg")){
-          buffer->type = CE_BUFFER_FILE_TYPE_CONFIG;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_config;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_CONFIG);
      }else if(string_ends_with(buffer->name, ".diff") ||
               string_ends_with(buffer->name, ".patch") ||
               string_ends_with(buffer->name, "COMMIT_EDITMSG")){
-          buffer->type = CE_BUFFER_FILE_TYPE_DIFF;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_diff;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_DIFF);
      }else{
-          buffer->type = CE_BUFFER_FILE_TYPE_PLAIN;
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->syntax_function = ce_syntax_highlight_plain;
+          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_PLAIN);
      }
 }
 
@@ -1559,17 +1574,52 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     char* filepath = strdup(app->user_config.filepath);
-     app->user_config.free_func(app);
-     user_config_free(&app->user_config);
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
 
-     if(!user_config_init(&app->user_config, filepath)){
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
           return CE_COMMAND_NO_ACTION;
      }
 
-     app->user_config.init_func(app);
-     free(filepath);
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     if(strcmp(command->args[0].string, "c") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_C);
+     }else if(strcmp(command->args[0].string, "python") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_PYTHON);
+     }else if(strcmp(command->args[0].string, "java") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_JAVA);
+     }else if(strcmp(command->args[0].string, "bash") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_BASH);
+     }else if(strcmp(command->args[0].string, "config") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_CONFIG);
+     }else if(strcmp(command->args[0].string, "diff") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_DIFF);
+     }else if(strcmp(command->args[0].string, "plain") == 0){
+          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_PLAIN);
+     }else{
+          return CE_COMMAND_PRINT_HELP;
+     }
 
      return CE_COMMAND_SUCCESS;
 }
@@ -2244,6 +2294,7 @@ int main(int argc, char** argv){
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},
+          {command_buffer_type, "buffer_type", "set the current buffer's type: c, python, java, bash, config, diff, plain"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
@@ -2382,7 +2433,6 @@ int main(int argc, char** argv){
 
           // handle input from the user
           int key = getch();
-          ce_log("%d\n", key);
           app_handle_key(&app, view, key);
 
           if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
