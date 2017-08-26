@@ -106,16 +106,15 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
 
 static void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
      ce_buffer_empty(buffer);
+     buffer->syntax_data = complete;
      char line[256];
      int64_t cursor = 0;
      for(int64_t i = 0; i < complete->count; i++){
           if(complete->elements[i].match){
                if(i == complete->current){
                     cursor = buffer->line_count;
-                    snprintf(line, 256, "*%s", complete->elements[i].string);
-               }else{
-                    snprintf(line, 256, " %s", complete->elements[i].string);
                }
+               snprintf(line, 256, " %s", complete->elements[i].string);
                buffer_append_on_new_line(buffer, line);
           }
      }
@@ -728,6 +727,11 @@ void* draw_thread(void* thread_data){
                app->complete_view.cursor.x = 0;
                ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
                CeDrawColorList_t draw_color_list = {};
+               CeRangeList_t range_list = {};
+               BufferUserData_t* buffer_data = app->complete_view.buffer->user_data;
+               buffer_data->syntax_function(&app->complete_view, &range_list, &draw_color_list, app->syntax_defs,
+                                            app->complete_view.buffer->syntax_data);
+               ce_range_list_free(&range_list);
                draw_view(&app->complete_view, app->config_options.tab_width, &draw_color_list, &color_defs);
                if(app->input_mode){
                     int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
@@ -2273,6 +2277,9 @@ int main(int argc, char** argv){
           app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
+
+          BufferUserData_t* buffer_data = app.complete_list_buffer->user_data;
+          buffer_data->syntax_function = ce_syntax_highlight_completions;
 
           if(argc > 1){
                for(int64_t i = last_arg_index; i < argc; i++){

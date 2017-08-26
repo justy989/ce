@@ -207,11 +207,17 @@ static int64_t match_c_control(const char* str, const char* beginning_of_line){
 }
 
 static bool is_caps_var_char(int ch){
+     return (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= '0' && ch <= '9');
+}
+
+static bool is_starting_caps_var_char(int ch){
      return (ch >= 'A' && ch <= 'Z') || ch == '_';
 }
 
 static int64_t match_caps_var(const char* str, const char* beginning_of_line){
      const char* itr = str;
+     if(!is_starting_caps_var_char(*itr)) return 0; // make sure the first char is not a number
+     itr++;
      while(*itr){
           if(!is_caps_var_char(*itr)) break;
           itr++;

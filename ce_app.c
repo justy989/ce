@@ -218,3 +218,56 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
           }
      }
 }
+
+void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                     CeSyntaxDef_t* syntax_defs, void* user_data){
+     if(!user_data) return;
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
+     CeComplete_t* complete = user_data;
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+     int64_t match_len = strlen(complete->current_match);
+
+     // figure out which line to highlight
+     int64_t selected = 0;
+     for(int64_t i = 0; i < complete->count; i++){
+          if(complete->elements[i].match){
+               if(i == complete->current) break;
+               selected++;
+          }
+     }
+
+     for(int64_t y = min; y <= max; ++y){
+          char* line = view->buffer->lines[y];
+          CePoint_t match_point = {0, y};
+
+          if(selected == (y - min)){
+               int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
+               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg, match_point);
+          }else{
+               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
+          }
+
+          if(complete->current_match && strlen(complete->current_match)){
+               char* prev_match = line;
+               char* match = NULL;
+               while((match = strstr(prev_match, complete->current_match))){
+                    match_point.x = ce_utf8_strlen_between(line, match) - 1;
+                    prev_match = match + match_len;
+                    int fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_MATCH, ce_draw_color_list_last_fg_color(draw_color_list));
+                    int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_MATCH, ce_draw_color_list_last_bg_color(draw_color_list));
+                    ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
+
+                    match_point.x += match_len;
+                    fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, ce_draw_color_list_last_fg_color(draw_color_list));
+                    bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, ce_draw_color_list_last_bg_color(draw_color_list));
+                    ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
+               }
+          }
+     }
+}
