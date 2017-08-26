@@ -1624,8 +1624,56 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
-static int int_strneq(int* a, int* b, size_t len)
-{
+CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data){
+     if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     const char* buffer_name = "unnamed";
+     if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING) buffer_name = command->args[0].string;
+
+     CeBuffer_t* buffer = new_buffer();
+     ce_buffer_alloc(buffer, 1, buffer_name);
+     view->buffer = buffer;
+     view->cursor = (CePoint_t){0, 0};
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     free(view->buffer->name);
+     view->buffer->name = strdup(command->args[0].string);
+     if(view->buffer->status == CE_BUFFER_STATUS_NONE) view->buffer->status = CE_BUFFER_STATUS_MODIFIED;
+
+     return CE_COMMAND_SUCCESS;
+}
+
+static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
           if(!*a) return false;
           if(!*b) return false;
@@ -2295,6 +2343,8 @@ int main(int argc, char** argv){
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},
           {command_buffer_type, "buffer_type", "set the current buffer's type: c, python, java, bash, config, diff, plain"},
+          {command_new_buffer, "new_buffer", "create a new buffer"},
+          {command_rename_buffer, "rename_buffer", "rename the current buffer"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
