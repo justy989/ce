@@ -1685,6 +1685,44 @@ static int int_strneq(int* a, int* b, size_t len){
      return true;
 }
 
+bool apply_completion(App_t* app, CeView_t* view){
+     CeComplete_t* complete = app_is_completing(app);
+     if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
+          if(complete->current >= 0){
+               char* insertion = strdup(complete->elements[complete->current].string);
+               int64_t insertion_len = strlen(insertion);
+               CePoint_t delete_point = app->input_view.cursor;
+               if(complete->current_match){
+                    int64_t delete_len = strlen(complete->current_match);
+                    delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
+                    if(delete_len > 0){
+                         ce_buffer_remove_string_change(app->input_view.buffer, delete_point, delete_len,
+                                                        &app->input_view.cursor, app->input_view.cursor, true);
+                    }
+               }
+
+               if(insertion_len > 0){
+                    CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
+                    ce_buffer_insert_string_change(app->input_view.buffer, insertion, delete_point, &app->input_view.cursor,
+                                                   cursor_end, true);
+               }
+
+               // if completion was load_file, continue auto completing since we could have completed a directory
+               // and want to see what is in it
+               if(complete == &app->load_file_complete){
+                    char* base_directory = view_base_directory(view, app);
+                    complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
+                    free(base_directory);
+                    build_complete_list(app->complete_list_buffer, &app->load_file_complete);
+               }
+          }
+
+          return true;
+     }
+
+     return false;
+}
+
 void app_handle_key(App_t* app, CeView_t* view, int key){
      if(app->key_count == 0 &&
         app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
@@ -1884,6 +1922,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }else if(app->input_mode){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+                         apply_completion(app, view);
                          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
                               char* base_directory = view_base_directory(view, app);
                               char filepath[PATH_MAX];
@@ -2004,39 +2043,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     key = CE_NEWLINE;
                }
           }else if(key == CE_TAB){ // TODO: configure auto complete key?
-               CeComplete_t* complete = app_is_completing(app);
-               if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
-                    if(complete->current >= 0){
-                         char* insertion = strdup(complete->elements[complete->current].string);
-                         int64_t insertion_len = strlen(insertion);
-                         CePoint_t delete_point = app->input_view.cursor;
-                         if(complete->current_match){
-                              int64_t delete_len = strlen(complete->current_match);
-                              delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
-                              if(delete_len > 0){
-                                   ce_buffer_remove_string_change(app->input_view.buffer, delete_point, delete_len,
-                                                                  &app->input_view.cursor, app->input_view.cursor, true);
-                              }
-                         }
-
-                         if(insertion_len > 0){
-                              CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
-                              ce_buffer_insert_string_change(app->input_view.buffer, insertion, delete_point, &app->input_view.cursor,
-                                                             cursor_end, true);
-                         }
-
-                         // if completion was load_file, continue auto completing since we could have completed a directory
-                         // and want to see what is in it
-                         if(complete == &app->load_file_complete){
-                              char* base_directory = view_base_directory(view, app);
-                              complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
-                              free(base_directory);
-                              build_complete_list(app->complete_list_buffer, &app->load_file_complete);
-                         }
-                    }
-
-                    return;
-               }
+               if(apply_completion(app, view)) return;
           }else if(key == 14){ // ctrl + n
                CeComplete_t* complete = app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){

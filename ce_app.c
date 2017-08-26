@@ -248,10 +248,11 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
           CePoint_t match_point = {0, y};
 
           if(selected == (y - min)){
+               int fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_fg_color(draw_color_list));
                int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
-               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg, match_point);
+               ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
           }else{
-               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
+               ce_draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, match_point);
           }
 
           if(complete->current_match && strlen(complete->current_match)){
