@@ -1580,6 +1580,12 @@ bool ce_terminal_send_key(CeTerminal_t* terminal, CeRune_t key){
           default:
                character = key;
                break;
+          case -1:
+               character = 3;
+               break;
+          case 339:
+               character = 4;
+               break;
           // damnit curses
           case 10:
                character = 13;

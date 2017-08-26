@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #include "ce_app.h"
 
@@ -21,6 +22,10 @@ FILE* g_ce_log = NULL;
 
 // limit to 60 fps
 #define DRAW_USEC_LIMIT 16666
+
+void handle_sigint(int signal){
+     // pass
+}
 
 bool user_config_init(UserConfig_t* user_config, const char* filepath){
      user_config->handle = dlopen(filepath, RTLD_LAZY);
@@ -2147,6 +2152,9 @@ int main(int argc, char** argv){
      const char* config_filepath = NULL;
      int last_arg_index = 0;
 
+     // setup signal handler
+     signal(SIGINT, handle_sigint);
+
      // parse args
      {
           char c;
@@ -2186,9 +2194,9 @@ int main(int argc, char** argv){
      {
           initscr();
           keypad(stdscr, TRUE);
-          raw();
           cbreak();
           noecho();
+          raw();
 
           if(has_colors() == FALSE){
                printf("Your terminal doesn't support colors. what year do you live in?\n");
@@ -2367,6 +2375,7 @@ int main(int argc, char** argv){
 
           // handle input from the user
           int key = getch();
+          ce_log("%d\n", key);
           app_handle_key(&app, view, key);
 
           if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
