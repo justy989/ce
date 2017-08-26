@@ -553,6 +553,11 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
           CeDrawColorList_t draw_color_list = {};
           BufferUserData_t* buffer_data = layout->view.buffer->user_data;
 
+          // update which terminal buffer we are viewing
+          if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
+               layout->view.buffer = terminal->buffer;
+          }
+
           if(buffer_data->syntax_function){
                CeRangeList_t range_list = {};
                // add to the highlight range list only if this is the current view
