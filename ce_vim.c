@@ -97,6 +97,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'H', &ce_vim_parse_motion_top_of_view);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'M', &ce_vim_parse_motion_middle_of_view);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'L', &ce_vim_parse_motion_bottom_of_view);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '}', &ce_vim_parse_motion_next_blank_line);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '{', &ce_vim_parse_motion_previous_blank_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 2, &ce_vim_parse_motion_page_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 6, &ce_vim_parse_motion_page_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 21, &ce_vim_parse_motion_half_page_up);
@@ -1597,6 +1599,14 @@ CeVimParseResult_t ce_vim_parse_motion_bottom_of_view(CeVimAction_t* action, CeR
      return parse_motion_direction(action, ce_vim_motion_bottom_of_view);
 }
 
+CeVimParseResult_t ce_vim_parse_motion_next_blank_line(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_next_blank_line);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_previous_blank_line(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_previous_blank_line);
+}
+
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
      action->visual_block_applies = true;
@@ -2222,6 +2232,48 @@ bool ce_vim_motion_bottom_of_view(CeVim_t* vim, CeVimAction_t* action, const CeV
      int64_t view_height = view->rect.bottom - view->rect.top;
      motion_range->end = (CePoint_t){motion_range->start.x, view->scroll.y + (view_height - config_options->vertical_scroll_off)};
      motion_range->end = ce_buffer_clamp_point(view->buffer, motion_range->end, CE_CLAMP_X_INSIDE);
+     return true;
+}
+
+static bool string_is_blank(const char* string){
+     while(*string){
+          if(!isblank(*string)) return false;
+          string++;
+     }
+     return true;
+}
+
+bool ce_vim_motion_next_blank_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                                   CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     bool start_blank = string_is_blank(view->buffer->lines[view->cursor.y]);
+     for(int64_t y = view->cursor.y + 1; y < view->buffer->line_count; y++){
+          bool current_blank = string_is_blank(view->buffer->lines[y]);
+          if(current_blank){
+               if(!start_blank){
+                    motion_range->end = (CePoint_t){0, y};
+                    break;
+               }
+          }else{
+               start_blank = false;
+          }
+     }
+     return true;
+}
+
+bool ce_vim_motion_previous_blank_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                                       CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     bool start_blank = string_is_blank(view->buffer->lines[view->cursor.y]);
+     for(int64_t y = view->cursor.y - 1; y >= 0; y--){
+          bool current_blank = string_is_blank(view->buffer->lines[y]);
+          if(current_blank){
+               if(!start_blank){
+                    motion_range->end = (CePoint_t){0, y};
+                    break;
+               }
+          }else{
+               start_blank = false;
+          }
+     }
      return true;
 }
 

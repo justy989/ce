@@ -184,6 +184,8 @@ CeVimParseResult_t ce_vim_parse_motion_mark(CeVimAction_t* action, CeRune_t key)
 CeVimParseResult_t ce_vim_parse_motion_top_of_view(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_middle_of_view(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_bottom_of_view(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_next_blank_line(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_previous_blank_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key);
@@ -252,6 +254,8 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_mark);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_top_of_view);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_middle_of_view);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_bottom_of_view);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_next_blank_line);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_previous_blank_line);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);
