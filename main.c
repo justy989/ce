@@ -944,8 +944,7 @@ static bool get_view_info_from_tab(CeLayout_t* tab_layout, CeView_t** view, CeRe
      return true;
 }
 
-CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data)
-{
+CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
@@ -1009,8 +1008,7 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data)
-{
+CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      App_t* app = user_data;
@@ -1025,8 +1023,7 @@ CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data)
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data)
-{
+CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      App_t* app = user_data;
@@ -1041,8 +1038,7 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data)
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data)
-{
+CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      App_t* app = user_data;
@@ -2196,7 +2192,9 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     if(app->vim.current_action.motion.function == ce_vim_motion_mark ||
                        app->vim.current_action.motion.function == ce_vim_motion_end_of_file ||
                        app->vim.current_action.motion.function == ce_vim_motion_search_next ||
-                       app->vim.current_action.motion.function == ce_vim_motion_search_prev){
+                       app->vim.current_action.motion.function == ce_vim_motion_search_prev ||
+                       app->vim.current_action.motion.function == ce_vim_motion_match_pair ||
+                       ){
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);

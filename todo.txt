@@ -2,7 +2,7 @@ todo:
 - multiple terminals
 - add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
 - dired mode
-- vim motions: 'H', 'L', 'M', '{', '}'
+- indentation for python, java, etc.
 
 bug:
 - slow to start, wtf
@@ -10,6 +10,10 @@ bug:
 - divide by zero in ce_layout_distribute_rect()
 - we don't show trailing whitespace on comments
 - terminal doesn't show visual selection
+- string highlighting in python goes 1 character too far
+- lots of blinking and occasional garbage, especially over ssh
+- pressing enter on buffer list buffer while in normal mode doesn't switch to a buffer, only insert mode does
+- visual line mode doesn't show up if it starts on a blank line
 
 notes:
 A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
