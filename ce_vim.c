@@ -94,6 +94,9 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '%', &ce_vim_parse_motion_match_pair);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '*', &ce_vim_parse_motion_search_word_forward);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '#', &ce_vim_parse_motion_search_word_backward);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'H', &ce_vim_parse_motion_top_of_view);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'M', &ce_vim_parse_motion_middle_of_view);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'L', &ce_vim_parse_motion_bottom_of_view);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 2, &ce_vim_parse_motion_page_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 6, &ce_vim_parse_motion_page_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 21, &ce_vim_parse_motion_half_page_up);
@@ -1569,6 +1572,31 @@ CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* actio
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_motion_mark(CeVimAction_t* action, CeRune_t key){
+     if(!action->motion.function){
+          action->motion.function = ce_vim_motion_mark;
+          return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
+     }else if(action->motion.function == ce_vim_motion_mark){
+          action->motion.integer = key;
+          if(!action->verb.function) action->verb.function = ce_vim_verb_motion;
+          return CE_VIM_PARSE_COMPLETE;
+     }
+
+     return CE_VIM_PARSE_INVALID;
+}
+
+CeVimParseResult_t ce_vim_parse_motion_top_of_view(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_top_of_view);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_middle_of_view(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_middle_of_view);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_bottom_of_view(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_bottom_of_view);
+}
+
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
      action->visual_block_applies = true;
@@ -1700,19 +1728,6 @@ CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRu
      }else if(action->verb.integer == '"'){
           action->verb.integer = key;
           return CE_VIM_PARSE_CONTINUE;
-     }
-
-     return CE_VIM_PARSE_INVALID;
-}
-
-CeVimParseResult_t ce_vim_parse_motion_mark(CeVimAction_t* action, CeRune_t key){
-     if(!action->motion.function){
-          action->motion.function = ce_vim_motion_mark;
-          return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
-     }else if(action->motion.function == ce_vim_motion_mark){
-          action->motion.integer = key;
-          if(!action->verb.function) action->verb.function = ce_vim_verb_motion;
-          return CE_VIM_PARSE_COMPLETE;
      }
 
      return CE_VIM_PARSE_INVALID;
@@ -2185,6 +2200,29 @@ bool ce_vim_motion_mark(CeVim_t* vim, CeVimAction_t* action, const CeView_t* vie
           return true;
      }
      return false;
+}
+
+bool ce_vim_motion_top_of_view(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                               CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     motion_range->end = (CePoint_t){motion_range->start.x, view->scroll.y + config_options->vertical_scroll_off};
+     motion_range->end = ce_buffer_clamp_point(view->buffer, motion_range->end, CE_CLAMP_X_INSIDE);
+     return true;
+}
+
+bool ce_vim_motion_middle_of_view(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                                  CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     int64_t view_height = view->rect.bottom - view->rect.top;
+     motion_range->end = (CePoint_t){motion_range->start.x, view->scroll.y + (view_height / 2)};
+     motion_range->end = ce_buffer_clamp_point(view->buffer, motion_range->end, CE_CLAMP_X_INSIDE);
+     return true;
+}
+
+bool ce_vim_motion_bottom_of_view(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                                  CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     int64_t view_height = view->rect.bottom - view->rect.top;
+     motion_range->end = (CePoint_t){motion_range->start.x, view->scroll.y + (view_height - config_options->vertical_scroll_off)};
+     motion_range->end = ce_buffer_clamp_point(view->buffer, motion_range->end, CE_CLAMP_X_INSIDE);
+     return true;
 }
 
 int64_t ce_vim_yank_register_index(CeRune_t rune){

@@ -1692,12 +1692,26 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      }else{
           return CE_COMMAND_NO_ACTION;
      }
+
      CeDestination_t* destination = NULL;
+     int64_t view_width = view->rect.right - view->rect.left;
+     int64_t view_height = view->rect.bottom - view->rect.top;
+     CeRect_t view_rect = {view->scroll.x, view->scroll.x + view_width, view->scroll.y, view->scroll.y + view_height};
 
      if(strcmp(command->args[0].string, "next")){
-          destination = jump_list_next(&app->jump_list);
+          // ignore destinations on screen
+          while((destination = jump_list_next(&app->jump_list))){
+               if(strcmp(destination->filepath, view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
+                    break;
+               }
+          }
      }else if(strcmp(command->args[0].string, "previous")){
-          destination = jump_list_previous(&app->jump_list);
+          // ignore destinations on screen
+          while((destination = jump_list_previous(&app->jump_list))){
+               if(strcmp(destination->filepath, view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
+                    break;
+               }
+          }
      }
 
      if(destination){
@@ -1959,6 +1973,11 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                          apply_completion(app, view);
                          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
+                              CeDestination_t destination = {};
+                              destination.point = view->cursor;
+                              strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+                              jump_list_insert(&app->jump_list, destination);
+
                               char* base_directory = view_base_directory(view, app);
                               char filepath[PATH_MAX];
                               for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
@@ -1981,6 +2000,12 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               free(yank->text);
                               yank->text = strdup(app->input_view.buffer->lines[0]);
                               yank->line = false;
+
+                              // insert jump
+                              CeDestination_t destination = {};
+                              destination.point = view->cursor;
+                              strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+                              jump_list_insert(&app->jump_list, destination);
                          }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
                               char* end_of_number = app->input_view.buffer->lines[0];
                               int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
@@ -2162,8 +2187,6 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }
           }else{
-               CePoint_t previous_cursor = view->cursor;
-
                BufferUserData_t* buffer_data = view->buffer->user_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
 
@@ -2175,7 +2198,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                        app->vim.current_action.motion.function == ce_vim_motion_search_next ||
                        app->vim.current_action.motion.function == ce_vim_motion_search_prev){
                          CeDestination_t destination = {};
-                         destination.point = previous_cursor;
+                         destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                          jump_list_insert(&app->jump_list, destination);
                     }

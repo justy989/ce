@@ -275,6 +275,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 }
 
 bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination){
+     ce_log("jump: %ld, %ld -> %s\n", destination.point.x, destination.point.y, destination.filepath);
      if(jump_list->count == 0 && jump_list->current <= 0){
           jump_list->destinations[0] = destination;
           jump_list->count = 1;
@@ -306,8 +307,8 @@ CeDestination_t* jump_list_previous(JumpList_t* jump_list){
 }
 
 CeDestination_t* jump_list_next(JumpList_t* jump_list){
-     if(jump_list->current >= (jump_list->count - 1)) return NULL;
-     CeDestination_t* result = jump_list->destinations + jump_list->current;
+     if(jump_list->current > (jump_list->count - 1)) return NULL;
      jump_list->current++;
+     CeDestination_t* result = jump_list->destinations + jump_list->current;
      return result;
 }
