@@ -410,6 +410,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
           return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
           if(!vim->verb_last_action && key != 27) ce_rune_node_insert(&vim->insert_rune_head, key);
+          memset(&vim->current_action, 0, sizeof(vim->current_action));
           return insert_mode_handle_key(vim, view, key, config_options);
      case CE_VIM_MODE_REPLACE:
           if(key != CE_NEWLINE && key != 27){ // escape
@@ -421,6 +422,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
               }
           }
 
+          memset(&vim->current_action, 0, sizeof(vim->current_action));
           return insert_mode_handle_key(vim, view, key, config_options);
      case CE_VIM_MODE_NORMAL:
      case CE_VIM_MODE_VISUAL:
@@ -450,6 +452,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                vim->current_command[0] = 0;
           }
 
+          vim->current_action = action;
           return result;
      } break;
      }

@@ -273,3 +273,41 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
           }
      }
 }
+
+bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination){
+     if(jump_list->count == 0 && jump_list->current <= 0){
+          jump_list->destinations[0] = destination;
+          jump_list->count = 1;
+          jump_list->current = 0;
+          return true;
+     }
+
+     // if we are on the latest jump
+     if(jump_list->current == (jump_list->count - 1)){
+          if(jump_list->count >= JUMP_LIST_COUNT) return false;
+
+          jump_list->destinations[jump_list->count] = destination;
+          jump_list->count++;
+          jump_list->current++;
+          return true;
+     }
+
+     jump_list->current++;
+     jump_list->count = jump_list->current + 1;
+     jump_list->destinations[jump_list->current] = destination;
+     return true;
+}
+
+CeDestination_t* jump_list_previous(JumpList_t* jump_list){
+     if(jump_list->current < 0) return NULL;
+     CeDestination_t* result = jump_list->destinations + jump_list->current;
+     jump_list->current--;
+     return result;
+}
+
+CeDestination_t* jump_list_next(JumpList_t* jump_list){
+     if(jump_list->current >= (jump_list->count - 1)) return NULL;
+     CeDestination_t* result = jump_list->destinations + jump_list->current;
+     jump_list->current++;
+     return result;
+}

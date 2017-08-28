@@ -1678,6 +1678,36 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+     }else{
+          return CE_COMMAND_NO_ACTION;
+     }
+     CeDestination_t* destination = NULL;
+
+     if(strcmp(command->args[0].string, "next")){
+          destination = jump_list_next(&app->jump_list);
+     }else if(strcmp(command->args[0].string, "previous")){
+          destination = jump_list_previous(&app->jump_list);
+     }
+
+     if(destination){
+          if(load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, destination->filepath)){
+               view->cursor = destination->point;
+          }
+     }
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
           if(!*a) return false;
@@ -2132,8 +2162,24 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }
           }else{
+               CePoint_t previous_cursor = view->cursor;
+
                BufferUserData_t* buffer_data = view->buffer->user_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
+
+               // A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
+               // "N", "%", "(", ")", "[[", "]]", "{", "}", ":s", ":tag", "L", "M", "H" and
+               if(app->vim.current_action.verb.function == ce_vim_verb_motion){
+                    if(app->vim.current_action.motion.function == ce_vim_motion_mark ||
+                       app->vim.current_action.motion.function == ce_vim_motion_end_of_file ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_next ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_prev){
+                         CeDestination_t destination = {};
+                         destination.point = previous_cursor;
+                         strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+                         jump_list_insert(&app->jump_list, destination);
+                    }
+               }
           }
      }else{
           if(key == KEY_ESCAPE){
@@ -2357,6 +2403,7 @@ int main(int argc, char** argv){
           {command_buffer_type, "buffer_type", "set the current buffer's type: c, python, java, bash, config, diff, plain"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
+          {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

@@ -3,8 +3,16 @@ todo:
 - multiple terminals
 - add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
 - dired mode
+- vim motions: 'H', 'L', 'M', '{', '}'
 
 bug:
 - slow to start, wtf
 - indentation sux in a lot of places right now
 - divide by zero in ce_layout_distribute_rect()
+- we don't show trailing whitespace on comments
+- terminal doesn't show visual selection
+
+notes:
+A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
+"N", "%", "(", ")", "[[", "]]", "{", "}", ":s", ":tag", "L", "M", "H" and
+the commands that start editing a new file.

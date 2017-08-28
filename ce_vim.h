@@ -108,6 +108,7 @@ typedef struct CeVim_t{
      int64_t motion_column;
      CePoint_t visual;
      CeVimAction_t last_action;
+     CeVimAction_t current_action;
      CeRuneNode_t* insert_rune_head;
      bool chain_undo;
      bool verb_last_action; // flag whether or not we are repeating our last action

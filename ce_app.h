@@ -10,6 +10,7 @@
 #include "ce_macros.h"
 
 #define APP_MAX_KEY_COUNT 16
+#define JUMP_LIST_COUNT 16
 
 typedef struct BufferNode_t{
      CeBuffer_t* buffer;
@@ -49,6 +50,12 @@ typedef struct{
      int64_t last_goto_destination;
      CeSyntaxHighlightFunc_t* syntax_function;
 }BufferUserData_t;
+
+typedef struct{
+     CeDestination_t destinations[JUMP_LIST_COUNT];
+     int64_t count;
+     int64_t current;
+}JumpList_t;
 
 struct App_t;
 
@@ -93,6 +100,7 @@ typedef struct App_t{
      CeTerminal_t terminal;
      CeMacros_t macros;
      CePoint_t search_start;
+     JumpList_t jump_list;
      void* user_config_data;
      bool record_macro;
      bool replay_macro;
@@ -124,3 +132,7 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
                                   CeSyntaxDef_t* syntax_defs, void* user_data);
 void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                      CeSyntaxDef_t* syntax_defs, void* user_data);
+
+bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination);
+CeDestination_t* jump_list_previous(JumpList_t* jump_list);
+CeDestination_t* jump_list_next(JumpList_t* jump_list);
