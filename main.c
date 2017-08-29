@@ -717,6 +717,13 @@ void* draw_thread(void* thread_data){
                       tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right);
 
           if(app->input_mode){
+               // clear behind the view
+               standend();
+               for(int64_t y = app->input_view.rect.top; y < app->input_view.rect.bottom; y++){
+                    for(int64_t x = app->input_view.rect.left; x < app->input_view.rect.right; x++){
+                         mvaddch(y, x, ' ');
+                    }
+               }
                CeDrawColorList_t draw_color_list = {};
                draw_view(&app->input_view, app->config_options.tab_width, &draw_color_list, &color_defs);
                int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
@@ -749,6 +756,13 @@ void* draw_thread(void* thread_data){
                buffer_data->syntax_function(&app->complete_view, &range_list, &draw_color_list, app->syntax_defs,
                                             app->complete_view.buffer->syntax_data);
                ce_range_list_free(&range_list);
+               // clear behind the view
+               standend();
+               for(int64_t y = app->complete_view.rect.top; y < app->complete_view.rect.bottom; y++){
+                    for(int64_t x = app->complete_view.rect.left; x < app->complete_view.rect.right; x++){
+                         mvaddch(y, x, ' ');
+                    }
+               }
                draw_view(&app->complete_view, app->config_options.tab_width, &draw_color_list, &color_defs);
                if(app->input_mode){
                     int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
@@ -1408,10 +1422,10 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
 
      CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                      &destination);
-     if(buffer){
-          BufferUserData_t* buffer_data = buffer->user_data;
-          buffer_data->last_goto_destination = view->cursor.y;
-     }
+     if(!buffer) return CE_COMMAND_NO_ACTION;
+
+     BufferUserData_t* buffer_data = buffer->user_data;
+     buffer_data->last_goto_destination = view->cursor.y;
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1880,6 +1894,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                               }
 
                               app->key_count = 0;
+                              break;
                          }else{
                               return;
                          }

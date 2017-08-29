@@ -248,9 +248,16 @@ static int64_t match_c_preproc(const char* str){
      return 0;
 }
 
-static int64_t match_c_comment(const char* str){
-     if(strncmp("//", str, 2) == 0) return ce_utf8_strlen(str);
+static int64_t utf8_strlen_until_trailing_whitespace(const char* str){
+     const char* itr = str;
+     while(*itr) itr++;
+     itr--;
+     while(itr > str && *itr && isblank(*itr)) itr--;
+     return ce_utf8_strlen_between(str, itr);
+}
 
+static int64_t match_c_comment(const char* str){
+     if(strncmp("//", str, 2) == 0) return utf8_strlen_until_trailing_whitespace(str);
      return 0;
 }
 
@@ -258,7 +265,7 @@ static int64_t match_c_multiline_comment(const char* str){
      if(strncmp("/*", str, 2) == 0){
           char* matching_comment = strstr(str, "*/");
           if(matching_comment) return (matching_comment - str);
-          return ce_utf8_strlen(str);
+          return utf8_strlen_until_trailing_whitespace(str);
      }
 
      return 0;
@@ -456,6 +463,11 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                     if(multiline_comment){
                          if((match_len = match_c_multiline_comment_end(str))){
                               multiline_comment = false;
+                         }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        (CePoint_t){0, match_point.y + 1});
                          }
                     }else{
                          if((match_len = match_c_type(str, line))){
@@ -745,7 +757,7 @@ static int64_t match_python_string(const char* str){
           while(match){
                match = strchr(match + 1, *str);
                if(match && *(match - 1) != '\\'){
-                    return ce_utf8_strlen_between(str, match) + 1;
+                    return ce_utf8_strlen_between(str, match);
                }
           }
      }

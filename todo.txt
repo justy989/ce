@@ -8,10 +8,7 @@ bug:
 - slow to start, wtf
 - indentation sux in a lot of places right now
 - divide by zero in ce_layout_distribute_rect()
-- we don't show trailing whitespace on comments
-- string highlighting in python goes 1 character too far
-- lots of blinking and occasional garbage, especially over ssh
-- pressing enter on buffer list buffer while in normal mode doesn't switch to a buffer, only insert mode does
+- lots of blinking and occasional garbage, especially over ssh (made some changes, unsure if fixed, definitely needs to be tested over ssh)
 
 notes:
 A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
