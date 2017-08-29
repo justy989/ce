@@ -16,14 +16,17 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
      }
 
      complete->count = string_count;
-     complete->current = 0;
      return true;
 }
 
 void ce_complete_reset(CeComplete_t* complete){
      free(complete->current_match);
      complete->current_match = NULL;
-     complete->current = -1;
+     complete->current = 0;
+
+     for(int64_t i = 0; i < complete->count; i++){
+          complete->elements[i].match = true;
+     }
 }
 
 void ce_complete_match(CeComplete_t* complete, const char* match){
@@ -111,5 +114,4 @@ void ce_complete_free(CeComplete_t* complete){
      free(complete->elements);
      free(complete->current_match);
      memset(complete, 0, sizeof(*complete));
-     complete->current = -1;
 }

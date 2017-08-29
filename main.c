@@ -1302,6 +1302,7 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      }
 
      app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "COMMAND");
+     ce_complete_reset(&app->command_complete);
      build_complete_list(app->complete_list_buffer, &app->command_complete);
      return CE_COMMAND_SUCCESS;
 }
@@ -1577,7 +1578,9 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
      }
 
      char* filename = strdup(view->buffer->name);
+     BufferUserData_t* buffer_data = view->buffer->user_data;
      ce_buffer_free(view->buffer);
+     view->buffer->user_data = buffer_data; // NOTE: not great that I need to save user data and reset it
      ce_buffer_load_file(view->buffer, filename);
      free(filename);
 
@@ -1659,6 +1662,7 @@ CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data){
      ce_buffer_alloc(buffer, 1, buffer_name);
      view->buffer = buffer;
      view->cursor = (CePoint_t){0, 0};
+     buffer_node_insert(&app->buffer_node_head, buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1746,6 +1750,9 @@ bool apply_completion(App_t* app, CeView_t* view){
      CeComplete_t* complete = app_is_completing(app);
      if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
           if(complete->current >= 0){
+               if(strcmp(complete->elements[complete->current].string, app->input_view.buffer->lines[app->input_view.cursor.y]) == 0){
+                    return false;
+               }
                char* insertion = strdup(complete->elements[complete->current].string);
                int64_t insertion_len = strlen(insertion);
                CePoint_t delete_point = app->input_view.cursor;
@@ -2575,6 +2582,10 @@ int main(int argc, char** argv){
 
           // handle input from the user
           int key = getch();
+
+          if(key == KEY_ENTER){
+               ce_log("enter\n");
+          }
           app_handle_key(&app, view, key);
 
           if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){

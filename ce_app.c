@@ -238,14 +238,14 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
      if(!view->buffer) return;
      if(view->buffer->line_count <= 0) return;
      CeComplete_t* complete = user_data;
-     if(!complete->current_match) return;
      int64_t min = view->scroll.y;
      int64_t max = min + (view->rect.bottom - view->rect.top);
      int64_t clamp_max = (view->buffer->line_count - 1);
      if(clamp_max < 0) clamp_max = 0;
      CE_CLAMP(min, 0, clamp_max);
      CE_CLAMP(max, 0, clamp_max);
-     int64_t match_len = strlen(complete->current_match);
+     int64_t match_len = 0;
+     if(complete->current_match) match_len = strlen(complete->current_match);
 
      // figure out which line to highlight
      int64_t selected = 0;
