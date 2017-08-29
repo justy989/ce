@@ -370,7 +370,6 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
 
      CeDrawColorNode_t* draw_color_node = draw_color_list->head;
 
-     standend();
      if(view->buffer->line_count >= 0){
           for(int64_t y = 0; y < view_height; y++){
                int64_t index = 0;
@@ -379,6 +378,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
                int64_t line_index = y + row_min;
                CeRune_t rune = 1;
 
+               standend();
                move(view->rect.top + y, view->rect.left);
 
                if(line_index < view->buffer->line_count){
@@ -421,12 +421,9 @@ void draw_view(CeView_t* view, int64_t tab_width, CeDrawColorList_t* draw_color_
 
                     x--;
                }
-
-               if(x < col_min) x = col_min;
-
-               standend();
-               for(; x <= col_max; x++) addch(' ');
           }
+     }else{
+          standend();
      }
 }
 
@@ -1411,9 +1408,10 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
 
      CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                      &destination);
-
-     BufferUserData_t* buffer_data = buffer->user_data;
-     buffer_data->last_goto_destination = view->cursor.y;
+     if(buffer){
+          BufferUserData_t* buffer_data = buffer->user_data;
+          buffer_data->last_goto_destination = view->cursor.y;
+     }
 
      return CE_COMMAND_SUCCESS;
 }

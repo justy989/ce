@@ -1,4 +1,5 @@
 #include "ce_app.h"
+#include "ce_syntax.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -206,14 +207,26 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
      CE_CLAMP(max, 0, clamp_max);
      int fg = COLOR_DEFAULT;
      int bg = COLOR_DEFAULT;
+     bool in_visual = false;
+     CeRangeNode_t* range_node = highlight_range_list->head;
 
      for(int64_t y = min; y <= max; ++y){
+          CePoint_t point = {0, y};
+
+          if(in_visual){
+               int new_bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_VISUAL, ce_draw_color_list_last_bg_color(draw_color_list));
+               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), new_bg, point);
+          }
+
           for(int64_t x = 0; x < terminal->columns; ++x){
+               point.x = x;
+               ce_syntax_highlight_visual(&range_node, &in_visual, point, draw_color_list, syntax_defs);
+
                CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
                if(glyph->foreground != fg || glyph->background != bg){
                     fg = glyph->foreground;
                     bg = glyph->background;
-                    ce_draw_color_list_insert(draw_color_list, fg, bg, (CePoint_t){x, y});
+                    ce_draw_color_list_insert(draw_color_list, fg, bg, point);
                }
           }
      }
@@ -275,7 +288,6 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 }
 
 bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination){
-     ce_log("jump: %ld, %ld -> %s\n", destination.point.x, destination.point.y, destination.filepath);
      if(jump_list->count == 0 && jump_list->current <= 0){
           jump_list->destinations[0] = destination;
           jump_list->count = 1;
