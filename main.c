@@ -2193,8 +2193,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                        app->vim.current_action.motion.function == ce_vim_motion_end_of_file ||
                        app->vim.current_action.motion.function == ce_vim_motion_search_next ||
                        app->vim.current_action.motion.function == ce_vim_motion_search_prev ||
-                       app->vim.current_action.motion.function == ce_vim_motion_match_pair ||
-                       ){
+                       app->vim.current_action.motion.function == ce_vim_motion_match_pair){
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
