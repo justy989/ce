@@ -1,5 +1,5 @@
 #include "ce_vim.h"
-#include "ce_syntax.h"
+#include "ce_app.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1357,22 +1357,57 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
 }
 
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length){
-     CeRange_t brace_range = ce_vim_find_pair(buffer, point, '{', false);
-     CeRange_t paren_range = ce_vim_find_pair(buffer, point, '(', false);
-     if(brace_range.start.x < 0 && paren_range.start.x < 0) return 0;
-     int64_t indent = 0;
-     if(ce_point_after(paren_range.start, brace_range.start)){
-          indent = paren_range.start.x + 1;
-     }else{
-          indent = ce_vim_soft_begin_line(buffer, brace_range.start.y);
-          // if in our indent, we are inside parens, get the indentation of where the parens started
-          paren_range = ce_vim_find_pair(buffer, (CePoint_t){indent, brace_range.start.y}, '(', false);
-          if(paren_range.start.x >= 0){
-               indent = ce_vim_soft_begin_line(buffer, paren_range.start.y);
+     BufferUserData_t* buffer_data = buffer->user_data;
+
+     if(buffer_data->syntax_function == ce_syntax_highlight_c ||
+        buffer_data->syntax_function == ce_syntax_highlight_java ||
+        buffer_data->syntax_function == ce_syntax_highlight_config){
+          CeRange_t brace_range = ce_vim_find_pair(buffer, point, '{', false);
+          CeRange_t paren_range = ce_vim_find_pair(buffer, point, '(', false);
+          if(brace_range.start.x < 0 && paren_range.start.x < 0) return 0;
+          int64_t indent = 0;
+          if(ce_point_after(paren_range.start, brace_range.start)){
+               indent = paren_range.start.x + 1;
+          }else{
+               indent = ce_vim_soft_begin_line(buffer, brace_range.start.y);
+               // if in our indent, we are inside parens, get the indentation of where the parens started
+               paren_range = ce_vim_find_pair(buffer, (CePoint_t){indent, brace_range.start.y}, '(', false);
+               if(paren_range.start.x >= 0){
+                    indent = ce_vim_soft_begin_line(buffer, paren_range.start.y);
+               }
+               indent += tab_length;
           }
-          indent += tab_length;
+          return indent;
+     }else if(buffer_data->syntax_function == ce_syntax_highlight_python){
+          for(int64_t y = point.y; y >= 0; --y){
+               const char* itr = buffer->lines[y];
+
+               // find previous line that isn't blank
+               bool blank = true;
+
+               while(*itr){
+                    if(!isblank(*itr)){
+                         blank = false;
+                         break;
+                    }
+
+                    itr++;
+               }
+
+               if(blank) continue;
+
+               // use it as indentation unless it ends in a ':'
+               int indentation = itr - buffer->lines[y];
+
+               while(*itr) itr++;
+               itr--;
+
+               if(*itr == ':') indentation += 5;
+               return indentation;
+          }
      }
-     return indent;
+
+     return 0;
 }
 
 bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, bool chain_undo){
@@ -2456,7 +2491,9 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeR
           ce_buffer_remove_string_change(view->buffer, view->cursor, 1, &view->cursor,
                                          view->cursor, false);
 
-          motion_range.start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+          CePoint_t new_start = ce_buffer_advance_point(view->buffer, motion_range.start, 1);
+          if(ce_points_equal(new_start, motion_range.start)) return false;
+          motion_range.start = new_start;
      }
 
      return true;
