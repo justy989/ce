@@ -46,16 +46,6 @@ typedef enum{
      CE_BUFFER_STATUS_NEW_FILE,
 }CeBufferStatus_t;
 
-typedef enum{
-     CE_BUFFER_FILE_TYPE_PLAIN,
-     CE_BUFFER_FILE_TYPE_C,
-     CE_BUFFER_FILE_TYPE_PYTHON,
-     CE_BUFFER_FILE_TYPE_JAVA,
-     CE_BUFFER_FILE_TYPE_BASH,
-     CE_BUFFER_FILE_TYPE_CONFIG,
-     CE_BUFFER_FILE_TYPE_DIFF,
-}CeBufferFileType_t;
-
 typedef struct{
      int64_t x;
      int64_t y;
@@ -91,7 +81,6 @@ typedef struct{
      char* name;
 
      CeBufferStatus_t status;
-     CeBufferFileType_t type;
 
      CePoint_t cursor_save;
      CePoint_t scroll_save;

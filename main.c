@@ -200,55 +200,26 @@ static bool string_ends_with(const char* str, const char* pattern){
      return strncmp(str + (str_len - pattern_len), pattern, pattern_len) == 0;
 }
 
-void set_buffer_type(CeBuffer_t* buffer, CeBufferFileType_t buffer_type){
-     BufferUserData_t* buffer_data = buffer->user_data;
-     buffer->type = buffer_type;
-
-     switch(buffer_type){
-     default:
-          break;
-     case CE_BUFFER_FILE_TYPE_C:
-          buffer_data->syntax_function = ce_syntax_highlight_c;
-          break;
-     case CE_BUFFER_FILE_TYPE_PYTHON:
-          buffer_data->syntax_function = ce_syntax_highlight_python;
-          break;
-     case CE_BUFFER_FILE_TYPE_JAVA:
-          buffer_data->syntax_function = ce_syntax_highlight_java;
-          break;
-     case CE_BUFFER_FILE_TYPE_BASH:
-          buffer_data->syntax_function = ce_syntax_highlight_bash;
-          break;
-     case CE_BUFFER_FILE_TYPE_CONFIG:
-          buffer_data->syntax_function = ce_syntax_highlight_config;
-          break;
-     case CE_BUFFER_FILE_TYPE_DIFF:
-          buffer_data->syntax_function = ce_syntax_highlight_diff;
-          break;
-     case CE_BUFFER_FILE_TYPE_PLAIN:
-          buffer_data->syntax_function = ce_syntax_highlight_plain;
-          break;
-     }
-}
-
 void determine_buffer_type(CeBuffer_t* buffer){
+     BufferUserData_t* buffer_data = buffer->user_data;
+
      if(string_ends_with(buffer->name, ".c") ||
         string_ends_with(buffer->name, ".h")){
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_C);
+          buffer_data->syntax_function = ce_syntax_highlight_c;
      }else if(string_ends_with(buffer->name, ".py")){
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_PYTHON);
+          buffer_data->syntax_function = ce_syntax_highlight_python;
      }else if(string_ends_with(buffer->name, ".java")){
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_JAVA);
+          buffer_data->syntax_function = ce_syntax_highlight_java;
      }else if(string_ends_with(buffer->name, ".sh")){
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_BASH);
+          buffer_data->syntax_function = ce_syntax_highlight_bash;
      }else if(string_ends_with(buffer->name, ".cfg")){
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_CONFIG);
+          buffer_data->syntax_function = ce_syntax_highlight_config;
      }else if(string_ends_with(buffer->name, ".diff") ||
               string_ends_with(buffer->name, ".patch") ||
               string_ends_with(buffer->name, "COMMIT_EDITMSG")){
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_DIFF);
+          buffer_data->syntax_function = ce_syntax_highlight_diff;
      }else{
-          set_buffer_type(buffer, CE_BUFFER_FILE_TYPE_PLAIN);
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
      }
 }
 
@@ -1619,20 +1590,22 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
           return CE_COMMAND_NO_ACTION;
      }
 
+     BufferUserData_t* buffer_data = view->buffer->user_data;
+
      if(strcmp(command->args[0].string, "c") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_C);
+          buffer_data->syntax_function = ce_syntax_highlight_c;
      }else if(strcmp(command->args[0].string, "python") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_PYTHON);
+          buffer_data->syntax_function = ce_syntax_highlight_python;
      }else if(strcmp(command->args[0].string, "java") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_JAVA);
+          buffer_data->syntax_function = ce_syntax_highlight_java;
      }else if(strcmp(command->args[0].string, "bash") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_BASH);
+          buffer_data->syntax_function = ce_syntax_highlight_bash;
      }else if(strcmp(command->args[0].string, "config") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_CONFIG);
+          buffer_data->syntax_function = ce_syntax_highlight_config;
      }else if(strcmp(command->args[0].string, "diff") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_DIFF);
+          buffer_data->syntax_function = ce_syntax_highlight_diff;
      }else if(strcmp(command->args[0].string, "plain") == 0){
-          set_buffer_type(view->buffer, CE_BUFFER_FILE_TYPE_PLAIN);
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
      }else{
           return CE_COMMAND_PRINT_HELP;
      }

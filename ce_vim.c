@@ -1,4 +1,5 @@
 #include "ce_vim.h"
+#include "ce_syntax.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1213,6 +1214,7 @@ static bool point_in_string_or_comment(CeBuffer_t* buffer, CePoint_t point){
      CeRune_t in_string = 0;
      CeRune_t in_comment = 0;
      CeRune_t prev_rune = 0;
+     CeRune_t prev_prev_rune = 0;
      char* str = buffer->lines[point.y];
      int64_t rune_len;
      for(int64_t i = 0; i <= point.x; i++){
@@ -1234,13 +1236,19 @@ static bool point_in_string_or_comment(CeBuffer_t* buffer, CePoint_t point){
                break;
           case '"':
           case '\'':
-               if(in_string == rune && prev_rune != '\\'){
-                    in_string = 0;
+               if(in_string == rune){
+                    if(prev_rune != '\\'){
+                         in_string = 0;
+                    // handle case where backslash getting backslashed
+                    }else if(prev_prev_rune == '\\'){
+                         in_string = 0;
+                    }
                }else if(in_string == 0){
                     in_string = rune;
                }
                break;
           }
+          prev_prev_rune = prev_rune;
           prev_rune = rune;
           str += rune_len;
      }
