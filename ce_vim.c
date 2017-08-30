@@ -2862,13 +2862,23 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeRange_t m
      for(int64_t i = motion_range.start.y; i <= motion_range.end.y; i++){
           // calc indentation
           CePoint_t indentation_point = {0, i};
+          int64_t tab_width = 0;
 
-          // build indentation string
-          char remove_string[config_options->tab_width];
-          memset(remove_string, ' ', config_options->tab_width);
-          remove_string[config_options->tab_width] = 0;
+          // figure out how much we can unindent
+          for(int64_t s = 0; s < config_options->tab_width; s++){
+               if(isblank(view->buffer->lines[i][s])){
+                    tab_width++;
+               }else{
+                    break;
+               }
+          }
 
-          if(strncmp(view->buffer->lines[i], remove_string, config_options->tab_width) == 0){
+          if(tab_width){
+               // build indentation string
+               char remove_string[tab_width + 1];
+               memset(remove_string, ' ', tab_width);
+               remove_string[tab_width] = 0;
+
                ce_buffer_remove_string_change(view->buffer, indentation_point, strlen(remove_string), &view->cursor,
                                               view->cursor, chain);
                chain = true;

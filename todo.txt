@@ -2,13 +2,11 @@ todo:
 - multiple terminals
 - add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
 - dired mode
-- indentation for python, java, etc.
 
 bug:
 - slow to start, wtf
 - divide by zero in ce_layout_distribute_rect()
 - lots of blinking and occasional garbage, especially over ssh (made some changes, unsure if fixed, definitely needs to be tested over ssh)
-- unindenting doesn't bring it down to 0 if it is misaligned
 
 notes:
 A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
