@@ -2,6 +2,8 @@ todo:
 - multiple terminals
 - add config option for log destination (Not sure if we want to do this, because we want to init the log before the user config)
 - dired mode
+- line numbers
+- highlight current line
 
 bug:
 - slow to start, wtf

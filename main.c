@@ -2555,10 +2555,6 @@ int main(int argc, char** argv){
 
           // handle input from the user
           int key = getch();
-
-          if(key == KEY_ENTER){
-               ce_log("enter\n");
-          }
           app_handle_key(&app, view, key);
 
           if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
