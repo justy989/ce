@@ -1741,6 +1741,25 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     App_t* app = user_data;
+     if(strcmp(command->args[0].string, "none") == 0){
+          app->config_options.line_number = CE_LINE_NUMBER_NONE;
+     }else if(strcmp(command->args[0].string, "absolute") == 0){
+          app->config_options.line_number = CE_LINE_NUMBER_ABSOLUTE;
+     }else if(strcmp(command->args[0].string, "relative") == 0){
+          app->config_options.line_number = CE_LINE_NUMBER_RELATIVE;
+     }else if(strcmp(command->args[0].string, "both") == 0){
+          app->config_options.line_number = CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE;
+     }else{
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
           if(!*a) return false;
@@ -2451,6 +2470,7 @@ int main(int argc, char** argv){
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
+          {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
