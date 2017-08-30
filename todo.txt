@@ -4,6 +4,7 @@ todo:
 - dired mode
 - line numbers
 - highlight current line
+- run command in terminal
 
 bug:
 - slow to start, wtf

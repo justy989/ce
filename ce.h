@@ -46,6 +46,13 @@ typedef enum{
      CE_BUFFER_STATUS_NEW_FILE,
 }CeBufferStatus_t;
 
+typedef enum {
+     CE_LINE_NUMBER_NONE,
+     CE_LINE_NUMBER_ABSOLUTE,
+     CE_LINE_NUMBER_RELATIVE,
+     CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE,
+}CeLineNumber_t;
+
 typedef struct{
      int64_t x;
      int64_t y;
