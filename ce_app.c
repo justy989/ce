@@ -324,3 +324,42 @@ CeDestination_t* jump_list_next(JumpList_t* jump_list){
      CeDestination_t* result = jump_list->destinations + jump_list->current;
      return result;
 }
+
+void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
+     // save the cursor on the old buffer
+     view->buffer->cursor_save = view->cursor;
+     view->buffer->scroll_save = view->scroll;
+
+     // update new buffer, using the buffer's cursor
+     view->buffer = buffer;
+     view->cursor = buffer->cursor_save;
+     view->scroll = buffer->scroll_save;
+
+     ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+
+     vim->mode = CE_VIM_MODE_NORMAL;
+}
+
+void run_command_in_terminal(CeTerminal_t* terminal, const char* command){
+     while(*command){
+          ce_terminal_send_key(terminal, *command);
+          command++;
+     }
+
+     ce_terminal_send_key(terminal, 10);
+}
+
+void switch_to_terminal(App_t* app, CeView_t* view, CeLayout_t* tab_layout){
+     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
+     if(terminal_layout){
+          tab_layout->tab.current = terminal_layout;
+     }else{
+          view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
+     }
+
+     int64_t width = view->rect.right - view->rect.left;
+     int64_t height = view->rect.bottom - view->rect.top;
+     ce_terminal_resize(&app->terminal, width, height);
+
+     app->vim.mode = CE_VIM_MODE_INSERT;
+}

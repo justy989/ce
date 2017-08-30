@@ -170,21 +170,6 @@ static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
-     // save the cursor on the old buffer
-     view->buffer->cursor_save = view->cursor;
-     view->buffer->scroll_save = view->scroll;
-
-     // update new buffer, using the buffer's cursor
-     view->buffer = buffer;
-     view->cursor = buffer->cursor_save;
-     view->scroll = buffer->scroll_save;
-
-     ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
-
-     vim->mode = CE_VIM_MODE_NORMAL;
-}
-
 CeBuffer_t* new_buffer(){
      CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
      if(!buffer) return buffer;
@@ -1327,19 +1312,7 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
           return CE_COMMAND_NO_ACTION;
      }
 
-     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
-     if(terminal_layout){
-          tab_layout->tab.current = terminal_layout;
-     }else{
-          view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
-     }
-
-     int64_t width = view->rect.right - view->rect.left;
-     int64_t height = view->rect.bottom - view->rect.top;
-     ce_terminal_resize(&app->terminal, width, height);
-
-     app->vim.mode = CE_VIM_MODE_INSERT;
-
+     switch_to_terminal(app, view, tab_layout);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1468,8 +1441,12 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
           if(access(destination.filepath, F_OK) == -1) continue;
 
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                          &destination);
-          if(loaded_buffer) buffer_data->last_goto_destination = i;
+                                                                 &destination);
+          if(loaded_buffer){
+               CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
+               if(layout) layout->view.scroll.y = i;
+               buffer_data->last_goto_destination = i;
+          }
           break;
      }
 
@@ -1477,6 +1454,8 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
      if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
           if(destination.point.x >= 0){
+               CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
+               if(layout) layout->view.scroll.y = save_destination;
                load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
           }
      }
@@ -1755,6 +1734,31 @@ CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data){
           app->config_options.line_number = CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE;
      }else{
           return CE_COMMAND_PRINT_HELP;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     App_t* app = (App_t*)(user_data);
+     run_command_in_terminal(&app->terminal, command->args[0].string);
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     App_t* app = (App_t*)(user_data);
+     run_command_in_terminal(&app->terminal, command->args[0].string);
+
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          view = &tab_layout->tab.current->view;
+          switch_to_terminal(app, view, tab_layout);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -2471,6 +2475,8 @@ int main(int argc, char** argv){
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
+          {command_terminal_command, "terminal_command", "run a command in the terminal"},
+          {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

@@ -136,3 +136,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination);
 CeDestination_t* jump_list_previous(JumpList_t* jump_list);
 CeDestination_t* jump_list_next(JumpList_t* jump_list);
+
+void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
+void run_command_in_terminal(CeTerminal_t* terminal, const char* command);
+void switch_to_terminal(App_t* app, CeView_t* view, CeLayout_t* tab_layout);
