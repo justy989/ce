@@ -95,7 +95,9 @@ typedef struct{
      CeBufferChangeNode_t* change_node;
      CeBufferChangeNode_t* save_at_change_node;
 
-     void* user_data;
+     bool no_line_numbers;
+
+     void* user_data; // TODO: rename to app_data, and add config_data
      void* syntax_data;
 }CeBuffer_t;
 
@@ -111,6 +113,7 @@ typedef struct{
 }CeView_t;
 
 typedef struct{
+     CeLineNumber_t line_number;
      int64_t tab_width;
      int64_t horizontal_scroll_off;
      int64_t vertical_scroll_off;
@@ -211,5 +214,7 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str);
 CeRune_t* ce_char_string_to_rune_string(const char* char_str);
 
 bool ce_range_sort(CeRange_t* range);
+
+int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_line_count, int64_t view_top, int64_t view_bottom);
 
 extern FILE* g_ce_log;

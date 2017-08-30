@@ -1658,3 +1658,35 @@ bool ce_range_sort(CeRange_t* range){
 
      return false;
 }
+
+static int64_t count_digits(int64_t n)
+{
+     if(n == 0) return 1;
+
+     int count = 0;
+     while(n > 0){
+          n /= 10;
+          count++;
+     }
+
+     return count;
+}
+
+int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_line_count, int64_t view_top, int64_t view_bottom){
+     if(buffer_line_count == 0) return 0;
+
+     int64_t column_width = 0;
+
+     if(line_number == CE_LINE_NUMBER_ABSOLUTE || line_number == CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE){
+          column_width += count_digits(buffer_line_count) + 1;
+     }else if(line_number == CE_LINE_NUMBER_RELATIVE){
+          int64_t view_height = (view_bottom - view_top) + 1;
+          if(view_height > buffer_line_count){
+               column_width += count_digits(buffer_line_count - 1) + 1;
+          }else{
+               column_width += count_digits(view_height - 1) + 1;
+          }
+     }
+
+     return column_width;
+}
