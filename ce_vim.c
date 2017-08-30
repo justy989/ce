@@ -256,7 +256,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           break;
      case '}':
      {
-         if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
+          if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
                int64_t remove_len = strlen(view->buffer->lines[view->cursor.y]);
                CePoint_t remove_loc = {0, view->cursor.y};
                ce_buffer_remove_string_change(view->buffer, remove_loc, remove_len, &view->cursor,
@@ -1207,6 +1207,47 @@ CeRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, cha
      return range;
 }
 
+// TODO: handle multiline comments
+static bool point_in_string_or_comment(CeBuffer_t* buffer, CePoint_t point){
+     if(!ce_buffer_contains_point(buffer, point)) return false;
+     CeRune_t in_string = 0;
+     CeRune_t in_comment = 0;
+     CeRune_t prev_rune = 0;
+     char* str = buffer->lines[point.y];
+     int64_t rune_len;
+     for(int64_t i = 0; i <= point.x; i++){
+          CeRune_t rune = ce_utf8_decode(str, &rune_len);
+          switch(rune){
+          default:
+               break;
+          case '/':
+               if(prev_rune == rune && !in_string){
+                    in_comment = true;
+               }else if(in_comment && prev_rune == '/'){
+                    in_comment = false;
+               }
+               break;
+          case '*':
+               if(prev_rune == '/' && !in_string){
+                    in_comment = true;
+               }
+               break;
+          case '"':
+          case '\'':
+               if(in_string == rune && prev_rune != '\\'){
+                    in_string = 0;
+               }else if(in_string == 0){
+                    in_string = rune;
+               }
+               break;
+          }
+          prev_rune = rune;
+          str += rune_len;
+     }
+
+     return in_string || in_comment;
+}
+
 CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, bool inside){
      CeRange_t range = {(CePoint_t){-1, -1}, (CePoint_t){-1, -1}};
      if(!ce_buffer_point_is_valid(buffer, start)) return range;
@@ -1260,14 +1301,14 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
      CePoint_t prev = itr;
      CePoint_t new_start = range.start;
      while(true){
-          buffer_rune = ce_buffer_get_rune(buffer, itr);
-          if(buffer_rune == left_match){
+          buffer_rune = ce_buffer_get_rune(buffer, itr); // NOTE: decoding would be faster
+          if(buffer_rune == left_match && !point_in_string_or_comment(buffer, itr)){
                match_count--;
                if(match_count < 0){
                     new_start = inside ? prev : itr;
                     break;
                }
-          }else if(buffer_rune == right_match){
+          }else if(buffer_rune == right_match && !point_in_string_or_comment(buffer, itr)){
                match_count++;
           }
           if(itr.x == 0 && itr.y == 0) return range;
@@ -1288,13 +1329,13 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
      CePoint_t end_of_buffer = {ce_utf8_last_index(buffer->lines[buffer->line_count - 1]), buffer->line_count - 1};
      while(true){
           buffer_rune = ce_buffer_get_rune(buffer, itr);
-          if(buffer_rune == right_match){
+          if(buffer_rune == right_match && !point_in_string_or_comment(buffer, itr)){
                match_count--;
                if(match_count < 0){
                     new_end = inside ? prev : itr;
                     break;
                }
-          }else if(buffer_rune == left_match){
+          }else if(buffer_rune == left_match && !point_in_string_or_comment(buffer, itr)){
                match_count++;
           }
           if(itr.x == end_of_buffer.x && itr.y == end_of_buffer.y) break;

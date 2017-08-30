@@ -6,9 +6,9 @@ todo:
 
 bug:
 - slow to start, wtf
-- indentation sux in a lot of places right now
 - divide by zero in ce_layout_distribute_rect()
 - lots of blinking and occasional garbage, especially over ssh (made some changes, unsure if fixed, definitely needs to be tested over ssh)
+- unindenting doesn't bring it down to 0 if it is misaligned
 
 notes:
 A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
