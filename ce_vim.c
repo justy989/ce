@@ -1359,6 +1359,7 @@ int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_
      CeAppBufferData_t* buffer_data = buffer->app_data;
 
      if(buffer_data->syntax_function == ce_syntax_highlight_c ||
+        buffer_data->syntax_function == ce_syntax_highlight_cpp ||
         buffer_data->syntax_function == ce_syntax_highlight_java ||
         buffer_data->syntax_function == ce_syntax_highlight_config){
           CeRange_t brace_range = ce_vim_find_pair(buffer, point, '{', false);
