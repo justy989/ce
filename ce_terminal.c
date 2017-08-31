@@ -1507,12 +1507,12 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
 
                // append spaces and null terminator with the new columns
                int64_t diff = width - terminal->columns;
-               char* end = ce_utf8_iterate_to_include_end(terminal->lines_buffer->lines[i], width);
+               char* end = ce_utf8_iterate_to_include_end(terminal->lines_buffer->lines[i], terminal->columns);
                memset(end, ' ', diff);
                end += diff;
                *end = 0;
 
-               end = ce_utf8_iterate_to_include_end(terminal->alternate_lines_buffer->lines[i], width);
+               end = ce_utf8_iterate_to_include_end(terminal->alternate_lines_buffer->lines[i], terminal->columns);
                memset(end, ' ', diff);
                end += diff;
                *end = 0;

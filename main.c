@@ -1764,6 +1764,29 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     App_t* app = (App_t*)(user_data);
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return CE_COMMAND_NO_ACTION;
+
+     view = &tab_layout->tab.current->view;
+
+     CeRange_t range = ce_vim_find_little_word_boundaries(view->buffer, view->cursor); // returns -1
+     char* word = ce_buffer_dupe_string(view->buffer, range.start, (range.end.x - range.start.x) + 1);
+     if(!word) return CE_COMMAND_NO_ACTION;
+     char cmd[128];
+     snprintf(cmd, 128, "man %s", word);
+     free(word);
+     run_command_in_terminal(&app->terminal, cmd);
+     switch_to_terminal(app, view, tab_layout);
+
+     return CE_COMMAND_SUCCESS;
+}
+
 static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
           if(!*a) return false;
@@ -2477,6 +2500,7 @@ int main(int argc, char** argv){
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
+          {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

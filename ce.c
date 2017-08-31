@@ -1235,7 +1235,6 @@ char* ce_utf8_iterate_to_include_end(char* string, int64_t index){
                }
                string++;
           }
-
      }
 
      return string;
