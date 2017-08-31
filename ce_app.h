@@ -107,7 +107,7 @@ typedef struct App_t{
      bool ready_to_draw;
      bool quit;
      UserConfig_t user_config;
-}App_t;
+}CeApp_t;
 
 bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer);
 bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer);
@@ -125,8 +125,8 @@ void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune
 void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
                      int64_t new_command_entry_count);
 
-void app_update_terminal_view(App_t* app);
-CeComplete_t* app_is_completing(App_t* app);
+void app_update_terminal_view(CeApp_t* app);
+CeComplete_t* app_is_completing(CeApp_t* app);
 
 void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                   CeSyntaxDef_t* syntax_defs, void* user_data);
@@ -139,4 +139,4 @@ CeDestination_t* jump_list_next(JumpList_t* jump_list);
 
 void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
 void run_command_in_terminal(CeTerminal_t* terminal, const char* command);
-void switch_to_terminal(App_t* app, CeView_t* view, CeLayout_t* tab_layout);
+void switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);

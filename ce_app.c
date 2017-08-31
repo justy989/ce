@@ -155,13 +155,13 @@ void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_
      }
 }
 
-void app_update_terminal_view(App_t* app){
+void app_update_terminal_view(CeApp_t* app){
      getmaxyx(stdscr, app->terminal_height, app->terminal_width);
      app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 }
 
-CeComplete_t* app_is_completing(App_t* app){
+CeComplete_t* app_is_completing(CeApp_t* app){
      if(app->input_mode){
           if(strcmp(app->input_view.buffer->name, "COMMAND") == 0) return &app->command_complete;
           if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
@@ -349,7 +349,7 @@ void run_command_in_terminal(CeTerminal_t* terminal, const char* command){
      ce_terminal_send_key(terminal, 10);
 }
 
-void switch_to_terminal(App_t* app, CeView_t* view, CeLayout_t* tab_layout){
+void switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout){
      CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
      if(terminal_layout){
           tab_layout->tab.current = terminal_layout;

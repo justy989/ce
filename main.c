@@ -305,7 +305,7 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      }
 }
 
-static char* view_base_directory(CeView_t* view, App_t* app){
+static char* view_base_directory(CeView_t* view, CeApp_t* app){
      if(view->buffer == app->terminal.buffer){
           return ce_terminal_get_current_directory(&app->terminal);
      }
@@ -652,7 +652,7 @@ static CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLine
 }
 
 void* draw_thread(void* thread_data){
-     App_t* app = (App_t*)(thread_data);
+     CeApp_t* app = (CeApp_t*)(thread_data);
      struct timeval previous_draw_time;
      struct timeval current_draw_time;
      uint64_t time_since_last_draw = 0;
@@ -907,7 +907,7 @@ void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* re
      }
 }
 
-bool get_layout_and_view(App_t* app, CeView_t** view, CeLayout_t** tab_layout){
+bool get_layout_and_view(CeApp_t* app, CeView_t** view, CeLayout_t** tab_layout){
      *tab_layout = app->tab_list_layout->tab_list.current;
 
      if(app->input_mode) return false;
@@ -923,7 +923,7 @@ bool get_layout_and_view(App_t* app, CeView_t** view, CeLayout_t** tab_layout){
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -967,7 +967,7 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CePoint_t target;
      CeView_t* view = NULL;
      CeRect_t view_rect = {};
@@ -1034,7 +1034,7 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
 CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1047,7 +1047,7 @@ CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1060,7 +1060,7 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1074,7 +1074,7 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
      bool vertical = false;
 
@@ -1099,7 +1099,7 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
      CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
@@ -1110,7 +1110,7 @@ CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_
 CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeRect_t view_rect = {};
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
@@ -1146,7 +1146,7 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
      if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1170,7 +1170,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
 
      CeLayout_t* new_tab_layout = ce_layout_tab_list_add(app->tab_list_layout);
      if(!new_tab_layout) return CE_COMMAND_NO_ACTION;
@@ -1183,7 +1183,7 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
 
      if(strcmp(command->args[0].string, "left") == 0){
           for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
@@ -1225,7 +1225,7 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1251,7 +1251,7 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1277,7 +1277,7 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1292,7 +1292,7 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1305,7 +1305,7 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
 CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1362,7 +1362,7 @@ CeBuffer_t* load_destination_into_view(BufferNode_t** buffer_node_head, CeView_t
 
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1385,7 +1385,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
 
 CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1433,7 +1433,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
 
 CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1475,7 +1475,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
 
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1499,8 +1499,7 @@ CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     // TODO: seriously... compress
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1523,7 +1522,7 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      char* config_path = strdup(app->user_config.filepath);
      user_config_free(&app->user_config);
      user_config_init(&app->user_config, config_path);
@@ -1535,7 +1534,7 @@ CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1567,7 +1566,7 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1589,7 +1588,7 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1605,7 +1604,7 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1643,7 +1642,7 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-     App_t* app = user_data;
+     CeApp_t* app = user_data;
      if(strcmp(command->args[0].string, "none") == 0){
           app->config_options.line_number = CE_LINE_NUMBER_NONE;
      }else if(strcmp(command->args[0].string, "absolute") == 0){
@@ -1662,7 +1661,7 @@ CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-     App_t* app = (App_t*)(user_data);
+     CeApp_t* app = (CeApp_t*)(user_data);
      run_command_in_terminal(&app->terminal, command->args[0].string);
      return CE_COMMAND_SUCCESS;
 }
@@ -1670,7 +1669,7 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
 CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-     App_t* app = (App_t*)(user_data);
+     CeApp_t* app = (CeApp_t*)(user_data);
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1685,7 +1684,7 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
-     App_t* app = (App_t*)(user_data);
+     CeApp_t* app = (CeApp_t*)(user_data);
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
@@ -1725,7 +1724,7 @@ void scroll_to_and_center_if_offscreen(CeView_t* view, CePoint_t point, CeConfig
      }
 }
 
-bool apply_completion(App_t* app, CeView_t* view){
+bool apply_completion(CeApp_t* app, CeView_t* view){
      CeComplete_t* complete = app_is_completing(app);
      if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
           if(complete->current >= 0){
@@ -1766,7 +1765,7 @@ bool apply_completion(App_t* app, CeView_t* view){
      return false;
 }
 
-void app_handle_key(App_t* app, CeView_t* view, int key){
+void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(app->key_count == 0 &&
         app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
@@ -2361,7 +2360,7 @@ int main(int argc, char** argv){
      }
 
      // TODO: allocate this on the heap when/if it gets too big?
-     App_t app = {};
+     CeApp_t app = {};
 
      // init commands
      CeCommandEntry_t command_entries[] = {
