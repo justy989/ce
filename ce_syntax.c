@@ -405,6 +405,19 @@ static void change_draw_color(CeDrawColorList_t* draw_color_list, CeSyntaxDef_t*
      ce_draw_color_list_insert(draw_color_list, fg, bg, point);
 }
 
+
+void check_visual_start(CeRangeNode_t* range_node, int64_t line, CeDrawColorList_t* draw_color_list,
+                        CeSyntaxDef_t* syntax_defs, bool* in_visual){
+     if(range_node){
+          CePoint_t start = {0, line};
+          if(ce_point_after(start, range_node->range.start) && !ce_point_after(start, range_node->range.end)){
+               int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_VISUAL, ce_draw_color_list_last_bg_color(draw_color_list));
+               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), bg, start);
+               *in_visual = true;
+          }
+     }
+}
+
 void ce_syntax_highlight_visual(CeRangeNode_t** range_node, bool* in_visual, CePoint_t point, CeDrawColorList_t* draw_color_list,
                                 CeSyntaxDef_t* syntax_defs){
      if(*range_node){
@@ -428,8 +441,10 @@ void ce_syntax_highlight_visual(CeRangeNode_t** range_node, bool* in_visual, CeP
 
 void check_visual_mode_end(CeRangeNode_t* range_node, bool* in_visual, int64_t line, int64_t line_len,
                            CeDrawColorList_t* draw_color_list){
+     if(!range_node) return;
+
      CePoint_t point = {line_len, line};
-     if(range_node && in_visual){
+     if(in_visual){
           if(ce_point_after(point, range_node->range.end)){
                ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list),
                                          COLOR_DEFAULT, point);
@@ -453,6 +468,8 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
      bool multiline_comment = false;
      bool in_visual = false;
      CeRangeNode_t* range_node = highlight_range_list->head;
+
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
@@ -488,6 +505,172 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                          }else if((match_len = match_c_keyword(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
                          }else if((match_len = match_c_control(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
+                         }else if((match_len = match_caps_var(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
+                         }else if((match_len = match_c_comment(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
+                         }else if((match_len = match_c_string(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_STRING, match_point);
+                         }else if((match_len = match_c_character_literal(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CHAR_LITERAL, match_point);
+                         }else if((match_len = match_c_literal(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NUMBER_LITERAL, match_point);
+                         }else if((match_len = match_c_preproc(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_PREPROCESSOR, match_point);
+                         }else if((match_len = match_c_multiline_comment(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
+                              multiline_comment = true;
+                         }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        (CePoint_t){0, match_point.y + 1});
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
+                         }
+                    }
+
+                    if(match_len) current_match_len = match_len;
+               }else{
+                    current_match_len--;
+               }
+          }
+
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
+     }
+}
+
+static int64_t match_cpp_keyword(const char* str, const char* beginning_of_line){
+     static const char* keywords[] = {
+          "Asm",
+          "auto",
+          "bool",
+          "case",
+          "char",
+          "class",
+          "const_cast",
+          "default",
+          "delete",
+          "do",
+          "double",
+          "else",
+          "enum",
+          "dynamic_cast",
+          "extern",
+          "false",
+          "float",
+          "for",
+          "union",
+          "unsigned",
+          "using",
+          "friend",
+          "if",
+          "inline",
+          "int",
+          "long",
+          "mutable",
+          "virtual",
+          "namespace",
+          "new",
+          "operator",
+          "private",
+          "protected",
+          "public",
+          "register",
+          "void",
+          "reinterpret_cast",
+          "short",
+          "signed",
+          "sizeof",
+          "static",
+          "static_cast",
+          "volatile",
+          "struct",
+          "switch",
+          "template",
+          "this",
+          "true",
+          "typedef",
+          "typeid",
+          "unsigned",
+          "wchar_t",
+          "while",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     return match_words(str, beginning_of_line, keywords, keyword_count);
+}
+
+static int64_t match_cpp_control(const char* str, const char* beginning_of_line){
+     static const char* keywords [] = {
+          "break",
+          "catch",
+          "const",
+          "continue",
+          "goto",
+          "return",
+          "throw",
+          "try",
+     };
+
+     static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
+
+     return match_words(str, beginning_of_line, keywords, keyword_count);
+}
+
+void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                             CeSyntaxDef_t* syntax_defs, void* user_data){
+     if(!view->buffer) return;
+     if(view->buffer->line_count <= 0) return;
+     int64_t min = view->scroll.y;
+     int64_t max = min + (view->rect.bottom - view->rect.top);
+     int64_t clamp_max = (view->buffer->line_count - 1);
+     if(clamp_max < 0) clamp_max = 0;
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+     int64_t match_len = 0;
+     bool multiline_comment = false;
+     bool in_visual = false;
+     CeRangeNode_t* range_node = highlight_range_list->head;
+
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
+
+     for(int64_t y = min; y <= max; ++y){
+          char* line = view->buffer->lines[y];
+          int64_t line_len = ce_utf8_strlen(line);
+          int64_t current_match_len = 1;
+          CePoint_t match_point = {0, y};
+
+          if(multiline_comment){
+               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
+          }
+
+          ce_syntax_highlight_visual(&range_node, &in_visual, match_point, draw_color_list, syntax_defs);
+
+          for(int64_t x = 0; x < line_len; ++x){
+               char* str = ce_utf8_iterate_to(line, x);
+               match_point.x = x;
+
+               ce_syntax_highlight_visual(&range_node, &in_visual, match_point, draw_color_list, syntax_defs);
+
+               if(current_match_len <= 1){
+                    if(multiline_comment){
+                         if((match_len = match_c_multiline_comment_end(str))){
+                              multiline_comment = false;
+                         }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                                                        (CePoint_t){0, match_point.y + 1});
+                         }
+                    }else{
+                         if((match_len = match_c_type(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
+                         }else if((match_len = match_cpp_keyword(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
+                         }else if((match_len = match_cpp_control(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
                          }else if((match_len = match_caps_var(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
@@ -625,6 +808,8 @@ void ce_syntax_highlight_java(CeView_t* view, CeRangeList_t* highlight_range_lis
      bool multiline_comment = false;
      bool in_visual = false;
      CeRangeNode_t* range_node = highlight_range_list->head;
+
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
@@ -799,6 +984,8 @@ void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_l
      PythonDocstring_t docstring = PYTHON_DOCSTRING_NONE;
      CeRangeNode_t* range_node = highlight_range_list->head;
 
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
+
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
           int64_t line_len = ce_utf8_strlen(line);
@@ -903,6 +1090,8 @@ void ce_syntax_highlight_bash(CeView_t* view, CeRangeList_t* highlight_range_lis
      bool in_visual = false;
      CeRangeNode_t* range_node = highlight_range_list->head;
 
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
+
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
           int64_t line_len = ce_utf8_strlen(line);
@@ -972,6 +1161,8 @@ void ce_syntax_highlight_config(CeView_t* view, CeRangeList_t* highlight_range_l
      bool in_visual = false;
      CeRangeNode_t* range_node = highlight_range_list->head;
 
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
+
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
           int64_t line_len = ce_utf8_strlen(line);
@@ -1029,6 +1220,8 @@ void ce_syntax_highlight_diff(CeView_t* view, CeRangeList_t* highlight_range_lis
      bool in_visual = false;
      CeRangeNode_t* range_node = highlight_range_list->head;
 
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
+
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
           int64_t line_len = ce_utf8_strlen(line);
@@ -1084,6 +1277,8 @@ void ce_syntax_highlight_plain(CeView_t* view, CeRangeList_t* highlight_range_li
      CE_CLAMP(max, 0, clamp_max);
      bool in_visual = false;
      CeRangeNode_t* range_node = highlight_range_list->head;
+
+     check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
