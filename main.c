@@ -1715,6 +1715,16 @@ static int int_strneq(int* a, int* b, size_t len){
      return true;
 }
 
+void scroll_to_and_center_if_offscreen(CeView_t* view, CePoint_t point, CeConfigOptions_t* config_options){
+     view->cursor = point;
+     CePoint_t before_follow = view->scroll;
+     ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
+                           config_options->vertical_scroll_off, config_options->tab_width);
+     if(!ce_points_equal(before_follow, view->scroll)){
+          ce_view_center(view);
+     }
+}
+
 bool apply_completion(App_t* app, CeView_t* view){
      CeComplete_t* complete = app_is_completing(app);
      if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
@@ -1999,12 +2009,10 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                                    if(line_number >= 0 && line_number < view->buffer->line_count){
                                         view->cursor.y = line_number - 1;
                                         view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
-                                        // TODO: compress with other view centering code I've seen
-                                        int64_t view_height = view->rect.bottom - view->rect.top;
                                         ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
                                                               app->config_options.vertical_scroll_off,
                                                               app->config_options.tab_width);
-                                        ce_view_scroll_to(view, (CePoint_t){view->cursor.x, view->cursor.y - (view_height / 2)});
+                                        ce_view_center(view);
                                    }
                               }else{
                                    // convert and run the command
@@ -2222,14 +2230,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, app->input_view.buffer->lines[0]);
                     if(match_point.x >= 0){
-                         view->cursor = match_point;
-                         CePoint_t before_follow = view->scroll;
-                         ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
-                                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
-                         if(!ce_points_equal(before_follow, view->scroll)){
-                              int64_t view_height = view->rect.bottom - view->rect.top;
-                              ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
-                         }
+                         scroll_to_and_center_if_offscreen(view, match_point, &app->config_options);
                     }else{
                          view->cursor = app->search_start;
                     }
@@ -2240,14 +2241,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     CePoint_t match_point = ce_buffer_search_backward(view->buffer, view->cursor, app->input_view.buffer->lines[0]);
                     if(match_point.x >= 0){
-                         view->cursor = match_point;
-                         CePoint_t before_follow = view->scroll;
-                         ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
-                                               app->config_options.vertical_scroll_off, app->config_options.tab_width);
-                         if(!ce_points_equal(before_follow, view->scroll)){
-                              int64_t view_height = view->rect.bottom - view->rect.top;
-                              ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
-                         }
+                         scroll_to_and_center_if_offscreen(view, match_point, &app->config_options);
                     }else{
                          view->cursor = app->search_start;
                     }
@@ -2264,16 +2258,8 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                          ce_log("regcomp() failed: '%s'", error_buffer);
                     }else{
                          CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
-                         // TODO: compress result code with all other search code
                          if(result.point.x >= 0){
-                              view->cursor = result.point;
-                              CePoint_t before_follow = view->scroll;
-                              ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
-                                                    app->config_options.vertical_scroll_off, app->config_options.tab_width);
-                              if(!ce_points_equal(before_follow, view->scroll)){
-                                   int64_t view_height = view->rect.bottom - view->rect.top;
-                                   ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
-                              }
+                              scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
                          }else{
                               view->cursor = app->search_start;
                          }
@@ -2292,14 +2278,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }else{
                          CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
                          if(result.point.x >= 0){
-                              view->cursor = result.point;
-                              CePoint_t before_follow = view->scroll;
-                              ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
-                                                    app->config_options.vertical_scroll_off, app->config_options.tab_width);
-                              if(!ce_points_equal(before_follow, view->scroll)){
-                                   int64_t view_height = view->rect.bottom - view->rect.top;
-                                   ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
-                              }
+                              scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
                          }else{
                               view->cursor = app->search_start;
                          }

@@ -2380,8 +2380,7 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      if(!ce_points_equal(before_follow, view->scroll) &&
         (action->motion.function == ce_vim_motion_search_next ||
          action->motion.function == ce_vim_motion_search_prev)){
-          int64_t view_height = view->rect.bottom - view->rect.top;
-          ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+          ce_view_center(view);
      }
 
      return true;
@@ -2778,8 +2777,7 @@ bool ce_vim_verb_z_command(CeVim_t* vim, const CeVimAction_t* action, CeRange_t 
           break;
      case 'z':
      {
-          int64_t view_height = view->rect.bottom - view->rect.top;
-          ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
+          ce_view_center(view);
      } break;
      case 'b':
      {
