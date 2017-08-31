@@ -228,9 +228,15 @@ static CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView
      char cwd[PATH_MAX + 1];
      if(getcwd(cwd, sizeof(cwd)) != NULL){
           size_t cwd_len = strlen(cwd);
+          // append a '/' so it looks like a path
+          if(cwd_len < PATH_MAX){
+               cwd[cwd_len] = '/';
+               cwd_len++;
+               cwd[cwd_len] = 0;
+          }
           // if the file is in our current directory, only show part of the path
           if(strncmp(cwd, real_path, cwd_len) == 0){
-               strncpy(load_path, real_path + cwd_len + 1, PATH_MAX);
+               strncpy(load_path, real_path + cwd_len, PATH_MAX);
           }else{
                strncpy(load_path, real_path, PATH_MAX);
           }
@@ -2568,15 +2574,17 @@ int main(int argc, char** argv){
           int key = getch();
           app_handle_key(&app, view, key);
 
-          if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
-               ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
-          }else{
-               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                     app.config_options.tab_width);
-          }
+          if(view){
+               if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+                    ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+               }else{
+                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                          app.config_options.tab_width);
+               }
 
-          // setup input view overlay if we are
-          if(view && app.input_mode) input_view_overlay(&app.input_view, view);
+               // setup input view overlay if we are
+               if(app.input_mode) input_view_overlay(&app.input_view, view);
+          }
 
           // update any list buffers if they are in view
           if(ce_layout_buffer_in_view(tab_layout, app.buffer_list_buffer)){
