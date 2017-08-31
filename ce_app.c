@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <ncurses.h>
 
-bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
-     BufferNode_t* node = malloc(sizeof(*node));
+bool buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
+     CeBufferNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
      node->buffer = buffer;
      node->next = *head;
@@ -14,9 +14,9 @@ bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
-bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer){
-     BufferNode_t* prev = NULL;
-     BufferNode_t* itr = *head;
+bool buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
+     CeBufferNode_t* prev = NULL;
+     CeBufferNode_t* itr = *head;
      while(itr){
           if(itr->buffer == buffer) break;
           prev = itr;
@@ -39,10 +39,10 @@ bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
-void buffer_node_free(BufferNode_t** head){
-     BufferNode_t* itr = *head;
+void buffer_node_free(CeBufferNode_t** head){
+     CeBufferNode_t* itr = *head;
      while(itr){
-          BufferNode_t* tmp = itr;
+          CeBufferNode_t* tmp = itr;
           itr = itr->next;
           free(tmp->buffer->app_data);
           ce_buffer_free(tmp->buffer);

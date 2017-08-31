@@ -76,7 +76,7 @@ bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
      return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
 }
 
-static void build_buffer_list(CeBuffer_t* buffer, BufferNode_t* head){
+static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      int64_t index = 1;
      char line[256];
      ce_buffer_empty(buffer);
@@ -208,10 +208,10 @@ void determine_buffer_type(CeBuffer_t* buffer){
      }
 }
 
-static CeBuffer_t* load_file_into_view(BufferNode_t** buffer_node_head, CeView_t* view,
+static CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                        CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
      // have we already loaded this file?
-     BufferNode_t* itr = *buffer_node_head;
+     CeBufferNode_t* itr = *buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, filepath) == 0){
                view_switch_buffer(view, itr->buffer, vim, config_options);
@@ -930,7 +930,7 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
      bool unsaved_buffers = false;
-     BufferNode_t* itr = app->buffer_node_head;
+     CeBufferNode_t* itr = app->buffer_node_head;
      while(itr){
           if(itr->buffer->status == CE_BUFFER_STATUS_MODIFIED && itr->buffer != app->input_view.buffer){
                unsaved_buffers = true;
@@ -1314,7 +1314,7 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
      app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SWITCH BUFFER");
 
      int64_t buffer_count = 0;
-     BufferNode_t* itr = app->buffer_node_head;
+     CeBufferNode_t* itr = app->buffer_node_head;
      while(itr){
           buffer_count++;
           itr = itr->next;
@@ -1346,7 +1346,7 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
-CeBuffer_t* load_destination_into_view(BufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
+CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
                                 CeVim_t* vim, CeDestination_t* destination){
      CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim, destination->filepath);
      if(!load_buffer) return load_buffer;
@@ -1900,7 +1900,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(view){
           if(key == KEY_ENTER){
                if(view->buffer == app->buffer_list_buffer){
-                    BufferNode_t* itr = app->buffer_node_head;
+                    CeBufferNode_t* itr = app->buffer_node_head;
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
@@ -2060,7 +2060,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    free(rune_string);
                               }
                          }else if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0){
-                              BufferNode_t* itr = app->buffer_node_head;
+                              CeBufferNode_t* itr = app->buffer_node_head;
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
                                         view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
@@ -2118,7 +2118,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                if(complete) ce_complete_reset(complete);
                return;
           }else if(key == 'd' && view->buffer == app->buffer_list_buffer){ // Escape
-               BufferNode_t* itr = app->buffer_node_head;
+               CeBufferNode_t* itr = app->buffer_node_head;
                int64_t buffer_index = 0;
                while(itr){
                     if(buffer_index == view->cursor.y) break;
@@ -2599,8 +2599,8 @@ int main(int argc, char** argv){
 
      // unlink terminal node from buffer no list
      {
-          BufferNode_t* itr = app.buffer_node_head;
-          BufferNode_t* prev = NULL;
+          CeBufferNode_t* itr = app.buffer_node_head;
+          CeBufferNode_t* prev = NULL;
           while(itr){
                if(itr->buffer == app.terminal.lines_buffer ||
                   itr->buffer == app.terminal.alternate_lines_buffer){

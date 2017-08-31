@@ -12,10 +12,10 @@
 #define APP_MAX_KEY_COUNT 16
 #define JUMP_LIST_COUNT 16
 
-typedef struct BufferNode_t{
+typedef struct CeBufferNode_t{
      CeBuffer_t* buffer;
-     struct BufferNode_t* next;
-}BufferNode_t;
+     struct CeBufferNode_t* next;
+}CeBufferNode_t;
 
 typedef struct StringNode_t{
      char* string;
@@ -79,7 +79,7 @@ typedef struct App_t{
      bool input_mode;
      CeLayout_t* tab_list_layout;
      CeSyntaxDef_t* syntax_defs;
-     BufferNode_t* buffer_node_head;
+     CeBufferNode_t* buffer_node_head;
      CeCommandEntry_t* command_entries;
      int64_t command_entry_count;
      CeVimParseResult_t last_vim_handle_result;
@@ -109,9 +109,9 @@ typedef struct App_t{
      UserConfig_t user_config;
 }CeApp_t;
 
-bool buffer_node_insert(BufferNode_t** head, CeBuffer_t* buffer);
-bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer);
-void buffer_node_free(BufferNode_t** head);
+bool buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);
+bool buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer);
+void buffer_node_free(CeBufferNode_t** head);
 
 StringNode_t* string_node_insert(StringNode_t** head, const char* string);
 void string_node_free(StringNode_t** head);
