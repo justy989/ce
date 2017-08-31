@@ -254,7 +254,7 @@ static CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView
 
 void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
      char full_path[PATH_MAX];
-     if(base_directory){
+     if(base_directory && *line != '/'){
           snprintf(full_path, PATH_MAX, "%s/%s", base_directory, line);
      }else{
           strncpy(full_path, line, PATH_MAX);
@@ -273,7 +273,10 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      // build list of files to complete
      struct dirent *node;
      DIR* os_dir = opendir(directory);
-     if(!os_dir) return; // TODO: leak directory
+     if(!os_dir){
+          free(directory);
+          return;
+     }
 
      int64_t file_count = 0;
      char** files = malloc(sizeof(*files));
@@ -321,6 +324,8 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      }else{
           ce_complete_match(complete, line);
      }
+
+     free(directory);
 }
 
 static char* view_base_directory(CeView_t* view, CeApp_t* app){
@@ -1993,7 +1998,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               char* base_directory = view_base_directory(view, app);
                               char filepath[PATH_MAX];
                               for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-                                   if(base_directory){
+                                   if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
                                         snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
                                    }else{
                                         strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
