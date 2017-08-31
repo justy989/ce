@@ -344,6 +344,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                int64_t rune_len = 0;
                int64_t line_index = y + row_min;
                CeRune_t rune = 1;
+               int64_t real_y = y + view->scroll.y;
 
                move(view->rect.top + y, view->rect.left);
 
@@ -358,8 +359,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                     bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_LINE_NUMBER, bg);
                     int change_color_pair = ce_color_def_get(color_defs, fg, bg);
                     attron(COLOR_PAIR(change_color_pair));
-                    long real_y = y + view->scroll.y;
-                    long value = real_y + 1;
+                    int value = real_y + 1;
                     if(line_number == CE_LINE_NUMBER_RELATIVE || (line_number == CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE && view->cursor.y != real_y)){
                          value = abs((int)(view->cursor.y - real_y));
                     }
@@ -367,6 +367,11 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                }
 
                standend();
+               if(real_y == view->cursor.y){
+                    int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
+                    int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
+                    attron(COLOR_PAIR(change_color_pair));
+               }
 
                if(line_index < view->buffer->line_count){
                     const char* line = view->buffer->lines[y + row_min];
@@ -376,7 +381,12 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
 
                          // check if we need to move to the next color
                          while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
-                              int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
+                              int bg = draw_color_node->bg;
+                              if(bg == COLOR_DEFAULT && real_y == view->cursor.y){
+                                   bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, bg);
+                              }
+
+                              int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, bg);
                               attron(COLOR_PAIR(change_color_pair));
                               draw_color_node = draw_color_node->next;
                          }
@@ -411,6 +421,11 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
 
                if(x < col_min) x = col_min;
                standend();
+               if(real_y == view->cursor.y){
+                    int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
+                    int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
+                    attron(COLOR_PAIR(change_color_pair));
+               }
                for(; x <= col_max; x++) addch(' ');
           }
      }else{
