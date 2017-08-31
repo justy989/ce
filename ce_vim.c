@@ -1174,11 +1174,11 @@ CeRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, cha
      char* line_start = buffer->lines[start.y];
      char* itr = ce_utf8_iterate_to(line_start, start.x);
      char* save_start = itr;
+     int64_t rune_len = 0;
 
      CeRune_t previous_rune = CE_UTF8_INVALID;
      int64_t end_x = start.x;
      while(*itr){
-          int64_t rune_len = 0;
           CeRune_t rune = ce_utf8_decode(itr, &rune_len);
           if(rune == string_char && previous_rune != '\\') break;
           previous_rune = rune;
@@ -1188,12 +1188,11 @@ CeRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, cha
 
      int64_t start_x = start.x + 1;
      itr = save_start;
-     previous_rune = CE_UTF8_INVALID;
+     previous_rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
      while(itr > line_start){
-          int64_t rune_len = 0;
           CeRune_t rune = previous_rune;
           previous_rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
-          if(rune == string_char && previous_rune != '\\') break;
+          if(rune == string_char && previous_rune != '\\' && start_x < start.x) break;
           start_x--;
           itr -= rune_len;
      }
@@ -1619,6 +1618,7 @@ CeVimParseResult_t ce_vim_parse_motion_find_forward(CeVimAction_t* action, CeRun
 }
 
 CeVimParseResult_t ce_vim_parse_motion_find_backward(CeVimAction_t* action, CeRune_t key){
+     action->exclude_end = true;
      return vim_parse_motion_find(action, key, ce_vim_motion_find_backward);
 }
 
@@ -1627,6 +1627,7 @@ CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, CeRu
 }
 
 CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeRune_t key){
+     action->exclude_end = true;
      return vim_parse_motion_find(action, key, ce_vim_motion_until_backward);
 }
 
