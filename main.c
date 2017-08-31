@@ -173,7 +173,7 @@ static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
 CeBuffer_t* new_buffer(){
      CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
      if(!buffer) return buffer;
-     buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+     buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
      return buffer;
 }
 
@@ -186,7 +186,7 @@ static bool string_ends_with(const char* str, const char* pattern){
 }
 
 void determine_buffer_type(CeBuffer_t* buffer){
-     BufferUserData_t* buffer_data = buffer->user_data;
+     CeAppBufferData_t* buffer_data = buffer->app_data;
 
      if(string_ends_with(buffer->name, ".c") ||
         string_ends_with(buffer->name, ".h")){
@@ -554,7 +554,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      case CE_LAYOUT_TYPE_VIEW:
      {
           CeDrawColorList_t draw_color_list = {};
-          BufferUserData_t* buffer_data = layout->view.buffer->user_data;
+          CeAppBufferData_t* buffer_data = layout->view.buffer->app_data;
 
           // update which terminal buffer we are viewing
           if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
@@ -757,7 +757,7 @@ void* draw_thread(void* thread_data){
                ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
                CeDrawColorList_t draw_color_list = {};
                CeRangeList_t range_list = {};
-               BufferUserData_t* buffer_data = app->complete_view.buffer->user_data;
+               CeAppBufferData_t* buffer_data = app->complete_view.buffer->app_data;
                buffer_data->syntax_function(&app->complete_view, &range_list, &draw_color_list, app->syntax_defs,
                                             app->complete_view.buffer->syntax_data);
                ce_range_list_free(&range_list);
@@ -1377,7 +1377,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
                                                      &destination);
      if(!buffer) return CE_COMMAND_NO_ACTION;
 
-     BufferUserData_t* buffer_data = buffer->user_data;
+     CeAppBufferData_t* buffer_data = buffer->app_data;
      buffer_data->last_goto_destination = view->cursor.y;
 
      return CE_COMMAND_SUCCESS;
@@ -1395,7 +1395,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
      if(!buffer) buffer = app->terminal.buffer;
      if(buffer->line_count == 0) return CE_COMMAND_SUCCESS;
 
-     BufferUserData_t* buffer_data = buffer->user_data;
+     CeAppBufferData_t* buffer_data = buffer->app_data;
 
      int64_t save_destination = buffer_data->last_goto_destination;
      for(int64_t i = buffer_data->last_goto_destination + 1; i != buffer_data->last_goto_destination; i++){
@@ -1443,7 +1443,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      if(!buffer) buffer = app->terminal.buffer;
      if(buffer->line_count == 0) return CE_COMMAND_SUCCESS;
 
-     BufferUserData_t* buffer_data = buffer->user_data;
+     CeAppBufferData_t* buffer_data = buffer->app_data;
 
      int64_t save_destination = buffer_data->last_goto_destination;
      for(int64_t i = buffer_data->last_goto_destination - 1; i != buffer_data->last_goto_destination; i--){
@@ -1512,9 +1512,9 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
      }
 
      char* filename = strdup(view->buffer->name);
-     BufferUserData_t* buffer_data = view->buffer->user_data;
+     CeAppBufferData_t* buffer_data = view->buffer->app_data;
      ce_buffer_free(view->buffer);
-     view->buffer->user_data = buffer_data; // NOTE: not great that I need to save user data and reset it
+     view->buffer->app_data = buffer_data; // NOTE: not great that I need to save user data and reset it
      ce_buffer_load_file(view->buffer, filename);
      free(filename);
 
@@ -1541,7 +1541,7 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
 
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
-     BufferUserData_t* buffer_data = view->buffer->user_data;
+     CeAppBufferData_t* buffer_data = view->buffer->app_data;
 
      if(strcmp(command->args[0].string, "c") == 0){
           buffer_data->syntax_function = ce_syntax_highlight_c;
@@ -1823,7 +1823,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
           }else{
                if(key == KEY_ENTER){
-                    BufferUserData_t* buffer_data = app->terminal.buffer->user_data;
+                    CeAppBufferData_t* buffer_data = app->terminal.buffer->app_data;
                     buffer_data->last_goto_destination = app->terminal.cursor.y;
                }
                ce_terminal_send_key(&app->terminal, key);
@@ -2161,7 +2161,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }
 
-               BufferUserData_t* buffer_data = app->input_view.buffer->user_data;
+               CeAppBufferData_t* buffer_data = app->input_view.buffer->app_data;
 
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &buffer_data->vim, &app->config_options);
 
@@ -2180,7 +2180,7 @@ void app_handle_key(App_t* app, CeView_t* view, int key){
                     }
                }
           }else{
-               BufferUserData_t* buffer_data = view->buffer->user_data;
+               CeAppBufferData_t* buffer_data = view->buffer->app_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
 
                // A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
@@ -2436,7 +2436,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->no_line_numbers = true;
           app.mark_list_buffer->no_line_numbers = true;
 
-          BufferUserData_t* buffer_data = app.complete_list_buffer->user_data;
+          CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_completions;
 
           if(argc > 1){
@@ -2491,15 +2491,15 @@ int main(int argc, char** argv){
           ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, app.config_options.terminal_scroll_back);
           buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
 
-          app.terminal.lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+          app.terminal.lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
           app.terminal.lines_buffer->no_line_numbers = true;
-          BufferUserData_t* buffer_data = app.terminal.lines_buffer->user_data;
+          CeAppBufferData_t* buffer_data = app.terminal.lines_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_terminal;
           app.terminal.lines_buffer->syntax_data = &app.terminal;
 
-          app.terminal.alternate_lines_buffer->user_data = calloc(1, sizeof(BufferUserData_t));
+          app.terminal.alternate_lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
           app.terminal.alternate_lines_buffer->no_line_numbers = true;
-          buffer_data = app.terminal.alternate_lines_buffer->user_data;
+          buffer_data = app.terminal.alternate_lines_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_terminal;
           app.terminal.alternate_lines_buffer->syntax_data = &app.terminal;
      }
@@ -2569,7 +2569,7 @@ int main(int argc, char** argv){
           }
 
           if(view && ce_layout_buffer_in_view(tab_layout, app.mark_list_buffer)){
-               BufferUserData_t* buffer_data = view->buffer->user_data;
+               CeAppBufferData_t* buffer_data = view->buffer->app_data;
                build_mark_list(app.mark_list_buffer, &buffer_data->vim);
           }
 

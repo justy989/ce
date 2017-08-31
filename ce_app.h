@@ -49,7 +49,7 @@ typedef struct{
      CeVimBufferData_t vim;
      int64_t last_goto_destination;
      CeSyntaxHighlightFunc_t* syntax_function;
-}BufferUserData_t;
+}CeAppBufferData_t;
 
 typedef struct{
      CeDestination_t destinations[JUMP_LIST_COUNT];

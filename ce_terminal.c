@@ -1551,11 +1551,11 @@ void ce_terminal_free(CeTerminal_t* terminal){
      free(terminal->tabs);
      terminal->tabs = NULL;
 
-     free(terminal->lines_buffer->user_data);
+     free(terminal->lines_buffer->app_data);
      ce_buffer_free(terminal->lines_buffer);
      free(terminal->lines_buffer);
 
-     free(terminal->alternate_lines_buffer->user_data);
+     free(terminal->alternate_lines_buffer->app_data);
      ce_buffer_free(terminal->alternate_lines_buffer);
      free(terminal->alternate_lines_buffer);
 

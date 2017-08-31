@@ -97,8 +97,10 @@ typedef struct{
 
      bool no_line_numbers;
 
-     void* user_data; // TODO: rename to app_data, and add config_data
+     void* app_data;
      void* syntax_data;
+
+     // NOTE: if we decide to do a buffer init hook, add config_data for user configs
 }CeBuffer_t;
 
 typedef struct{

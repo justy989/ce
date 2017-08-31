@@ -1356,7 +1356,7 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
 }
 
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length){
-     BufferUserData_t* buffer_data = buffer->user_data;
+     CeAppBufferData_t* buffer_data = buffer->app_data;
 
      if(buffer_data->syntax_function == ce_syntax_highlight_c ||
         buffer_data->syntax_function == ce_syntax_highlight_java ||

@@ -32,7 +32,7 @@ bool buffer_node_delete(BufferNode_t** head, CeBuffer_t* buffer){
      }
 
      // TODO: compress with below
-     free(itr->buffer->user_data);
+     free(itr->buffer->app_data);
      ce_buffer_free(itr->buffer);
      free(itr->buffer);
      free(itr);
@@ -44,7 +44,7 @@ void buffer_node_free(BufferNode_t** head){
      while(itr){
           BufferNode_t* tmp = itr;
           itr = itr->next;
-          free(tmp->buffer->user_data);
+          free(tmp->buffer->app_data);
           ce_buffer_free(tmp->buffer);
           free(tmp->buffer);
           free(tmp);

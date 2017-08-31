@@ -426,6 +426,19 @@ void ce_syntax_highlight_visual(CeRangeNode_t** range_node, bool* in_visual, CeP
      }
 }
 
+void check_visual_mode_end(CeRangeNode_t* range_node, bool* in_visual, int64_t line, int64_t line_len,
+                           CeDrawColorList_t* draw_color_list){
+     CePoint_t point = {line_len, line};
+     if(range_node && in_visual){
+          if(ce_point_after(point, range_node->range.end)){
+               ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list),
+                                         COLOR_DEFAULT, point);
+               range_node = range_node->next;
+               *in_visual = false;
+          }
+     }
+}
+
 void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                            CeSyntaxDef_t* syntax_defs, void* user_data){
      if(!view->buffer) return;
@@ -507,16 +520,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                }
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
 
@@ -681,16 +685,7 @@ void ce_syntax_highlight_java(CeView_t* view, CeRangeList_t* highlight_range_lis
                }
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
 
@@ -864,16 +859,7 @@ void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_l
                }
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
 
@@ -957,16 +943,7 @@ void ce_syntax_highlight_bash(CeView_t* view, CeRangeList_t* highlight_range_lis
                }
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
 
@@ -1035,16 +1012,7 @@ void ce_syntax_highlight_config(CeView_t* view, CeRangeList_t* highlight_range_l
                }
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
 
@@ -1100,16 +1068,7 @@ void ce_syntax_highlight_diff(CeView_t* view, CeRangeList_t* highlight_range_lis
                }
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
 
@@ -1141,15 +1100,6 @@ void ce_syntax_highlight_plain(CeView_t* view, CeRangeList_t* highlight_range_li
                ce_syntax_highlight_visual(&range_node, &in_visual, match_point, draw_color_list, syntax_defs);
           }
 
-          // handle case where visual mode ends at the end of the line
-          match_point.x = line_len;
-          if(range_node && in_visual){
-               // TODO: compress with above
-               if(ce_point_after(match_point, range_node->range.end)){
-                    ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list), COLOR_DEFAULT, match_point);
-                    range_node = range_node->next;
-                    in_visual = false;
-               }
-          }
+          check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
      }
 }
