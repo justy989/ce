@@ -2,9 +2,11 @@ todo:
 - multiple terminals
 - add config option for log destination (we want to init the log before the user config, so can we even do this?)
 - dired mode
+- message box
 
 bug:
 - slow to start, wtf
 - divide by zero in ce_layout_distribute_rect()
 - occasional blinking garbage when drawing
 - core dump when escaping after selecting parent
+- 2 slashes in a string start comment syntax

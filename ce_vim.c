@@ -359,7 +359,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
 
                // adjust range because we've already inserted text the line the cursor is on
                CePoint_t cursor_end;
-               if(ce_points_equal(visual_top_left, view->cursor)){
+               if(visual_top_left.y == view->cursor.y){
                     cursor_end = visual_top_left;
                     visual_top_left.y++;
                }else{
@@ -2363,8 +2363,8 @@ bool ce_vim_motion_previous_blank_line(CeVim_t* vim, CeVimAction_t* action, cons
 }
 
 int64_t ce_vim_yank_register_index(CeRune_t rune){
-     if(rune < 33 || rune >= 177) return -1; // ascii printable character range
-     return rune - '!';
+     if(rune < 32 || rune > 126) return -1; // ascii printable character range
+     return rune - ' ';
 }
 
 bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
