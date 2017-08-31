@@ -33,17 +33,17 @@ typedef struct{
      int64_t key_count;
      CeCommand_t command;
      CeVimMode_t vim_mode;
-}KeyBind_t;
+}CeKeyBind_t;
 
 typedef struct{
-     KeyBind_t* binds;
+     CeKeyBind_t* binds;
      int64_t count;
-}KeyBinds_t;
+}CeKeyBinds_t;
 
 typedef struct{
      int keys[4];
      const char* command;
-}KeyBindDef_t;
+}CeKeyBindDef_t;
 
 typedef struct{
      CeVimBufferData_t vim;
@@ -93,7 +93,7 @@ typedef struct CeApp_t{
      CeComplete_t load_file_complete;
      CeComplete_t switch_buffer_complete;
      History_t command_history;
-     KeyBinds_t key_binds[CE_VIM_MODE_COUNT];
+     CeKeyBinds_t key_binds;
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
      char edit_register;
@@ -120,7 +120,7 @@ bool ce_history_insert(History_t* history, const char* string);
 char* ce_history_previous(History_t* history);
 char* ce_history_next(History_t* history);
 
-void ce_convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count);
+void ce_convert_bind_defs(CeKeyBinds_t* binds, CeKeyBindDef_t* bind_defs, int64_t bind_def_count);
 void ce_set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
 void ce_extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
                      int64_t new_command_entry_count);

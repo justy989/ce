@@ -125,7 +125,7 @@ char* ce_history_next(History_t* history){
      return NULL;
 }
 
-void ce_convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count){
+void ce_convert_bind_defs(CeKeyBinds_t* binds, CeKeyBindDef_t* bind_defs, int64_t bind_def_count){
      if(binds->count){
           for(int64_t i = 0; i < binds->count; ++i){
                free(binds->binds[i].keys);

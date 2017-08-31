@@ -1859,13 +1859,13 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                app->key_count++;
 
                bool no_matches = true;
-               for(int64_t i = 0; i < app->key_binds[app->vim.mode].count; ++i){
-                    if(int_strneq(app->key_binds[app->vim.mode].binds[i].keys, app->keys, app->key_count)){
+               for(int64_t i = 0; i < app->key_binds.count; ++i){
+                    if(int_strneq(app->key_binds.binds[i].keys, app->keys, app->key_count)){
                          no_matches = false;
                          // if we have matches, but don't completely match, then wait for more keypresses,
                          // otherwise, execute the action
-                         if(app->key_binds[app->vim.mode].binds[i].key_count == app->key_count){
-                              CeCommand_t* command = &app->key_binds[app->vim.mode].binds[i].command;
+                         if(app->key_binds.binds[i].key_count == app->key_count){
+                              CeCommand_t* command = &app->key_binds.binds[i].command;
                               CeCommandFunc_t* command_func = NULL;
                               CeCommandEntry_t* entry = NULL;
                               for(int64_t c = 0; c < app->command_entry_count; ++c){
@@ -2605,7 +2605,7 @@ int main(int argc, char** argv){
      ce_complete_free(&app.load_file_complete);
      ce_complete_free(&app.switch_buffer_complete);
 
-     KeyBinds_t* binds = &app.key_binds[CE_VIM_MODE_NORMAL];
+     CeKeyBinds_t* binds = &app.key_binds;
      for(int64_t i = 0; i < binds->count; ++i){
           ce_command_free(&binds->binds[i].command);
           if(!binds->binds[i].key_count) continue;
