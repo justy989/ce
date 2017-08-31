@@ -2751,8 +2751,6 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
           return false;
      }
 
-     if(change_node && change_node->next) change_node->next->change.chain = false;
-
      if(vim->insert_rune_head){
           CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
           CeRune_t* itr = rune_string;
@@ -2764,6 +2762,8 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
 
           free(rune_string);
      }
+
+     if(change_node && change_node->next) change_node->next->change.chain = false;
 
      vim->mode = save_mode;
      vim->verb_last_action = false;

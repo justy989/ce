@@ -862,6 +862,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
      bool success = ce_buffer_alloc(input_view->buffer, 1, dialogue);
      input_view->cursor = (CePoint_t){0, 0};
      vim->mode = CE_VIM_MODE_INSERT;
+     ce_rune_node_free(&vim->insert_rune_head);
 
      return success;
 }

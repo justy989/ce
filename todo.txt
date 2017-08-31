@@ -7,6 +7,4 @@ bug:
 - slow to start, wtf
 - divide by zero in ce_layout_distribute_rect()
 - occasional blinking garbage when drawing
-- dotting (repeat action) a lot then doing undo will undo all the dots!
-- repeat action includes input mode changes !
 - core dump when escaping after selecting parent
