@@ -17,15 +17,15 @@ typedef struct CeBufferNode_t{
      struct CeBufferNode_t* next;
 }CeBufferNode_t;
 
-typedef struct StringNode_t{
+typedef struct CeStringNode_t{
      char* string;
-     struct StringNode_t* next;
-     struct StringNode_t* prev;
-}StringNode_t;
+     struct CeStringNode_t* next;
+     struct CeStringNode_t* prev;
+}CeStringNode_t;
 
 typedef struct{
-     StringNode_t* head;
-     StringNode_t* current;
+     CeStringNode_t* head;
+     CeStringNode_t* current;
 }History_t;
 
 typedef struct{
@@ -55,20 +55,20 @@ typedef struct{
      CeDestination_t destinations[JUMP_LIST_COUNT];
      int64_t count;
      int64_t current;
-}JumpList_t;
+}CeJumpList_t;
 
-struct App_t;
+struct CeApp_t;
 
-typedef bool CeUserConfigFunc(struct App_t*);
+typedef bool CeUserConfigFunc(struct CeApp_t*);
 
 typedef struct{
      void* handle;
      char* filepath;
      CeUserConfigFunc* init_func;
      CeUserConfigFunc* free_func;
-}UserConfig_t;
+}CeUserConfig_t;
 
-typedef struct App_t{
+typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
      CeConfigOptions_t config_options;
@@ -100,43 +100,43 @@ typedef struct App_t{
      CeTerminal_t terminal;
      CeMacros_t macros;
      CePoint_t search_start;
-     JumpList_t jump_list;
+     CeJumpList_t jump_list;
      void* user_config_data;
      bool record_macro;
      bool replay_macro;
      bool ready_to_draw;
      bool quit;
-     UserConfig_t user_config;
+     CeUserConfig_t user_config;
 }CeApp_t;
 
-bool buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);
-bool buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer);
-void buffer_node_free(CeBufferNode_t** head);
+bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);
+bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer);
+void ce_buffer_node_free(CeBufferNode_t** head);
 
-StringNode_t* string_node_insert(StringNode_t** head, const char* string);
-void string_node_free(StringNode_t** head);
+CeStringNode_t* ce_string_node_insert(CeStringNode_t** head, const char* string);
+void ce_string_node_free(CeStringNode_t** head);
 
-bool history_insert(History_t* history, const char* string);
-char* history_previous(History_t* history);
-char* history_next(History_t* history);
+bool ce_history_insert(History_t* history, const char* string);
+char* ce_history_previous(History_t* history);
+char* ce_history_next(History_t* history);
 
-void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count);
-void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
-void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
+void ce_convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count);
+void ce_set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
+void ce_extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
                      int64_t new_command_entry_count);
 
-void app_update_terminal_view(CeApp_t* app);
-CeComplete_t* app_is_completing(CeApp_t* app);
+void ce_app_update_terminal_view(CeApp_t* app);
+CeComplete_t* ce_app_is_completing(CeApp_t* app);
 
 void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                   CeSyntaxDef_t* syntax_defs, void* user_data);
 void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                      CeSyntaxDef_t* syntax_defs, void* user_data);
 
-bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination);
-CeDestination_t* jump_list_previous(JumpList_t* jump_list);
-CeDestination_t* jump_list_next(JumpList_t* jump_list);
+bool ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination);
+CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list);
+CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
 
-void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
-void run_command_in_terminal(CeTerminal_t* terminal, const char* command);
-void switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
+void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);
+void ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);

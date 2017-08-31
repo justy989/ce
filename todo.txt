@@ -9,3 +9,6 @@ bug:
 - occasional blinking garbage when drawing
 - dotting (repeat action) a lot then doing undo will undo all the dots!
 - repeat action includes input mode changes !
+- when loading a file starting in '/' we sometimes prepend the current path causing us not to find the file
+- ce_app.h and ./ce_app.h are different files annoyingly
+- core dump when escaping after selecting parent

@@ -27,7 +27,7 @@ void handle_sigint(int signal){
      // pass
 }
 
-bool user_config_init(UserConfig_t* user_config, const char* filepath){
+bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
           ce_log("dlopen() failed: '%s'\n", dlerror());
@@ -50,7 +50,7 @@ bool user_config_init(UserConfig_t* user_config, const char* filepath){
      return true;
 }
 
-void user_config_free(UserConfig_t* user_config){
+void user_config_free(CeUserConfig_t* user_config){
      free(user_config->filepath);
      // NOTE: comment out dlclose() so valgrind can get a helpful stack frame
      dlclose(user_config->handle);
@@ -185,7 +185,7 @@ static bool string_ends_with(const char* str, const char* pattern){
      return strncmp(str + (str_len - pattern_len), pattern, pattern_len) == 0;
 }
 
-void determine_buffer_type(CeBuffer_t* buffer){
+void determine_buffer_syntax(CeBuffer_t* buffer){
      CeAppBufferData_t* buffer_data = buffer->app_data;
 
      if(string_ends_with(buffer->name, ".c") ||
@@ -214,18 +214,36 @@ static CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView
      CeBufferNode_t* itr = *buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, filepath) == 0){
-               view_switch_buffer(view, itr->buffer, vim, config_options);
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options);
                return itr->buffer;
           }
           itr = itr->next;
      }
 
+     // adjust the filepath if it doesn't match our pwd
+     char real_path[PATH_MAX + 1];
+     char load_path[PATH_MAX + 1];
+     char* res = realpath(filepath, real_path);
+     if(!res) return NULL;
+     char cwd[PATH_MAX + 1];
+     if(getcwd(cwd, sizeof(cwd)) != NULL){
+          size_t cwd_len = strlen(cwd);
+          // if the file is in our current directory, only show part of the path
+          if(strncmp(cwd, real_path, cwd_len) == 0){
+               strncpy(load_path, real_path + cwd_len + 1, PATH_MAX);
+          }else{
+               strncpy(load_path, real_path, PATH_MAX);
+          }
+     }else{
+          strncpy(load_path, real_path, PATH_MAX);
+     }
+
      // load file
      CeBuffer_t* buffer = new_buffer();
-     if(ce_buffer_load_file(buffer, filepath)){
-          buffer_node_insert(buffer_node_head, buffer);
-          view_switch_buffer(view, buffer, vim, config_options);
-          determine_buffer_type(buffer);
+     if(ce_buffer_load_file(buffer, load_path)){
+          ce_buffer_node_insert(buffer_node_head, buffer);
+          ce_view_switch_buffer(view, buffer, vim, config_options);
+          determine_buffer_syntax(buffer);
      }else{
           free(buffer);
           return NULL;
@@ -736,7 +754,7 @@ void* draw_thread(void* thread_data){
                draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
           }
 
-          CeComplete_t* complete = app_is_completing(app);
+          CeComplete_t* complete = ce_app_is_completing(app);
           if(complete && tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW && app->complete_list_buffer->line_count &&
              strlen(app->complete_list_buffer->lines[0])){
                CeLayout_t* view_layout = tab_layout->tab.current;
@@ -1052,7 +1070,7 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      CeLayout_t* tab_layout = NULL;
 
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     view_switch_buffer(view, app->buffer_list_buffer, &app->vim, &app->config_options);
+     ce_view_switch_buffer(view, app->buffer_list_buffer, &app->vim, &app->config_options);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1065,7 +1083,7 @@ CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
      CeLayout_t* tab_layout = NULL;
 
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     view_switch_buffer(view, app->yank_list_buffer, &app->vim, &app->config_options);
+     ce_view_switch_buffer(view, app->yank_list_buffer, &app->vim, &app->config_options);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1298,7 +1316,7 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
 
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
-     switch_to_terminal(app, view, tab_layout);
+     ce_switch_to_terminal(app, view, tab_layout);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1579,7 +1597,7 @@ CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data){
      ce_buffer_alloc(buffer, 1, buffer_name);
      view->buffer = buffer;
      view->cursor = (CePoint_t){0, 0};
-     buffer_node_insert(&app->buffer_node_head, buffer);
+     ce_buffer_node_insert(&app->buffer_node_head, buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1617,14 +1635,14 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
 
      if(strcmp(command->args[0].string, "next")){
           // ignore destinations on screen
-          while((destination = jump_list_next(&app->jump_list))){
+          while((destination = ce_jump_list_next(&app->jump_list))){
                if(strcmp(destination->filepath, view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
                     break;
                }
           }
      }else if(strcmp(command->args[0].string, "previous")){
           // ignore destinations on screen
-          while((destination = jump_list_previous(&app->jump_list))){
+          while((destination = ce_jump_list_previous(&app->jump_list))){
                if(strcmp(destination->filepath, view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
                     break;
                }
@@ -1662,7 +1680,7 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = (CeApp_t*)(user_data);
-     run_command_in_terminal(&app->terminal, command->args[0].string);
+     ce_run_command_in_terminal(&app->terminal, command->args[0].string);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1675,8 +1693,8 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
 
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
-     run_command_in_terminal(&app->terminal, command->args[0].string);
-     switch_to_terminal(app, view, tab_layout);
+     ce_run_command_in_terminal(&app->terminal, command->args[0].string);
+     ce_switch_to_terminal(app, view, tab_layout);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1696,8 +1714,8 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      char cmd[128];
      snprintf(cmd, 128, "man %s", word);
      free(word);
-     run_command_in_terminal(&app->terminal, cmd);
-     switch_to_terminal(app, view, tab_layout);
+     ce_run_command_in_terminal(&app->terminal, cmd);
+     ce_switch_to_terminal(app, view, tab_layout);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1725,7 +1743,7 @@ void scroll_to_and_center_if_offscreen(CeView_t* view, CePoint_t point, CeConfig
 }
 
 bool apply_completion(CeApp_t* app, CeView_t* view){
-     CeComplete_t* complete = app_is_completing(app);
+     CeComplete_t* complete = ce_app_is_completing(app);
      if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
           if(complete->current >= 0){
                if(strcmp(complete->elements[complete->current].string, app->input_view.buffer->lines[app->input_view.cursor.y]) == 0){
@@ -1904,7 +1922,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
-                              view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
                               break;
                          }
                          itr = itr->next;
@@ -1970,7 +1988,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeDestination_t destination = {};
                               destination.point = view->cursor;
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                              jump_list_insert(&app->jump_list, destination);
+                              ce_jump_list_insert(&app->jump_list, destination);
 
                               char* base_directory = view_base_directory(view, app);
                               char filepath[PATH_MAX];
@@ -1999,7 +2017,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeDestination_t destination = {};
                               destination.point = view->cursor;
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                              jump_list_insert(&app->jump_list, destination);
+                              ce_jump_list_insert(&app->jump_list, destination);
                          }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
                               char* end_of_number = app->input_view.buffer->lines[0];
                               int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
@@ -2034,7 +2052,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                              app->vim.mode = CE_VIM_MODE_NORMAL;
 
                                              command_func(&command, app);
-                                             history_insert(&app->command_history, app->input_view.buffer->lines[0]);
+                                             ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
 
                                              return;
                                         }else{
@@ -2063,7 +2081,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeBufferNode_t* itr = app->buffer_node_head;
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-                                        view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
                                         if(itr->buffer == app->terminal.buffer){
                                              int64_t width = view->rect.right - view->rect.left;
                                              int64_t height = view->rect.bottom - view->rect.top;
@@ -2097,14 +2115,14 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }else if(key == CE_TAB){ // TODO: configure auto complete key?
                if(apply_completion(app, view)) return;
           }else if(key == 14){ // ctrl + n
-               CeComplete_t* complete = app_is_completing(app);
+               CeComplete_t* complete = ce_app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
                     ce_complete_next_match(complete);
                     build_complete_list(app->complete_list_buffer, complete);
                     return;
                }
           }else if(key == 16){ // ctrl + p
-               CeComplete_t* complete = app_is_completing(app);
+               CeComplete_t* complete = ce_app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
                     ce_complete_previous_match(complete);
                     build_complete_list(app->complete_list_buffer, complete);
@@ -2114,7 +2132,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                app->input_mode = false;
                app->vim.mode = CE_VIM_MODE_NORMAL;
 
-               CeComplete_t* complete = app_is_completing(app);
+               CeComplete_t* complete = ce_app_is_completing(app);
                if(complete) ce_complete_reset(complete);
                return;
           }else if(key == 'd' && view->buffer == app->buffer_list_buffer){ // Escape
@@ -2135,14 +2153,14 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          }
                     }
 
-                    buffer_node_delete(&app->buffer_node_head, itr->buffer);
+                    ce_buffer_node_delete(&app->buffer_node_head, itr->buffer);
                }
           }
 
           if(app->input_mode){
                if(strcmp(app->input_view.buffer->name, "COMMAND") == 0 && app->input_view.buffer->line_count){
                     if(key == KEY_UP){
-                         char* prev = history_previous(&app->command_history);
+                         char* prev = ce_history_previous(&app->command_history);
                          if(prev){
                               ce_buffer_remove_string(app->input_view.buffer, (CePoint_t){0, 0}, ce_utf8_strlen(app->input_view.buffer->lines[0]));
                               ce_buffer_insert_string(app->input_view.buffer, prev, (CePoint_t){0, 0});
@@ -2151,7 +2169,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
 
                     if(key == KEY_DOWN){
-                         char* next = history_next(&app->command_history);
+                         char* next = ce_history_next(&app->command_history);
                          if(next){
                               ce_buffer_remove_string(app->input_view.buffer, (CePoint_t){0, 0}, ce_utf8_strlen(app->input_view.buffer->lines[0]));
                               ce_buffer_insert_string(app->input_view.buffer, next, (CePoint_t){0, 0});
@@ -2193,7 +2211,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                         jump_list_insert(&app->jump_list, destination);
+                         ce_jump_list_insert(&app->jump_list, destination);
                     }
                }
           }
@@ -2413,15 +2431,15 @@ int main(int argc, char** argv){
      // init buffers
      {
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
-          buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
           ce_buffer_alloc(app.yank_list_buffer, 1, "[yanks]");
-          buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
           ce_buffer_alloc(app.complete_list_buffer, 1, "[completions]");
-          buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
           ce_buffer_alloc(app.macro_list_buffer, 1, "[macros]");
-          buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
           ce_buffer_alloc(app.mark_list_buffer, 1, "[marks]");
-          buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
@@ -2442,8 +2460,8 @@ int main(int argc, char** argv){
                for(int64_t i = last_arg_index; i < argc; i++){
                     CeBuffer_t* buffer = new_buffer();
                     if(ce_buffer_load_file(buffer, argv[i])){
-                         buffer_node_insert(&app.buffer_node_head, buffer);
-                         determine_buffer_type(buffer);
+                         ce_buffer_node_insert(&app.buffer_node_head, buffer);
+                         determine_buffer_syntax(buffer);
                     }else{
                          free(buffer);
                     }
@@ -2463,7 +2481,7 @@ int main(int argc, char** argv){
      {
           CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
-          app_update_terminal_view(&app);
+          ce_app_update_terminal_view(&app);
      }
 
      // setup input buffer
@@ -2472,7 +2490,7 @@ int main(int argc, char** argv){
           ce_buffer_alloc(buffer, 1, "input");
           app.input_view.buffer = buffer;
           app.input_view.buffer->no_line_numbers = true;
-          buffer_node_insert(&app.buffer_node_head, buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
      // init user config
@@ -2488,7 +2506,7 @@ int main(int argc, char** argv){
                app.config_options.terminal_scroll_back = app.terminal_height - 1;
           }
           ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, app.config_options.terminal_scroll_back);
-          buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
+          ce_buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
 
           app.terminal.lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
           app.terminal.lines_buffer->no_line_numbers = true;
@@ -2526,7 +2544,7 @@ int main(int argc, char** argv){
      // main loop
      while(!app.quit){
           // TODO: we can optimize by only resizing when we see a resized event
-          app_update_terminal_view(&app);
+          ce_app_update_terminal_view(&app);
 
           // figure out our current view rect
           CeView_t* view = NULL;
@@ -2616,7 +2634,7 @@ int main(int argc, char** argv){
           }
      }
 
-     buffer_node_free(&app.buffer_node_head);
+     ce_buffer_node_free(&app.buffer_node_head);
      ce_terminal_free(&app.terminal);
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);

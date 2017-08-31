@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <ncurses.h>
 
-bool buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
+bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
      node->buffer = buffer;
@@ -14,7 +14,7 @@ bool buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
-bool buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
+bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* prev = NULL;
      CeBufferNode_t* itr = *head;
      while(itr){
@@ -39,7 +39,7 @@ bool buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
-void buffer_node_free(CeBufferNode_t** head){
+void ce_buffer_node_free(CeBufferNode_t** head){
      CeBufferNode_t* itr = *head;
      while(itr){
           CeBufferNode_t* tmp = itr;
@@ -52,9 +52,9 @@ void buffer_node_free(CeBufferNode_t** head){
      *head = NULL;
 }
 
-StringNode_t* string_node_insert(StringNode_t** head, const char* string){
-     StringNode_t* tail = *head;
-     StringNode_t* node;
+CeStringNode_t* ce_string_node_insert(CeStringNode_t** head, const char* string){
+     CeStringNode_t* tail = *head;
+     CeStringNode_t* node;
      if(tail){
           while(tail->next) tail = tail->next;
 
@@ -79,10 +79,10 @@ StringNode_t* string_node_insert(StringNode_t** head, const char* string){
      return node;
 }
 
-void string_node_free(StringNode_t** head){
-     StringNode_t* itr = *head;
+void ce_string_node_free(CeStringNode_t** head){
+     CeStringNode_t* itr = *head;
      while(itr){
-          StringNode_t* tmp = itr;
+          CeStringNode_t* tmp = itr;
           itr = itr->next;
           free(tmp->string);
           free(tmp);
@@ -91,13 +91,13 @@ void string_node_free(StringNode_t** head){
      *head = NULL;
 }
 
-bool history_insert(History_t* history, const char* string){
-     StringNode_t* new_node = string_node_insert(&history->head, string);
+bool ce_history_insert(History_t* history, const char* string){
+     CeStringNode_t* new_node = ce_string_node_insert(&history->head, string);
      if(new_node) return true;
      return false;
 }
 
-char* history_previous(History_t* history){
+char* ce_history_previous(History_t* history){
      if(history->current){
           if(history->current->prev){
                history->current = history->current->prev;
@@ -105,7 +105,7 @@ char* history_previous(History_t* history){
           return history->current->string;
      }
 
-     StringNode_t* tail = history->head;
+     CeStringNode_t* tail = history->head;
      if(!tail) return NULL;
 
      while(tail->next) tail = tail->next;
@@ -114,7 +114,7 @@ char* history_previous(History_t* history){
      return tail->string;
 }
 
-char* history_next(History_t* history){
+char* ce_history_next(History_t* history){
      if(history->current){
           if(history->current->next){
                history->current = history->current->next;
@@ -125,7 +125,7 @@ char* history_next(History_t* history){
      return NULL;
 }
 
-void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count){
+void ce_convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_def_count){
      if(binds->count){
           for(int64_t i = 0; i < binds->count; ++i){
                free(binds->binds[i].keys);
@@ -155,13 +155,13 @@ void convert_bind_defs(KeyBinds_t* binds, KeyBindDef_t* bind_defs, int64_t bind_
      }
 }
 
-void app_update_terminal_view(CeApp_t* app){
+void ce_app_update_terminal_view(CeApp_t* app){
      getmaxyx(stdscr, app->terminal_height, app->terminal_width);
      app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 }
 
-CeComplete_t* app_is_completing(CeApp_t* app){
+CeComplete_t* ce_app_is_completing(CeApp_t* app){
      if(app->input_mode){
           if(strcmp(app->input_view.buffer->name, "COMMAND") == 0) return &app->command_complete;
           if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
@@ -171,7 +171,7 @@ CeComplete_t* app_is_completing(CeApp_t* app){
      return NULL;
 }
 
-void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func){
+void ce_set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func){
      for(int64_t i = 0; i < *key_bind_count; ++i){
           CeVimKeyBind_t* key_bind = key_binds + i;
           if(key_bind->key == key){
@@ -184,8 +184,8 @@ void set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune
      ce_vim_add_key_bind(key_binds, key_bind_count, key, parse_func);
 }
 
-void extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
-                     int64_t new_command_entry_count){
+void ce_extend_commands(CeCommandEntry_t** command_entries, int64_t* command_entry_count, CeCommandEntry_t* new_command_entries,
+                        int64_t new_command_entry_count){
      int64_t final_command_entry_count = *command_entry_count + new_command_entry_count;
      *command_entries = realloc(*command_entries, final_command_entry_count * sizeof(**command_entries));
      for(int64_t i = 0; i < new_command_entry_count; i++){
@@ -287,7 +287,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
      }
 }
 
-bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination){
+bool ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
      if(jump_list->count == 0 && jump_list->current <= 0){
           jump_list->destinations[0] = destination;
           jump_list->count = 1;
@@ -311,21 +311,21 @@ bool jump_list_insert(JumpList_t* jump_list, CeDestination_t destination){
      return true;
 }
 
-CeDestination_t* jump_list_previous(JumpList_t* jump_list){
+CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list){
      if(jump_list->current < 0) return NULL;
      CeDestination_t* result = jump_list->destinations + jump_list->current;
      jump_list->current--;
      return result;
 }
 
-CeDestination_t* jump_list_next(JumpList_t* jump_list){
+CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
      if(jump_list->current > (jump_list->count - 1)) return NULL;
      jump_list->current++;
      CeDestination_t* result = jump_list->destinations + jump_list->current;
      return result;
 }
 
-void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
      // save the cursor on the old buffer
      view->buffer->cursor_save = view->cursor;
      view->buffer->scroll_save = view->scroll;
@@ -340,7 +340,7 @@ void view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConf
      vim->mode = CE_VIM_MODE_NORMAL;
 }
 
-void run_command_in_terminal(CeTerminal_t* terminal, const char* command){
+void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command){
      while(*command){
           ce_terminal_send_key(terminal, *command);
           command++;
@@ -349,12 +349,12 @@ void run_command_in_terminal(CeTerminal_t* terminal, const char* command){
      ce_terminal_send_key(terminal, 10);
 }
 
-void switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout){
+void ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout){
      CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
      if(terminal_layout){
           tab_layout->tab.current = terminal_layout;
      }else{
-          view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
+          ce_view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
      }
 
      int64_t width = view->rect.right - view->rect.left;
