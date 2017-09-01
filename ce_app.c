@@ -349,17 +349,19 @@ void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command){
      ce_terminal_send_key(terminal, 10);
 }
 
-void ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout){
+CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout){
+     app->vim.mode = CE_VIM_MODE_INSERT;
+
      CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
      if(terminal_layout){
           tab_layout->tab.current = terminal_layout;
-     }else{
-          ce_view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
+          return &terminal_layout->view;
      }
+
+     ce_view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
 
      int64_t width = view->rect.right - view->rect.left;
      int64_t height = view->rect.bottom - view->rect.top;
      ce_terminal_resize(&app->terminal, width, height);
-
-     app->vim.mode = CE_VIM_MODE_INSERT;
+     return view;
 }

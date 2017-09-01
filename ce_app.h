@@ -139,4 +139,4 @@ CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);
-void ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);
+CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);

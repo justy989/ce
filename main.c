@@ -1695,7 +1695,16 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = (CeApp_t*)(user_data);
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
      ce_run_command_in_terminal(&app->terminal, command->args[0].string);
+     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
+     if(terminal_layout){
+          terminal_layout->view.cursor.x = 0;
+          terminal_layout->view.cursor.y = app->terminal.cursor.y;
+          terminal_layout->view.scroll.y = app->terminal.cursor.y;
+          terminal_layout->view.scroll.x = 0;
+     }
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1709,7 +1718,11 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
      ce_run_command_in_terminal(&app->terminal, command->args[0].string);
-     ce_switch_to_terminal(app, view, tab_layout);
+     view = ce_switch_to_terminal(app, view, tab_layout);
+     view->cursor.x = 0;
+     view->cursor.y = app->terminal.cursor.y;
+     view->scroll.y = app->terminal.cursor.y;
+     view->scroll.x = 0;
 
      return CE_COMMAND_SUCCESS;
 }
