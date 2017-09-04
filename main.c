@@ -213,16 +213,6 @@ void determine_buffer_syntax(CeBuffer_t* buffer){
 
 static CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                        CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
-     // have we already loaded this file?
-     CeBufferNode_t* itr = *buffer_node_head;
-     while(itr){
-          if(strcmp(itr->buffer->name, filepath) == 0){
-               ce_view_switch_buffer(view, itr->buffer, vim, config_options);
-               return itr->buffer;
-          }
-          itr = itr->next;
-     }
-
      // adjust the filepath if it doesn't match our pwd
      char real_path[PATH_MAX + 1];
      char load_path[PATH_MAX + 1];
@@ -246,6 +236,17 @@ static CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView
      }else{
           strncpy(load_path, real_path, PATH_MAX);
      }
+
+     // have we already loaded this file?
+     CeBufferNode_t* itr = *buffer_node_head;
+     while(itr){
+          if(strcmp(itr->buffer->name, load_path) == 0){
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options);
+               return itr->buffer;
+          }
+          itr = itr->next;
+     }
+
 
      // load file
      CeBuffer_t* buffer = new_buffer();
