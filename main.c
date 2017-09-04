@@ -1407,12 +1407,13 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      CeDestination_t destination = scan_line_for_destination(view->buffer->lines[view->cursor.y]);
      if(destination.point.x < 0) return CE_COMMAND_NO_ACTION;
 
+     CeAppBufferData_t* buffer_data = view->buffer->app_data;
+     buffer_data->last_goto_destination = view->cursor.y;
+
      CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                      &destination);
      if(!buffer) return CE_COMMAND_NO_ACTION;
 
-     CeAppBufferData_t* buffer_data = buffer->app_data;
-     buffer_data->last_goto_destination = view->cursor.y;
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1492,7 +1493,11 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
 
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                           &destination);
-          if(loaded_buffer) buffer_data->last_goto_destination = i;
+          if(loaded_buffer){
+               CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
+               if(layout) layout->view.scroll.y = i;
+               buffer_data->last_goto_destination = i;
+          }
           break;
      }
 
