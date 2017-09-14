@@ -292,16 +292,20 @@ static int64_t match_c_string(const char* str){
 }
 
 static int64_t match_c_character_literal(const char* str){
+     // c character literals are one character long unless that character is escaped
+     // in which case the literal will be 2 characters long before we see an end '
      if(*str == '\''){
-          const char* match = str;
-          while(match){
-               match = strchr(match + 1, '\'');
-               if(match && *(match - 1) != '\\'){
-                    int64_t len = (match - str) + 1;
-                    if(len == 3) return len;
-                    if(*(str + 1) == '\\') return len;
-                    return 0;
-               }
+          switch(str[1]){
+          case 0: return 0;
+          case '\'': return 2;
+          case '\\':
+               // our next character is escaped. skip it unless its the end of the string
+               if(!str[2]) return 0;
+
+               // our next character must be an end quote or we are not in a character literal
+               if(str[3] == '\'') return 4;
+          default:
+               if(str[2] == '\'') return 3;
           }
      }
 
