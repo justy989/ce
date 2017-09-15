@@ -2,21 +2,21 @@ CC ?= clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
 LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
 
-builddir ?= build
+OBJDIR ?= build
 
 .PHONY: all clean
 
-all: $(builddir) ce
+all: ce
 
 CSRCS := $(wildcard *.c)
-# put our .o files in $(builddir)
-COBJS := $(patsubst %.c,$(builddir)/%.o,$(CSRCS))
+# put our .o files in $(OBJDIR)
+COBJS := $(patsubst %.c,$(OBJDIR)/%.o,$(CSRCS))
 CHDRS := $(wildcard *.h)
 
-$(builddir):
+$(OBJDIR):
 	mkdir $@
 
-$(builddir)/%.o: %.c $(CHDRS)
+$(OBJDIR)/%.o: %.c $(CHDRS) | $(OBJDIR)
 	$(CC) $(CFLAGS) -c  -o $@ $<
 
 ce: $(COBJS)
@@ -24,4 +24,4 @@ ce: $(COBJS)
 
 clean:
 	rm -f ce test_ce ce_test.log valgrind.out
-	rm -r $(builddir)
+	rm -r $(OBJDIR)
