@@ -1,3 +1,0 @@
-#!/bin/bash
-set -x
-rm -f ce test_ce ce.log ce_test.log valgrind.out
