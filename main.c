@@ -869,7 +869,9 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
      input_view_overlay(input_view, view);
 
      // update name based on dialog
+     free(input_view->buffer->app_data);
      bool success = ce_buffer_alloc(input_view->buffer, 1, dialogue);
+     input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
      input_view->cursor = (CePoint_t){0, 0};
      vim->mode = CE_VIM_MODE_INSERT;
      ce_rune_node_free(&vim->insert_rune_head);
