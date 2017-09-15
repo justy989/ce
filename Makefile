@@ -11,12 +11,13 @@ all: $(builddir) ce
 CSRCS := $(wildcard *.c)
 # put our .o files in $(builddir)
 COBJS := $(patsubst %.c,$(builddir)/%.o,$(CSRCS))
+CHDRS := $(wildcard *.h)
 
 $(builddir):
 	mkdir $@
 
-$(builddir)/%.o: %.c
-	$(CC) $(CFLAGS) -c  -o $@ $^
+$(builddir)/%.o: %.c $(CHDRS)
+	$(CC) $(CFLAGS) -c  -o $@ $<
 
 ce: $(COBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
