@@ -4,6 +4,8 @@
 #include <string.h>
 #include <locale.h>
 
+FILE* g_ce_log = NULL;
+
 const char* g_multiline_string = "0123456789\nabcdefghij\nklmnopqrst";
 const char* g_multiline_string_with_empty_line = "0123456789\n\nabcdefghij\nklmnopqrst";
 const char* g_name = "test.txt";

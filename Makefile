@@ -8,7 +8,7 @@ OBJDIR ?= build
 
 all: ce
 
-CSRCS := $(wildcard *.c)
+CSRCS := $(shell ls *.c | grep -v test_*)
 # put our .o files in $(OBJDIR)
 COBJS := $(patsubst %.c,$(OBJDIR)/%.o,$(CSRCS))
 CHDRS := $(wildcard *.h)
@@ -22,6 +22,11 @@ $(OBJDIR)/%.o: %.c $(CHDRS) | $(OBJDIR)
 ce: $(COBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+test: test_ce
+test_ce: test_ce.c ce.c
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+	./test_ce
+
 clean:
 	rm -f ce test_ce ce_test.log valgrind.out
-	rm -r $(OBJDIR)
+	rm -rf $(OBJDIR)
