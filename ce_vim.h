@@ -75,6 +75,7 @@ typedef struct CeVimAction_t{
      bool repeatable;
      bool visual_block_applies;
      bool exclude_end;
+     CeClampX_t clamp_x;
 }CeVimAction_t;
 
 typedef struct{

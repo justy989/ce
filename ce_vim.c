@@ -1703,6 +1703,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key)
      }
 
      action->verb.function = &ce_vim_verb_delete;
+     action->clamp_x = CE_CLAMP_X_INSIDE;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
@@ -1710,6 +1711,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_delete;
+     action->clamp_x = CE_CLAMP_X_INSIDE;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1722,6 +1724,7 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key)
      }
 
      action->verb.function = &ce_vim_verb_change;
+     action->clamp_x = CE_CLAMP_X_ON;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
@@ -1729,6 +1732,7 @@ CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_change;
+     action->clamp_x = CE_CLAMP_X_ON;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1748,12 +1752,14 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune
 CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_delete_character;
+     action->clamp_x = CE_CLAMP_X_INSIDE;
      return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_substitute_character;
+     action->clamp_x = CE_CLAMP_X_ON;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -2408,7 +2414,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
           return false;
      }
 
-     CePoint_t end_cursor = ce_buffer_clamp_point(view->buffer, motion_range.start, CE_CLAMP_X_INSIDE);
+     CePoint_t end_cursor = ce_buffer_clamp_point(view->buffer, motion_range.start, action->clamp_x);
 
      // commit the change
      CeBufferChange_t change = {};
@@ -2497,7 +2503,7 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeR
           motion_range.start = new_start;
      }
 
-     view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_INSIDE);
+     view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, action->clamp_x);
      return true;
 }
 
