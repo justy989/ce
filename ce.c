@@ -577,11 +577,7 @@ CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t 
           if(buffer->line_count){
                CE_CLAMP(point.y, 0, (buffer->line_count - 1));
                int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
-               if(line_len){
-                    CE_CLAMP(point.x, 0, (line_len - 1));
-               }else{
-                    point.x = 0;
-               }
+               CE_CLAMP(point.x, 0, line_len);
           }else{
                point.x = 0;
                point.y = 0;
@@ -591,7 +587,11 @@ CePoint_t ce_buffer_clamp_point(CeBuffer_t* buffer, CePoint_t point, CeClampX_t 
           if(buffer->line_count){
                CE_CLAMP(point.y, 0, (buffer->line_count - 1));
                int64_t line_len = ce_utf8_strlen(buffer->lines[point.y]);
-               CE_CLAMP(point.x, 0, line_len);
+               if(line_len){
+                    CE_CLAMP(point.x, 0, (line_len - 1));
+               }else{
+                    point.x = 0;
+               }
           }else{
                point.x = 0;
                point.y = 0;

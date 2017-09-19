@@ -72,6 +72,7 @@ static bool parse_arg(CeCommandArg_t* arg, const char* string)
           arg->type = CE_COMMAND_ARG_STRING;
           arg->string = strdup(string);
           int64_t len = strlen(arg->string);
+          ce_log("arg: '%s'\n", arg->string);
 
           // overwrite last quote with null terminator
           if(arg->string[len - 1] == '"') arg->string[len - 1] = 0;

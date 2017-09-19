@@ -1903,7 +1903,7 @@ CeVimParseResult_t ce_vim_parse_verb_set_mark(CeVimAction_t* action, CeRune_t ke
 
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
                              CeRange_t* motion_range){
-     CePoint_t destination = ce_buffer_move_point(view->buffer, motion_range->end, delta, config_options->tab_width, CE_CLAMP_X_NONE);
+     CePoint_t destination = ce_buffer_move_point(view->buffer, motion_range->end, delta, config_options->tab_width, CE_CLAMP_X_INSIDE);
      if(destination.x < 0) return false;
      motion_range->end = destination;
      return true;
@@ -2373,7 +2373,7 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      if(action->motion.function == ce_vim_motion_up || action->motion.function == ce_vim_motion_down){
           motion_range.end.x = buffer_data->motion_column;
      }
-     view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_ON);
+     view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_INSIDE);
      if(ce_points_equal(motion_range.end, view->cursor)) buffer_data->motion_column = view->cursor.x;
      CePoint_t before_follow = view->scroll;
 
@@ -2497,6 +2497,7 @@ bool ce_vim_verb_delete_character(CeVim_t* vim, const CeVimAction_t* action, CeR
           motion_range.start = new_start;
      }
 
+     view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_INSIDE);
      return true;
 }
 
