@@ -17,6 +17,7 @@
 #include "ce_app.h"
 
 FILE* g_ce_log = NULL;
+CeBuffer_t* g_ce_log_buffer = NULL;
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
@@ -2180,7 +2181,13 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     itr = itr->next;
                }
 
-               if(buffer_index == view->cursor.y && itr->buffer != app->buffer_list_buffer){
+               if(buffer_index == view->cursor.y &&
+                  (itr->buffer != app->buffer_list_buffer &&
+                   itr->buffer != app->yank_list_buffer &&
+                   itr->buffer != app->complete_list_buffer &&
+                   itr->buffer != app->macro_list_buffer &&
+                   itr->buffer != app->mark_list_buffer &&
+                   itr->buffer != g_ce_log_buffer)){
                     // find all the views showing this buffer and switch to a different view
                     for(int64_t t = 0; t < app->tab_list_layout->tab_list.tab_count; t++){
                          CeLayoutBufferInViewsResult_t result = ce_layout_buffer_in_views(app->tab_list_layout->tab_list.tabs[t], itr->buffer);
@@ -2385,10 +2392,72 @@ int main(int argc, char** argv){
 
      setlocale(LC_ALL, "");
 
+     // TODO: allocate this on the heap when/if it gets too big?
+     CeApp_t app = {};
+
+     // init log buffer
+     {
+          g_ce_log_buffer = new_buffer();
+          ce_buffer_alloc(g_ce_log_buffer, 1, "[log]");
+          ce_buffer_node_insert(&app.buffer_node_head, g_ce_log_buffer);
+          g_ce_log_buffer->status = CE_BUFFER_STATUS_READONLY;
+          g_ce_log_buffer->no_line_numbers = true;
+     }
+
      char log_filepath[PATH_MAX];
      snprintf(log_filepath, PATH_MAX, "%s/ce.log", getenv("HOME"));
      if(!ce_log_init(log_filepath)){
           return 1;
+     }
+
+     // init buffers
+     {
+          app.buffer_list_buffer = new_buffer();
+          app.yank_list_buffer = new_buffer();
+          app.complete_list_buffer = new_buffer();
+          app.macro_list_buffer = new_buffer();
+          app.mark_list_buffer = new_buffer();
+
+          ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
+          ce_buffer_alloc(app.yank_list_buffer, 1, "[yanks]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
+          ce_buffer_alloc(app.complete_list_buffer, 1, "[completions]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
+          ce_buffer_alloc(app.macro_list_buffer, 1, "[macros]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
+          ce_buffer_alloc(app.mark_list_buffer, 1, "[marks]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
+
+          app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
+
+          app.buffer_list_buffer->no_line_numbers = true;
+          app.yank_list_buffer->no_line_numbers = true;
+          app.complete_list_buffer->no_line_numbers = true;
+          app.macro_list_buffer->no_line_numbers = true;
+          app.mark_list_buffer->no_line_numbers = true;
+
+          CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_completions;
+
+          if(argc > 1){
+               for(int64_t i = last_arg_index; i < argc; i++){
+                    CeBuffer_t* buffer = new_buffer();
+                    if(ce_buffer_load_file(buffer, argv[i])){
+                         ce_buffer_node_insert(&app.buffer_node_head, buffer);
+                         determine_buffer_syntax(buffer);
+                    }else{
+                         free(buffer);
+                    }
+               }
+          }else{
+               CeBuffer_t* buffer = new_buffer();
+               ce_buffer_alloc(buffer, 1, "unnamed");
+          }
      }
 
      // init ncurses
@@ -2412,9 +2481,6 @@ int main(int argc, char** argv){
           define_key(NULL, KEY_ENTER);       // Blow away enter
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
      }
-
-     // TODO: allocate this on the heap when/if it gets too big?
-     CeApp_t app = {};
 
      // init commands
      CeCommandEntry_t command_entries[] = {
@@ -2456,56 +2522,6 @@ int main(int argc, char** argv){
      app.command_entry_count = command_entry_count;
      for(int64_t i = 0; i < command_entry_count; i++){
           app.command_entries[i] = command_entries[i];
-     }
-
-     app.buffer_list_buffer = new_buffer();
-     app.yank_list_buffer = new_buffer();
-     app.complete_list_buffer = new_buffer();
-     app.macro_list_buffer = new_buffer();
-     app.mark_list_buffer = new_buffer();
-
-     // init buffers
-     {
-          ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
-          ce_buffer_alloc(app.yank_list_buffer, 1, "[yanks]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.yank_list_buffer);
-          ce_buffer_alloc(app.complete_list_buffer, 1, "[completions]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.complete_list_buffer);
-          ce_buffer_alloc(app.macro_list_buffer, 1, "[macros]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
-          ce_buffer_alloc(app.mark_list_buffer, 1, "[marks]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
-
-          app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
-          app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
-          app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
-          app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
-          app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
-
-          app.buffer_list_buffer->no_line_numbers = true;
-          app.yank_list_buffer->no_line_numbers = true;
-          app.complete_list_buffer->no_line_numbers = true;
-          app.macro_list_buffer->no_line_numbers = true;
-          app.mark_list_buffer->no_line_numbers = true;
-
-          CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_completions;
-
-          if(argc > 1){
-               for(int64_t i = last_arg_index; i < argc; i++){
-                    CeBuffer_t* buffer = new_buffer();
-                    if(ce_buffer_load_file(buffer, argv[i])){
-                         ce_buffer_node_insert(&app.buffer_node_head, buffer);
-                         determine_buffer_syntax(buffer);
-                    }else{
-                         free(buffer);
-                    }
-               }
-          }else{
-               CeBuffer_t* buffer = new_buffer();
-               ce_buffer_alloc(buffer, 1, "unnamed");
-          }
      }
 
      // init vim

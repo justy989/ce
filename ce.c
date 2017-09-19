@@ -62,11 +62,19 @@ bool ce_log_init(const char* filename){
      return true;
 }
 
+char g_log_string[BUFSIZ];
+
 void ce_log(const char* fmt, ...){
      va_list args;
      va_start(args, fmt);
-     vfprintf(g_ce_log, fmt, args);
+     size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
      va_end(args);
+
+     fwrite(g_log_string, string_len, 1, g_ce_log);
+     CePoint_t end = ce_buffer_end_point(g_ce_log_buffer);
+     g_ce_log_buffer->status = CE_BUFFER_STATUS_NONE;
+     ce_buffer_insert_string(g_ce_log_buffer, g_log_string, end);
+     g_ce_log_buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
 // NOTE: we expect that if we are downsizing, the lines that will be overwritten are freed prior to calling this func
