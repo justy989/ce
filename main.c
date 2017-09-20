@@ -683,14 +683,20 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
 
                                    for(int64_t i = min; i <= max; i++){
                                         char* itr = layout->view.buffer->lines[i];
+                                        int64_t prev_end_x = 0;
                                         while(itr){
                                              rc = regexec(&regex, itr, match_count, matches, 0);
                                              if(rc == 0){
                                                   int64_t match_len = matches[0].rm_eo - matches[0].rm_so;
-                                                  CePoint_t start = {matches[0].rm_so, i};
-                                                  CePoint_t end = {start.x + (match_len - 1), i};
-                                                  ce_range_list_insert(&range_list, start, end);
-                                                  itr = ce_utf8_iterate_to(layout->view.buffer->lines[i], end.x);
+                                                  if(match_len > 0){
+                                                       CePoint_t start = {prev_end_x + matches[0].rm_so, i};
+                                                       CePoint_t end = {start.x + (match_len - 1), i};
+                                                       ce_range_list_insert(&range_list, start, end);
+                                                       itr = ce_utf8_iterate_to(itr, matches[0].rm_so + match_len);
+                                                       prev_end_x = end.x + 1;
+                                                  }else{
+                                                       break;
+                                                  }
                                              }else{
                                                   break;
                                              }
