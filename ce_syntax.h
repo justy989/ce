@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ce.h"
-#include "ce_vim.h"
 
 #define CE_SYNTAX_USE_CURRENT_COLOR -2
 
@@ -77,6 +76,7 @@ int ce_syntax_def_get_bg(CeSyntaxDef_t* syntax_defs, CeSyntaxColor_t syntax_colo
 bool ce_draw_color_list_insert(CeDrawColorList_t* list, int fg, int bg, CePoint_t point);
 void ce_draw_color_list_free(CeDrawColorList_t* list);
 bool ce_range_list_insert(CeRangeList_t* list, CePoint_t start, CePoint_t end);
+bool ce_range_list_insert_sorted(CeRangeList_t* list, CePoint_t start, CePoint_t end);
 void ce_range_list_free(CeRangeList_t* list);
 int ce_draw_color_list_last_fg_color(CeDrawColorList_t* draw_color_list);
 int ce_draw_color_list_last_bg_color(CeDrawColorList_t* draw_color_list);

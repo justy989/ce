@@ -579,7 +579,7 @@ CeDestination_t scan_line_for_destination(const char* line){
      return destination;
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminal_t* terminal,
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminal_t* terminal, CeBuffer_t* input_buffer,
                  CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number, CeLayout_t* current,
                  CeSyntaxDef_t* syntax_defs, int64_t terminal_width){
      switch(layout->type){
@@ -638,6 +638,44 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                     }
                }
 
+               // TODO: doesn't work for regex searches
+               // TODO: doesn't work for multiline searches
+               // highlight search
+               {
+                    const char* match_text = NULL;
+
+                    if(strcmp(input_buffer->name, "SEARCH") == 0){
+                         if(input_buffer->line_count && input_buffer->line_count && strlen(input_buffer->lines[0])){
+                              match_text = input_buffer->lines[0];
+                         }
+                    }else{
+                         const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+                         if(yank->text){
+                              match_text = yank->text;
+                         }
+                    }
+
+                    if(match_text){
+                         int64_t match_len = ce_utf8_strlen(match_text);
+                         int64_t min = layout->view.scroll.y;
+                         int64_t max = min + (layout->view.rect.bottom - layout->view.rect.top);
+                         int64_t clamp_max = (layout->view.buffer->line_count - 1);
+                         CE_CLAMP(min, 0, clamp_max);
+                         CE_CLAMP(max, 0, clamp_max);
+
+                         for(int64_t i = min; i <= max; i++){
+                              char* match = NULL;
+                              char* itr = layout->view.buffer->lines[i];
+                              while((match = strstr(itr, match_text))){
+                                   CePoint_t start = {ce_utf8_strlen_between(layout->view.buffer->lines[i], match) - 1, i};
+                                   CePoint_t end = {start.x + (match_len - 1), i};
+                                   ce_range_list_insert(&range_list, start, end);
+                                   itr = match + match_len;
+                              }
+                         }
+                    }
+               }
+
                buffer_data->syntax_function(&layout->view, &range_list, &draw_color_list, syntax_defs,
                                             layout->view.buffer->syntax_data);
                ce_range_list_free(&range_list);
@@ -657,13 +695,13 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               draw_layout(layout->list.layouts[i], vim, macros, terminal, color_defs, tab_width, line_number, current,
-                           syntax_defs, terminal_width);
+               draw_layout(layout->list.layouts[i], vim, macros, terminal, input_buffer, color_defs, tab_width,
+                           line_number, current, syntax_defs, terminal_width);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          draw_layout(layout->tab.root, vim, macros, terminal, color_defs, tab_width, line_number, current, syntax_defs,
-                      terminal_width);
+          draw_layout(layout->tab.root, vim, macros, terminal, input_buffer, color_defs, tab_width, line_number,
+                      current, syntax_defs, terminal_width);
           break;
      }
 }
@@ -758,7 +796,7 @@ void* draw_thread(void* thread_data){
           }
 
           standend();
-          draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, &color_defs, app->config_options.tab_width,
+          draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, app->input_view.buffer, &color_defs, app->config_options.tab_width,
                       app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right);
 
           if(app->input_mode){

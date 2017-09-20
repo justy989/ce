@@ -54,6 +54,49 @@ bool ce_range_list_insert(CeRangeList_t* list, CePoint_t start, CePoint_t end){
      return true;
 }
 
+bool ce_range_list_insert_sorted(CeRangeList_t* list, CePoint_t start, CePoint_t end){
+     CeRangeNode_t* itr = list->head;
+     CeRangeNode_t* prev = NULL;
+     while(itr){
+          if(prev){
+               if(ce_point_after(itr->range.start, end) &&
+                  ce_point_after(end, prev->range.end)){
+                    break;
+               }
+          }else{
+               if(ce_point_after(itr->range.start, end)){
+                    break;
+               }
+          }
+
+          prev = itr;
+          itr = itr->next;
+     }
+
+     if(!itr){
+          if(!ce_point_after(end, itr->range.start)) return false;
+     }
+
+     CeRangeNode_t* node = malloc(sizeof(*node));
+     if(!node) return false;
+     node->range.start = start;
+     node->range.end = end;
+
+     if(!itr){
+          node->next = NULL;
+     }else{
+          node->next = itr;
+     }
+
+     if(prev){
+          prev->next = node;
+     }else{
+          list->head = node;
+     }
+
+     return true;
+}
+
 void ce_range_list_free(CeRangeList_t* list){
      CeRangeNode_t* itr = list->head;
      while(itr){
