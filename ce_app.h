@@ -106,6 +106,7 @@ typedef struct CeApp_t{
      bool replay_macro;
      bool ready_to_draw;
      bool quit;
+     bool highlight_search;
      CeUserConfig_t user_config;
 }CeApp_t;
 

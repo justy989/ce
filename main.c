@@ -581,7 +581,7 @@ CeDestination_t scan_line_for_destination(const char* line){
 
 void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminal_t* terminal, CeBuffer_t* input_buffer,
                  CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number, CeLayout_t* current,
-                 CeSyntaxDef_t* syntax_defs, int64_t terminal_width){
+                 CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search){
      switch(layout->type){
      default:
           break;
@@ -638,39 +638,64 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                     }
                }
 
-               // TODO: doesn't work for regex searches
                // TODO: doesn't work for multiline searches
-               // highlight search
-               {
-                    const char* match_text = NULL;
+               if(highlight_search){
+                    const char* pattern = NULL;
 
                     if(strcmp(input_buffer->name, "SEARCH") == 0){
                          if(input_buffer->line_count && input_buffer->line_count && strlen(input_buffer->lines[0])){
-                              match_text = input_buffer->lines[0];
+                              pattern = input_buffer->lines[0];
                          }
                     }else{
                          const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
                          if(yank->text){
-                              match_text = yank->text;
+                              pattern = yank->text;
                          }
                     }
 
-                    if(match_text){
-                         int64_t match_len = ce_utf8_strlen(match_text);
+                    if(pattern){
+                         int64_t pattern_len = ce_utf8_strlen(pattern);
                          int64_t min = layout->view.scroll.y;
                          int64_t max = min + (layout->view.rect.bottom - layout->view.rect.top);
                          int64_t clamp_max = (layout->view.buffer->line_count - 1);
                          CE_CLAMP(min, 0, clamp_max);
                          CE_CLAMP(max, 0, clamp_max);
 
-                         for(int64_t i = min; i <= max; i++){
-                              char* match = NULL;
-                              char* itr = layout->view.buffer->lines[i];
-                              while((match = strstr(itr, match_text))){
-                                   CePoint_t start = {ce_utf8_strlen_between(layout->view.buffer->lines[i], match) - 1, i};
-                                   CePoint_t end = {start.x + (match_len - 1), i};
-                                   ce_range_list_insert(&range_list, start, end);
-                                   itr = match + match_len;
+                         if(vim->search_mode == CE_VIM_SEARCH_MODE_FORWARD ||
+                            vim->search_mode == CE_VIM_SEARCH_MODE_BACKWARD){
+                              for(int64_t i = min; i <= max; i++){
+                                   char* match = NULL;
+                                   char* itr = layout->view.buffer->lines[i];
+                                   while((match = strstr(itr, pattern))){
+                                        CePoint_t start = {ce_utf8_strlen_between(layout->view.buffer->lines[i], match) - 1, i};
+                                        CePoint_t end = {start.x + (pattern_len - 1), i};
+                                        ce_range_list_insert(&range_list, start, end);
+                                        itr = match + pattern_len;
+                                   }
+                              }
+                         }else if(vim->search_mode == CE_VIM_SEARCH_MODE_REGEX_FORWARD ||
+                                  vim->search_mode == CE_VIM_SEARCH_MODE_REGEX_BACKWARD){
+                              regex_t regex = {};
+                              int rc = regcomp(&regex, pattern, REG_EXTENDED);
+                              if(rc == 0){
+                                   const size_t match_count = 1;
+                                   regmatch_t matches[match_count];
+
+                                   for(int64_t i = min; i <= max; i++){
+                                        char* itr = layout->view.buffer->lines[i];
+                                        while(itr){
+                                             rc = regexec(&regex, itr, match_count, matches, 0);
+                                             if(rc == 0){
+                                                  int64_t match_len = matches[0].rm_eo - matches[0].rm_so;
+                                                  CePoint_t start = {matches[0].rm_so, i};
+                                                  CePoint_t end = {start.x + (match_len - 1), i};
+                                                  ce_range_list_insert(&range_list, start, end);
+                                                  itr = ce_utf8_iterate_to(layout->view.buffer->lines[i], end.x);
+                                             }else{
+                                                  break;
+                                             }
+                                        }
+                                   }
                               }
                          }
                     }
@@ -696,12 +721,12 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
                draw_layout(layout->list.layouts[i], vim, macros, terminal, input_buffer, color_defs, tab_width,
-                           line_number, current, syntax_defs, terminal_width);
+                           line_number, current, syntax_defs, terminal_width, highlight_search);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
           draw_layout(layout->tab.root, vim, macros, terminal, input_buffer, color_defs, tab_width, line_number,
-                      current, syntax_defs, terminal_width);
+                      current, syntax_defs, terminal_width, highlight_search);
           break;
      }
 }
@@ -797,7 +822,8 @@ void* draw_thread(void* thread_data){
 
           standend();
           draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, app->input_view.buffer, &color_defs, app->config_options.tab_width,
-                      app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right);
+                      app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
+                      app->highlight_search);
 
           if(app->input_mode){
                CeDrawColorList_t draw_color_list = {};
@@ -1319,6 +1345,14 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
+     app->highlight_search = true;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_noh(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     app->highlight_search = false;
      return CE_COMMAND_SUCCESS;
 }
 
@@ -2293,6 +2327,11 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                          ce_jump_list_insert(&app->jump_list, destination);
+                    }else if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
+                             app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
+                             app->vim.current_action.motion.function == ce_vim_motion_search_next ||
+                             app->vim.current_action.motion.function == ce_vim_motion_search_prev){
+                         app->highlight_search = true;
                     }
                }
           }
@@ -2535,6 +2574,7 @@ int main(int argc, char** argv){
           {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
           {command_search, "search", "interactive search 'forward' or 'backward'"},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
+          {command_noh, "noh", "turn off search highlighting"},
           {command_command, "command", "interactively send a commmand"},
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
