@@ -642,15 +642,15 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                if(highlight_search){
                     const char* pattern = NULL;
 
-                    if(strcmp(input_buffer->name, "SEARCH") == 0){
-                         if(input_buffer->line_count && input_buffer->line_count && strlen(input_buffer->lines[0])){
-                              pattern = input_buffer->lines[0];
-                         }
+                    if((strcmp(input_buffer->name, "SEARCH") == 0 ||
+                        strcmp(input_buffer->name, "REVERSE SEARCH") == 0 ||
+                        strcmp(input_buffer->name, "REGEX SEARCH") == 0 ||
+                        strcmp(input_buffer->name, "REGEX REVERSE SEARCH") == 0) &&
+                       input_buffer->line_count && strlen(input_buffer->lines[0])){
+                         pattern = input_buffer->lines[0];
                     }else{
                          const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
-                         if(yank->text){
-                              pattern = yank->text;
-                         }
+                         if(yank->text) pattern = yank->text;
                     }
 
                     if(pattern){
@@ -2122,11 +2122,13 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                   strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
                                   strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0){
                               // update yanks
-                              int64_t index = ce_vim_yank_register_index('/');
-                              CeVimYank_t* yank = app->vim.yanks + index;
+                              CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('/');
                               free(yank->text);
                               yank->text = strdup(app->input_view.buffer->lines[0]);
                               yank->line = false;
+
+                              // clear input buffer
+                              app->input_view.buffer->lines[0][0] = 0;
 
                               // insert jump
                               CeDestination_t destination = {};
