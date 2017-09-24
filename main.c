@@ -562,18 +562,24 @@ CeDestination_t scan_line_for_destination(const char* line){
      char* end = NULL;
 
      if(row_end){
-          destination.point.y = strtol(file_end + 1, &end, 10);
+          char* row_start = file_end + 1;
+          destination.point.y = strtol(row_start, &end, 10);
+          if(end == row_start) destination.point.y = -1;
 
-          if(destination.point.y > 0) destination.point.y--; // account for format which is 1 indexed
+          if(destination.point.y > 0){
+               destination.point.y--; // account for format which is 1 indexed
+          }
 
           if(col_end){
-               destination.point.x = strtol(row_end + 1, &end, 10);
+               char* col_start = row_end + 1;
+               destination.point.x = strtol(col_start, &end, 10);
+               if(end == col_start) destination.point.x = -1;
                if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
           }else{
                destination.point.x = 0;
           }
      }else{
-          destination.point = (CePoint_t){0, 0};
+          destination.point = (CePoint_t){-1, -1};
      }
 
      return destination;
@@ -1025,6 +1031,11 @@ bool get_layout_and_view(CeApp_t* app, CeView_t** view, CeLayout_t** tab_layout)
      }
 
      return true;
+}
+
+void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal){
+     CeAppBufferData_t* buffer_data = terminal->buffer->app_data;
+     buffer_data->last_goto_destination = terminal->cursor.y;
 }
 
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
@@ -1521,7 +1532,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
           }
 
           CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
-          if(destination.point.x < 0) continue;
+          if(destination.point.x < 0 || destination.point.y < 0) continue;
           if(access(destination.filepath, F_OK) == -1) continue;
 
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
@@ -1537,7 +1548,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
      // we didn't find anything, and since the user asked for a destination, find this one
      if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
-          if(destination.point.x >= 0){
+          if(destination.point.x >= 0 && destination.point.y >= 0){
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = save_destination;
                load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
@@ -1569,7 +1580,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
           }
 
           CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
-          if(destination.point.x < 0) continue;
+          if(destination.point.x < 0 || destination.point.y < 0) continue;
           if(access(destination.filepath, F_OK) == -1) continue;
 
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
@@ -1585,7 +1596,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      // we didn't find anything, and since the user asked for a destination, find this one
      if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
-          if(destination.point.x >= 0){
+          if(destination.point.x >= 0 && destination.point.y >= 0){
                load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
           }
      }
@@ -1792,6 +1803,8 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
           terminal_layout->view.scroll.y = app->terminal.cursor.y;
           terminal_layout->view.scroll.x = 0;
      }
+
+     update_terminal_last_goto_using_cursor(&app->terminal);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1811,6 +1824,7 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
      view->scroll.y = app->terminal.cursor.y;
      view->scroll.x = 0;
 
+     update_terminal_last_goto_using_cursor(&app->terminal);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1955,8 +1969,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
           }else{
                if(key == KEY_ENTER){
-                    CeAppBufferData_t* buffer_data = app->terminal.buffer->app_data;
-                    buffer_data->last_goto_destination = app->terminal.cursor.y;
+                    update_terminal_last_goto_using_cursor(&app->terminal);
                }
                ce_terminal_send_key(&app->terminal, key);
           }
