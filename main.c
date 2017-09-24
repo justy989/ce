@@ -339,12 +339,12 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      free(directory);
 }
 
-static char* view_base_directory(CeView_t* view, CeApp_t* app){
-     if(view->buffer == app->terminal.buffer){
-          return ce_terminal_get_current_directory(&app->terminal);
+static char* buffer_base_directory(CeBuffer_t* buffer, CeTerminal_t* terminal){
+     if(buffer == terminal->buffer){
+          return ce_terminal_get_current_directory(terminal);
      }
 
-     return directory_from_filename(view->buffer->name);
+     return directory_from_filename(buffer->name);
 }
 
 void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeDrawColorList_t* draw_color_list,
@@ -1276,7 +1276,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
      }else{ // it's 0
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
 
-          char* base_directory = view_base_directory(view, app);
+          char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
           complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
           free(base_directory);
           build_complete_list(app->complete_list_buffer, &app->load_file_complete);
@@ -1473,8 +1473,12 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
 }
 
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
-                                CeVim_t* vim, CeDestination_t* destination){
-     CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim, destination->filepath);
+                                       CeVim_t* vim, const char* base_directory, CeDestination_t* destination){
+     char full_path[PATH_MAX];
+     if(!base_directory) base_directory = ".";
+     strncpy(full_path, base_directory, PATH_MAX);
+     snprintf(full_path, PATH_MAX, "%s/%s", base_directory, destination->filepath);
+     CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim, full_path);
      if(!load_buffer) return load_buffer;
 
      if(destination->point.y < load_buffer->line_count){
@@ -1502,10 +1506,11 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      CeAppBufferData_t* buffer_data = view->buffer->app_data;
      buffer_data->last_goto_destination = view->cursor.y;
 
+     char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
      CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                     &destination);
+                                                     base_directory, &destination);
+     free(base_directory);
      if(!buffer) return CE_COMMAND_NO_ACTION;
-
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1533,10 +1538,11 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
 
           CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
           if(destination.point.x < 0 || destination.point.y < 0) continue;
-          if(access(destination.filepath, F_OK) == -1) continue;
 
+          char* base_directory = buffer_base_directory(buffer, &app->terminal);
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                                 &destination);
+                                                                 base_directory, &destination);
+          free(base_directory);
           if(loaded_buffer){
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = i;
@@ -1551,7 +1557,10 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
           if(destination.point.x >= 0 && destination.point.y >= 0){
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = save_destination;
-               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
+               char* base_directory = buffer_base_directory(buffer, &app->terminal);
+               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                          base_directory, &destination);
+               free(base_directory);
           }
      }
 
@@ -1581,10 +1590,11 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
 
           CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
           if(destination.point.x < 0 || destination.point.y < 0) continue;
-          if(access(destination.filepath, F_OK) == -1) continue;
 
+          char* base_directory = buffer_base_directory(buffer, &app->terminal);
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                          &destination);
+                                                                 base_directory, &destination);
+          free(base_directory);
           if(loaded_buffer){
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = i;
@@ -1597,7 +1607,9 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
           if(destination.point.x >= 0 && destination.point.y >= 0){
-               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, &destination);
+               char* base_directory = buffer_base_directory(buffer, &app->terminal);
+               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, base_directory, &destination);
+               free(base_directory);
           }
      }
 
@@ -1899,7 +1911,7 @@ bool apply_completion(CeApp_t* app, CeView_t* view){
                // if completion was load_file, continue auto completing since we could have completed a directory
                // and want to see what is in it
                if(complete == &app->load_file_complete){
-                    char* base_directory = view_base_directory(view, app);
+                    char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
                     complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
                     free(base_directory);
                     build_complete_list(app->complete_list_buffer, &app->load_file_complete);
@@ -2118,7 +2130,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                               ce_jump_list_insert(&app->jump_list, destination);
 
-                              char* base_directory = view_base_directory(view, app);
+                              char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
                               char filepath[PATH_MAX];
                               for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
                                    if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
@@ -2323,7 +2335,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          ce_complete_match(&app->command_complete, app->input_view.buffer->lines[0]);
                          build_complete_list(app->complete_list_buffer, &app->command_complete);
                     }else if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                         char* base_directory = view_base_directory(view, app);
+                         char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
                          complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
                          free(base_directory);
                          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
