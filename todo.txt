@@ -8,5 +8,3 @@ bug:
 - slow to start, wtf
 - divide by zero in ce_layout_distribute_rect()
 - occasional blinking garbage when drawing
-- 2 slashes in a string start comment syntax
-- terminal goto next destination doesn't use terminal directory

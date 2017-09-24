@@ -1115,7 +1115,7 @@ CeRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start
 
      int64_t start_x = start.x + 1;
      itr = save_start;
-     while(itr > line_start){
+     while(itr >= line_start){
           int64_t rune_len = 0;
           CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
           if(!is_little_word_character(rune)) break;
@@ -1151,7 +1151,7 @@ CeRange_t ce_vim_find_big_word_boundaries(CeBuffer_t* buffer, CePoint_t start){
 
      int64_t start_x = start.x + 1;
      itr = save_start;
-     while(itr > line_start){
+     while(itr >= line_start){
           int64_t rune_len = 0;
           CeRune_t rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
           if(isspace(rune)) break;
