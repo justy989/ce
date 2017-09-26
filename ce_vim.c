@@ -1058,6 +1058,7 @@ CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeR
      if(!ce_buffer_point_is_valid(buffer, start)) return (CePoint_t){-1, -1};
      int64_t match_x = until ? start.x + 2 : start.x + 1;
      char* str = ce_utf8_iterate_to(buffer->lines[start.y], match_x);
+     if(!str) return (CePoint_t){-1, -1};
 
      while(*str){
           int64_t rune_len = 0;
@@ -1076,6 +1077,7 @@ CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, Ce
 
      char* start_of_line = buffer->lines[start.y];
      char* str = ce_utf8_iterate_to(start_of_line, start.x);
+     if(!str) return (CePoint_t){-1, -1};
      int64_t match_x = start.x - 1;
      str--;
 
