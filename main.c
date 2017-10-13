@@ -760,6 +760,11 @@ static CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLine
                         view->cursor.y - view->scroll.y + view->rect.top};
 }
 
+uint64_t time_between(struct timeval previous, struct timeval current){
+     return (current.tv_sec - previous.tv_sec) * 1000000LL +
+            (current.tv_usec - previous.tv_usec);
+}
+
 void* draw_thread(void* thread_data){
      CeApp_t* app = (CeApp_t*)(thread_data);
      struct timeval previous_draw_time;
@@ -768,12 +773,10 @@ void* draw_thread(void* thread_data){
      CeColorDefs_t color_defs = {};
 
      gettimeofday(&previous_draw_time, NULL);
-
      while(!app->quit){
           while(true){
                gettimeofday(&current_draw_time, NULL);
-               time_since_last_draw = (current_draw_time.tv_sec - previous_draw_time.tv_sec) * 1000000LL +
-                                      (current_draw_time.tv_usec - previous_draw_time.tv_usec);
+               time_since_last_draw = time_between(previous_draw_time, current_draw_time);
                if(time_since_last_draw >= DRAW_USEC_LIMIT){
                     if(app->ready_to_draw){
                          app->ready_to_draw = false;
@@ -784,6 +787,10 @@ void* draw_thread(void* thread_data){
                     }
                }
                sleep(0);
+          }
+
+          if(pthread_mutex_trylock(&app->draw_lock) != 0){
+               continue;
           }
 
           previous_draw_time = current_draw_time;
@@ -925,6 +932,7 @@ void* draw_thread(void* thread_data){
           }
 
           refresh();
+          pthread_mutex_unlock(&app->draw_lock);
      }
 
      return NULL;
@@ -2573,6 +2581,7 @@ int main(int argc, char** argv){
      // init ncurses
      {
           initscr();
+          nodelay(stdscr, TRUE);
           keypad(stdscr, TRUE);
           cbreak();
           noecho();
@@ -2700,6 +2709,7 @@ int main(int argc, char** argv){
      // init draw thread
      pthread_t thread_draw;
      {
+          pthread_mutex_init(&app.draw_lock, NULL);
           pthread_create(&thread_draw, NULL, draw_thread, &app);
           app.ready_to_draw = true;
      }
@@ -2721,8 +2731,16 @@ int main(int argc, char** argv){
                break;
           }
 
-          // handle input from the user
+          // take the draw lock around getting input because curses calls refresh() like an $#^&#@!
+          pthread_mutex_lock(&app.draw_lock);
           int key = getch();
+          pthread_mutex_unlock(&app.draw_lock);
+          if(key == ERR){
+               sleep(0);
+               continue;
+          }
+
+          // handle input from the user
           app_handle_key(&app, view, key);
 
           if(view){
@@ -2762,6 +2780,7 @@ int main(int argc, char** argv){
      // cleanup
      pthread_cancel(thread_draw);
      pthread_join(thread_draw, NULL);
+     pthread_mutex_destroy(&app.draw_lock);
      app.user_config.free_func(&app);
      user_config_free(&app.user_config);
 
