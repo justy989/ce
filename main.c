@@ -2697,6 +2697,8 @@ int main(int argc, char** argv){
           free(commands);
      }
 
+     WINDOW* fake_window = newwin(1, 1, 0, 0);
+
      // init draw thread
      pthread_t thread_draw;
      {
@@ -2722,7 +2724,7 @@ int main(int argc, char** argv){
           }
 
           // handle input from the user
-          int key = getch();
+          int key = wgetch(fake_window); // we use a fake window because getch() calls refresh on stdscr
           app_handle_key(&app, view, key);
 
           if(view){
@@ -2803,6 +2805,7 @@ int main(int argc, char** argv){
      ce_terminal_free(&app.terminal);
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
+     delwin(fake_window);
      endwin();
      return 0;
 }

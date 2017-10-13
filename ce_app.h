@@ -10,7 +10,7 @@
 #include "ce_macros.h"
 
 #define APP_MAX_KEY_COUNT 16
-#define JUMP_LIST_COUNT 16
+#define JUMP_LIST_COUNT 3 // TODO: change back to 16
 
 typedef struct CeBufferNode_t{
      CeBuffer_t* buffer;

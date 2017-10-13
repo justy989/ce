@@ -6,5 +6,8 @@ todo:
 
 bug:
 - slow to start, wtf
-- divide by zero in ce_layout_distribute_rect()
-- occasional blinking garbage when drawing
+- occasional blinking garbage when drawing (really stumped on this one!)
+- 'man fwrite' crashes in the terminal
+- resizing with terminal on screen crashes sometimes
+- 'Si]' substitutes over the last bracket if the cursor is on it [check it out]
+- 'man' commands that don't crash have broken scrolling

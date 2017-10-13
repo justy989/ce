@@ -303,6 +303,9 @@ bool ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
           jump_list->count++;
           jump_list->current++;
           return true;
+     }else if(jump_list->current == jump_list->count){
+          if(jump_list->count >= JUMP_LIST_COUNT) return false;
+          // TODO: we need to shift down the jumps
      }
 
      jump_list->current++;
