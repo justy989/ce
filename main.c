@@ -767,12 +767,11 @@ uint64_t time_between(struct timeval previous, struct timeval current){
 
 void* draw_thread(void* thread_data){
      CeApp_t* app = (CeApp_t*)(thread_data);
-     struct timeval previous_draw_time;
-     struct timeval current_draw_time;
+     struct timeval previous_draw_time = {};
+     struct timeval current_draw_time = {};
      uint64_t time_since_last_draw = 0;
      CeColorDefs_t color_defs = {};
 
-     gettimeofday(&previous_draw_time, NULL);
      while(!app->quit){
           while(true){
                gettimeofday(&current_draw_time, NULL);
@@ -789,10 +788,7 @@ void* draw_thread(void* thread_data){
                sleep(0);
           }
 
-          if(pthread_mutex_trylock(&app->draw_lock) != 0){
-               continue;
-          }
-
+          pthread_mutex_lock(&app->draw_lock);
           previous_draw_time = current_draw_time;
 
           CeLayout_t* tab_list_layout = app->tab_list_layout;
@@ -2706,12 +2702,14 @@ int main(int argc, char** argv){
           free(commands);
      }
 
+     ce_app_update_terminal_view(&app);
+
      // init draw thread
      pthread_t thread_draw;
      {
+          app.ready_to_draw = true;
           pthread_mutex_init(&app.draw_lock, NULL);
           pthread_create(&thread_draw, NULL, draw_thread, &app);
-          app.ready_to_draw = true;
      }
 
      // main loop

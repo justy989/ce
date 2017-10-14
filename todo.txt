@@ -6,5 +6,3 @@ todo:
 
 bug:
 - slow to start, wtf
-- divide by zero in ce_layout_distribute_rect()
-- occasional blinking garbage when drawing

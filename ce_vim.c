@@ -2125,8 +2125,12 @@ bool ce_vim_motion_until_backward(CeVim_t* vim, CeVimAction_t* action, const CeV
 
 static bool vim_motion_find(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                             CeRange_t* motion_range, bool inside){
+     CePoint_t start = motion_range->start;
      CeRange_t new_range = ce_vim_find_pair(view->buffer, motion_range->end, action->motion.integer, inside);
      if(new_range.start.x < 0) return false;
+     if(ce_points_equal(start, new_range.end)){
+          action->exclude_end = true;
+     }
      *motion_range = new_range;
      return true;
 }
