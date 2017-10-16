@@ -1068,7 +1068,7 @@ CePoint_t ce_vim_move_find_rune_forward(CeBuffer_t* buffer, CePoint_t start, CeR
           match_x++;
      }
 
-     return start;
+     return (CePoint_t){-1, -1};
 }
 
 CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, CeRune_t match_rune, bool until){
@@ -1096,7 +1096,7 @@ CePoint_t ce_vim_move_find_rune_backward(CeBuffer_t* buffer, CePoint_t start, Ce
           match_x--;
      }
 
-     return start;
+     return (CePoint_t){-1, -1};
 }
 
 CeRange_t ce_vim_find_little_word_boundaries(CeBuffer_t* buffer, CePoint_t start){
