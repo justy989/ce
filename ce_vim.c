@@ -1744,6 +1744,7 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune
           action->verb.function = &ce_vim_verb_set_character;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
      }else{
+          if(!isprint(key)) return CE_VIM_PARSE_INVALID;
           action->verb.integer = key;
           return CE_VIM_PARSE_COMPLETE;
      }
