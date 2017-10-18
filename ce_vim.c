@@ -1546,10 +1546,12 @@ CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action, CeR
 }
 
 CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+     action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_soft_begin_line);
 }
 
 CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action, CeRune_t key){
+     action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_hard_begin_line);
 }
 
