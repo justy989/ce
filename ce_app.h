@@ -107,7 +107,6 @@ typedef struct CeApp_t{
      bool ready_to_draw;
      bool quit;
      bool highlight_search;
-     pthread_mutex_t draw_lock;
      CeUserConfig_t user_config;
 }CeApp_t;
 

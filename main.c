@@ -765,173 +765,146 @@ uint64_t time_between(struct timeval previous, struct timeval current){
             (current.tv_usec - previous.tv_usec);
 }
 
-void* draw_thread(void* thread_data){
-     CeApp_t* app = (CeApp_t*)(thread_data);
-     struct timeval previous_draw_time = {};
-     struct timeval current_draw_time = {};
-     uint64_t time_since_last_draw = 0;
+void draw(CeApp_t* app){
      CeColorDefs_t color_defs = {};
 
-     while(!app->quit){
-          while(true){
-               gettimeofday(&current_draw_time, NULL);
-               time_since_last_draw = time_between(previous_draw_time, current_draw_time);
-               if(time_since_last_draw >= DRAW_USEC_LIMIT){
-                    if(app->ready_to_draw){
-                         app->ready_to_draw = false;
-                         break;
-                    }else if(app->terminal.ready_to_draw){
-                         app->terminal.ready_to_draw = false;
-                         break;
-                    }
-               }
-               sleep(0);
+     CeLayout_t* tab_list_layout = app->tab_list_layout;
+     CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
+
+     // draw a tab bar if there is more than 1 tab
+     if(tab_list_layout->tab_list.tab_count > 1){
+          move(0, 0);
+          int color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+          attron(COLOR_PAIR(color_pair));
+          for(int64_t i = tab_list_layout->tab_list.rect.left; i <= tab_list_layout->tab_list.rect.right; i++){
+               addch(' ');
           }
 
-          pthread_mutex_lock(&app->draw_lock);
-          previous_draw_time = current_draw_time;
+          move(0, 0);
 
-          CeLayout_t* tab_list_layout = app->tab_list_layout;
-          CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
-
-          // draw a tab bar if there is more than 1 tab
-          if(tab_list_layout->tab_list.tab_count > 1){
-               move(0, 0);
-               int color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
-               attron(COLOR_PAIR(color_pair));
-               for(int64_t i = tab_list_layout->tab_list.rect.left; i <= tab_list_layout->tab_list.rect.right; i++){
-                    addch(' ');
-               }
-
-               move(0, 0);
-
-               for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
-                    if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
-                         color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
-                         attron(COLOR_PAIR(color_pair));
-                    }else{
-                         color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
-                         attron(COLOR_PAIR(color_pair));
-                    }
-
-                    if(tab_list_layout->tab_list.tabs[i]->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-                         const char* buffer_name = tab_list_layout->tab_list.tabs[i]->tab.current->view.buffer->name;
-
-                         printw(" %s ", buffer_name);
-                    }else{
-                         printw(" selection ");
-                    }
-               }
-          }
-
-          CeView_t* view = &tab_layout->tab.current->view;
-
-          // update cursor if it is on a terminal
-          if((view->buffer == app->terminal.lines_buffer ||
-              view->buffer == app->terminal.alternate_lines_buffer) &&
-             app->vim.mode == CE_VIM_MODE_INSERT){
-               view->cursor.x = app->terminal.cursor.x;
-               view->cursor.y = app->terminal.cursor.y;
-               ce_view_follow_cursor(view, 1, 1, app->config_options.tab_width);
-          }
-
-          standend();
-          draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, app->input_view.buffer, &color_defs, app->config_options.tab_width,
-                      app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
-                      app->highlight_search);
-
-          if(app->input_mode){
-               CeDrawColorList_t draw_color_list = {};
-               draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
-                         &color_defs, app->syntax_defs);
-               int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
-               draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0);
-               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
-          }
-
-          CeComplete_t* complete = ce_app_is_completing(app);
-          if(complete && tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW && app->complete_list_buffer->line_count &&
-             strlen(app->complete_list_buffer->lines[0])){
-               CeLayout_t* view_layout = tab_layout->tab.current;
-               app->complete_view.rect.left = view_layout->view.rect.left;
-               app->complete_view.rect.right = view_layout->view.rect.right;
-               if(app->input_mode){
-                    app->complete_view.rect.bottom = app->input_view.rect.top;
+          for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
+               if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
+                    color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+                    attron(COLOR_PAIR(color_pair));
                }else{
-                    app->complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
+                    color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+                    attron(COLOR_PAIR(color_pair));
                }
-               app->complete_view.rect.top = app->complete_view.rect.bottom - app->complete_list_buffer->line_count;
-               if(app->complete_view.rect.top <= view_layout->view.rect.top){
-                    app->complete_view.rect.top = view_layout->view.rect.top + 1; // account for current view's status bar
-               }
-               app->complete_view.buffer = app->complete_list_buffer;
-               app->complete_view.cursor.y = app->complete_list_buffer->cursor_save.y;
-               app->complete_view.cursor.x = 0;
-               ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
-               CeDrawColorList_t draw_color_list = {};
-               CeRangeList_t range_list = {};
-               CeAppBufferData_t* buffer_data = app->complete_view.buffer->app_data;
-               buffer_data->syntax_function(&app->complete_view, &range_list, &draw_color_list, app->syntax_defs,
-                                            app->complete_view.buffer->syntax_data);
-               ce_range_list_free(&range_list);
-               draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
-                         &color_defs, app->syntax_defs);
-               if(app->input_mode){
-                    int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
-                    draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
+
+               if(tab_list_layout->tab_list.tabs[i]->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+                    const char* buffer_name = tab_list_layout->tab_list.tabs[i]->tab.current->view.buffer->name;
+
+                    printw(" %s ", buffer_name);
+               }else{
+                    printw(" selection ");
                }
           }
-
-          // show border when non view is selected
-          if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
-               int64_t rect_height = 0;
-               int64_t rect_width = 0;
-               CeRect_t* rect = NULL;
-               switch(tab_layout->tab.current->type){
-               default:
-                    break;
-               case CE_LAYOUT_TYPE_LIST:
-                    rect = &tab_layout->tab.current->list.rect;
-                    rect_width = rect->right - rect->left;
-                    rect_height = rect->bottom - rect->top;
-                    break;
-               case CE_LAYOUT_TYPE_TAB:
-                    rect = &tab_layout->tab.current->tab.rect;
-                    rect_width = rect->right - rect->left;
-                    rect_height = rect->bottom - rect->top;
-                    break;
-               }
-
-               int color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_BRIGHT_WHITE);
-               attron(COLOR_PAIR(color_pair));
-               for(int i = 0; i < rect_height; i++){
-                    mvaddch(rect->top + i, rect->right, ' ');
-                    mvaddch(rect->top + i, rect->left, ' ');
-               }
-
-               for(int i = 0; i < rect_width; i++){
-                    mvaddch(rect->top, rect->left + i, ' ');
-                    mvaddch(rect->bottom, rect->left + i, ' ');
-               }
-
-               mvaddch(rect->bottom, rect->right, ' ');
-
-               move(0, 0);
-          }else if(app->input_mode){
-               CePoint_t screen_cursor = view_cursor_on_screen(&app->input_view, app->config_options.tab_width,
-                                                               app->config_options.line_number);
-               move(screen_cursor.y, screen_cursor.x);
-          }else{
-               CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width,
-                                                               app->config_options.line_number);
-               move(screen_cursor.y, screen_cursor.x);
-          }
-
-          refresh();
-          pthread_mutex_unlock(&app->draw_lock);
      }
 
-     return NULL;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     // update cursor if it is on a terminal
+     if((view->buffer == app->terminal.lines_buffer ||
+         view->buffer == app->terminal.alternate_lines_buffer) &&
+        app->vim.mode == CE_VIM_MODE_INSERT){
+          view->cursor.x = app->terminal.cursor.x;
+          view->cursor.y = app->terminal.cursor.y;
+          ce_view_follow_cursor(view, 1, 1, app->config_options.tab_width);
+     }
+
+     standend();
+     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, app->input_view.buffer, &color_defs, app->config_options.tab_width,
+                 app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
+                 app->highlight_search);
+
+     if(app->input_mode){
+          CeDrawColorList_t draw_color_list = {};
+          draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
+                    &color_defs, app->syntax_defs);
+          int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
+          draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0);
+          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
+     }
+
+     CeComplete_t* complete = ce_app_is_completing(app);
+     if(complete && tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW && app->complete_list_buffer->line_count &&
+        strlen(app->complete_list_buffer->lines[0])){
+          CeLayout_t* view_layout = tab_layout->tab.current;
+          app->complete_view.rect.left = view_layout->view.rect.left;
+          app->complete_view.rect.right = view_layout->view.rect.right;
+          if(app->input_mode){
+               app->complete_view.rect.bottom = app->input_view.rect.top;
+          }else{
+               app->complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
+          }
+          app->complete_view.rect.top = app->complete_view.rect.bottom - app->complete_list_buffer->line_count;
+          if(app->complete_view.rect.top <= view_layout->view.rect.top){
+               app->complete_view.rect.top = view_layout->view.rect.top + 1; // account for current view's status bar
+          }
+          app->complete_view.buffer = app->complete_list_buffer;
+          app->complete_view.cursor.y = app->complete_list_buffer->cursor_save.y;
+          app->complete_view.cursor.x = 0;
+          ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
+          CeDrawColorList_t draw_color_list = {};
+          CeRangeList_t range_list = {};
+          CeAppBufferData_t* buffer_data = app->complete_view.buffer->app_data;
+          buffer_data->syntax_function(&app->complete_view, &range_list, &draw_color_list, app->syntax_defs,
+                                       app->complete_view.buffer->syntax_data);
+          ce_range_list_free(&range_list);
+          draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
+                    &color_defs, app->syntax_defs);
+          if(app->input_mode){
+               int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
+               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
+          }
+     }
+
+     // show border when non view is selected
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
+          int64_t rect_height = 0;
+          int64_t rect_width = 0;
+          CeRect_t* rect = NULL;
+          switch(tab_layout->tab.current->type){
+          default:
+               break;
+          case CE_LAYOUT_TYPE_LIST:
+               rect = &tab_layout->tab.current->list.rect;
+               rect_width = rect->right - rect->left;
+               rect_height = rect->bottom - rect->top;
+               break;
+          case CE_LAYOUT_TYPE_TAB:
+               rect = &tab_layout->tab.current->tab.rect;
+               rect_width = rect->right - rect->left;
+               rect_height = rect->bottom - rect->top;
+               break;
+          }
+
+          int color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_BRIGHT_WHITE);
+          attron(COLOR_PAIR(color_pair));
+          for(int i = 0; i < rect_height; i++){
+               mvaddch(rect->top + i, rect->right, ' ');
+               mvaddch(rect->top + i, rect->left, ' ');
+          }
+
+          for(int i = 0; i < rect_width; i++){
+               mvaddch(rect->top, rect->left + i, ' ');
+               mvaddch(rect->bottom, rect->left + i, ' ');
+          }
+
+          mvaddch(rect->bottom, rect->right, ' ');
+
+          move(0, 0);
+     }else if(app->input_mode){
+          CePoint_t screen_cursor = view_cursor_on_screen(&app->input_view, app->config_options.tab_width,
+                                                          app->config_options.line_number);
+          move(screen_cursor.y, screen_cursor.x);
+     }else{
+          CePoint_t screen_cursor = view_cursor_on_screen(view, app->config_options.tab_width,
+                                                          app->config_options.line_number);
+          move(screen_cursor.y, screen_cursor.x);
+     }
+
+     refresh();
 }
 
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
@@ -2705,15 +2678,15 @@ int main(int argc, char** argv){
      ce_app_update_terminal_view(&app);
 
      // init draw thread
-     pthread_t thread_draw;
-     {
-          app.ready_to_draw = true;
-          pthread_mutex_init(&app.draw_lock, NULL);
-          pthread_create(&thread_draw, NULL, draw_thread, &app);
-     }
+     struct timeval previous_draw_time = {};
+     struct timeval current_draw_time = {};
+     uint64_t time_since_last_draw = 0;
 
      // main loop
      while(!app.quit){
+          gettimeofday(&current_draw_time, NULL);
+          time_since_last_draw = time_between(previous_draw_time, current_draw_time);
+
           // TODO: we can optimize by only resizing when we see a resized event
           ce_app_update_terminal_view(&app);
 
@@ -2729,10 +2702,21 @@ int main(int argc, char** argv){
                break;
           }
 
-          // take the draw lock around getting input because curses calls refresh() like an $#^&#@!
-          pthread_mutex_lock(&app.draw_lock);
           int key = getch();
-          pthread_mutex_unlock(&app.draw_lock);
+
+          if(time_since_last_draw >= DRAW_USEC_LIMIT){
+               if(app.ready_to_draw){
+                    draw(&app);
+                    app.ready_to_draw = false;
+                    previous_draw_time = current_draw_time;
+               }else if(app.terminal.ready_to_draw){
+                    draw(&app);
+                    app.terminal.ready_to_draw = false;
+                    app.ready_to_draw = false;
+                    previous_draw_time = current_draw_time;
+               }
+          }
+
           if(key == ERR){
                sleep(0);
                continue;
@@ -2776,9 +2760,6 @@ int main(int argc, char** argv){
      }
 
      // cleanup
-     pthread_cancel(thread_draw);
-     pthread_join(thread_draw, NULL);
-     pthread_mutex_destroy(&app.draw_lock);
      app.user_config.free_func(&app);
      user_config_free(&app.user_config);
 
