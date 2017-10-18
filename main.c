@@ -2676,6 +2676,7 @@ int main(int argc, char** argv){
      }
 
      ce_app_update_terminal_view(&app);
+     draw(&app);
 
      // init draw thread
      struct timeval previous_draw_time = {};
