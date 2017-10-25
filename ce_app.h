@@ -141,3 +141,21 @@ CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);
 CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);
+
+bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue);
+void input_view_overlay(CeView_t* input_view, CeView_t* view);
+CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number);
+CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
+                                CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath);
+CeBuffer_t* new_buffer();
+void determine_buffer_syntax(CeBuffer_t* buffer);
+char* buffer_base_directory(CeBuffer_t* buffer, CeTerminal_t* terminal);
+void complete_files(CeComplete_t* complete, const char* line, const char* base_directory);
+void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete);
+bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string);
+CeDestination_t scan_line_for_destination(const char* line);
+void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* replace);
+
+bool user_config_init(CeUserConfig_t* user_config, const char* filepath);
+void user_config_free(CeUserConfig_t* user_config);
+void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal);

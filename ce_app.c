@@ -1,9 +1,13 @@
 #include "ce_app.h"
 #include "ce_syntax.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ncurses.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <dlfcn.h>
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
@@ -364,4 +368,338 @@ CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_la
      int64_t height = view->rect.bottom - view->rect.top;
      ce_terminal_resize(&app->terminal, width, height);
      return view;
+}
+
+bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue){
+     // update input view to overlay the current view
+     input_view_overlay(input_view, view);
+
+     // update name based on dialog
+     free(input_view->buffer->app_data);
+     bool success = ce_buffer_alloc(input_view->buffer, 1, dialogue);
+     input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     input_view->cursor = (CePoint_t){0, 0};
+     vim->mode = CE_VIM_MODE_INSERT;
+     ce_rune_node_free(&vim->insert_rune_head);
+
+     return success;
+}
+
+void input_view_overlay(CeView_t* input_view, CeView_t* view){
+     input_view->rect.left = view->rect.left;
+     input_view->rect.right = view->rect.right;
+     input_view->rect.bottom = view->rect.bottom;
+     int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
+     int64_t height = input_view->buffer->line_count;
+     if(height <= 0) height = 1;
+     if(height > max_height) height = max_height;
+     input_view->rect.top = view->rect.bottom - height;
+}
+
+CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number){
+     // move the visual cursor to the right location
+     int64_t visible_cursor_x = 0;
+     if(ce_buffer_point_is_valid(view->buffer, view->cursor)){
+          visible_cursor_x = ce_util_string_index_to_visible_index(view->buffer->lines[view->cursor.y],
+                                                                   view->cursor.x, tab_width);
+     }
+
+     int64_t line_number_width = 0;
+     if(!view->buffer->no_line_numbers){
+          line_number_width = ce_line_number_column_width(line_number, view->buffer->line_count, view->rect.top, view->rect.bottom);
+     }
+
+     return (CePoint_t){visible_cursor_x - view->scroll.x + view->rect.left + line_number_width,
+                        view->cursor.y - view->scroll.y + view->rect.top};
+}
+
+CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
+                                CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
+     // adjust the filepath if it doesn't match our pwd
+     char real_path[PATH_MAX + 1];
+     char load_path[PATH_MAX + 1];
+     char* res = realpath(filepath, real_path);
+     if(!res) return NULL;
+     char cwd[PATH_MAX + 1];
+     if(getcwd(cwd, sizeof(cwd)) != NULL){
+          size_t cwd_len = strlen(cwd);
+          // append a '/' so it looks like a path
+          if(cwd_len < PATH_MAX){
+               cwd[cwd_len] = '/';
+               cwd_len++;
+               cwd[cwd_len] = 0;
+          }
+          // if the file is in our current directory, only show part of the path
+          if(strncmp(cwd, real_path, cwd_len) == 0){
+               strncpy(load_path, real_path + cwd_len, PATH_MAX);
+          }else{
+               strncpy(load_path, real_path, PATH_MAX);
+          }
+     }else{
+          strncpy(load_path, real_path, PATH_MAX);
+     }
+
+     // have we already loaded this file?
+     CeBufferNode_t* itr = *buffer_node_head;
+     while(itr){
+          if(strcmp(itr->buffer->name, load_path) == 0){
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options);
+               return itr->buffer;
+          }
+          itr = itr->next;
+     }
+
+     // load file
+     CeBuffer_t* buffer = new_buffer();
+     if(ce_buffer_load_file(buffer, load_path)){
+          ce_buffer_node_insert(buffer_node_head, buffer);
+          ce_view_switch_buffer(view, buffer, vim, config_options);
+          determine_buffer_syntax(buffer);
+     }else{
+          free(buffer);
+          return NULL;
+     }
+
+     return buffer;
+}
+
+CeBuffer_t* new_buffer(){
+     CeBuffer_t* buffer = calloc(1, sizeof(*buffer));
+     if(!buffer) return buffer;
+     buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     return buffer;
+}
+
+static bool string_ends_with(const char* str, const char* pattern){
+     int64_t str_len = strlen(str);
+     int64_t pattern_len = strlen(pattern);
+     if(str_len < pattern_len) return false;
+
+     return strncmp(str + (str_len - pattern_len), pattern, pattern_len) == 0;
+}
+
+void determine_buffer_syntax(CeBuffer_t* buffer){
+     CeAppBufferData_t* buffer_data = buffer->app_data;
+
+     if(string_ends_with(buffer->name, ".c") ||
+        string_ends_with(buffer->name, ".h")){
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+     }else if(string_ends_with(buffer->name, ".cpp") ||
+        string_ends_with(buffer->name, ".hpp")){
+          buffer_data->syntax_function = ce_syntax_highlight_cpp;
+     }else if(string_ends_with(buffer->name, ".py")){
+          buffer_data->syntax_function = ce_syntax_highlight_python;
+     }else if(string_ends_with(buffer->name, ".java")){
+          buffer_data->syntax_function = ce_syntax_highlight_java;
+     }else if(string_ends_with(buffer->name, ".sh")){
+          buffer_data->syntax_function = ce_syntax_highlight_bash;
+     }else if(string_ends_with(buffer->name, ".cfg")){
+          buffer_data->syntax_function = ce_syntax_highlight_config;
+     }else if(string_ends_with(buffer->name, ".diff") ||
+              string_ends_with(buffer->name, ".patch") ||
+              string_ends_with(buffer->name, "COMMIT_EDITMSG")){
+          buffer_data->syntax_function = ce_syntax_highlight_diff;
+     }else{
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
+     }
+}
+
+char* directory_from_filename(const char* filename){
+     const char* last_slash = strrchr(filename, '/');
+     char* directory = NULL;
+     if(last_slash) directory = strndup(filename, last_slash - filename);
+     return directory;
+}
+
+char* buffer_base_directory(CeBuffer_t* buffer, CeTerminal_t* terminal){
+     if(buffer == terminal->buffer){
+          return ce_terminal_get_current_directory(terminal);
+     }
+
+     return directory_from_filename(buffer->name);
+}
+
+void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
+     char full_path[PATH_MAX];
+     if(base_directory && *line != '/'){
+          snprintf(full_path, PATH_MAX, "%s/%s", base_directory, line);
+     }else{
+          strncpy(full_path, line, PATH_MAX);
+     }
+
+     // figure out the directory to complete
+     const char* last_slash = strrchr(full_path, '/');
+     char* directory = NULL;
+
+     if(last_slash){
+          directory = strndup(full_path, (last_slash - full_path) + 1);
+     }else{
+          directory = strdup(".");
+     }
+
+     // build list of files to complete
+     struct dirent *node;
+     DIR* os_dir = opendir(directory);
+     if(!os_dir){
+          free(directory);
+          return;
+     }
+
+     int64_t file_count = 0;
+     char** files = malloc(sizeof(*files));
+
+     char tmp[PATH_MAX];
+     struct stat info;
+     while((node = readdir(os_dir)) != NULL){
+          snprintf(tmp, PATH_MAX, "%s/%s", directory, node->d_name);
+          stat(tmp, &info);
+          file_count++;
+          files = realloc(files, file_count * sizeof(*files));
+          if(S_ISDIR(info.st_mode)){
+               asprintf(&files[file_count - 1], "%s/", node->d_name);
+          }else{
+               files[file_count - 1] = strdup(node->d_name);
+          }
+     }
+
+     closedir(os_dir);
+
+     // check for exact match
+     bool exact_match = true;
+     if(complete->count != file_count){
+          exact_match = false;
+     }else{
+          for(int64_t i = 0; i < file_count; i++){
+               if(strcmp(files[i], complete->elements[i].string) != 0){
+                    exact_match = false;
+                    break;
+               }
+          }
+     }
+
+     if(!exact_match){
+          ce_complete_init(complete, (const char**)(files), file_count);
+     }
+
+     for(int64_t i = 0; i < file_count; i++){
+          free(files[i]);
+     }
+     free(files);
+
+     if(last_slash){
+          ce_complete_match(complete, last_slash + 1);
+     }else{
+          ce_complete_match(complete, line);
+     }
+
+     free(directory);
+}
+
+void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
+     ce_buffer_empty(buffer);
+     buffer->syntax_data = complete;
+     char line[256];
+     int64_t cursor = 0;
+     for(int64_t i = 0; i < complete->count; i++){
+          if(complete->elements[i].match){
+               if(i == complete->current) cursor = buffer->line_count;
+               snprintf(line, 256, "%s", complete->elements[i].string);
+               buffer_append_on_new_line(buffer, line);
+          }
+     }
+
+     // TODO: figure out why we have to account for this case
+     if(buffer->line_count == 1 && cursor == 1) cursor = 0;
+
+     buffer->cursor_save = (CePoint_t){0, cursor};
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
+bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
+     int64_t last_line = buffer->line_count;
+     if(last_line) last_line--;
+     int64_t line_len = ce_utf8_strlen(buffer->lines[last_line]);
+     if(line_len){
+          if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     }
+     int64_t next_line = last_line;
+     if(line_len) next_line++;
+     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
+}
+
+CeDestination_t scan_line_for_destination(const char* line){
+     CeDestination_t destination = {};
+     destination.point = (CePoint_t){-1, -1};
+
+     // grep/gcc format
+     char* file_end = strchr(line, ':');
+     if(!file_end) return destination;
+     char* row_end = strchr(file_end + 1, ':');
+     char* col_end = NULL;
+     if(row_end) col_end = strchr(row_end + 1, ':');
+     // col_end and row_end is not always present
+
+     int64_t filepath_len = file_end - line;
+     if(filepath_len >= PATH_MAX) return destination;
+     strncpy(destination.filepath, line, filepath_len);
+     destination.filepath[filepath_len] = 0;
+     char* end = NULL;
+
+     if(row_end){
+          char* row_start = file_end + 1;
+          destination.point.y = strtol(row_start, &end, 10);
+          if(end == row_start) destination.point.y = -1;
+
+          if(destination.point.y > 0){
+               destination.point.y--; // account for format which is 1 indexed
+          }
+
+          if(col_end){
+               char* col_start = row_end + 1;
+               destination.point.x = strtol(col_start, &end, 10);
+               if(end == col_start) destination.point.x = -1;
+               if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
+          }else{
+               destination.point.x = 0;
+          }
+     }else{
+          destination.point = (CePoint_t){-1, -1};
+     }
+
+     return destination;
+}
+
+bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
+     user_config->handle = dlopen(filepath, RTLD_LAZY);
+     if(!user_config->handle){
+          ce_log("dlopen() failed: '%s'\n", dlerror());
+          return false;
+     }
+
+     user_config->filepath = strdup(filepath);
+     user_config->init_func = dlsym(user_config->handle, "ce_init");
+     if(!user_config->init_func){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+
+     user_config->free_func = dlsym(user_config->handle, "ce_free");
+     if(!user_config->free_func){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+
+     return true;
+}
+
+void user_config_free(CeUserConfig_t* user_config){
+     free(user_config->filepath);
+     // NOTE: comment out dlclose() so valgrind can get a helpful stack frame
+     dlclose(user_config->handle);
+     memset(user_config, 0, sizeof(*user_config));
+}
+
+void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal){
+     CeAppBufferData_t* buffer_data = terminal->buffer->app_data;
+     buffer_data->last_goto_destination = terminal->cursor.y;
 }
