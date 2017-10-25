@@ -6,4 +6,5 @@ todo:
 
 bug:
 - slow to start, wtf
-- shifting right/left on visual selection can lead to cursor getting set to 0, 0, not sure the exact case yet
+- shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
+- ctrl+q doesn't kill tab
