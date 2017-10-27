@@ -707,6 +707,11 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
      if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
         app->vim.mode == CE_VIM_MODE_INSERT && !app->input_mode){
+          int64_t width = view->rect.right - view->rect.left;
+          int64_t height = view->rect.bottom - view->rect.top;
+          if(app->terminal.columns != width || app->terminal.rows != height){
+               ce_terminal_resize(&app->terminal, width, height);
+          }
           if(key == KEY_ESCAPE){
                app->vim.mode = CE_VIM_MODE_NORMAL;
           }else if(key == 1){ // ctrl + a
@@ -958,11 +963,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
                                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
-                                        if(itr->buffer == app->terminal.buffer){
-                                             int64_t width = view->rect.right - view->rect.left;
-                                             int64_t height = view->rect.bottom - view->rect.top;
-                                             ce_terminal_resize(&app->terminal, width, height);
-                                        }
                                         break;
                                    }
                                    itr = itr->next;
