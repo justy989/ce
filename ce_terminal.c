@@ -1169,9 +1169,6 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
 
      if(terminal->mode & CE_TERMINAL_MODE_UTF8){
           ce_utf8_encode(rune, characters, CE_UTF8_SIZE, &len);
-          if(rune == 9661){
-               ce_log("buttcheeks\n");
-          }
      }else{
           characters[0] = rune;
           width = 1;
