@@ -813,7 +813,7 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
      if(terminal_layout){
           terminal_layout->view.cursor.x = 0;
           terminal_layout->view.cursor.y = app->terminal.cursor.y;
-          terminal_layout->view.scroll.y = app->terminal.cursor.y;
+          terminal_layout->view.scroll.y = app->terminal.cursor.y + app->terminal.start_line;
           terminal_layout->view.scroll.x = 0;
      }
 
