@@ -113,6 +113,7 @@ typedef struct{
      int32_t rows;
      int32_t columns;
      int64_t line_count;
+     int64_t start_line;
      CeTerminalGlyph_t** lines;
      CeTerminalGlyph_t** alternate_lines;
      CeBuffer_t* buffer; // current buffer

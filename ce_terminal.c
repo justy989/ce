@@ -60,26 +60,28 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
 
      CE_CLAMP(left, 0, terminal->columns - 1);
      CE_CLAMP(right, 0, terminal->columns - 1);
-     CE_CLAMP(top, 0, terminal->line_count - 1);
-     CE_CLAMP(bottom, 0, terminal->line_count - 1);
+     CE_CLAMP(top, -terminal->start_line, terminal->rows - 1);
+     CE_CLAMP(bottom, -terminal->start_line, terminal->rows - 1);
+     int width = (right - left) + 1;
 
-     for(int y = top; y <= bottom; ++y){
+     for(int y = top + terminal->start_line; y <= bottom + terminal->start_line; ++y){
           for(int x = left; x <= right; ++x){
                CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
                glyph->foreground = terminal->cursor.attributes.foreground;
                glyph->background = terminal->cursor.attributes.background;
                glyph->attributes = 0;
-               char* str = ce_utf8_iterate_to(terminal->buffer->lines[y], x);
-               int64_t rune_len;
-               ce_utf8_decode(str, &rune_len);
-               if(rune_len > 1){
-                    // shift down to overwrite the current rune's extra bytes, leaving the current rune's first byte open for the space
-                    char* src = str + rune_len;
-                    char* dst = str + 1;
-                    memmove(dst, src, strlen(src) + 1); // include moving down the null terminator
-               }
-               *str = ' ';
           }
+
+          char* start = ce_utf8_iterate_to(terminal->buffer->lines[y], left);
+          char* end = ce_utf8_iterate_to(terminal->buffer->lines[y], right);
+          int64_t length = ce_utf8_strlen_between(start, end);
+          if(length > width){
+               char* shift_src = start + length;
+               char* shift_dst = start + width;
+               int64_t shift_len = strlen(shift_src) + 1; // include null terminator
+               memmove(shift_dst, shift_src, shift_len);
+          }
+          memset(start, ' ', width);
      }
 }
 
@@ -92,13 +94,16 @@ static void terminal_scroll_down(CeTerminal_t* terminal, int original, int n){
      terminal_clear_region(terminal, 0, terminal->bottom - n + 1, terminal->columns - 1, terminal->bottom);
 
      for (int i = terminal->bottom; i >= original + n; i--) {
-          temp_line = terminal->lines[i];
-          terminal->lines[i] = terminal->lines[i - n];
-          terminal->lines[i - n] = temp_line;
+          int cur = terminal->start_line + i;
+          int next = terminal->start_line + (i - n);
 
-          temp_buffer_line = terminal->buffer->lines[i];
-          terminal->buffer->lines[i] = terminal->buffer->lines[i - n];
-          terminal->buffer->lines[i - n] = temp_buffer_line;
+          temp_line = terminal->lines[cur];
+          terminal->lines[cur] = terminal->lines[next];
+          terminal->lines[next] = temp_line;
+
+          temp_buffer_line = terminal->buffer->lines[cur];
+          terminal->buffer->lines[cur] = terminal->buffer->lines[next];
+          terminal->buffer->lines[next] = temp_buffer_line;
      }
 }
 
@@ -114,19 +119,22 @@ static void terminal_scroll_up(CeTerminal_t* terminal, int original, int n){
      // swap lines to move them all up
      // the cleared lines will end up at the bottom
      for(int i = original; i <= terminal->bottom - n; ++i){
-          temp_line = terminal->lines[i];
-          terminal->lines[i] = terminal->lines[i + n];
-          terminal->lines[i + n] = temp_line;
+          int cur = terminal->start_line + i;
+          int next = terminal->start_line + (i + n);
 
-          temp_buffer_line = terminal->buffer->lines[i];
-          terminal->buffer->lines[i] = terminal->buffer->lines[i + n];
-          terminal->buffer->lines[i + n] = temp_buffer_line;
+          temp_line = terminal->lines[cur];
+          terminal->lines[cur] = terminal->lines[next];
+          terminal->lines[next] = temp_line;
+
+          temp_buffer_line = terminal->buffer->lines[cur];
+          terminal->buffer->lines[cur] = terminal->buffer->lines[next];
+          terminal->buffer->lines[next] = temp_buffer_line;
      }
 }
 
 static void terminal_set_scroll(CeTerminal_t* terminal, int top, int bottom){
-     CE_CLAMP(top, 0, terminal->line_count - 1);
-     CE_CLAMP(bottom, 0, terminal->line_count - 1);
+     CE_CLAMP(top, 0, terminal->rows - 1);
+     CE_CLAMP(bottom, 0, terminal->rows - 1);
 
      if(top > bottom){
           int temp = top;
@@ -189,7 +197,7 @@ static void terminal_move_cursor_to(CeTerminal_t* terminal, int x, int y){
           max_y = terminal->bottom;
      }else{
           min_y = 0;
-          max_y = terminal->line_count - 1;
+          max_y = terminal->rows - 1;
      }
 
      terminal->cursor.state &= ~CE_TERMINAL_CURSOR_STATE_WRAPNEXT;
@@ -226,7 +234,7 @@ static void terminal_put_newline(CeTerminal_t* terminal, bool first_column){
      int y = terminal->cursor.y;
 
      if(y == terminal->bottom){
-          terminal_scroll_up(terminal, terminal->top, 1);
+          terminal_scroll_up(terminal, -terminal->start_line, 1);
      }else{
           y++;
      }
@@ -236,7 +244,8 @@ static void terminal_put_newline(CeTerminal_t* terminal, bool first_column){
 
 static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminalGlyph_t* attributes, int x, int y){
      assert(x >= 0 && x < terminal->columns);
-     assert(y >= 0 && y < terminal->line_count);
+     assert(y >= 0 && y < terminal->rows);
+     y += terminal->start_line;
      terminal->lines[y][x] = *attributes;
      char* str = ce_utf8_iterate_to(terminal->buffer->lines[y], x);
      assert(str);
@@ -1034,7 +1043,7 @@ static void csi_handle(CeTerminal_t* terminal){
      case 'r':
           if(!csi->private){
                DEFAULT(csi->arguments[0], 1);
-               DEFAULT(csi->arguments[1], terminal->line_count);
+               DEFAULT(csi->arguments[1], terminal->rows);
                terminal_set_scroll(terminal, csi->arguments[0] - 1, csi->arguments[1] - 1);
                terminal_move_cursor_to_absolute(terminal, 0, 0);
           }
@@ -1051,17 +1060,10 @@ static void csi_handle(CeTerminal_t* terminal){
 }
 
 static void terminal_reset(CeTerminal_t* terminal){
-     terminal->cursor.attributes.attributes = CE_TERMINAL_GLYPH_ATTRIBUTE_NONE;
-     terminal->cursor.attributes.foreground = COLOR_DEFAULT;
-     terminal->cursor.attributes.background = COLOR_DEFAULT;
-     terminal->cursor.x = 0;
-     terminal->cursor.y = 0;
-     terminal->cursor.state = CE_TERMINAL_CURSOR_STATE_DEFAULT;
-
      memset(terminal->tabs, 0, terminal->columns * sizeof(*terminal->tabs));
      for(int i = CE_TERMINAL_TAB_SPACES; i < terminal->columns; ++i) terminal->tabs[i] = 1;
      terminal->top = 0;
-     terminal->bottom = terminal->line_count - 1;
+     terminal->bottom = terminal->rows - 1;
      terminal->mode = CE_TERMINAL_MODE_WRAP | CE_TERMINAL_MODE_UTF8;
 
      //TODO: clear character translation table
@@ -1070,13 +1072,20 @@ static void terminal_reset(CeTerminal_t* terminal){
 
      terminal_move_cursor_to(terminal, 0, 0);
      terminal_cursor_save(terminal);
-     terminal_clear_region(terminal, 0, 0, terminal->columns - 1, terminal->line_count - 1);
+     terminal_clear_region(terminal, 0, 0, terminal->columns - 1, terminal->rows - 1);
      terminal_swap_screen(terminal);
 
      terminal_move_cursor_to(terminal, 0, 0);
      terminal_cursor_save(terminal);
-     terminal_clear_region(terminal, 0, 0, terminal->columns - 1, terminal->line_count - 1);
+     terminal_clear_region(terminal, 0, 0, terminal->columns - 1, terminal->rows - 1);
      terminal_swap_screen(terminal);
+
+     terminal->cursor.attributes.attributes = CE_TERMINAL_GLYPH_ATTRIBUTE_NONE;
+     terminal->cursor.attributes.foreground = COLOR_DEFAULT;
+     terminal->cursor.attributes.background = COLOR_DEFAULT;
+     terminal->cursor.state = CE_TERMINAL_CURSOR_STATE_DEFAULT;
+     terminal->cursor.x = 0;
+     terminal->cursor.y = 0;
 }
 
 static bool esc_handle(CeTerminal_t* terminal, CeRune_t rune){
@@ -1118,7 +1127,7 @@ static bool esc_handle(CeTerminal_t* terminal, CeRune_t rune){
           }
           break;
      case 'E': // NEL -- Next line
-          terminal_put_newline(terminal, 1); // always go to first col
+          terminal_put_newline(terminal, true); // always go to first col
           break;
      case 'H': // HTS -- Horizontal tab stop
           terminal->tabs[terminal->cursor.x] = 1;
@@ -1413,8 +1422,10 @@ static void terminal_echo(CeTerminal_t* terminal, CeRune_t rune){
 bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int64_t line_count){
      terminal->columns = width;
      terminal->rows = height;
-     terminal->bottom = line_count - 1;
+     terminal->top = 0;
+     terminal->bottom = height - 1;
      terminal->line_count = line_count;
+     terminal->start_line = line_count - height;
 
      // allocate lines and alternate lines
      terminal->lines = calloc(line_count, sizeof(*terminal->lines));
