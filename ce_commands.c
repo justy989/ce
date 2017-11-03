@@ -211,7 +211,15 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
      CeView_t* view = NULL;
      CeRect_t view_rect = {};
+     int64_t current_index = 0;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
+          if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
+               current_index = i;
+               break;
+          }
+     }
 
      // check if this is the only view, and ignore the delete request
      if(app->tab_list_layout->tab_list.tab_count == 1 &&
@@ -230,7 +238,18 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
 
      CePoint_t cursor = {0, 0};
      if(view) cursor = view_cursor_on_screen(view, app->config_options.tab_width, app->config_options.line_number);
-     ce_layout_delete(tab_layout, tab_layout->tab.current);
+
+     if(app->tab_list_layout->tab_list.tab_count > 1 && ce_layout_tab_get_layout_count(tab_layout) == 1){
+          ce_layout_delete(app->tab_list_layout, tab_layout);
+          if(current_index >= app->tab_list_layout->tab_list.tab_count){
+               current_index = app->tab_list_layout->tab_list.tab_count - 1;
+          }
+          app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[current_index];
+          tab_layout = app->tab_list_layout->tab_list.current;
+     }else{
+          ce_layout_delete(tab_layout, tab_layout->tab.current);
+     }
+
      ce_layout_distribute_rect(tab_layout, app->terminal_rect);
      ce_layout_view_follow_cursor(tab_layout, app->config_options.horizontal_scroll_off,
                                   app->config_options.vertical_scroll_off, app->config_options.tab_width,

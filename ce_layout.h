@@ -54,6 +54,7 @@ typedef struct{
 CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout);
 CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer);
 CeLayout_t* ce_layout_tab_list_add(CeLayout_t* tab_list_layout);
+int64_t ce_layout_tab_get_layout_count(CeLayout_t* layout);
 void ce_layout_free(CeLayout_t** layout);
 bool ce_layout_split(CeLayout_t* layout, bool vertical);
 void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect);

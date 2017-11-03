@@ -439,3 +439,32 @@ CeLayoutBufferInViewsResult_t ce_layout_buffer_in_views(CeLayout_t* layout, CeBu
      build_buffer_in_views(layout, buffer, &result);
      return result;
 }
+
+static int64_t count_children(CeLayout_t* layout){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+     {
+          int sum = 0;
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               sum += count_children(layout->list.layouts[i]);
+          }
+          return sum;
+     }
+     }
+
+     return 1;
+}
+
+int64_t ce_layout_tab_get_layout_count(CeLayout_t* layout){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          if(!layout->tab.root) return 0;
+          return count_children(layout->tab.root);
+     }
+
+     return 0;
+}

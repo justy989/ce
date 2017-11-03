@@ -703,5 +703,5 @@ void user_config_free(CeUserConfig_t* user_config){
 
 void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal){
      CeAppBufferData_t* buffer_data = terminal->buffer->app_data;
-     buffer_data->last_goto_destination = terminal->cursor.y;
+     buffer_data->last_goto_destination = terminal->cursor.y + terminal->start_line;
 }

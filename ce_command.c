@@ -5,8 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 
-static const char* eat_blanks(const char* string)
-{
+static const char* eat_blanks(const char* string){
      while(*string){
           if(!isblank(*string)) break;
           string++;
@@ -15,8 +14,7 @@ static const char* eat_blanks(const char* string)
      return string;
 }
 
-static const char* find_end_of_arg(const char* string)
-{
+static const char* find_end_of_arg(const char* string){
      bool quote = (*string == '"');
 
      if(quote){
@@ -37,8 +35,7 @@ static const char* find_end_of_arg(const char* string)
      }
 }
 
-static bool parse_arg(CeCommandArg_t* arg, const char* string)
-{
+static bool parse_arg(CeCommandArg_t* arg, const char* string){
      if(*string == 0) return false;
 
      bool digits_only = true;
@@ -80,8 +77,7 @@ static bool parse_arg(CeCommandArg_t* arg, const char* string)
      return true;
 }
 
-bool ce_command_parse(CeCommand_t* command, const char* string)
-{
+bool ce_command_parse(CeCommand_t* command, const char* string){
      if(*string == 0) return false;
 
      const char* start = NULL;
@@ -178,8 +174,7 @@ bool ce_command_parse(CeCommand_t* command, const char* string)
      return true;
 }
 
-void ce_command_free(CeCommand_t* command)
-{
+void ce_command_free(CeCommand_t* command){
      memset(command, 0, CE_COMMAND_NAME_MAX_LEN);
 
      for(int64_t i = 0; i < command->arg_count; ++i){
@@ -193,8 +188,7 @@ void ce_command_free(CeCommand_t* command)
      command->arg_count = 0;
 }
 
-void ce_command_log(CeCommand_t* command)
-{
+void ce_command_log(CeCommand_t* command){
      ce_log("command: '%s', %ld args\n", command->name, command->arg_count);
 
      for(int64_t i = 0; i < command->arg_count; ++i){
