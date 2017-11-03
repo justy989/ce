@@ -3,8 +3,10 @@ todo:
 - add config option for log destination (we want to init the log before the user config, so can we even do this?)
 - dired mode
 - message box
+- 'r' needs to loop over range
 
 bug:
 - slow to start, wtf
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - ctrl+q doesn't kill tab
+- sometimes chain undo will undo 2 actions, not sure how to reproduce yet

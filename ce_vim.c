@@ -112,6 +112,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 27, &ce_vim_parse_verb_normal_mode);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'a', &ce_vim_parse_verb_append);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'A', &ce_vim_parse_verb_append_at_end_of_line);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'I', &ce_vim_parse_verb_insert_at_soft_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'd', &ce_vim_parse_verb_delete);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'D', &ce_vim_parse_verb_delete_to_end_of_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'c', &ce_vim_parse_verb_change);
@@ -1477,6 +1478,14 @@ CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action
      return CE_VIM_PARSE_COMPLETE;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_insert_at_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+     if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+
+     action->verb.function = &ce_vim_verb_insert_at_soft_begin_line;
+     action->repeatable = true;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 static CeVimParseResult_t parse_motion_direction(CeVimAction_t* action, CeVimMotionFunc_t* func){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      action->motion.function = func;
@@ -2752,6 +2761,15 @@ bool ce_vim_verb_append(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
 bool ce_vim_verb_append_at_end_of_line(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                                        CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      view->cursor.x = ce_utf8_strlen(view->buffer->lines[view->cursor.y]);
+     insert_mode(vim);
+     return true;
+}
+
+bool ce_vim_verb_insert_at_soft_begin_line(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
+                                           CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
+     int64_t result = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+     if(result < 0) return false;
+     view->cursor.x = result;
      insert_mode(vim);
      return true;
 }
