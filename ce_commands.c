@@ -724,6 +724,7 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+#if 0
 CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
@@ -761,6 +762,7 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      }
      return CE_COMMAND_SUCCESS;
 }
+#endif
 
 CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;

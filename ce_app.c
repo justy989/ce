@@ -291,6 +291,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
      }
 }
 
+#if 0
 bool ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
      if(jump_list->count == 0 && jump_list->current <= 0){
           jump_list->destinations[0] = destination;
@@ -328,6 +329,7 @@ CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
      CeDestination_t* result = jump_list->destinations + jump_list->current;
      return result;
 }
+#endif
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
      // save the cursor on the old buffer

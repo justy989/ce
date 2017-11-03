@@ -3,7 +3,6 @@ todo:
 - add config option for log destination (we want to init the log before the user config, so can we even do this?)
 - dired mode
 - message box
-- 'r' needs to loop over range
 
 bug:
 - slow to start, wtf
