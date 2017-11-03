@@ -66,6 +66,10 @@ static void insert_mode(CeVim_t* vim){
      if(!vim->verb_last_action) ce_rune_node_free(&vim->insert_rune_head);
 }
 
+bool vim_mode_is_visual(CeVimMode_t vim_mode){
+     return vim_mode == CE_VIM_MODE_VISUAL || vim_mode == CE_VIM_MODE_VISUAL_LINE || vim_mode == CE_VIM_MODE_VISUAL_BLOCK;
+}
+
 bool ce_vim_init(CeVim_t* vim){
      vim->chain_undo = false;
 
@@ -509,8 +513,7 @@ VIM_PARSE_CONTINUE:
 
      // parse multiplier
      if(result != CE_VIM_PARSE_COMPLETE){
-          if(vim_mode == CE_VIM_MODE_VISUAL || vim_mode == CE_VIM_MODE_VISUAL_LINE ||
-             vim_mode == CE_VIM_MODE_VISUAL_BLOCK){
+          if(vim_mode_is_visual(vim_mode)){
                build_action.motion.function = &ce_vim_motion_visual;
                result = CE_VIM_PARSE_COMPLETE;
           }else{
@@ -541,6 +544,8 @@ VIM_PARSE_CONTINUE:
                     }
                }
           }
+     }else if(vim_mode_is_visual(vim_mode) && !build_action.motion.function){
+          build_action.motion.function = &ce_vim_motion_visual;
      }
 
      if(result == CE_VIM_PARSE_COMPLETE) *action = build_action;

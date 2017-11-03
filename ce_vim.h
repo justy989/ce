@@ -124,6 +124,8 @@ bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeVimBufferData_t* buffer_data,
                                      const CeConfigOptions_t* config_options);
 
+bool vim_mode_is_visual(CeVimMode_t mode);
+
 // action
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* keys, CeVimKeyBind_t* key_binds,
                                        int64_t key_bind_count, CeVimMode_t vim_mode);
