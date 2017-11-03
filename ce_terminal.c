@@ -60,8 +60,8 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
 
      CE_CLAMP(left, 0, terminal->columns - 1);
      CE_CLAMP(right, 0, terminal->columns - 1);
-     CE_CLAMP(top, 0, terminal->rows - 1);
-     CE_CLAMP(bottom, 0, terminal->rows - 1);
+     CE_CLAMP(top, -terminal->start_line, terminal->rows - 1);
+     CE_CLAMP(bottom, -terminal->start_line, terminal->rows - 1);
      int width = (right - left) + 1;
 
      for(int y = top + terminal->start_line; y <= bottom + terminal->start_line; ++y){
@@ -234,7 +234,7 @@ static void terminal_put_newline(CeTerminal_t* terminal, bool first_column){
      int y = terminal->cursor.y;
 
      if(y == terminal->bottom){
-          terminal_scroll_up(terminal, terminal->top, 1);
+          terminal_scroll_up(terminal, -terminal->start_line, 1);
      }else{
           y++;
      }
