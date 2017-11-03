@@ -1072,12 +1072,12 @@ static void terminal_reset(CeTerminal_t* terminal){
 
      terminal_move_cursor_to(terminal, 0, 0);
      terminal_cursor_save(terminal);
-     terminal_clear_region(terminal, 0, 0, terminal->columns - 1, terminal->rows - 1);
+     terminal_clear_region(terminal, 0, -terminal->start_line, terminal->columns - 1, terminal->rows - 1);
      terminal_swap_screen(terminal);
 
      terminal_move_cursor_to(terminal, 0, 0);
      terminal_cursor_save(terminal);
-     terminal_clear_region(terminal, 0, 0, terminal->columns - 1, terminal->rows - 1);
+     terminal_clear_region(terminal, 0, -terminal->start_line, terminal->columns - 1, terminal->rows - 1);
      terminal_swap_screen(terminal);
 
      terminal->cursor.attributes.attributes = CE_TERMINAL_GLYPH_ATTRIBUTE_NONE;
