@@ -708,8 +708,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
      if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
         app->vim.mode == CE_VIM_MODE_INSERT && !app->input_mode){
-          int64_t width = view->rect.right - view->rect.left;
-          int64_t height = view->rect.bottom - view->rect.top;
+          int64_t width = (view->rect.right - view->rect.left);
+          int64_t height = (view->rect.bottom - view->rect.top);
           if(app->terminal.columns != width || app->terminal.rows != height){
                ce_terminal_resize(&app->terminal, width, height);
           }
@@ -1477,8 +1477,20 @@ int main(int argc, char** argv){
                }
           }
 
+          // TODO: compress with below
+          if(view->buffer == app.terminal.lines_buffer){
+               ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+          }else if(view->buffer == app.terminal.alternate_lines_buffer){
+               view->scroll.x = 0;
+               view->scroll.y = app.terminal.start_line;
+          }else{
+               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                     app.config_options.tab_width);
+          }
+
           if(key == ERR){
                sleep(0);
+
                continue;
           }
 
@@ -1486,13 +1498,6 @@ int main(int argc, char** argv){
           app_handle_key(&app, view, key);
 
           if(view){
-               if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
-                    ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
-               }else{
-                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                          app.config_options.tab_width);
-               }
-
                // setup input view overlay if we are
                if(app.input_mode) input_view_overlay(&app.input_view, view);
           }
