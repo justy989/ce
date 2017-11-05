@@ -439,7 +439,7 @@ CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
      int64_t width = view->rect.right - view->rect.left;
      int64_t height = view->rect.bottom - view->rect.top;
 
-     CeTerminal_t* terminal = terminal_list_new_terminal(&app->terminal_list, width, height, app->config_options.terminal_scroll_back);
+     CeTerminal_t* terminal = ce_terminal_list_new_terminal(&app->terminal_list, width, height, app->config_options.terminal_scroll_back);
      ce_buffer_node_insert(&app->buffer_node_head, terminal->buffer);
 
      // TODO: compress with main.c's terminal_init stuff
@@ -447,7 +447,7 @@ CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
      terminal->lines_buffer->no_line_numbers = true;
      CeAppBufferData_t* buffer_data = terminal->lines_buffer->app_data;
      buffer_data->syntax_function = ce_syntax_highlight_terminal;
-     terminal->lines_buffer->syntax_data = &terminal;
+     terminal->lines_buffer->syntax_data = terminal;
 
      terminal->alternate_lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
      terminal->alternate_lines_buffer->no_line_numbers = true;

@@ -110,7 +110,6 @@ typedef struct CeApp_t{
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
      char edit_register;
-     CeTerminal_t terminal;
      CeMacros_t macros;
      CePoint_t search_start;
      // CeJumpList_t jump_list;
@@ -176,4 +175,5 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath);
 void user_config_free(CeUserConfig_t* user_config);
 void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal);
 
-CeTerminal_t* terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back);
+CeTerminal_t* ce_terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back);
+CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);

@@ -706,7 +706,7 @@ void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal){
      buffer_data->last_goto_destination = terminal->cursor.y + terminal->start_line;
 }
 
-CeTerminal_t* terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back){
+CeTerminal_t* ce_terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back){
      CeTerminalNode_t* node = calloc(1, sizeof(*node));
 
      ce_terminal_init(&node->terminal, width, height, scroll_back);
@@ -722,4 +722,16 @@ CeTerminal_t* terminal_list_new_terminal(CeTerminalList_t* terminal_list, int wi
      }
 
      return &node->terminal;
+}
+
+CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* terminal_list){
+     CeTerminalNode_t* itr = terminal_list->head;
+     while(itr){
+          if(buffer == itr->terminal.lines_buffer || buffer == itr->terminal.alternate_lines_buffer){
+             return &itr->terminal;
+          }
+          itr = itr->next;
+     }
+
+     return NULL;
 }

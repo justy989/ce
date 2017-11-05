@@ -291,7 +291,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminal_t* terminal, CeBuffer_t* input_buffer,
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminalList_t* terminal_list, CeBuffer_t* input_buffer,
                  CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number, CeLayout_t* current,
                  CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search, int ui_fg_color, int ui_bg_color){
      switch(layout->type){
@@ -303,9 +303,8 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
           CeAppBufferData_t* buffer_data = layout->view.buffer->app_data;
 
           // update which terminal buffer we are viewing
-          if(layout->view.buffer == terminal->lines_buffer || layout->view.buffer == terminal->alternate_lines_buffer){
-               layout->view.buffer = terminal->buffer;
-          }
+          CeTerminal_t* terminal = ce_buffer_in_terminal_list(layout->view.buffer, terminal_list);
+          if(terminal) layout->view.buffer = terminal->buffer;
 
           if(buffer_data->syntax_function){
                CeRangeList_t range_list = {};
@@ -438,13 +437,13 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               draw_layout(layout->list.layouts[i], vim, macros, terminal, input_buffer, color_defs, tab_width,
+               draw_layout(layout->list.layouts[i], vim, macros, terminal_list, input_buffer, color_defs, tab_width,
                            line_number, current, syntax_defs, terminal_width, highlight_search, ui_fg_color,
                            ui_bg_color);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          draw_layout(layout->tab.root, vim, macros, terminal, input_buffer, color_defs, tab_width, line_number,
+          draw_layout(layout->tab.root, vim, macros, terminal_list, input_buffer, color_defs, tab_width, line_number,
                       current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
           break;
      }
@@ -494,16 +493,14 @@ void draw(CeApp_t* app){
      CeView_t* view = &tab_layout->tab.current->view;
 
      // update cursor if it is on a terminal
-     if((view->buffer == app->terminal.lines_buffer ||
-         view->buffer == app->terminal.alternate_lines_buffer) &&
-        app->vim.mode == CE_VIM_MODE_INSERT){
-          view->cursor.x = app->terminal.cursor.x;
-          view->cursor.y = app->terminal.cursor.y + app->terminal.start_line;
-          ce_view_follow_cursor(view, 1, 1, app->config_options.tab_width);
+     CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app->terminal_list);
+     if(terminal && app->vim.mode == CE_VIM_MODE_INSERT){
+          view->cursor.x = terminal->cursor.x;
+          view->cursor.y = terminal->cursor.y + terminal->start_line;
      }
 
      standend();
-     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, app->input_view.buffer, &color_defs, app->config_options.tab_width,
+     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs, app->config_options.tab_width,
                  app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
                  app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
 
@@ -716,36 +713,38 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           ce_macros_record_key(&app->macros, key);
      }
 
-     if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
-        !app->input_mode){
-          if(app->vim.mode == CE_VIM_MODE_INSERT){
-               int64_t width = (view->rect.right - view->rect.left);
-               int64_t height = (view->rect.bottom - view->rect.top);
-               if(app->terminal.columns != width || app->terminal.rows != height){
-                    ce_terminal_resize(&app->terminal, width, height);
-               }
-               if(key == KEY_ESCAPE){
-                    app->vim.mode = CE_VIM_MODE_NORMAL;
-               }else if(key == 1){ // ctrl + a
-                    // TODO: make this configurable
-                    // send escape
-                    ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
-               }else{
-                    if(key == KEY_ENTER){
-                         update_terminal_last_goto_using_cursor(&app->terminal);
+     if(view && !app->input_mode){
+          CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app->terminal_list);
+          if(terminal){
+               if(app->vim.mode == CE_VIM_MODE_INSERT){
+                    int64_t width = (view->rect.right - view->rect.left);
+                    int64_t height = (view->rect.bottom - view->rect.top);
+                    if(terminal->columns != width || terminal->rows != height){
+                         ce_terminal_resize(terminal, width, height);
                     }
-                    ce_terminal_send_key(&app->terminal, key);
-               }
-               return;
-          }else if(app->vim.mode == CE_VIM_MODE_NORMAL){
-               if(key == 'p'){
-                    CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('"');
-                    if(yank->text){
-                         char* itr = yank->text;
+                    if(key == KEY_ESCAPE){
+                         app->vim.mode = CE_VIM_MODE_NORMAL;
+                    }else if(key == 1){ // ctrl + a
+                         // TODO: make this configurable
+                         // send escape
+                         ce_terminal_send_key(terminal, KEY_ESCAPE);
+                    }else{
+                         if(key == KEY_ENTER){
+                              update_terminal_last_goto_using_cursor(terminal);
+                         }
+                         ce_terminal_send_key(terminal, key);
+                    }
+                    return;
+               }else if(app->vim.mode == CE_VIM_MODE_NORMAL){
+                    if(key == 'p'){
+                         CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('"');
+                         if(yank->text){
+                              char* itr = yank->text;
 
-                         while(*itr){
-                              ce_terminal_send_key(&app->terminal, *itr);
-                              itr++;
+                              while(*itr){
+                                   ce_terminal_send_key(terminal, *itr);
+                                   itr++;
+                              }
                          }
                     }
                }
@@ -1500,10 +1499,11 @@ int main(int argc, char** argv){
 
           // TODO: compress with below
           if(view){
-               if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+               CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app.terminal_list);
+               if(terminal){
                     if(app.vim.mode == CE_VIM_MODE_INSERT){
                          view->scroll.x = 0;
-                         view->scroll.y = app.terminal.start_line;
+                         view->scroll.y = terminal->start_line;
                     }else{
                          ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
                     }
@@ -1519,10 +1519,11 @@ int main(int argc, char** argv){
           app_handle_key(&app, view, key);
 
           if(view){
-               if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+               CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app.terminal_list);
+               if(terminal){
                     if(app.vim.mode == CE_VIM_MODE_INSERT){
                          view->scroll.x = 0;
-                         view->scroll.y = app.terminal.start_line;
+                         view->scroll.y = terminal->start_line;
                     }else{
                          ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
                     }
@@ -1591,6 +1592,18 @@ int main(int argc, char** argv){
                     free(itr);
                     break;
                }
+
+               CeTerminal_t* terminal = ce_buffer_in_terminal_list(itr->buffer, &app.terminal_list);
+               if(terminal){
+                    if(prev){
+                         prev->next = itr->next;
+                    }else{
+                         app.buffer_node_head = itr->next;
+                    }
+                    free(itr);
+                    break;
+               }
+
                itr = itr->next;
           }
      }
