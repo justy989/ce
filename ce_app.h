@@ -178,3 +178,4 @@ void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal);
 
 CeTerminal_t* ce_terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back);
 CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);
+CeTerminal_t* create_terminal(CeApp_t* app, int width, int height);
