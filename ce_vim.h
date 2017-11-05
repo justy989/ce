@@ -113,6 +113,7 @@ typedef struct CeVim_t{
      CeRuneNode_t* insert_rune_head;
      bool chain_undo;
      bool verb_last_action; // flag whether or not we are repeating our last action
+     bool pasting;
      CePoint_t visual_block_top_left;
      CePoint_t visual_block_bottom_right;
      CeVimSearchMode_t search_mode;

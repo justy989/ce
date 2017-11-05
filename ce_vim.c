@@ -208,7 +208,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                     vim->chain_undo = true;
 
                     // indent after newline
-                    if(key == CE_NEWLINE){
+                    if(key == CE_NEWLINE && !vim->pasting){
                          // calc indentation
                          CePoint_t indentation_point = {0, view->cursor.y};
                          int64_t indentation = ce_vim_get_indentation(view->buffer, save_cursor, config_options->tab_width);
@@ -262,7 +262,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           break;
      case '}':
      {
-          if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
+          if(!vim->pasting && string_is_whitespace(view->buffer->lines[view->cursor.y])){
                int64_t remove_len = strlen(view->buffer->lines[view->cursor.y]);
                CePoint_t remove_loc = {0, view->cursor.y};
                ce_buffer_remove_string_change(view->buffer, remove_loc, remove_len, &view->cursor,

@@ -235,27 +235,27 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
           default:
                break;
           case CE_VIM_MODE_NORMAL:
-               vim_mode_string = "N";
+               vim_mode_string = "NORMAL";
                vim_mode_fg = COLOR_BLUE;
                break;
           case CE_VIM_MODE_INSERT:
-               vim_mode_string = "I";
+               vim_mode_string = "INSERT";
                vim_mode_fg = COLOR_GREEN;
                break;
           case CE_VIM_MODE_VISUAL:
-               vim_mode_string = "V";
+               vim_mode_string = "VISUAL";
                vim_mode_fg = COLOR_YELLOW;
                break;
           case CE_VIM_MODE_VISUAL_LINE:
-               vim_mode_string = "VL";
+               vim_mode_string = "VISUAL LINE";
                vim_mode_fg = COLOR_BRIGHT_YELLOW;
                break;
           case CE_VIM_MODE_VISUAL_BLOCK:
-               vim_mode_string = "VB";
+               vim_mode_string = "VISUAL BLOCK";
                vim_mode_fg = COLOR_BRIGHT_YELLOW;
                break;
           case CE_VIM_MODE_REPLACE:
-               vim_mode_string = "R";
+               vim_mode_string = "REPLACE";
                vim_mode_fg = COLOR_RED;
                break;
           }
@@ -1368,6 +1368,8 @@ int main(int argc, char** argv){
           {command_search, "search", "interactive search 'forward' or 'backward'"},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_noh, "noh", "turn off search highlighting"},
+          {command_setpaste, "setpaste", "about to paste, so turn off auto indentation"},
+          {command_setnopaste, "setnopaste", "done pasting, so turn on auto indentation again"},
           {command_command, "command", "interactively send a commmand"},
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},

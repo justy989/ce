@@ -366,6 +366,20 @@ CeCommandStatus_t command_noh(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_setpaste(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     app->vim.pasting = true;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_setnopaste(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     app->vim.pasting = false;
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
