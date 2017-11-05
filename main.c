@@ -1492,24 +1492,34 @@ int main(int argc, char** argv){
           }
 
           // TODO: compress with below
-          if(view->buffer == app.terminal.lines_buffer){
-               ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
-          }else if(view->buffer == app.terminal.alternate_lines_buffer){
-               view->scroll.x = 0;
-               view->scroll.y = app.terminal.start_line;
-          }else{
-               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                     app.config_options.tab_width);
+          if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+               if(app.vim.mode == CE_VIM_MODE_INSERT){
+                    view->scroll.x = 0;
+                    view->scroll.y = app.terminal.start_line;
+               }else{
+                    ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+               }
           }
 
           if(key == ERR){
                sleep(0);
-
                continue;
           }
 
           // handle input from the user
           app_handle_key(&app, view, key);
+
+          if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+               if(app.vim.mode == CE_VIM_MODE_INSERT){
+                    view->scroll.x = 0;
+                    view->scroll.y = app.terminal.start_line;
+               }else{
+                    ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+               }
+          }else{
+               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                     app.config_options.tab_width);
+          }
 
           if(view){
                // setup input view overlay if we are
