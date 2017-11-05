@@ -707,25 +707,39 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      }
 
      if(view && (view->buffer == app->terminal.lines_buffer || view->buffer == app->terminal.alternate_lines_buffer) &&
-        app->vim.mode == CE_VIM_MODE_INSERT && !app->input_mode){
-          int64_t width = (view->rect.right - view->rect.left);
-          int64_t height = (view->rect.bottom - view->rect.top);
-          if(app->terminal.columns != width || app->terminal.rows != height){
-               ce_terminal_resize(&app->terminal, width, height);
-          }
-          if(key == KEY_ESCAPE){
-               app->vim.mode = CE_VIM_MODE_NORMAL;
-          }else if(key == 1){ // ctrl + a
-               // TODO: make this configurable
-               // send escape
-               ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
-          }else{
-               if(key == KEY_ENTER){
-                    update_terminal_last_goto_using_cursor(&app->terminal);
+        !app->input_mode){
+          if(app->vim.mode == CE_VIM_MODE_INSERT){
+               int64_t width = (view->rect.right - view->rect.left);
+               int64_t height = (view->rect.bottom - view->rect.top);
+               if(app->terminal.columns != width || app->terminal.rows != height){
+                    ce_terminal_resize(&app->terminal, width, height);
                }
-               ce_terminal_send_key(&app->terminal, key);
+               if(key == KEY_ESCAPE){
+                    app->vim.mode = CE_VIM_MODE_NORMAL;
+               }else if(key == 1){ // ctrl + a
+                    // TODO: make this configurable
+                    // send escape
+                    ce_terminal_send_key(&app->terminal, KEY_ESCAPE);
+               }else{
+                    if(key == KEY_ENTER){
+                         update_terminal_last_goto_using_cursor(&app->terminal);
+                    }
+                    ce_terminal_send_key(&app->terminal, key);
+               }
+               return;
+          }else if(app->vim.mode == CE_VIM_MODE_NORMAL){
+               if(key == 'p'){
+                    CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('"');
+                    if(yank->text){
+                         char* itr = yank->text;
+
+                         while(*itr){
+                              ce_terminal_send_key(&app->terminal, *itr);
+                              itr++;
+                         }
+                    }
+               }
           }
-          return;
      }
 
      // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
