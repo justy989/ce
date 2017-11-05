@@ -226,34 +226,6 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
      }
 }
 
-void ce_layout_view_follow_cursor(CeLayout_t* layout, int64_t horizontal_scroll_off, int64_t vertical_scroll_off,
-                                  int64_t tab_width, CeBuffer_t* terminal_buffer){
-     switch(layout->type){
-     default:
-          break;
-     case CE_LAYOUT_TYPE_VIEW:
-          if(layout->view.buffer == terminal_buffer){
-               ce_view_follow_cursor(&layout->view, 1, 1, tab_width);
-          }else{
-               ce_view_follow_cursor(&layout->view, horizontal_scroll_off, vertical_scroll_off, tab_width);
-          }
-          break;
-     case CE_LAYOUT_TYPE_LIST:
-     {
-          for(int64_t i = 0; i < layout->list.layout_count; i++){
-               ce_layout_view_follow_cursor(layout->list.layouts[i], horizontal_scroll_off, vertical_scroll_off, tab_width,
-                                            terminal_buffer);
-          }
-     } break;
-     case CE_LAYOUT_TYPE_TAB:
-          ce_layout_view_follow_cursor(layout->tab.root, horizontal_scroll_off, vertical_scroll_off, tab_width, terminal_buffer);
-          break;
-     case CE_LAYOUT_TYPE_TAB_LIST:
-          ce_layout_view_follow_cursor(layout->tab_list.current, horizontal_scroll_off, vertical_scroll_off, tab_width, terminal_buffer);
-          break;
-     }
-}
-
 CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point){
      switch(layout->type){
      default:

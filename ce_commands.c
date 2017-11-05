@@ -187,9 +187,6 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
 
      ce_layout_split(tab_layout, vertical);
      ce_layout_distribute_rect(tab_layout, app->terminal_rect);
-     ce_layout_view_follow_cursor(tab_layout, app->config_options.horizontal_scroll_off,
-                                  app->config_options.vertical_scroll_off, app->config_options.tab_width,
-                                  app->terminal.buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -251,9 +248,6 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      }
 
      ce_layout_distribute_rect(tab_layout, app->terminal_rect);
-     ce_layout_view_follow_cursor(tab_layout, app->config_options.horizontal_scroll_off,
-                                  app->config_options.vertical_scroll_off, app->config_options.tab_width,
-                                  app->terminal.buffer);
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 
@@ -275,7 +269,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
      }else{ // it's 0
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
 
-          char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
+          char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
           complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
           free(base_directory);
           build_complete_list(app->complete_list_buffer, &app->load_file_complete);
@@ -457,6 +451,7 @@ CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
 
      ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options);
      app->vim.mode = CE_VIM_MODE_INSERT;
+     app->last_terminal = terminal;
 
      return CE_COMMAND_SUCCESS;
 }
@@ -539,7 +534,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      CeAppBufferData_t* buffer_data = view->buffer->app_data;
      buffer_data->last_goto_destination = view->cursor.y;
 
-     char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
+     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
      CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                      base_directory, &destination);
      free(base_directory);
@@ -557,8 +552,8 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
      CeBuffer_t* buffer = app->last_goto_buffer;
-     if(!buffer) buffer = app->terminal.buffer;
-     if(buffer->line_count == 0) return CE_COMMAND_SUCCESS;
+     if(!buffer && app->last_terminal) buffer = app->last_terminal->buffer;
+     if(!buffer || buffer->line_count == 0) return CE_COMMAND_SUCCESS;
 
      CeAppBufferData_t* buffer_data = buffer->app_data;
 
@@ -572,7 +567,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
           CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
           if(destination.point.x < 0 || destination.point.y < 0) continue;
 
-          char* base_directory = buffer_base_directory(buffer, &app->terminal);
+          char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                                  base_directory, &destination);
           free(base_directory);
@@ -590,7 +585,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
           if(destination.point.x >= 0 && destination.point.y >= 0){
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = save_destination;
-               char* base_directory = buffer_base_directory(buffer, &app->terminal);
+               char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
                load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                           base_directory, &destination);
                free(base_directory);
@@ -609,8 +604,8 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
      CeBuffer_t* buffer = app->last_goto_buffer;
-     if(!buffer) buffer = app->terminal.buffer;
-     if(buffer->line_count == 0) return CE_COMMAND_SUCCESS;
+     if(!buffer && app->last_terminal) buffer = app->last_terminal->buffer;
+     if(!buffer || buffer->line_count == 0) return CE_COMMAND_SUCCESS;
 
      CeAppBufferData_t* buffer_data = buffer->app_data;
 
@@ -624,7 +619,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
           CeDestination_t destination = scan_line_for_destination(buffer->lines[i]);
           if(destination.point.x < 0 || destination.point.y < 0) continue;
 
-          char* base_directory = buffer_base_directory(buffer, &app->terminal);
+          char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
           CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                                                  base_directory, &destination);
           free(base_directory);
@@ -640,7 +635,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
           if(destination.point.x >= 0 && destination.point.y >= 0){
-               char* base_directory = buffer_base_directory(buffer, &app->terminal);
+               char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
                load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, base_directory, &destination);
                free(base_directory);
           }
@@ -839,39 +834,51 @@ CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
      CeApp_t* app = (CeApp_t*)(user_data);
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     ce_run_command_in_terminal(&app->terminal, command->args[0].string);
-     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
+     if(!app->last_terminal){
+          ce_log("error in terminal command: no terminal available\n");
+          return CE_COMMAND_FAILURE;
+     }
+
+     ce_run_command_in_terminal(app->last_terminal, command->args[0].string);
+     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->last_terminal->buffer);
      if(terminal_layout){
           terminal_layout->view.cursor.x = 0;
-          terminal_layout->view.cursor.y = app->terminal.cursor.y;
-          terminal_layout->view.scroll.y = app->terminal.cursor.y + app->terminal.start_line;
+          terminal_layout->view.cursor.y = app->last_terminal->cursor.y;
+          terminal_layout->view.scroll.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
           terminal_layout->view.scroll.x = 0;
      }
 
-     update_terminal_last_goto_using_cursor(&app->terminal);
+     update_terminal_last_goto_using_cursor(app->last_terminal);
      return CE_COMMAND_SUCCESS;
 }
 
 CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
      CeApp_t* app = (CeApp_t*)(user_data);
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
+     if(!app->last_terminal){
+          ce_log("error in terminal command: no terminal available\n");
+          return CE_COMMAND_FAILURE;
+     }
+
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
-     ce_run_command_in_terminal(&app->terminal, command->args[0].string);
+     ce_run_command_in_terminal(app->last_terminal, command->args[0].string);
      view = ce_switch_to_terminal(app, view, tab_layout);
      view->cursor.x = 0;
-     view->cursor.y = app->terminal.cursor.y;
-     view->scroll.y = app->terminal.cursor.y;
+     view->cursor.y = app->last_terminal->cursor.y;
+     view->scroll.y = app->last_terminal->cursor.y;
      view->scroll.x = 0;
 
-     update_terminal_last_goto_using_cursor(&app->terminal);
+     update_terminal_last_goto_using_cursor(app->last_terminal);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -882,6 +889,11 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
+     if(!app->last_terminal){
+          ce_log("error in terminal command: no terminal available\n");
+          return CE_COMMAND_FAILURE;
+     }
+
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
      CeRange_t range = ce_vim_find_little_word_boundaries(view->buffer, view->cursor); // returns -1
@@ -890,7 +902,7 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      char cmd[128];
      snprintf(cmd, 128, "man %s", word);
      free(word);
-     ce_run_command_in_terminal(&app->terminal, cmd);
+     ce_run_command_in_terminal(app->last_terminal, cmd);
      ce_switch_to_terminal(app, view, tab_layout);
 
      return CE_COMMAND_SUCCESS;

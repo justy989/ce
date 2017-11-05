@@ -121,6 +121,7 @@ typedef struct CeApp_t{
      bool highlight_search;
      CeUserConfig_t user_config;
      CeTerminalList_t terminal_list;
+     CeTerminal_t* last_terminal;
 }CeApp_t;
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);
@@ -164,7 +165,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
                                 CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath);
 CeBuffer_t* new_buffer();
 void determine_buffer_syntax(CeBuffer_t* buffer);
-char* buffer_base_directory(CeBuffer_t* buffer, CeTerminal_t* terminal);
+char* buffer_base_directory(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);
 void complete_files(CeComplete_t* complete, const char* line, const char* base_directory);
 void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete);
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string);

@@ -356,19 +356,28 @@ void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command){
 }
 
 CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout){
-     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->terminal.buffer);
-     if(terminal_layout){
-          tab_layout->tab.current = terminal_layout;
-          app->vim.mode = CE_VIM_MODE_INSERT;
-          return &terminal_layout->view;
+     CeTerminalNode_t* itr = app->terminal_list.head;
+     while(itr){
+          CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, itr->terminal.buffer);
+          if(terminal_layout){
+               tab_layout->tab.current = terminal_layout;
+               app->vim.mode = CE_VIM_MODE_INSERT;
+               app->last_terminal = &itr->terminal;
+               return &terminal_layout->view;
+          }
+          itr = itr->next;
      }
 
-     ce_view_switch_buffer(view, app->terminal.buffer, &app->vim, &app->config_options);
-     app->vim.mode = CE_VIM_MODE_INSERT;
+     if(app->last_terminal){
+          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options);
+          app->vim.mode = CE_VIM_MODE_INSERT;
 
-     int64_t width = view->rect.right - view->rect.left;
-     int64_t height = view->rect.bottom - view->rect.top;
-     ce_terminal_resize(&app->terminal, width, height);
+          int64_t width = view->rect.right - view->rect.left;
+          int64_t height = view->rect.bottom - view->rect.top;
+          ce_terminal_resize(app->last_terminal, width, height);
+     }else{
+
+     }
      return view;
 }
 
@@ -513,10 +522,9 @@ char* directory_from_filename(const char* filename){
      return directory;
 }
 
-char* buffer_base_directory(CeBuffer_t* buffer, CeTerminal_t* terminal){
-     if(buffer == terminal->buffer){
-          return ce_terminal_get_current_directory(terminal);
-     }
+char* buffer_base_directory(CeBuffer_t* buffer, CeTerminalList_t* terminal_list){
+     CeTerminal_t* terminal = ce_buffer_in_terminal_list(buffer, terminal_list);
+     if(terminal) return ce_terminal_get_current_directory(terminal);
 
      return directory_from_filename(buffer->name);
 }
@@ -709,7 +717,12 @@ void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal){
 CeTerminal_t* ce_terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back){
      CeTerminalNode_t* node = calloc(1, sizeof(*node));
 
-     ce_terminal_init(&node->terminal, width, height, scroll_back);
+     const int max_name_len = 64;
+     char name[max_name_len];
+     terminal_list->unique_id++;
+     snprintf(name, max_name_len, "terminal_%ld", terminal_list->unique_id);
+
+     ce_terminal_init(&node->terminal, width, height, scroll_back, name);
 
      if(terminal_list->tail){
           terminal_list->tail->next = node;

@@ -1419,7 +1419,7 @@ static void terminal_echo(CeTerminal_t* terminal, CeRune_t rune){
      terminal_put(terminal, rune);
 }
 
-bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int64_t line_count){
+bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int64_t line_count, const char* buffer_name){
      terminal->columns = width;
      terminal->rows = height;
      terminal->top = 0;
@@ -1434,8 +1434,8 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int
      // allocate buffers
      terminal->lines_buffer = calloc(1, sizeof(*terminal->lines_buffer));
      terminal->alternate_lines_buffer = calloc(1, sizeof(*terminal->alternate_lines_buffer));
-     ce_buffer_alloc(terminal->lines_buffer, line_count, "[terminal]");
-     ce_buffer_alloc(terminal->alternate_lines_buffer, line_count, "[terminal]");
+     ce_buffer_alloc(terminal->lines_buffer, line_count, buffer_name);
+     ce_buffer_alloc(terminal->alternate_lines_buffer, line_count, buffer_name);
      terminal->lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->alternate_lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->buffer = terminal->lines_buffer;
@@ -1529,6 +1529,7 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
 
      terminal->columns = width;
      terminal->rows = height;
+     terminal->start_line = terminal->line_count - height;
 
      struct winsize window_size = {};
 

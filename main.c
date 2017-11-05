@@ -647,7 +647,7 @@ bool apply_completion(CeApp_t* app, CeView_t* view){
                // if completion was load_file, continue auto completing since we could have completed a directory
                // and want to see what is in it
                if(complete == &app->load_file_complete){
-                    char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
+                    char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                     complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
                     free(base_directory);
                     build_complete_list(app->complete_list_buffer, &app->load_file_complete);
@@ -894,7 +894,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                               // ce_jump_list_insert(&app->jump_list, destination);
 
-                              char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
+                              char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                               char filepath[PATH_MAX];
                               for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
                                    if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
@@ -1094,7 +1094,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          ce_complete_match(&app->command_complete, app->input_view.buffer->lines[0]);
                          build_complete_list(app->complete_list_buffer, &app->command_complete);
                     }else if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                         char* base_directory = buffer_base_directory(view->buffer, &app->terminal);
+                         char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                          complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
                          free(base_directory);
                          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
@@ -1423,28 +1423,6 @@ int main(int argc, char** argv){
           app.user_config.init_func(&app);
      }
 
-     // init terminal
-     {
-          getmaxyx(stdscr, app.terminal_height, app.terminal_width);
-          if(app.config_options.terminal_scroll_back < app.terminal_height){
-               app.config_options.terminal_scroll_back = app.terminal_height - 1;
-          }
-          ce_terminal_init(&app.terminal, app.terminal_width, app.terminal_height - 1, app.config_options.terminal_scroll_back);
-          ce_buffer_node_insert(&app.buffer_node_head, app.terminal.buffer);
-
-          app.terminal.lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
-          app.terminal.lines_buffer->no_line_numbers = true;
-          CeAppBufferData_t* buffer_data = app.terminal.lines_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_terminal;
-          app.terminal.lines_buffer->syntax_data = &app.terminal;
-
-          app.terminal.alternate_lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
-          app.terminal.alternate_lines_buffer->no_line_numbers = true;
-          buffer_data = app.terminal.alternate_lines_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_terminal;
-          app.terminal.alternate_lines_buffer->syntax_data = &app.terminal;
-     }
-
      // init command complete
      {
           const char** commands = malloc(app.command_entry_count * sizeof(*commands));
@@ -1489,11 +1467,24 @@ int main(int argc, char** argv){
                     draw(&app);
                     app.ready_to_draw = false;
                     previous_draw_time = current_draw_time;
-               }else if(app.terminal.ready_to_draw){
-                    draw(&app);
-                    app.terminal.ready_to_draw = false;
-                    app.ready_to_draw = false;
-                    previous_draw_time = current_draw_time;
+               }else{
+                    CeTerminalNode_t* itr = app.terminal_list.head;
+                    bool do_draw = false;
+
+                    while(itr){
+                         if(itr->terminal.ready_to_draw){
+                              do_draw = true;
+                              itr->terminal.ready_to_draw = false;
+                              break;
+                         }
+                         itr = itr->next;
+                    }
+
+                    // if we did draw, turn of any outstanding draw flags
+                    if(do_draw){
+                         draw(&app);
+                         app.ready_to_draw = false;
+                    }
                }
           }
 
@@ -1582,17 +1573,6 @@ int main(int argc, char** argv){
           CeBufferNode_t* itr = app.buffer_node_head;
           CeBufferNode_t* prev = NULL;
           while(itr){
-               if(itr->buffer == app.terminal.lines_buffer ||
-                  itr->buffer == app.terminal.alternate_lines_buffer){
-                    if(prev){
-                         prev->next = itr->next;
-                    }else{
-                         app.buffer_node_head = itr->next;
-                    }
-                    free(itr);
-                    break;
-               }
-
                CeTerminal_t* terminal = ce_buffer_in_terminal_list(itr->buffer, &app.terminal_list);
                if(terminal){
                     if(prev){
@@ -1609,7 +1589,15 @@ int main(int argc, char** argv){
      }
 
      ce_buffer_node_free(&app.buffer_node_head);
-     ce_terminal_free(&app.terminal);
+
+     CeTerminalNode_t* itr = app.terminal_list.head;
+     while(itr){
+          CeTerminalNode_t* tmp = itr;
+          itr = itr->next;
+          ce_terminal_free(&tmp->terminal);
+          free(tmp);
+     }
+
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
      endwin();
