@@ -70,6 +70,17 @@ typedef struct{
      CeUserConfigFunc* free_func;
 }CeUserConfig_t;
 
+typedef struct CeTerminalNode_t{
+     CeTerminal_t terminal;
+     struct CeTerminalNode_t* next;
+}CeTerminalNode_t;
+
+typedef struct{
+     CeTerminalNode_t* head;
+     CeTerminalNode_t* tail;
+     int64_t unique_id;
+}CeTerminalList_t;
+
 typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
@@ -110,6 +121,7 @@ typedef struct CeApp_t{
      bool quit;
      bool highlight_search;
      CeUserConfig_t user_config;
+     CeTerminalList_t terminal_list;
 }CeApp_t;
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);
@@ -163,3 +175,5 @@ void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* re
 bool user_config_init(CeUserConfig_t* user_config, const char* filepath);
 void user_config_free(CeUserConfig_t* user_config);
 void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal);
+
+CeTerminal_t* terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back);

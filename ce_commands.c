@@ -427,6 +427,40 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+
+     int64_t width = view->rect.right - view->rect.left;
+     int64_t height = view->rect.bottom - view->rect.top;
+
+     CeTerminal_t* terminal = terminal_list_new_terminal(&app->terminal_list, width, height, app->config_options.terminal_scroll_back);
+     ce_buffer_node_insert(&app->buffer_node_head, terminal->buffer);
+
+     // TODO: compress with main.c's terminal_init stuff
+     terminal->lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     terminal->lines_buffer->no_line_numbers = true;
+     CeAppBufferData_t* buffer_data = terminal->lines_buffer->app_data;
+     buffer_data->syntax_function = ce_syntax_highlight_terminal;
+     terminal->lines_buffer->syntax_data = &terminal;
+
+     terminal->alternate_lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     terminal->alternate_lines_buffer->no_line_numbers = true;
+     buffer_data = terminal->alternate_lines_buffer->app_data;
+     buffer_data->syntax_function = ce_syntax_highlight_terminal;
+     terminal->alternate_lines_buffer->syntax_data = terminal;
+
+     ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options);
+     app->vim.mode = CE_VIM_MODE_INSERT;
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 

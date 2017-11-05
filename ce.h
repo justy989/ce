@@ -123,6 +123,8 @@ typedef struct{
      int64_t vertical_scroll_off;
      int64_t terminal_scroll_back;
      bool insert_spaces_on_tab;
+     int ui_fg_color;
+     int ui_bg_color;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{

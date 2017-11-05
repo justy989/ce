@@ -705,3 +705,21 @@ void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal){
      CeAppBufferData_t* buffer_data = terminal->buffer->app_data;
      buffer_data->last_goto_destination = terminal->cursor.y + terminal->start_line;
 }
+
+CeTerminal_t* terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back){
+     CeTerminalNode_t* node = calloc(1, sizeof(*node));
+
+     ce_terminal_init(&node->terminal, width, height, scroll_back);
+
+     if(terminal_list->tail){
+          terminal_list->tail->next = node;
+     }
+
+     terminal_list->tail = node;
+
+     if(!terminal_list->head){
+          terminal_list->head = terminal_list->tail;
+     }
+
+     return &node->terminal;
+}

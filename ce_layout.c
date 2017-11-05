@@ -454,7 +454,7 @@ static int64_t count_children(CeLayout_t* layout){
      }
      }
 
-     return 1;
+     return 0;
 }
 
 int64_t ce_layout_tab_get_layout_count(CeLayout_t* layout){

@@ -214,10 +214,11 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
      }
 }
 
-void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorDefs_t* color_defs, int64_t height_offset){
+void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorDefs_t* color_defs, int64_t height_offset,
+                      int ui_fg_color, int ui_bg_color){
      // create bottom bar bg
      int64_t bottom = view->rect.bottom + height_offset;
-     int color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+     int color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
      attron(COLOR_PAIR(color_pair));
      int64_t width = (view->rect.right - view->rect.left) + 1;
      move(bottom, view->rect.left);
@@ -261,15 +262,15 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      }
 
      if(vim_mode_string){
-          color_pair = ce_color_def_get(color_defs, vim_mode_fg, COLOR_BRIGHT_BLACK);
+          color_pair = ce_color_def_get(color_defs, vim_mode_fg, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", vim_mode_string);
 
-          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           printw(" %s", view->buffer->name);
      }else{
-          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", view->buffer->name);
      }
@@ -292,7 +293,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
 
 void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminal_t* terminal, CeBuffer_t* input_buffer,
                  CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number, CeLayout_t* current,
-                 CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search){
+                 CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search, int ui_fg_color, int ui_bg_color){
      switch(layout->type){
      default:
           break;
@@ -425,9 +426,9 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
 
           draw_view(&layout->view, tab_width, line_number, &draw_color_list, color_defs, syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
-          draw_view_status(&layout->view, layout == current ? vim : NULL, macros, color_defs, 0);
+          draw_view_status(&layout->view, layout == current ? vim : NULL, macros, color_defs, 0, ui_fg_color, ui_bg_color);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
-          int color_pair = ce_color_def_get(color_defs, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_BLACK);
+          int color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           if(layout->view.rect.right < (terminal_width - 1)){
                for(int i = 0; i < rect_height; i++){
@@ -438,12 +439,13 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
                draw_layout(layout->list.layouts[i], vim, macros, terminal, input_buffer, color_defs, tab_width,
-                           line_number, current, syntax_defs, terminal_width, highlight_search);
+                           line_number, current, syntax_defs, terminal_width, highlight_search, ui_fg_color,
+                           ui_bg_color);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
           draw_layout(layout->tab.root, vim, macros, terminal, input_buffer, color_defs, tab_width, line_number,
-                      current, syntax_defs, terminal_width, highlight_search);
+                      current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
           break;
      }
 }
@@ -503,15 +505,17 @@ void draw(CeApp_t* app){
      standend();
      draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal, app->input_view.buffer, &color_defs, app->config_options.tab_width,
                  app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
-                 app->highlight_search);
+                 app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
 
      if(app->input_mode){
           CeDrawColorList_t draw_color_list = {};
           draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
                     &color_defs, app->syntax_defs);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
-          draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0);
-          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
+          draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0, app->config_options.ui_fg_color,
+                           app->config_options.ui_bg_color);
+          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
+                           app->config_options.ui_fg_color, app->config_options.ui_bg_color);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -543,7 +547,8 @@ void draw(CeApp_t* app){
                     &color_defs, app->syntax_defs);
           if(app->input_mode){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
-               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset);
+               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
+                                app->config_options.ui_fg_color, app->config_options.ui_bg_color);
           }
      }
 
@@ -659,6 +664,11 @@ bool apply_completion(CeApp_t* app, CeView_t* view){
 }
 
 void app_handle_key(CeApp_t* app, CeView_t* view, int key){
+     if(key == KEY_RESIZE){
+          ce_app_update_terminal_view(app);
+          return;
+     }
+
      if(app->key_count == 0 &&
         app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
@@ -1362,6 +1372,7 @@ int main(int argc, char** argv){
           {command_command, "command", "interactively send a commmand"},
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
+          {command_new_terminal, "new_terminal", "open a new terminal and show it in the current view"},
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
@@ -1448,7 +1459,6 @@ int main(int argc, char** argv){
           free(commands);
      }
 
-     ce_app_update_terminal_view(&app);
      draw(&app);
 
      // init draw thread
@@ -1460,9 +1470,6 @@ int main(int argc, char** argv){
      while(!app.quit){
           gettimeofday(&current_draw_time, NULL);
           time_since_last_draw = time_between(previous_draw_time, current_draw_time);
-
-          // TODO: we can optimize by only resizing when we see a resized event
-          ce_app_update_terminal_view(&app);
 
           // figure out our current view rect
           CeView_t* view = NULL;
@@ -1492,12 +1499,14 @@ int main(int argc, char** argv){
           }
 
           // TODO: compress with below
-          if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
-               if(app.vim.mode == CE_VIM_MODE_INSERT){
-                    view->scroll.x = 0;
-                    view->scroll.y = app.terminal.start_line;
-               }else{
-                    ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+          if(view){
+               if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+                    if(app.vim.mode == CE_VIM_MODE_INSERT){
+                         view->scroll.x = 0;
+                         view->scroll.y = app.terminal.start_line;
+                    }else{
+                         ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+                    }
                }
           }
 
@@ -1509,19 +1518,19 @@ int main(int argc, char** argv){
           // handle input from the user
           app_handle_key(&app, view, key);
 
-          if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
-               if(app.vim.mode == CE_VIM_MODE_INSERT){
-                    view->scroll.x = 0;
-                    view->scroll.y = app.terminal.start_line;
-               }else{
-                    ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
-               }
-          }else{
-               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                     app.config_options.tab_width);
-          }
-
           if(view){
+               if(view->buffer == app.terminal.lines_buffer || view->buffer == app.terminal.alternate_lines_buffer){
+                    if(app.vim.mode == CE_VIM_MODE_INSERT){
+                         view->scroll.x = 0;
+                         view->scroll.y = app.terminal.start_line;
+                    }else{
+                         ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+                    }
+               }else{
+                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                          app.config_options.tab_width);
+               }
+
                // setup input view overlay if we are
                if(app.input_mode) input_view_overlay(&app.input_view, view);
           }

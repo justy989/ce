@@ -20,6 +20,7 @@ CeCommandStatus_t command_noh(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data);

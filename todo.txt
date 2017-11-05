@@ -4,6 +4,8 @@ todo:
 - dired mode
 - message box
 - undo in macros
+- vim increment and decrement number on line
+- vim 'delete' in insert mode
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
