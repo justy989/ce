@@ -1,4 +1,5 @@
 #include "ce_terminal.h"
+#include "ce_app.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -105,6 +106,13 @@ static void terminal_scroll_down(CeTerminal_t* terminal, int original, int n){
           terminal->buffer->lines[cur] = terminal->buffer->lines[next];
           terminal->buffer->lines[next] = temp_buffer_line;
      }
+
+     // update the last goto destination based on scrolling
+     CeAppBufferData_t* buffer_data = terminal->buffer->app_data;
+     buffer_data->last_goto_destination += n;
+     if(buffer_data->last_goto_destination >= terminal->buffer->line_count){
+          buffer_data->last_goto_destination = terminal->buffer->line_count - 1;
+     }
 }
 
 static void terminal_scroll_up(CeTerminal_t* terminal, int original, int n){
@@ -129,6 +137,13 @@ static void terminal_scroll_up(CeTerminal_t* terminal, int original, int n){
           temp_buffer_line = terminal->buffer->lines[cur];
           terminal->buffer->lines[cur] = terminal->buffer->lines[next];
           terminal->buffer->lines[next] = temp_buffer_line;
+     }
+
+     // update the last goto destination based on scrolling
+     CeAppBufferData_t* buffer_data = terminal->buffer->app_data;
+     buffer_data->last_goto_destination -= n;
+     if(buffer_data->last_goto_destination < 0){
+          buffer_data->last_goto_destination = 0;
      }
 }
 

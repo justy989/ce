@@ -99,7 +99,7 @@ typedef struct{
 
      bool no_line_numbers;
 
-     void* app_data;
+     void* app_data; // TODO: this doesn't need to be a void*
      void* syntax_data;
 
      // NOTE: if we decide to do a buffer init hook, add config_data for user configs
