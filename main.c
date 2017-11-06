@@ -75,6 +75,7 @@ static void build_macro_list(CeBuffer_t* buffer, CeMacros_t* macros){
      buffer_append_on_new_line(buffer, "// \\l -> KEY_LEFT");
      buffer_append_on_new_line(buffer, "// \\i -> KEY_RIGHT");
      buffer_append_on_new_line(buffer, "// \\\\ -> \\"); // HAHAHAHAHA
+     buffer_append_on_new_line(buffer, "// \^k -> CTRL_K");
 
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }

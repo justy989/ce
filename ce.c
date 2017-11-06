@@ -1508,7 +1508,11 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
           }else{
                switch(*int_itr){
                default:
-                    len++; // going to fill in with '~' for now
+                    if(*int_itr >= 1 && *int_itr <= 31){
+                         len += 3;
+                    }else{
+                         len++; // going to fill in with '~' for now
+                    }
                     break;
                case KEY_BACKSPACE:
                case KEY_ESCAPE:
@@ -1539,8 +1543,34 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
           }else{
                switch(*int_itr){
                default:
-                    *char_itr = '~';
-                    char_itr++;
+                    if(*int_itr >= 1 && *int_itr <= 26){
+                         *char_itr = '\\'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                         *char_itr = 'a' + (*int_itr - 1); char_itr++;
+                    }else if(*int_itr == 27){
+                         *char_itr = '\\'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                         *char_itr = '['; char_itr++;
+                    }else if(*int_itr == 28){
+                         *char_itr = '\\'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                         *char_itr = '\\'; char_itr++;
+                    }else if(*int_itr == 29){
+                         *char_itr = '\\'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                         *char_itr = ']'; char_itr++;
+                    }else if(*int_itr == 30){
+                         *char_itr = '\\'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                    }else if(*int_itr == 31){
+                         *char_itr = '\\'; char_itr++;
+                         *char_itr = '^'; char_itr++;
+                         *char_itr = '_'; char_itr++;
+                    }else{
+                         *char_itr = '~';
+                         char_itr++;
+                    }
                     break;
                case KEY_BACKSPACE:
                     *char_itr = '\\'; char_itr++;
@@ -1637,6 +1667,22 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
                     break;
                case '\\':
                     *int_itr = '\\';
+                    break;
+               case '^':
+                    char_itr++;
+                    if(*char_itr >= 'a' && *char_itr <= 'z'){
+                         *int_itr = (*char_itr - 'a') + 1;
+                    }else if(*char_itr == '['){
+                         *int_itr = 27;
+                    }else if(*char_itr == '\\'){
+                         *int_itr = 28;
+                    }else if(*char_itr == ']'){
+                         *int_itr = 29;
+                    }else if(*char_itr == '^'){
+                         *int_itr = 30;
+                    }else if(*char_itr == '_'){
+                         *int_itr = 31;
+                    }
                     break;
                }
 
