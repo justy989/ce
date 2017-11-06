@@ -10,3 +10,6 @@ todo:
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
+- macros don't work moving around to other views
+- terminal resize is weird with the scroll, where it doesn't seem to know where the bottom is correctly sometimes
+- ctrl+j in completion creates extra lines that ruin drawing

@@ -716,12 +716,13 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(view && !app->input_mode){
           CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app->terminal_list);
           if(terminal){
+               int64_t width = (view->rect.right - view->rect.left);
+               int64_t height = (view->rect.bottom - view->rect.top);
+               if(terminal->columns != width || terminal->rows != height){
+                    ce_terminal_resize(terminal, width, height);
+               }
+
                if(app->vim.mode == CE_VIM_MODE_INSERT){
-                    int64_t width = (view->rect.right - view->rect.left);
-                    int64_t height = (view->rect.bottom - view->rect.top);
-                    if(terminal->columns != width || terminal->rows != height){
-                         ce_terminal_resize(terminal, width, height);
-                    }
                     if(key == KEY_ESCAPE){
                          app->vim.mode = CE_VIM_MODE_NORMAL;
                     }else if(key == 1){ // ctrl + a

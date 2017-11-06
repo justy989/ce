@@ -1544,7 +1544,18 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
 
      terminal->columns = width;
      terminal->rows = height;
+     terminal->top = 0;
+     terminal->bottom = height - 1;
      terminal->start_line = terminal->line_count - height;
+
+     // clamp cursor onto terminal
+     if(terminal->cursor.y > terminal->line_count){
+          terminal->cursor.y = terminal->line_count - 1;
+     }
+
+     if(terminal->cursor.y > width){
+          terminal->cursor.x = width - 1;
+     }
 
      struct winsize window_size = {};
 
