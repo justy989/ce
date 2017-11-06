@@ -6,10 +6,10 @@ todo:
 - vim increment and decrement number on line
 - vim 'delete' in insert mode
 - visual block paste doesn't work as exected
+- when turning macros into strings, support ctrl sequences /^j maybe
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
-- sometimes chain undo will undo 2 actions, not sure how to reproduce yet
-- macros don't work moving around to other views
+- Sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - terminal resize is weird with the scroll, where it doesn't seem to know where the bottom is correctly sometimes
 - ctrl+j in completion creates extra lines that ruin drawing

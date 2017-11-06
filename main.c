@@ -700,6 +700,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     CeRune_t* itr = rune_string;
                     while(*itr){
                          app_handle_key(app, view, *itr);
+
+                         // update the view if it has changed
+                         CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+                         if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+                              view = &tab_layout->tab.current->view;
+                         }
                          itr++;
                     }
                }
@@ -747,6 +753,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    itr++;
                               }
                          }
+                         return;
                     }
                }
           }
