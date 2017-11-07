@@ -58,7 +58,7 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      char format_string[BUFSIZ];
 
      // build buffer info
-     snprintf(format_string, BUFSIZ, "   %%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
+     snprintf(format_string, BUFSIZ, "%%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
 
      itr = head;
      while(itr){
@@ -888,7 +888,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
-                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->jump_list);
                               break;
                          }
                          itr = itr->next;
@@ -951,11 +951,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                          apply_completion(app, view);
                          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                              CeDestination_t destination = {};
-                              destination.point = view->cursor;
-                              strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                              // ce_jump_list_insert(&app->jump_list, destination);
-
                               char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                               char filepath[PATH_MAX];
                               for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
@@ -964,7 +959,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    }else{
                                         strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
                                    }
-                                   load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
+                                   load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                                       &app->jump_list, filepath);
                               }
 
                               free(base_directory);
@@ -985,7 +981,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeDestination_t destination = {};
                               destination.point = view->cursor;
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                              // ce_jump_list_insert(&app->jump_list, destination);
+                              ce_jump_list_insert(&app->jump_list, destination);
                          }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
                               char* end_of_number = app->input_view.buffer->lines[0];
                               int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
@@ -1049,7 +1045,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeBufferNode_t* itr = app->buffer_node_head;
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->jump_list);
                                         break;
                                    }
                                    itr = itr->next;
@@ -1180,7 +1176,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                         // ce_jump_list_insert(&app->jump_list, destination);
+                         ce_jump_list_insert(&app->jump_list, destination);
                     }else if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
                              app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
                              app->vim.current_action.motion.function == ce_vim_motion_search_next ||
@@ -1380,6 +1376,15 @@ int main(int argc, char** argv){
           CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_completions;
 
+          buffer_data = app.buffer_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.yank_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.macro_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.mark_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+
           if(argc > 1){
                for(int64_t i = last_arg_index; i < argc; i++){
                     CeBuffer_t* buffer = new_buffer();
@@ -1451,7 +1456,7 @@ int main(int argc, char** argv){
           {command_buffer_type, "buffer_type", "set the current buffer's type: c, python, java, bash, config, diff, plain"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
-          // {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
+          {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
