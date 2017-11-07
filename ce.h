@@ -223,6 +223,7 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str);
 bool ce_range_sort(CeRange_t* range);
 
 int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_line_count, int64_t view_top, int64_t view_bottom);
+int64_t ce_count_digits(int64_t n);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;

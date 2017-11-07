@@ -20,15 +20,53 @@ void handle_sigint(int signal){
      // pass
 }
 
+const char* buffer_status_get_str(CeBufferStatus_t status){
+     if(status == CE_BUFFER_STATUS_READONLY){
+          return "[RO]";
+     }
+
+     if(status == CE_BUFFER_STATUS_MODIFIED ||
+        status == CE_BUFFER_STATUS_NEW_FILE){
+          return "*";
+     }
+
+     return "";
+}
+
 static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
-     int64_t index = 1;
-     char line[256];
+     char buffer_info[BUFSIZ];
      ce_buffer_empty(buffer);
-     while(head){
-          snprintf(line, 256, "%ld %s %ld", index, head->buffer->name, head->buffer->line_count);
-          buffer_append_on_new_line(buffer, line);
-          head = head->next;
-          index++;
+
+     // calc maxes of things we care about for formatting
+     int64_t max_buffer_lines = 0;
+     int64_t max_name_len = 0;
+     int64_t buffer_count = 0;
+     const CeBufferNode_t* itr = head;
+     while(itr){
+          if(max_buffer_lines < itr->buffer->line_count) max_buffer_lines = itr->buffer->line_count;
+          int64_t name_len = strlen(itr->buffer->name);
+          if(max_name_len < name_len) max_name_len = name_len;
+          buffer_count++;
+          itr = itr->next;
+     }
+
+     int64_t max_buffer_lines_digits = ce_count_digits(max_buffer_lines);
+     if(max_buffer_lines_digits < 5) max_buffer_lines_digits = 5; // account for "lines" string row header
+     if(max_name_len < 11) max_name_len = 11; // account for "buffer name" string row header
+
+     // build format string, OMG THIS IS SO UNREADABLE HOLY MOLY BATMAN
+     char format_string[BUFSIZ];
+
+     // build buffer info
+     snprintf(format_string, BUFSIZ, "   %%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
+
+     itr = head;
+     while(itr){
+          const char* buffer_flag_str = buffer_status_get_str(itr->buffer->status);
+          snprintf(buffer_info, BUFSIZ, format_string, buffer_flag_str, itr->buffer->name,
+                   itr->buffer->line_count);
+          buffer_append_on_new_line(buffer, buffer_info);
+          itr = itr->next;
      }
 
      buffer->status = CE_BUFFER_STATUS_READONLY;
@@ -276,12 +314,8 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
           mvprintw(bottom, view->rect.left + 1, "%s", view->buffer->name);
      }
 
-     if(view->buffer->status == CE_BUFFER_STATUS_MODIFIED ||
-        view->buffer->status == CE_BUFFER_STATUS_NEW_FILE){
-          addch('*');
-     }else if(view->buffer->status == CE_BUFFER_STATUS_READONLY){
-          printw("[RO]");
-     }
+     const char* status_str = buffer_status_get_str(view->buffer->status);
+     if(status_str) printw(status_str);
 
      if(vim_mode_string && ce_macros_is_recording(macros)){
           printw(" RECORDING %c", macros->recording);
