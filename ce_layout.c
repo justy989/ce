@@ -53,6 +53,7 @@ void ce_layout_free(CeLayout_t** root){
           break;
      case CE_LAYOUT_TYPE_VIEW:
           free(layout->view.user_data);
+          layout->view.user_data = NULL;
           break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
