@@ -309,21 +309,50 @@ void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
 }
 
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list){
-     if(jump_list->count == 0) return 0;
-     if(jump_list->current < 0) return 0;
-     int save_current = jump_list->current;
+     if(jump_list->count == 0) return NULL;
+     if(jump_list->current < 0) return NULL;
+     int64_t save_current = jump_list->current;
      jump_list->current--;
      return jump_list->destinations + save_current;
 }
 
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
-     if(jump_list->count == 0) return 0;
+     if(jump_list->count == 0) return NULL;
      if(jump_list->current >= (jump_list->count - 1)) return 0;
      jump_list->current++;
      return jump_list->destinations + jump_list->current;
 }
 
-void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
+CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list){
+     if(jump_list->count == 0) return NULL;
+     if(jump_list->current < 0) return NULL;
+     return jump_list->destinations + jump_list->current;
+}
+
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options,
+                           CeJumpList_t* jump_list){
+     // if the old buffer is not in the jump list, then add it
+     if(jump_list){
+          bool add_current = false;
+          CeDestination_t* current_destination = ce_jump_list_current(jump_list);
+          if(current_destination){
+               if(!ce_destination_in_view(current_destination, view)){
+                    add_current = true;
+               }
+          }else{
+               add_current = true;
+          }
+
+          CeDestination_t destination = {};
+
+          if(add_current){
+               destination.point = view->cursor;
+               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+               ce_jump_list_insert(jump_list, destination);
+               ce_log("pre ji: %s: %ld, %ld\n", destination.filepath, destination.point.x, destination.point.y);
+          }
+     }
+
      // save the cursor on the old buffer
      view->buffer->cursor_save = view->cursor;
      view->buffer->scroll_save = view->scroll;
@@ -334,6 +363,15 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      view->scroll = buffer->scroll_save;
 
      ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
+
+     // add to the jump list
+     if(jump_list){
+          CeDestination_t destination = {};
+          destination.point = view->cursor;
+          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+          ce_jump_list_insert(jump_list, destination);
+          ce_log("post ji: %s: %ld, %ld\n", destination.filepath, destination.point.x, destination.point.y);
+     }
 
      vim->mode = CE_VIM_MODE_NORMAL;
 }
@@ -364,11 +402,15 @@ CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_la
      int64_t height = view->rect.bottom - view->rect.top;
 
      if(app->last_terminal){
-          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options);
+          app->last_terminal->buffer->cursor_save.x = app->last_terminal->cursor.x;
+          app->last_terminal->buffer->cursor_save.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
+          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options, &app->jump_list);
           ce_terminal_resize(app->last_terminal, width, height);
      }else{
           CeTerminal_t* terminal = create_terminal(app, width, height);
-          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options);
+          terminal->buffer->cursor_save.x = terminal->cursor.x;
+          terminal->buffer->cursor_save.y = terminal->cursor.y + terminal->start_line;
+          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options, &app->jump_list);
           app->last_terminal = terminal;
      }
 
@@ -420,7 +462,8 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
 }
 
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
-                                CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath){
+                                CeConfigOptions_t* config_options, CeVim_t* vim,
+                                CeJumpList_t* jump_list, const char* filepath){
      // adjust the filepath if it doesn't match our pwd
      char real_path[PATH_MAX + 1];
      char load_path[PATH_MAX + 1];
@@ -449,7 +492,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBufferNode_t* itr = *buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, load_path) == 0){
-               ce_view_switch_buffer(view, itr->buffer, vim, config_options);
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options, jump_list);
                return itr->buffer;
           }
           itr = itr->next;
@@ -459,7 +502,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBuffer_t* buffer = new_buffer();
      if(ce_buffer_load_file(buffer, load_path)){
           ce_buffer_node_insert(buffer_node_head, buffer);
-          ce_view_switch_buffer(view, buffer, vim, config_options);
+          ce_view_switch_buffer(view, buffer, vim, config_options, jump_list);
           determine_buffer_syntax(buffer);
      }else{
           free(buffer);
@@ -789,4 +832,15 @@ int64_t istrlen(const CeRune_t* istr){
      const CeRune_t* start = istr;
      while(*istr) istr++;
      return istr - start;
+}
+
+bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
+     if(!view) return false;
+
+     int64_t view_width = view->rect.right - view->rect.left;
+     int64_t view_height = view->rect.bottom - view->rect.top;
+     CeRect_t view_rect = {view->scroll.x, view->scroll.x + view_width, view->scroll.y, view->scroll.y + view_height};
+
+     return strcmp(destination->filepath, view->buffer->name) == 0 &&
+            ce_point_in_rect(destination->point, view_rect);
 }

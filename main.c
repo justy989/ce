@@ -888,7 +888,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
-                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->jump_list);
                               break;
                          }
                          itr = itr->next;
@@ -951,29 +951,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                          apply_completion(app, view);
                          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                              bool add_current = false;
-                              if(app->jump_list.current >= 0){
-                                   CeDestination_t* destination = app->jump_list.destinations + app->jump_list.current;
-                                   int64_t view_width = view->rect.right - view->rect.left;
-                                   int64_t view_height = view->rect.bottom - view->rect.top;
-                                   CeRect_t view_rect = {view->scroll.x, view->scroll.x + view_width, view->scroll.y, view->scroll.y + view_height};
-                                   if(strcmp(destination->filepath, view->buffer->name) == 0 && ce_point_in_rect(destination->point, view_rect)){
-                                        // pass
-                                   }else{
-                                        add_current = true;
-                                   }
-                              }else{
-                                   add_current = true;
-                              }
-
-                              CeDestination_t destination = {};
-
-                              if(add_current){
-                                   destination.point = view->cursor;
-                                   strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                                   ce_jump_list_insert(&app->jump_list, destination);
-                              }
-
                               char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                               char filepath[PATH_MAX];
                               for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
@@ -982,12 +959,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    }else{
                                         strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
                                    }
-                                   load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, filepath);
+                                   load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                                       &app->jump_list, filepath);
                               }
-
-                              destination.point = view->cursor;
-                              strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                              ce_jump_list_insert(&app->jump_list, destination);
 
                               free(base_directory);
                          }else if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
@@ -1071,7 +1045,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeBufferNode_t* itr = app->buffer_node_head;
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options);
+                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->jump_list);
                                         break;
                                    }
                                    itr = itr->next;

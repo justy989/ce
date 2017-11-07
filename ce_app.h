@@ -152,8 +152,10 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination);
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
+CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list);
 
-void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options,
+                           CeJumpList_t* jump_list);
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);
 CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);
 
@@ -161,7 +163,8 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 void input_view_overlay(CeView_t* input_view, CeView_t* view);
 CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number);
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
-                                CeConfigOptions_t* config_options, CeVim_t* vim, const char* filepath);
+                                CeConfigOptions_t* config_options, CeVim_t* vim,
+                                CeJumpList_t* jump_list, const char* filepath);
 CeBuffer_t* new_buffer();
 void determine_buffer_syntax(CeBuffer_t* buffer);
 char* buffer_base_directory(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);
@@ -181,3 +184,5 @@ CeTerminal_t* create_terminal(CeApp_t* app, int width, int height);
 
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
 int64_t istrlen(const CeRune_t* istr);
+
+bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
