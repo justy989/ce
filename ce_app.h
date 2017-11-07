@@ -46,16 +46,20 @@ typedef struct{
 }CeKeyBindDef_t;
 
 typedef struct{
+     CeDestination_t destinations[JUMP_LIST_DESTINATION_COUNT];
+     int64_t count;
+     int64_t current;
+}CeJumpList_t;
+
+typedef struct{
      CeVimBufferData_t vim;
      int64_t last_goto_destination;
      CeSyntaxHighlightFunc_t* syntax_function;
 }CeAppBufferData_t;
 
 typedef struct{
-     CeDestination_t destinations[JUMP_LIST_DESTINATION_COUNT];
-     int64_t count;
-     int64_t current;
-}CeJumpList_t;
+     CeJumpList_t jump_list;
+}CeAppViewData_t;
 
 struct CeApp_t;
 
@@ -110,7 +114,6 @@ typedef struct CeApp_t{
      char edit_register;
      CeMacros_t macros;
      CePoint_t search_start;
-     CeJumpList_t jump_list;
      void* user_config_data;
      bool record_macro;
      bool replay_macro;
@@ -155,7 +158,7 @@ CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list);
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options,
-                           CeJumpList_t* jump_list);
+                           bool insert_into_jump_list);
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);
 CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);
 
@@ -164,7 +167,7 @@ void input_view_overlay(CeView_t* input_view, CeView_t* view);
 CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number);
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
-                                CeJumpList_t* jump_list, const char* filepath);
+                                bool insert_into_jump_list, const char* filepath);
 CeBuffer_t* new_buffer();
 void determine_buffer_syntax(CeBuffer_t* buffer);
 char* buffer_base_directory(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);

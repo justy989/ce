@@ -330,9 +330,12 @@ CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list){
 }
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options,
-                           CeJumpList_t* jump_list){
+                           bool insert_into_jump_list){
+     CeAppViewData_t* view_data = view->user_data;
+     CeJumpList_t* jump_list = &view_data->jump_list;
+
      // if the old buffer is not in the jump list, then add it
-     if(jump_list){
+     if(insert_into_jump_list){
           bool add_current = false;
           CeDestination_t* current_destination = ce_jump_list_current(jump_list);
           if(current_destination){
@@ -349,7 +352,6 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
                destination.point = view->cursor;
                strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                ce_jump_list_insert(jump_list, destination);
-               ce_log("pre ji: %s: %ld, %ld\n", destination.filepath, destination.point.x, destination.point.y);
           }
      }
 
@@ -365,12 +367,11 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      ce_view_follow_cursor(view, config_options->horizontal_scroll_off, config_options->vertical_scroll_off, config_options->tab_width);
 
      // add to the jump list
-     if(jump_list){
+     if(insert_into_jump_list){
           CeDestination_t destination = {};
           destination.point = view->cursor;
           strncpy(destination.filepath, view->buffer->name, PATH_MAX);
           ce_jump_list_insert(jump_list, destination);
-          ce_log("post ji: %s: %ld, %ld\n", destination.filepath, destination.point.x, destination.point.y);
      }
 
      vim->mode = CE_VIM_MODE_NORMAL;
@@ -404,13 +405,13 @@ CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_la
      if(app->last_terminal){
           app->last_terminal->buffer->cursor_save.x = app->last_terminal->cursor.x;
           app->last_terminal->buffer->cursor_save.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
-          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options, &app->jump_list);
+          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options, true);
           ce_terminal_resize(app->last_terminal, width, height);
      }else{
           CeTerminal_t* terminal = create_terminal(app, width, height);
           terminal->buffer->cursor_save.x = terminal->cursor.x;
           terminal->buffer->cursor_save.y = terminal->cursor.y + terminal->start_line;
-          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options, &app->jump_list);
+          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options, true);
           app->last_terminal = terminal;
      }
 
@@ -463,7 +464,7 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
 
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
-                                CeJumpList_t* jump_list, const char* filepath){
+                                bool insert_into_jump_list, const char* filepath){
      // adjust the filepath if it doesn't match our pwd
      char real_path[PATH_MAX + 1];
      char load_path[PATH_MAX + 1];
@@ -492,7 +493,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBufferNode_t* itr = *buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, load_path) == 0){
-               ce_view_switch_buffer(view, itr->buffer, vim, config_options, jump_list);
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
                return itr->buffer;
           }
           itr = itr->next;
@@ -502,7 +503,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBuffer_t* buffer = new_buffer();
      if(ce_buffer_load_file(buffer, load_path)){
           ce_buffer_node_insert(buffer_node_head, buffer);
-          ce_view_switch_buffer(view, buffer, vim, config_options, jump_list);
+          ce_view_switch_buffer(view, buffer, vim, config_options, insert_into_jump_list);
           determine_buffer_syntax(buffer);
      }else{
           free(buffer);
