@@ -10,7 +10,7 @@
 #include "ce_macros.h"
 
 #define APP_MAX_KEY_COUNT 16
-#define JUMP_LIST_COUNT 16
+#define JUMP_LIST_DESTINATION_COUNT 16
 
 typedef struct CeBufferNode_t{
      CeBuffer_t* buffer;
@@ -51,13 +51,11 @@ typedef struct{
      CeSyntaxHighlightFunc_t* syntax_function;
 }CeAppBufferData_t;
 
-#if 0
 typedef struct{
-     CeDestination_t destinations[JUMP_LIST_COUNT];
+     CeDestination_t destinations[JUMP_LIST_DESTINATION_COUNT];
      int64_t count;
      int64_t current;
 }CeJumpList_t;
-#endif
 
 struct CeApp_t;
 
@@ -112,7 +110,7 @@ typedef struct CeApp_t{
      char edit_register;
      CeMacros_t macros;
      CePoint_t search_start;
-     // CeJumpList_t jump_list;
+     CeJumpList_t jump_list;
      void* user_config_data;
      bool record_macro;
      bool replay_macro;
@@ -151,11 +149,9 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
 void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                      CeSyntaxDef_t* syntax_defs, void* user_data);
 
-#if 0
-bool ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination);
+void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination);
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
-#endif
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options);
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);

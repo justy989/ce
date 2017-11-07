@@ -292,45 +292,36 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
      }
 }
 
-#if 0
-bool ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
-     if(jump_list->count == 0 && jump_list->current <= 0){
-          jump_list->destinations[0] = destination;
-          jump_list->count = 1;
-          jump_list->current = 0;
-          return true;
-     }
-
-     // if we are on the latest jump
-     if(jump_list->current == (jump_list->count - 1)){
-          if(jump_list->count >= JUMP_LIST_COUNT) return false;
-
-          jump_list->destinations[jump_list->count] = destination;
+void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
+     if(jump_list->count < JUMP_LIST_DESTINATION_COUNT){
+          if(jump_list->count > 0) jump_list->current++;
+          jump_list->destinations[jump_list->current] = destination;
           jump_list->count++;
-          jump_list->current++;
-          return true;
+          return;
      }
 
-     jump_list->current++;
-     jump_list->count = jump_list->current + 1;
+     // shift all destinations down
+     for(int i = 1; i <= jump_list->current; i++){
+          jump_list->destinations[i - 1] = jump_list->destinations[i];
+     }
+
      jump_list->destinations[jump_list->current] = destination;
-     return true;
 }
 
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list){
-     if(jump_list->current < 0) return NULL;
-     CeDestination_t* result = jump_list->destinations + jump_list->current;
+     if(jump_list->count == 0) return 0;
+     if(jump_list->current < 0) return 0;
+     int save_current = jump_list->current;
      jump_list->current--;
-     return result;
+     return jump_list->destinations + save_current;
 }
 
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
-     if(jump_list->current > (jump_list->count - 1)) return NULL;
+     if(jump_list->count == 0) return 0;
+     if(jump_list->current >= (jump_list->count - 1)) return 0;
      jump_list->current++;
-     CeDestination_t* result = jump_list->destinations + jump_list->current;
-     return result;
+     return jump_list->destinations + jump_list->current;
 }
-#endif
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options){
      // save the cursor on the old buffer
