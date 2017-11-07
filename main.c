@@ -888,7 +888,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
-                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->jump_list);
+                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, true);
                               break;
                          }
                          itr = itr->next;
@@ -960,7 +960,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
                                    }
                                    load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                       &app->jump_list, filepath);
+                                                       true, filepath);
                               }
 
                               free(base_directory);
@@ -978,10 +978,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               app->input_view.buffer->lines[0][0] = 0;
 
                               // insert jump
+                              CeAppViewData_t* view_data = view->user_data;
+                              CeJumpList_t* jump_list = &view_data->jump_list;
                               CeDestination_t destination = {};
                               destination.point = view->cursor;
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                              ce_jump_list_insert(&app->jump_list, destination);
+                              ce_jump_list_insert(jump_list, destination);
                          }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
                               char* end_of_number = app->input_view.buffer->lines[0];
                               int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
@@ -1042,10 +1044,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    free(rune_string);
                               }
                          }else if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0){
+                              CeAppViewData_t* view_data = view->user_data;
+                              CeJumpList_t* jump_list = &view_data->jump_list;
                               CeBufferNode_t* itr = app->buffer_node_head;
                               while(itr){
                                    if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->jump_list);
+                                        ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, jump_list);
                                         break;
                                    }
                                    itr = itr->next;
@@ -1173,10 +1177,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                        app->vim.current_action.motion.function == ce_vim_motion_search_next ||
                        app->vim.current_action.motion.function == ce_vim_motion_search_prev ||
                        app->vim.current_action.motion.function == ce_vim_motion_match_pair){
+                         CeAppViewData_t* view_data = view->user_data;
+                         CeJumpList_t* jump_list = &view_data->jump_list;
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
-                         ce_jump_list_insert(&app->jump_list, destination);
+                         ce_jump_list_insert(jump_list, destination);
                     }else if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
                              app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
                              app->vim.current_action.motion.function == ce_vim_motion_search_next ||

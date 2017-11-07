@@ -1,4 +1,5 @@
 #include "ce_layout.h"
+#include "ce_app.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -30,6 +31,7 @@ CeLayout_t* ce_layout_view_init(CeBuffer_t* buffer){
      if(!view_layout) return NULL;
      view_layout->type = CE_LAYOUT_TYPE_VIEW;
      view_layout->view.buffer = buffer;
+     view_layout->view.user_data = calloc(1, sizeof(CeAppViewData_t));
      return view_layout;
 }
 
@@ -50,6 +52,7 @@ void ce_layout_free(CeLayout_t** root){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
+          free(layout->view.user_data);
           break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
