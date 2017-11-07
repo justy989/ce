@@ -1,4 +1,4 @@
-CC ?= clang
+CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
 LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
 

@@ -1711,8 +1711,7 @@ bool ce_range_sort(CeRange_t* range){
      return false;
 }
 
-static int64_t count_digits(int64_t n)
-{
+int64_t ce_count_digits(int64_t n){
      if(n == 0) return 1;
 
      int count = 0;
@@ -1730,13 +1729,13 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
      int64_t column_width = 0;
 
      if(line_number == CE_LINE_NUMBER_ABSOLUTE || line_number == CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE){
-          column_width += count_digits(buffer_line_count) + 1;
+          column_width += ce_count_digits(buffer_line_count) + 1;
      }else if(line_number == CE_LINE_NUMBER_RELATIVE){
           int64_t view_height = (view_bottom - view_top) + 1;
           if(view_height > buffer_line_count){
-               column_width += count_digits(buffer_line_count - 1) + 1;
+               column_width += ce_count_digits(buffer_line_count - 1) + 1;
           }else{
-               column_width += count_digits(view_height - 1) + 1;
+               column_width += ce_count_digits(view_height - 1) + 1;
           }
      }
 
