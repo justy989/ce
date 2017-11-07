@@ -48,6 +48,7 @@ typedef struct{
 typedef struct{
      CeDestination_t destinations[JUMP_LIST_DESTINATION_COUNT];
      int64_t count;
+     int64_t itr;
      int64_t current;
 }CeJumpList_t;
 
@@ -103,6 +104,7 @@ typedef struct CeApp_t{
      CeBuffer_t* complete_list_buffer;
      CeBuffer_t* macro_list_buffer;
      CeBuffer_t* mark_list_buffer;
+     CeBuffer_t* jump_list_buffer;
      CeBuffer_t* last_goto_buffer;
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
