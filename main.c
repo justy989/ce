@@ -667,8 +667,20 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           return;
      }
 
+     if(app->last_vim_handle_result == CE_VIM_PARSE_IN_PROGRESS){
+          const CeRune_t* end = NULL;
+          int64_t parsed_multiplier = istrtol(app->vim.current_command, &end);
+          if(end) app->macro_multiplier = parsed_multiplier;
+     }
+
+     if(key == '.' && app->last_macro_register){
+          app->macro_multiplier = app->last_macro_multiplier;
+          app->replay_macro = true;
+          key = app->last_macro_register;
+     }
+
      if(app->key_count == 0 &&
-        app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
+        (app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS || app->macro_multiplier > 1) &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONTINUE &&
         app->vim.mode != CE_VIM_MODE_INSERT &&
@@ -686,11 +698,13 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
           if(key == '@' && !app->record_macro && !app->replay_macro){
                app->replay_macro = true;
+               app->vim.current_command[0] = 0;
                return;
           }
 
           if(app->record_macro && !ce_macros_is_recording(&app->macros)){
                ce_macros_begin_recording(&app->macros, key);
+               app->macro_multiplier = 1;
                return;
           }
 
@@ -698,17 +712,22 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                app->replay_macro = false;
                CeRune_t* rune_string = ce_macros_get_register_string(&app->macros, key);
                if(rune_string){
-                    CeRune_t* itr = rune_string;
-                    while(*itr){
-                         app_handle_key(app, view, *itr);
+                    for(int64_t i = 0; i < app->macro_multiplier; i++){
+                         CeRune_t* itr = rune_string;
+                         while(*itr){
+                              app_handle_key(app, view, *itr);
 
-                         // update the view if it has changed
-                         CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
-                         if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-                              view = &tab_layout->tab.current->view;
+                              // update the view if it has changed
+                              CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+                              if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+                                   view = &tab_layout->tab.current->view;
+                              }
+                              itr++;
                          }
-                         itr++;
                     }
+                    app->last_macro_register = key;
+                    app->last_macro_multiplier = app->macro_multiplier;
+                    app->macro_multiplier = 1;
                }
 
                free(rune_string);
@@ -1111,6 +1130,11 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          ce_complete_match(&app->switch_buffer_complete, app->input_view.buffer->lines[0]);
                          build_complete_list(app->complete_list_buffer, &app->switch_buffer_complete);
                     }
+               }
+
+               if(app->last_vim_handle_result == CE_VIM_PARSE_COMPLETE &&
+                  app->vim.current_action.repeatable){
+                    app->last_macro_register = 0;
                }
           }else{
                CeAppBufferData_t* buffer_data = view->buffer->app_data;

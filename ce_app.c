@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <ncurses.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -772,3 +773,29 @@ CeTerminal_t* create_terminal(CeApp_t* app, int width, int height){
      return terminal;
 }
 
+int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers){
+     int64_t value = 0;
+     const CeRune_t* itr = istr;
+
+     while(*itr){
+          if(isdigit(*itr)){
+               value *= 10;
+               value += *itr - '0';
+          }else{
+               if(itr != istr) *end_of_numbers = itr;
+               break;
+          }
+
+          itr++;
+     }
+
+     if(!(*itr) && itr != istr) *end_of_numbers = itr;
+
+     return value;
+}
+
+int64_t istrlen(const CeRune_t* istr){
+     const CeRune_t* start = istr;
+     while(*istr) istr++;
+     return istr - start;
+}

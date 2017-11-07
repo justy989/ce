@@ -116,6 +116,9 @@ typedef struct CeApp_t{
      void* user_config_data;
      bool record_macro;
      bool replay_macro;
+     int64_t macro_multiplier;
+     char last_macro_register;
+     int64_t last_macro_multiplier;
      bool ready_to_draw;
      bool quit;
      bool highlight_search;
@@ -179,3 +182,6 @@ void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal);
 CeTerminal_t* ce_terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back);
 CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);
 CeTerminal_t* create_terminal(CeApp_t* app, int width, int height);
+
+int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
+int64_t istrlen(const CeRune_t* istr);

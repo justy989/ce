@@ -7,37 +7,6 @@
 #include <ncurses.h>
 #include <assert.h>
 
-// TODO: move these to utils somewhere?
-static int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers){
-     int64_t value = 0;
-     const CeRune_t* itr = istr;
-
-     while(*itr){
-          if(isdigit(*itr)){
-               value *= 10;
-               value += *itr - '0';
-          }else{
-               if(itr != istr) *end_of_numbers = itr;
-               break;
-          }
-
-          itr++;
-     }
-
-     if(!(*itr)) *end_of_numbers = itr;
-
-     return value;
-}
-
-static int64_t istrlen(const CeRune_t* istr){
-     int64_t len = 0;
-     while(*istr){
-          istr++;
-          len++;
-     }
-     return len;
-}
-
 static bool string_is_whitespace(const char* string)
 {
      if(*string == 0) return false;
