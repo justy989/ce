@@ -58,7 +58,7 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      char format_string[BUFSIZ];
 
      // build buffer info
-     snprintf(format_string, BUFSIZ, "   %%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
+     snprintf(format_string, BUFSIZ, "%%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
 
      itr = head;
      while(itr){
@@ -1375,6 +1375,15 @@ int main(int argc, char** argv){
 
           CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_completions;
+
+          buffer_data = app.buffer_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.yank_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.macro_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.mark_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
 
           if(argc > 1){
                for(int64_t i = last_arg_index; i < argc; i++){
