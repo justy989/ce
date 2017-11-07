@@ -1131,11 +1131,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          build_complete_list(app->complete_list_buffer, &app->switch_buffer_complete);
                     }
                }
-
-               if(app->last_vim_handle_result == CE_VIM_PARSE_COMPLETE &&
-                  app->vim.current_action.repeatable){
-                    app->last_macro_register = 0;
-               }
           }else{
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
@@ -1158,6 +1153,11 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                              app->vim.current_action.motion.function == ce_vim_motion_search_prev){
                          app->highlight_search = true;
                     }
+               }
+
+               if(app->last_vim_handle_result == CE_VIM_PARSE_COMPLETE &&
+                  app->vim.current_action.repeatable){
+                    app->last_macro_register = 0;
                }
           }
      }else{
