@@ -11,3 +11,4 @@ bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - Sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - ctrl+j in completion creates extra lines that ruin drawing
+- python multiline string commends are broken sometimes

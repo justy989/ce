@@ -1625,6 +1625,17 @@ int main(int argc, char** argv){
           // handle input from the user
           app_handle_key(&app, view, key);
 
+          // update refs to view and tab_layout
+          tab_layout = app.tab_list_layout->tab_list.current;
+
+          switch(tab_layout->tab.current->type){
+          default:
+               break;
+          case CE_LAYOUT_TYPE_VIEW:
+               view = &tab_layout->tab.current->view;
+               break;
+          }
+
           if(view){
                CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app.terminal_list);
                if(terminal){
