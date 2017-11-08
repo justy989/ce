@@ -89,6 +89,7 @@ typedef struct CeVimAction_t{
      bool chain_undo;
      bool repeatable;
      bool exclude_end;
+     bool do_not_yank;
      CeClampX_t clamp_x;
 }CeVimAction_t;
 
