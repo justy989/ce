@@ -116,13 +116,7 @@ bool ce_vim_init(CeVim_t* vim){
 
 bool ce_vim_free(CeVim_t* vim){
      for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
-          CeVimYank_t* yank = vim->yanks + i;
-          if(yank->text){
-               free(yank->text);
-               yank->text = NULL;
-          }
-
-          yank->line = false;
+          ce_vim_yank_free(vim->yanks + i);
      }
      return true;
 }
@@ -297,6 +291,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                vim->chain_undo = true;
           }
           break;
+     case KEY_DC:
+          ce_buffer_remove_string_change(view->buffer, view->cursor, 1, &view->cursor,
+                                         view->cursor, vim->chain_undo);
+          break;
      case KEY_LEFT:
           view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0},
                                               config_options->tab_width, CE_CLAMP_X_ON);
@@ -371,6 +369,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
      {
           CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
           if(!yank) break;
+          if(yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
 
           if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text), &view->cursor, vim->chain_undo)){
                break;
@@ -523,56 +522,87 @@ VIM_PARSE_CONTINUE:
 
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, CeVimBufferData_t* buffer_data,
                          const CeConfigOptions_t* config_options){
-     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK &&
-        action->verb.function != ce_vim_verb_motion){
+     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK && action->verb.function != ce_vim_verb_motion){
+          // sort y
+          if(vim->visual.y < view->cursor.y){
+               vim->visual_block_top_left.y = vim->visual.y;
+               vim->visual_block_bottom_right.y = view->cursor.y;
+          }else{
+               vim->visual_block_top_left.y = view->cursor.y;
+               vim->visual_block_bottom_right.y = vim->visual.y;
+          }
+
+          // sort x
+          if(vim->visual.x < view->cursor.x){
+               vim->visual_block_top_left.x = vim->visual.x;
+               vim->visual_block_bottom_right.x = view->cursor.x;
+          }else{
+               vim->visual_block_top_left.x = view->cursor.x;
+               vim->visual_block_bottom_right.x = vim->visual.x;
+          }
+
           bool success = true;
-          if(action->verb.function){
-               if(action->visual_block_applies){
-                    // sort y
-                    if(vim->visual.y < view->cursor.y){
-                         vim->visual_block_top_left.y = vim->visual.y;
-                         vim->visual_block_bottom_right.y = view->cursor.y;
-                    }else{
-                         vim->visual_block_top_left.y = view->cursor.y;
-                         vim->visual_block_bottom_right.y = vim->visual.y;
+          if(action->verb.function == ce_vim_verb_yank ||
+             action->verb.function == ce_vim_verb_delete ||
+             action->verb.function == ce_vim_verb_change){
+               CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
+               if(action->verb.function == ce_vim_verb_delete || action->verb.function == ce_vim_verb_change){
+                    yank = vim->yanks + ce_vim_yank_register_index('"');
+               }
+               ce_vim_yank_free(yank);
+               yank->type = CE_VIM_YANK_TYPE_BLOCK;
+               yank->block_line_count = (vim->visual_block_bottom_right.y - vim->visual_block_top_left.y) + 1;
+               yank->block = malloc(yank->block_line_count * sizeof(*yank->block));
+               for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
+                    CeRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
+                                              (CePoint_t){vim->visual_block_bottom_right.x, i}};
+                    int64_t yank_string_index = i - vim->visual_block_top_left.y;
+
+                    // TODO: compress code with above code
+                    int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
+
+                    // clamp the range to the line length
+                    if(motion_range.start.x > line_last_index) motion_range.start.x = line_last_index;
+                    if(motion_range.end.x > line_last_index) motion_range.end.x = line_last_index;
+                    if(motion_range.end.x == 0 && line_last_index == 0){
+                         yank->block[yank_string_index] = NULL;
+                         continue;
                     }
 
-                    // sort x
-                    if(vim->visual.x < view->cursor.x){
-                         vim->visual_block_top_left.x = vim->visual.x;
-                         vim->visual_block_bottom_right.x = view->cursor.x;
-                    }else{
-                         vim->visual_block_top_left.x = view->cursor.x;
-                         vim->visual_block_bottom_right.x = vim->visual.x;
-                    }
+                    int64_t motion_range_len = (motion_range.end.x - motion_range.start.x) + 1;
+                    yank->block[yank_string_index] = ce_buffer_dupe_string(view->buffer, motion_range.start, motion_range_len);
+               }
 
-                    // run verb for each line in range
-                    for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
-                         CeRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
-                                                   (CePoint_t){vim->visual_block_bottom_right.x, i}};
-                         int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
+               vim->visual_block_top_left = (CePoint_t){0, 0};
+               vim->visual_block_bottom_right = (CePoint_t){0, 0};
+               vim->mode = CE_VIM_MODE_NORMAL;
+               action->do_not_yank = true;
+          }
 
-                         // clamp the range to the line length
-                         if(motion_range.start.x > line_last_index) motion_range.start.x = line_last_index;
-                         if(motion_range.end.x > line_last_index) motion_range.end.x = line_last_index;
-                         if(motion_range.end.x == 0 && line_last_index == 0) continue;
+          if(action->verb.function == ce_vim_verb_insert_mode ||
+             action->verb.function == ce_vim_verb_delete ||
+             action->verb.function == ce_vim_verb_change){
+               // run verb for each line in range
+               for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
+                    CeRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
+                                              (CePoint_t){vim->visual_block_bottom_right.x, i}};
+                    int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
 
-                         if(!action->verb.function(vim, action, motion_range, view, buffer_data, config_options)){
-                              success = false;
-                         }else if(i != vim->visual_block_top_left.y){
-                              if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
-                         }
-                    }
+                    // clamp the range to the line length
+                    if(motion_range.start.x > line_last_index) motion_range.start.x = line_last_index;
+                    if(motion_range.end.x > line_last_index) motion_range.end.x = line_last_index;
+                    if(motion_range.end.x == 0 && line_last_index == 0) continue;
 
-                    if(vim->mode != CE_VIM_MODE_INSERT){
-                         vim->visual_block_top_left = (CePoint_t){0, 0};
-                         vim->visual_block_bottom_right = (CePoint_t){0, 0};
-                    }
-               }else{
-                    CeRange_t motion_range = {view->cursor, view->cursor};
                     if(!action->verb.function(vim, action, motion_range, view, buffer_data, config_options)){
-                         return false;
+                         success = false;
+                    }else if(i != vim->visual_block_top_left.y){
+                         if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
                     }
+               }
+
+               if(vim->mode != CE_VIM_MODE_INSERT){
+                    vim->visual_block_top_left = (CePoint_t){0, 0};
+                    vim->visual_block_bottom_right = (CePoint_t){0, 0};
                }
           }
 
@@ -1400,7 +1430,6 @@ CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t
 
      action->verb.function = &ce_vim_verb_insert_mode;
      action->repeatable = true;
-     action->visual_block_applies = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -1483,7 +1512,7 @@ CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, CeRune_t key){
      action->motion.function = ce_vim_motion_up;
 
      if(action->verb.function){
-          action->yank_line = true;
+          action->yank_type = CE_VIM_YANK_TYPE_LINE;
           return CE_VIM_PARSE_COMPLETE;
      }
 
@@ -1496,7 +1525,7 @@ CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action, CeRune_t key)
      action->motion.function = ce_vim_motion_down;
 
      if(action->verb.function){
-          action->yank_line = true;
+          action->yank_type = CE_VIM_YANK_TYPE_LINE;
           return CE_VIM_PARSE_COMPLETE;
      }
 
@@ -1682,10 +1711,9 @@ CeVimParseResult_t ce_vim_parse_motion_previous_blank_line(CeVimAction_t* action
 
 CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
-     action->visual_block_applies = true;
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
-          action->yank_line = true;
+          action->yank_type = CE_VIM_YANK_TYPE_LINE;
           return CE_VIM_PARSE_COMPLETE;
      }
 
@@ -1704,7 +1732,6 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
 
 CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key){
      action->repeatable = true;
-     action->visual_block_applies = true;
      if(action->verb.function == ce_vim_verb_change){
           action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
           return CE_VIM_PARSE_COMPLETE;
@@ -1760,7 +1787,7 @@ CeVimParseResult_t ce_vim_parse_verb_substitute_soft_begin_line(CeVimAction_t* a
 CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == &ce_vim_verb_yank){
           action->motion.function = &ce_vim_motion_entire_line;
-          action->yank_line = true;
+          action->yank_type = CE_VIM_YANK_TYPE_LINE;
           return CE_VIM_PARSE_COMPLETE;
      }
 
@@ -2060,17 +2087,22 @@ bool ce_vim_motion_visual(CeVim_t* vim, CeVimAction_t* action, const CeView_t* v
           if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
                motion_range->start.x = 0;
                motion_range->end.x = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
-               action->yank_line = true;
+               action->yank_type = CE_VIM_YANK_TYPE_LINE;
                action->motion.integer = motion_range->end.y - motion_range->start.y;
           }
      }else if(vim->verb_last_action){
-          if(action->yank_line){
+          switch(action->yank_type){
+          default:
+               break;
+          case CE_VIM_YANK_TYPE_LINE:
                motion_range->start = (CePoint_t){0, view->cursor.y};
                motion_range->end.y = view->cursor.y + action->motion.integer;
                motion_range->end.x = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
-          }else{
+               break;
+          case CE_VIM_YANK_TYPE_STRING:
                motion_range->start = view->cursor;
                motion_range->end = ce_buffer_advance_point(view->buffer, view->cursor, action->motion.integer);
+               break;
           }
      }
 
@@ -2243,7 +2275,7 @@ bool ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* action, const CeView
 
 static void search_word(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, CeRange_t* motion_range){
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
-     free(yank->text);
+     ce_vim_yank_free(yank);
      *motion_range = ce_vim_find_pair(view->buffer, view->cursor, 'w', true);
      int64_t word_len = ce_buffer_range_len(view->buffer, motion_range->start, motion_range->end);
      char* word = ce_buffer_dupe_string(view->buffer, motion_range->start, word_len);
@@ -2252,7 +2284,7 @@ static void search_word(CeVim_t* vim, CeVimAction_t* action, const CeView_t* vie
      snprintf(yank->text, search_len + 1, "\\b%s\\b", word); // TODO: this doesn't work on other platforms like macos
      yank->text[search_len] = 0;
      free(word);
-     yank->line = false;
+     yank->type = CE_VIM_YANK_TYPE_STRING;
      vim->search_mode = CE_VIM_SEARCH_MODE_REGEX_FORWARD;
 }
 
@@ -2366,6 +2398,28 @@ int64_t ce_vim_yank_register_index(CeRune_t rune){
      return rune - ' ';
 }
 
+void ce_vim_yank_free(CeVimYank_t* yank){
+     switch(yank->type){
+     default:
+          break;
+     case CE_VIM_YANK_TYPE_STRING:
+     case CE_VIM_YANK_TYPE_LINE:
+          free(yank->text);
+          yank->text = NULL;
+          break;
+     case CE_VIM_YANK_TYPE_BLOCK:
+          for(int64_t i = 0; i < yank->block_line_count; i++){
+               free(yank->block[i]);
+          }
+          free(yank->block);
+          yank->block = NULL;
+          yank->block_line_count = 0;
+          break;
+     }
+
+     yank->type = CE_VIM_YANK_TYPE_STRING;
+}
+
 bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                         CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      if(action->motion.function == ce_vim_motion_up || action->motion.function == ce_vim_motion_down){
@@ -2390,10 +2444,12 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      ce_range_sort(&motion_range);
 
      // delete the range
-     bool yank_line = action->yank_line;
+     CeVimYankType_t yank_type = action->yank_type;
      if(action->exclude_end){
           motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
-          if(motion_range.end.x == ce_utf8_strlen(view->buffer->lines[motion_range.end.y])) yank_line = true;
+          if(motion_range.end.x == ce_utf8_strlen(view->buffer->lines[motion_range.end.y])){
+               yank_type = CE_VIM_YANK_TYPE_LINE;
+          }
      }
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      // if the end of the range is at the end of the buffer, take off the extra newline, unless the line is empty
@@ -2422,10 +2478,12 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      vim->chain_undo = action->chain_undo;
      vim->mode = CE_VIM_MODE_NORMAL;
 
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
-     if(yank->text) free(yank->text);
-     yank->text = strdup(removed_string);
-     yank->line = yank_line;
+     if(!action->do_not_yank){
+          CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
+          ce_vim_yank_free(yank);
+          yank->text = strdup(removed_string);
+          yank->type = yank_type;
+     }
      return true;
 }
 
@@ -2528,11 +2586,11 @@ bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* a
 bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                       CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
-     if(yank->text) free(yank->text);
+     ce_vim_yank_free(yank);
      int64_t yank_len = 0;
      yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
-     yank->line = action->yank_line;
+     yank->type = action->yank_type;
      vim->mode = CE_VIM_MODE_NORMAL;
      return true;
 }
@@ -2544,16 +2602,93 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
 
      CePoint_t insertion_point = motion_range.end;
 
-     if(yank->line){
+     switch(yank->type){
+     default:
+          break;
+     case CE_VIM_YANK_TYPE_LINE:
           insertion_point.x = 0;
           // TODO: insert line if at end of buffer
           if(after) insertion_point.y++;
-     }else{
+          break;
+     case CE_VIM_YANK_TYPE_STRING:
           if(after){
                insertion_point.x++;
                int64_t line_len = ce_utf8_strlen(view->buffer->lines[insertion_point.y]);
                if(insertion_point.x > line_len) insertion_point.x = line_len - 1;
           }
+          break;
+     case CE_VIM_YANK_TYPE_BLOCK:
+     {
+          bool chain = false;
+
+          // if the buffer isn't long enough, insert some lines
+          int64_t line_count_check = insertion_point.y + yank->block_line_count;
+          if(line_count_check > view->buffer->line_count){
+               int64_t line_diff = line_count_check - view->buffer->line_count;
+               char* newline_str = malloc(line_diff + 1);
+               memset(newline_str, '\n', line_diff);
+               newline_str[line_diff] = 0;
+
+               CePoint_t newline_point = ce_buffer_end_point(view->buffer);
+               if(!ce_buffer_insert_string(view->buffer, newline_str, newline_point)) return false;
+
+               // commit the change
+               CeBufferChange_t change = {};
+               change.chain = chain;
+               change.insertion = true;
+               change.string = newline_str;
+               change.location = newline_point;
+               change.cursor_before = view->cursor;
+               change.cursor_after = view->cursor;
+               ce_buffer_change(view->buffer, &change);
+               chain = true;
+          }
+
+          for(int64_t i = 0; i < yank->block_line_count; i++){
+               if(!yank->block[i]) continue;
+               CePoint_t point = {insertion_point.x, insertion_point.y + i};
+
+               // if the line isn't long enough, append space so it is long enough
+               int64_t line_len = ce_utf8_strlen(view->buffer->lines[point.y]);
+               if(insertion_point.x > line_len){
+                    int64_t space_len = (insertion_point.x - line_len);
+                    char* space_str = malloc(space_len + 1);
+                    memset(space_str, ' ', space_len);
+                    space_str[space_len] = 0;
+
+                    CePoint_t space_point = {line_len, point.y};
+                    if(!ce_buffer_insert_string(view->buffer, space_str, space_point)) return false;
+
+                    // commit the change
+                    CeBufferChange_t change = {};
+                    change.chain = chain;
+                    change.insertion = true;
+                    change.string = space_str;
+                    change.location = space_point;
+                    change.cursor_before = view->cursor;
+                    change.cursor_after = view->cursor;
+                    ce_buffer_change(view->buffer, &change);
+                    chain = true;
+               }
+
+               char* insert_str = strdup(yank->block[i]);
+               if(!ce_buffer_insert_string(view->buffer, insert_str, point)) return false;
+
+               // commit the change
+               CeBufferChange_t change = {};
+               change.chain = chain;
+               change.insertion = true;
+               change.string = insert_str;
+               change.location = point;
+               change.cursor_before = view->cursor;
+               change.cursor_after = view->cursor;
+               ce_buffer_change(view->buffer, &change);
+               chain = true;
+          }
+
+          vim->mode = CE_VIM_MODE_NORMAL;
+          return true;
+     }
      }
 
      char* insert_str = strdup(yank->text);
@@ -2576,11 +2711,17 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
 
      if(!ce_buffer_insert_string(view->buffer, insert_str, insertion_point)) return false;
 
-     CePoint_t cursor_end;
-     if(yank->line){
+     CePoint_t cursor_end = {};
+
+     switch(yank->type){
+     default:
+          break;
+     case CE_VIM_YANK_TYPE_LINE:
           cursor_end = insertion_point;
-     }else{
+          break;
+     case CE_VIM_YANK_TYPE_STRING:
           cursor_end = ce_buffer_advance_point(view->buffer, view->cursor, ce_utf8_strlen(yank->text));
+          break;
      }
 
      // commit the change

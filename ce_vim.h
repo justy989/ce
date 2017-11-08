@@ -44,6 +44,21 @@ typedef enum{
      CE_VIM_MODE_COUNT,
 }CeVimMode_t;
 
+typedef enum{
+     CE_VIM_YANK_TYPE_STRING,
+     CE_VIM_YANK_TYPE_LINE,
+     CE_VIM_YANK_TYPE_BLOCK,
+}CeVimYankType_t;
+
+typedef struct{
+     CeVimYankType_t type;
+     union{
+          char* text;
+          char** block;
+     };
+     int64_t block_line_count;
+}CeVimYank_t;
+
 typedef struct{
      int64_t multiplier;
      CeVimMotionFunc_t* function;
@@ -70,11 +85,11 @@ typedef struct CeVimAction_t{
      CeVimMotion_t motion;
      CeVimVerb_t verb;
      // NOTE: after enough bools, should we just make some bit flags?
-     bool yank_line; // TODO: consider rename as more than just yanking looks at this
+     CeVimYankType_t yank_type; // TODO: consider rename as more than just yanking looks at this
      bool chain_undo;
      bool repeatable;
-     bool visual_block_applies;
      bool exclude_end;
+     bool do_not_yank;
      CeClampX_t clamp_x;
 }CeVimAction_t;
 
@@ -82,11 +97,6 @@ typedef struct{
      CeRune_t key;
      CeVimParseFunc_t* function;
 }CeVimKeyBind_t;
-
-typedef struct{
-     char* text;
-     bool line;
-}CeVimYank_t;
 
 typedef enum{
      CE_VIM_SEARCH_MODE_FORWARD,
@@ -136,6 +146,8 @@ bool ce_vim_append_key(CeVim_t* vim, CeRune_t key);
 
 // util
 int64_t ce_vim_yank_register_index(CeRune_t rune); // TODO: rename since this is used for marks as well !
+void ce_vim_yank_free(CeVimYank_t* yank);
+
 // TODO: add const, since most of these are just readonly
 int64_t ce_vim_soft_begin_line(CeBuffer_t* buffer, int64_t line); // returns -1
 CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start); // returns -1, -1 on error
