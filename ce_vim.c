@@ -517,9 +517,7 @@ VIM_PARSE_CONTINUE:
 
 bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, CeVimBufferData_t* buffer_data,
                          const CeConfigOptions_t* config_options){
-     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK &&
-        action->verb.function != ce_vim_verb_motion){
-
+     if(vim->mode == CE_VIM_MODE_VISUAL_BLOCK && action->verb.function != ce_vim_verb_motion){
           // sort y
           if(vim->visual.y < view->cursor.y){
                vim->visual_block_top_left.y = vim->visual.y;
@@ -2607,6 +2605,30 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
                if(insertion_point.x > line_len) insertion_point.x = line_len - 1;
           }
           break;
+     case CE_VIM_YANK_TYPE_BLOCK:
+     {
+          // TODO: insert blank lines if the block goes passed the end of the file
+
+          for(int64_t i = 0; i < yank->block_line_count; i++){
+               CePoint_t point = {insertion_point.x, insertion_point.y + i};
+               char* insert_str = strdup(yank->block[i]);
+
+               if(!ce_buffer_insert_string(view->buffer, insert_str, point)) return false;
+
+               // commit the change
+               CeBufferChange_t change = {};
+               change.chain = (i != 0);
+               change.insertion = true;
+               change.string = insert_str;
+               change.location = point;
+               change.cursor_before = view->cursor;
+               change.cursor_after = view->cursor;
+               ce_buffer_change(view->buffer, &change);
+          }
+
+          vim->mode = CE_VIM_MODE_NORMAL;
+          return true;
+     }
      }
 
      char* insert_str = strdup(yank->text);
