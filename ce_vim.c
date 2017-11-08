@@ -291,6 +291,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                vim->chain_undo = true;
           }
           break;
+     case KEY_DC:
+          ce_buffer_remove_string_change(view->buffer, view->cursor, 1, &view->cursor,
+                                         view->cursor, vim->chain_undo);
+          break;
      case KEY_LEFT:
           view->cursor = ce_buffer_move_point(view->buffer, view->cursor, (CePoint_t){-1, 0},
                                               config_options->tab_width, CE_CLAMP_X_ON);
