@@ -294,38 +294,41 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 
 void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
      if(jump_list->count < JUMP_LIST_DESTINATION_COUNT){
-          if(jump_list->count > 0) jump_list->current++;
-          jump_list->destinations[jump_list->current] = destination;
+          if(jump_list->count > 0){
+               jump_list->itr++;
+               jump_list->current = jump_list->itr;
+          }
+          jump_list->destinations[jump_list->itr] = destination;
           jump_list->count++;
           return;
      }
 
      // shift all destinations down
-     for(int i = 1; i <= jump_list->current; i++){
+     for(int i = 1; i <= jump_list->itr; i++){
           jump_list->destinations[i - 1] = jump_list->destinations[i];
      }
 
-     jump_list->destinations[jump_list->current] = destination;
+     jump_list->destinations[jump_list->itr] = destination;
 }
 
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list){
      if(jump_list->count == 0) return NULL;
-     if(jump_list->current < 0) return NULL;
-     int64_t save_current = jump_list->current;
-     jump_list->current--;
-     return jump_list->destinations + save_current;
+     if(jump_list->itr < 0) return NULL;
+     jump_list->current = jump_list->itr;
+     jump_list->itr--;
+     return jump_list->destinations + jump_list->current;
 }
 
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
      if(jump_list->count == 0) return NULL;
-     if(jump_list->current >= (jump_list->count - 1)) return 0;
-     jump_list->current++;
-     return jump_list->destinations + jump_list->current;
+     if(jump_list->itr >= (jump_list->count - 1)) return 0;
+     jump_list->itr++;
+     jump_list->current = jump_list->itr;
+     return jump_list->destinations + jump_list->itr;
 }
 
 CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list){
      if(jump_list->count == 0) return NULL;
-     if(jump_list->current < 0) return NULL;
      return jump_list->destinations + jump_list->current;
 }
 

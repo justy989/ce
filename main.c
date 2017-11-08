@@ -121,12 +121,40 @@ static void build_macro_list(CeBuffer_t* buffer, CeMacros_t* macros){
 static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
      ce_buffer_empty(buffer);
      char line[256];
-          buffer_append_on_new_line(buffer, "reg point:\n");
+     buffer_append_on_new_line(buffer, "reg point:\n");
      for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           CePoint_t* point = buffer_data->marks + i;
           if(point->x == 0 && point->y == 0) continue;
           char reg = i + '!';
           snprintf(line, 256, "'%c' %ld, %ld\n", reg, point->x, point->y);
+          buffer_append_on_new_line(buffer, line);
+     }
+
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
+static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
+     ce_buffer_empty(buffer);
+     char line[256];
+     int max_row_digits = -1;
+     int max_col_digits = -1;
+     for(int64_t i = 0; i < jump_list->count; i++){
+          int digits = ce_count_digits(jump_list->destinations[i].point.x);
+          if(digits > max_col_digits) max_col_digits = digits;
+          digits = ce_count_digits(jump_list->destinations[i].point.y);
+          if(digits > max_row_digits) max_row_digits = digits;
+     }
+
+     char format_string[128];
+     snprintf(format_string, 128, "  %%%dld, %%%dld  %%s", max_col_digits, max_row_digits);
+     for(int64_t i = 0; i < jump_list->count; i++){
+          if(i == jump_list->current){
+               format_string[0] = '*';
+          }else{
+               format_string[0] = ' ';
+          }
+          CeDestination_t* dest = jump_list->destinations + i;
+          snprintf(line, 256, format_string, dest->point.x, dest->point.y, dest->filepath);
           buffer_append_on_new_line(buffer, line);
      }
 
@@ -1113,6 +1141,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                    itr->buffer != app->complete_list_buffer &&
                    itr->buffer != app->macro_list_buffer &&
                    itr->buffer != app->mark_list_buffer &&
+                   itr->buffer != app->jump_list_buffer &&
                    itr->buffer != g_ce_log_buffer)){
                     // find all the views showing this buffer and switch to a different view
                     for(int64_t t = 0; t < app->tab_list_layout->tab_list.tab_count; t++){
@@ -1355,6 +1384,7 @@ int main(int argc, char** argv){
           app.complete_list_buffer = new_buffer();
           app.macro_list_buffer = new_buffer();
           app.mark_list_buffer = new_buffer();
+          app.jump_list_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
           ce_buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
@@ -1366,18 +1396,22 @@ int main(int argc, char** argv){
           ce_buffer_node_insert(&app.buffer_node_head, app.macro_list_buffer);
           ce_buffer_alloc(app.mark_list_buffer, 1, "[marks]");
           ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
+          ce_buffer_alloc(app.jump_list_buffer, 1, "[jumps]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.complete_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.yank_list_buffer->no_line_numbers = true;
           app.complete_list_buffer->no_line_numbers = true;
           app.macro_list_buffer->no_line_numbers = true;
           app.mark_list_buffer->no_line_numbers = true;
+          app.jump_list_buffer->no_line_numbers = true;
 
           CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_completions;
@@ -1389,6 +1423,8 @@ int main(int argc, char** argv){
           buffer_data = app.macro_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.mark_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.jump_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 
           if(argc > 1){
@@ -1589,6 +1625,17 @@ int main(int argc, char** argv){
           // handle input from the user
           app_handle_key(&app, view, key);
 
+          // update refs to view and tab_layout
+          tab_layout = app.tab_list_layout->tab_list.current;
+
+          switch(tab_layout->tab.current->type){
+          default:
+               break;
+          case CE_LAYOUT_TYPE_VIEW:
+               view = &tab_layout->tab.current->view;
+               break;
+          }
+
           if(view){
                CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app.terminal_list);
                if(terminal){
@@ -1623,6 +1670,11 @@ int main(int argc, char** argv){
           if(view && ce_layout_buffer_in_view(tab_layout, app.mark_list_buffer)){
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
                build_mark_list(app.mark_list_buffer, &buffer_data->vim);
+          }
+
+          if(view && ce_layout_buffer_in_view(tab_layout, app.jump_list_buffer)){
+               CeAppViewData_t* view_data = view->user_data;
+               build_jump_list(app.jump_list_buffer, &view_data->jump_list);
           }
 
           // tell the draw thread we are ready to draw
