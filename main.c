@@ -856,7 +856,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else if(app->vim.mode == CE_VIM_MODE_NORMAL){
                     if(key == 'p'){
                          CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('"');
-                         if(yank->text){
+                         if((yank->type == CE_VIM_YANK_TYPE_STRING ||
+                             yank->type == CE_VIM_YANK_TYPE_LINE) &&
+                             yank->text){
                               char* itr = yank->text;
 
                               while(*itr){
@@ -1085,9 +1087,23 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               }
                          }else if(strcmp(app->input_view.buffer->name, "EDIT YANK") == 0){
                               CeVimYank_t* yank = app->vim.yanks + app->edit_register;
-                              free(yank->text);
-                              yank->text = ce_buffer_dupe(app->input_view.buffer);
-                              yank->type = CE_VIM_YANK_TYPE_STRING;
+                              CeVimYankType_t yank_type = yank->type;
+                              ce_vim_yank_free(yank);
+                              if(yank_type == CE_VIM_YANK_TYPE_BLOCK){
+                                   yank->block_line_count = app->input_view.buffer->line_count;
+                                   yank->block = malloc(yank->block_line_count * sizeof(*yank->block));
+                                   for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
+                                        if(strlen(app->input_view.buffer->lines[i])){
+                                             yank->block[i] = strdup(app->input_view.buffer->lines[i]);
+                                        }else{
+                                             yank->block[i] = NULL;
+                                        }
+                                   }
+                                   yank->type = yank_type;
+                              }else{
+                                   yank->text = ce_buffer_dupe(app->input_view.buffer);
+                                   yank->type = yank_type;
+                              }
                          }else if(strcmp(app->input_view.buffer->name, "EDIT MACRO") == 0){
                               CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
                               if(rune_string){

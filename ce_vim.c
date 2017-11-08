@@ -365,6 +365,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
      {
           CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
           if(!yank) break;
+          if(yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
 
           if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text), &view->cursor, vim->chain_undo)){
                break;
@@ -2612,9 +2613,31 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
           break;
      case CE_VIM_YANK_TYPE_BLOCK:
      {
-          // TODO: insert blank lines if the block goes passed the end of the file
-
           bool chain = false;
+
+          // if the buffer isn't long enough, insert some lines
+          int64_t line_count_check = insertion_point.y + yank->block_line_count;
+          if(line_count_check > view->buffer->line_count){
+               int64_t line_diff = line_count_check - view->buffer->line_count;
+               char* newline_str = malloc(line_diff + 1);
+               memset(newline_str, '\n', line_diff);
+               newline_str[line_diff] = 0;
+
+               CePoint_t newline_point = ce_buffer_end_point(view->buffer);
+               if(!ce_buffer_insert_string(view->buffer, newline_str, newline_point)) return false;
+
+               // commit the change
+               CeBufferChange_t change = {};
+               change.chain = chain;
+               change.insertion = true;
+               change.string = newline_str;
+               change.location = newline_point;
+               change.cursor_before = view->cursor;
+               change.cursor_after = view->cursor;
+               ce_buffer_change(view->buffer, &change);
+               chain = true;
+          }
+
           for(int64_t i = 0; i < yank->block_line_count; i++){
                if(!yank->block[i]) continue;
                CePoint_t point = {insertion_point.x, insertion_point.y + i};
