@@ -719,6 +719,9 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
 
      if(strcmp(command->args[0].string, "c") == 0){
           buffer_data->syntax_function = ce_syntax_highlight_c;
+     }else if(strcmp(command->args[0].string, "cpp") == 0 ||
+              strcmp(command->args[0].string, "c++") == 0){
+          buffer_data->syntax_function = ce_syntax_highlight_cpp;
      }else if(strcmp(command->args[0].string, "python") == 0){
           buffer_data->syntax_function = ce_syntax_highlight_python;
      }else if(strcmp(command->args[0].string, "java") == 0){

@@ -1540,7 +1540,7 @@ int main(int argc, char** argv){
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},
-          {command_buffer_type, "buffer_type", "set the current buffer's type: c, python, java, bash, config, diff, plain"},
+          {command_buffer_type, "buffer_type", "set the current buffer's type: c, cpp, python, java, bash, config, diff, plain"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},

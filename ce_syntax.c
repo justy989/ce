@@ -183,9 +183,9 @@ static int64_t match_c_type(const char* str, const char* beginning_of_line){
      }
 
      int64_t len = itr - str;
-     if(len <= 2) return 0;
-
-     if(strncmp((itr - 2), "_t", 2) == 0) return len;
+     if(len > 1){
+          if(strncmp((itr - 2), "_t", 2) == 0) return len;
+     }
 
      static const char* keywords[] = {
           "bool",
@@ -198,6 +198,16 @@ static int64_t match_c_type(const char* str, const char* beginning_of_line){
           "signed",
           "unsigned",
           "void",
+          "S8",
+          "S16",
+          "S32",
+          "S64",
+          "U8",
+          "U16",
+          "U32",
+          "U64",
+          "F32",
+          "F64",
      };
 
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
@@ -646,6 +656,7 @@ static int64_t match_cpp_keyword(const char* str, const char* beginning_of_line)
           "virtual",
           "namespace",
           "new",
+          "nullptr",
           "operator",
           "private",
           "protected",
@@ -666,6 +677,7 @@ static int64_t match_cpp_keyword(const char* str, const char* beginning_of_line)
           "true",
           "typedef",
           "typeid",
+          "typename",
           "unsigned",
           "wchar_t",
           "while",
