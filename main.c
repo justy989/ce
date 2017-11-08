@@ -22,7 +22,7 @@ void handle_sigint(int signal){
 
 const char* buffer_status_get_str(CeBufferStatus_t status){
      if(status == CE_BUFFER_STATUS_READONLY){
-          return "[RO]";
+           return "[RO]";
      }
 
      if(status == CE_BUFFER_STATUS_MODIFIED ||
@@ -91,8 +91,25 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
                break;
           }
 
-          snprintf(line, 256, "// register '%c': type: %s\n%s\n", reg, yank_type, yank->text);
-          buffer_append_on_new_line(buffer, line);
+          if(yank->type ==CE_VIM_YANK_TYPE_BLOCK){
+               snprintf(line, 256, "// register '%c': type: %s\n", reg, yank_type);
+               buffer_append_on_new_line(buffer, line);
+               for(int64_t l = 0; l < yank->block_line_count; l++){
+                    if(yank->block[l]){
+                         strncpy(line, yank->block[l], 256);
+                         buffer_append_on_new_line(buffer, line);
+                    }else{
+                         int64_t last_line = buffer->line_count;
+                         int64_t line_len = 0;
+                         if(last_line) last_line--;
+                         if(buffer->lines[last_line]) line_len = ce_utf8_strlen(buffer->lines[last_line]);
+                         ce_buffer_insert_string(buffer, "\n\n", (CePoint_t){line_len, last_line});
+                    }
+               }
+          }else{
+               snprintf(line, 256, "// register '%c': type: %s\n%s\n", reg, yank_type, yank->text);
+               buffer_append_on_new_line(buffer, line);
+          }
      }
 
      buffer->status = CE_BUFFER_STATUS_READONLY;
