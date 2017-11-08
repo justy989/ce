@@ -44,6 +44,20 @@ typedef enum{
      CE_VIM_MODE_COUNT,
 }CeVimMode_t;
 
+typedef enum{
+     CE_VIM_YANK_TYPE_STRING,
+     CE_VIM_YANK_TYPE_LINE,
+     CE_VIM_YANK_TYPE_BLOCK,
+}CeVimYankType_t;
+
+typedef struct{
+     CeVimYankType_t type;
+     union{
+          char* text;
+          char** block;
+     };
+}CeVimYank_t;
+
 typedef struct{
      int64_t multiplier;
      CeVimMotionFunc_t* function;
@@ -70,7 +84,7 @@ typedef struct CeVimAction_t{
      CeVimMotion_t motion;
      CeVimVerb_t verb;
      // NOTE: after enough bools, should we just make some bit flags?
-     bool yank_line; // TODO: consider rename as more than just yanking looks at this
+     CeVimYankType_t yank_type; // TODO: consider rename as more than just yanking looks at this
      bool chain_undo;
      bool repeatable;
      bool visual_block_applies;
@@ -82,11 +96,6 @@ typedef struct{
      CeRune_t key;
      CeVimParseFunc_t* function;
 }CeVimKeyBind_t;
-
-typedef struct{
-     char* text;
-     bool line;
-}CeVimYank_t;
 
 typedef enum{
      CE_VIM_SEARCH_MODE_FORWARD,

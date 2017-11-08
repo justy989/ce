@@ -79,7 +79,19 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
           CeVimYank_t* yank = yanks + i;
           if(yank->text == NULL) continue;
           char reg = i + '!';
-          snprintf(line, 256, "// register '%c': line: %s\n%s\n", reg, yank->line ? "true" : "false", yank->text);
+          const char* yank_type = "string";
+          switch(yank->type){
+          default:
+               break;
+          case CE_VIM_YANK_TYPE_LINE:
+               yank_type = "line";
+               break;
+          case CE_VIM_YANK_TYPE_BLOCK:
+               yank_type = "block";
+               break;
+          }
+
+          snprintf(line, 256, "// register '%c': type: %s\n%s\n", reg, yank_type, yank->text);
           buffer_append_on_new_line(buffer, line);
      }
 
@@ -1000,7 +1012,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('/');
                               free(yank->text);
                               yank->text = strdup(app->input_view.buffer->lines[0]);
-                              yank->line = false;
+                              yank->type = CE_VIM_YANK_TYPE_STRING;
 
                               // clear input buffer
                               app->input_view.buffer->lines[0][0] = 0;
@@ -1058,7 +1070,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               CeVimYank_t* yank = app->vim.yanks + app->edit_register;
                               free(yank->text);
                               yank->text = ce_buffer_dupe(app->input_view.buffer);
-                              yank->line = false;
+                              yank->type = CE_VIM_YANK_TYPE_STRING;
                          }else if(strcmp(app->input_view.buffer->name, "EDIT MACRO") == 0){
                               CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
                               if(rune_string){
