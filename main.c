@@ -555,7 +555,7 @@ void draw(CeApp_t* app){
      // draw a tab bar if there is more than 1 tab
      if(tab_list_layout->tab_list.tab_count > 1){
           move(0, 0);
-          int color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+          int color_pair = ce_color_def_get(&color_defs, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           for(int64_t i = tab_list_layout->tab_list.rect.left; i <= tab_list_layout->tab_list.rect.right; i++){
                addch(' ');
@@ -565,10 +565,10 @@ void draw(CeApp_t* app){
 
           for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
                if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
-                    color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, COLOR_DEFAULT);
+                    color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, app->config_options.ui_bg_color);
                     attron(COLOR_PAIR(color_pair));
                }else{
-                    color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_BRIGHT_BLACK);
+                    color_pair = ce_color_def_get(&color_defs, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
                     attron(COLOR_PAIR(color_pair));
                }
 
