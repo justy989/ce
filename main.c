@@ -865,6 +865,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    ce_terminal_send_key(terminal, *itr);
                                    itr++;
                               }
+
+                              app->vim.mode = CE_VIM_MODE_INSERT;
                          }
                          return;
                     }
