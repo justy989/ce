@@ -96,38 +96,42 @@ void ce_string_node_free(CeStringNode_t** head){
      *head = NULL;
 }
 
-bool ce_history_insert(History_t* history, const char* string){
+bool ce_history_insert(CeHistory_t* history, const char* string){
      CeStringNode_t* new_node = ce_string_node_insert(&history->head, string);
-     if(new_node) return true;
-     return false;
+     if(!new_node) return false;
+     ce_history_reset_current(history);
+     return true;
 }
 
-char* ce_history_previous(History_t* history){
+char* ce_history_previous(CeHistory_t* history){
      if(history->current){
           if(history->current->prev){
                history->current = history->current->prev;
           }
+
           return history->current->string;
-     }
-
-     CeStringNode_t* tail = history->head;
-     if(!tail) return NULL;
-
-     while(tail->next) tail = tail->next;
-     history->current = tail;
-
-     return tail->string;
-}
-
-char* ce_history_next(History_t* history){
-     if(history->current){
-          if(history->current->next){
-               history->current = history->current->next;
+     }else{
+          history->current = history->head;
+          if(history->current){
+               while(history->current->next) history->current = history->current->next;
+               return history->current->string;
           }
-          return history->current->string;
      }
 
      return NULL;
+}
+
+char* ce_history_next(CeHistory_t* history){
+     if(history->current){
+          history->current = history->current->next;
+          if(history->current) return history->current->string;
+     }
+
+     return NULL;
+}
+
+void ce_history_reset_current(CeHistory_t* history){
+     history->current = NULL;
 }
 
 void ce_convert_bind_defs(CeKeyBinds_t* binds, CeKeyBindDef_t* bind_defs, int64_t bind_def_count){
