@@ -574,9 +574,12 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
                     yank->block[yank_string_index] = ce_buffer_dupe_string(view->buffer, motion_range.start, motion_range_len);
                }
 
-               vim->visual_block_top_left = (CePoint_t){0, 0};
-               vim->visual_block_bottom_right = (CePoint_t){0, 0};
-               vim->mode = CE_VIM_MODE_NORMAL;
+               if(action->verb.function == ce_vim_verb_yank){
+                    vim->visual_block_top_left = (CePoint_t){0, 0};
+                    vim->visual_block_bottom_right = (CePoint_t){0, 0};
+                    vim->mode = CE_VIM_MODE_NORMAL;
+               }
+
                action->do_not_yank = true;
           }
 
