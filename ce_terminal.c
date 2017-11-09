@@ -172,17 +172,18 @@ static void terminal_insert_blank(CeTerminal_t* terminal, int n){
      CeTerminalGlyph_t* line;
 
      CE_CLAMP(n, 0, terminal->columns - terminal->cursor.x);
+     int cursor_line = terminal->cursor.y + terminal->start_line;
 
      dst = terminal->cursor.x + n;
      src = terminal->cursor.x;
      size = terminal->columns - dst;
-     line = terminal->lines[terminal->cursor.y];
+     line = terminal->lines[cursor_line];
 
      memmove(&line[dst], &line[src], size * sizeof(*line));
 
      // figure out our start and end
-     char* line_dst = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], dst);
-     char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], src);
+     char* line_dst = ce_utf8_iterate_to(terminal->buffer->lines[cursor_line], dst);
+     char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[cursor_line], src);
 
      // copy into tmp array
      CeRune_t runes[size];
