@@ -752,6 +752,30 @@ bool apply_completion(CeApp_t* app, CeView_t* view){
      return false;
 }
 
+bool handle_input_history_key(int key, CeHistory_t* history, CeBuffer_t* input_buffer, CePoint_t* cursor){
+     if(key == KEY_UP){
+          char* prev = ce_history_previous(history);
+          if(prev){
+               ce_buffer_remove_string(input_buffer, (CePoint_t){0, 0}, ce_utf8_strlen(input_buffer->lines[0]));
+               ce_buffer_insert_string(input_buffer, prev, (CePoint_t){0, 0});
+          }
+          cursor->x = ce_utf8_strlen(input_buffer->lines[0]);
+          return true;
+     }
+
+     if(key == KEY_DOWN){
+          char* next = ce_history_next(history);
+          ce_buffer_remove_string(input_buffer, (CePoint_t){0, 0}, ce_utf8_strlen(input_buffer->lines[0]));
+          if(next){
+               ce_buffer_insert_string(input_buffer, next, (CePoint_t){0, 0});
+          }
+          cursor->x = ce_utf8_strlen(input_buffer->lines[0]);
+          return true;
+     }
+
+     return false;
+}
+
 void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(key == KEY_RESIZE){
           ce_app_update_terminal_view(app);
@@ -1029,6 +1053,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                   strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
                                   strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
                                   strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0){
+                              ce_history_insert(&app->search_history, app->input_view.buffer->lines[0]);
+
                               // update yanks
                               CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('/');
                               free(yank->text);
@@ -1167,6 +1193,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     return;
                }
           }else if(key == KEY_ESCAPE && app->input_mode && app->vim.mode == CE_VIM_MODE_NORMAL){ // Escape
+               ce_history_reset_current(&app->command_history);
+               ce_history_reset_current(&app->search_history);
                app->input_mode = false;
                app->vim.mode = CE_VIM_MODE_NORMAL;
 
@@ -1204,23 +1232,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
           if(app->input_mode){
                if(strcmp(app->input_view.buffer->name, "COMMAND") == 0 && app->input_view.buffer->line_count){
-                    if(key == KEY_UP){
-                         char* prev = ce_history_previous(&app->command_history);
-                         if(prev){
-                              ce_buffer_remove_string(app->input_view.buffer, (CePoint_t){0, 0}, ce_utf8_strlen(app->input_view.buffer->lines[0]));
-                              ce_buffer_insert_string(app->input_view.buffer, prev, (CePoint_t){0, 0});
-                         }
-                         return;
-                    }
-
-                    if(key == KEY_DOWN){
-                         char* next = ce_history_next(&app->command_history);
-                         if(next){
-                              ce_buffer_remove_string(app->input_view.buffer, (CePoint_t){0, 0}, ce_utf8_strlen(app->input_view.buffer->lines[0]));
-                              ce_buffer_insert_string(app->input_view.buffer, next, (CePoint_t){0, 0});
-                         }
-                         return;
-                    }
+                    handle_input_history_key(key, &app->command_history, app->input_view.buffer, &app->input_view.cursor);
+               }else if((strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
+                         strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
+                         strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
+                         strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0) && app->input_view.buffer->line_count){
+                    handle_input_history_key(key, &app->search_history, app->input_view.buffer, &app->input_view.cursor);
                }
 
                CeAppBufferData_t* buffer_data = app->input_view.buffer->app_data;

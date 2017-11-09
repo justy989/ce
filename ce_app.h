@@ -26,7 +26,7 @@ typedef struct CeStringNode_t{
 typedef struct{
      CeStringNode_t* head;
      CeStringNode_t* current;
-}History_t;
+}CeHistory_t;
 
 typedef struct{
      int* keys;
@@ -109,7 +109,8 @@ typedef struct CeApp_t{
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
      CeComplete_t switch_buffer_complete;
-     History_t command_history;
+     CeHistory_t command_history;
+     CeHistory_t search_history;
      CeKeyBinds_t key_binds;
      CeRune_t keys[APP_MAX_KEY_COUNT];
      int64_t key_count;
@@ -137,9 +138,10 @@ void ce_buffer_node_free(CeBufferNode_t** head);
 CeStringNode_t* ce_string_node_insert(CeStringNode_t** head, const char* string);
 void ce_string_node_free(CeStringNode_t** head);
 
-bool ce_history_insert(History_t* history, const char* string);
-char* ce_history_previous(History_t* history);
-char* ce_history_next(History_t* history);
+bool ce_history_insert(CeHistory_t* history, const char* string);
+char* ce_history_previous(CeHistory_t* history);
+char* ce_history_next(CeHistory_t* history);
+void ce_history_reset_current(CeHistory_t* history);
 
 void ce_convert_bind_defs(CeKeyBinds_t* binds, CeKeyBindDef_t* bind_defs, int64_t bind_def_count);
 void ce_set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
