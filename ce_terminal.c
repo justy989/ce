@@ -1408,7 +1408,7 @@ static bool tty_create(int rows, int columns, pid_t* pid, int* tty_file_descript
 
                execvp(shell, args);
                _exit(1);
-          }
+               }
           break;
      default:
           close(slave_file_descriptor);
@@ -1520,9 +1520,13 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
                if(end) *end = 0;
           }
      }else if(terminal->columns < width){
+          int64_t diff = width - terminal->columns;
           for(int64_t i = 0; i < terminal->line_count; i++){
                terminal->lines[i] = realloc(terminal->lines[i], width * sizeof(*terminal->lines[0]));
                terminal->alternate_lines[i] = realloc(terminal->alternate_lines[i], width * sizeof(*terminal->alternate_lines[0]));
+
+               memset(terminal->lines[i] + terminal->columns, 0, diff * sizeof(terminal->lines[i][0]));
+               memset(terminal->alternate_lines[i] + terminal->columns, 0, diff * sizeof(terminal->alternate_lines[i][0]));
 
                // realloc buffer lines so they are smaller
                size_t bytes = (width + 1) * CE_UTF8_SIZE;
@@ -1530,7 +1534,6 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
                terminal->alternate_lines_buffer->lines[i] = realloc(terminal->alternate_lines_buffer->lines[i], bytes);
 
                // append spaces and null terminator with the new columns
-               int64_t diff = width - terminal->columns;
                char* end = ce_utf8_iterate_to_include_end(terminal->lines_buffer->lines[i], terminal->columns);
                memset(end, ' ', diff);
                end += diff;
@@ -1545,16 +1548,15 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
 
      terminal->columns = width;
      terminal->rows = height;
-     terminal->top = 0;
-     terminal->bottom = height - 1;
+     terminal->bottom = terminal->top + (height - 1);
      terminal->start_line = terminal->line_count - height;
 
      // clamp cursor onto terminal
-     if(terminal->cursor.y > terminal->line_count){
-          terminal->cursor.y = terminal->line_count - 1;
+     if(terminal->cursor.y >= height){
+          terminal->cursor.y = height - 1;
      }
 
-     if(terminal->cursor.y > width){
+     if(terminal->cursor.x >= width){
           terminal->cursor.x = width - 1;
      }
 

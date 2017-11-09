@@ -1657,7 +1657,7 @@ int main(int argc, char** argv){
                          view->scroll.x = 0;
                          view->scroll.y = terminal->start_line;
                     }else{
-                         ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+                         ce_view_follow_cursor(view, 0, 0, app.config_options.tab_width);
                     }
                }
           }
@@ -1688,7 +1688,7 @@ int main(int argc, char** argv){
                          view->scroll.x = 0;
                          view->scroll.y = terminal->start_line;
                     }else{
-                         ce_view_follow_cursor(view, 1, 1, app.config_options.tab_width);
+                         ce_view_follow_cursor(view, 0, 0, app.config_options.tab_width);
                     }
                }else{
                     ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
