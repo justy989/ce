@@ -186,7 +186,7 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      }
 
      ce_layout_split(tab_layout, vertical);
-     ce_layout_distribute_rect(tab_layout, app->terminal_rect);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -247,7 +247,7 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
           ce_layout_delete(tab_layout, tab_layout->tab.current);
      }
 
-     ce_layout_distribute_rect(tab_layout, app->terminal_rect);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 
@@ -287,6 +287,7 @@ CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data){
      CeLayout_t* new_tab_layout = ce_layout_tab_list_add(app->tab_list_layout);
      if(!new_tab_layout) return CE_COMMAND_NO_ACTION;
      app->tab_list_layout->tab_list.current = new_tab_layout;
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -302,10 +303,12 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
                if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
                     if(i > 0){
                          app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i - 1];
+                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
                          return CE_COMMAND_SUCCESS;
                     }else{
                          // wrap around
                          app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[app->tab_list_layout->tab_list.tab_count - 1];
+                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
                          return CE_COMMAND_SUCCESS;
                     }
                     break;
@@ -316,10 +319,12 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
                if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
                     if(i < (app->tab_list_layout->tab_list.tab_count - 1)){
                          app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i + 1];
+                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
                          return CE_COMMAND_SUCCESS;
                     }else{
                          // wrap around
                          app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[0];
+                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
                          return CE_COMMAND_SUCCESS;
                     }
                     break;
