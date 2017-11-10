@@ -60,6 +60,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'F', &ce_vim_parse_motion_find_backward);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 't', &ce_vim_parse_motion_until_forward);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'T', &ce_vim_parse_motion_until_backward);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ';', &ce_vim_parse_motion_next_find_char);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ',', &ce_vim_parse_motion_prev_find_char);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'i', &ce_vim_parse_motion_inside);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'a', &ce_vim_parse_motion_around);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'G', &ce_vim_parse_motion_end_of_file);
@@ -1652,6 +1654,14 @@ CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeR
      return vim_parse_motion_find(action, key, ce_vim_motion_until_backward);
 }
 
+CeVimParseResult_t ce_vim_parse_motion_next_find_char(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_next_find_char);
+}
+
+CeVimParseResult_t ce_vim_parse_motion_prev_find_char(CeVimAction_t* action, CeRune_t key){
+     return parse_motion_direction(action, ce_vim_motion_prev_find_char);
+}
+
 CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_end_of_file);
 }
@@ -2118,6 +2128,8 @@ bool ce_vim_motion_find_forward(CeVim_t* vim, CeVimAction_t* action, const CeVie
      CePoint_t new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, action->motion.integer, false);
      if(new_position.x < 0) return false;
      motion_range->end = new_position;
+     vim->find_char.rune = action->motion.integer;
+     vim->find_char.state = CE_VIM_FIND_CHAR_STATE_FIND_FORWARD;
      return true;
 }
 
@@ -2126,6 +2138,8 @@ bool ce_vim_motion_find_backward(CeVim_t* vim, CeVimAction_t* action, const CeVi
      CePoint_t new_position = ce_vim_move_find_rune_backward(view->buffer, motion_range->end, action->motion.integer, false);
      if(new_position.x < 0) return false;
      motion_range->end = new_position;
+     vim->find_char.rune = action->motion.integer;
+     vim->find_char.state = CE_VIM_FIND_CHAR_STATE_FIND_BACKWARD;
      return true;
 }
 
@@ -2134,12 +2148,68 @@ bool ce_vim_motion_until_forward(CeVim_t* vim, CeVimAction_t* action, const CeVi
      CePoint_t new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, action->motion.integer, true);
      if(new_position.x < 0) return false;
      motion_range->end = new_position;
+     vim->find_char.rune = action->motion.integer;
+     vim->find_char.state = CE_VIM_FIND_CHAR_STATE_UNTIL_FORWARD;
      return true;
 }
 
 bool ce_vim_motion_until_backward(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                   CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
      CePoint_t new_position = ce_vim_move_find_rune_backward(view->buffer, motion_range->end, action->motion.integer, true);
+     if(new_position.x < 0) return false;
+     motion_range->end = new_position;
+     vim->find_char.rune = action->motion.integer;
+     vim->find_char.state = CE_VIM_FIND_CHAR_STATE_UNTIL_BACKWARD;
+     return true;
+}
+
+bool ce_vim_motion_next_find_char(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                                  CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     CePoint_t new_position = motion_range->end;
+
+     switch(vim->find_char.state){
+     default:
+          break;
+     case CE_VIM_FIND_CHAR_STATE_FIND_FORWARD:
+          new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, vim->find_char.rune, false);
+          break;
+     case CE_VIM_FIND_CHAR_STATE_FIND_BACKWARD:
+          new_position = ce_vim_move_find_rune_backward(view->buffer, motion_range->end, vim->find_char.rune, false);
+          break;
+     case CE_VIM_FIND_CHAR_STATE_UNTIL_FORWARD:
+          new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, vim->find_char.rune, true);
+          break;
+     case CE_VIM_FIND_CHAR_STATE_UNTIL_BACKWARD:
+          new_position = ce_vim_move_find_rune_backward(view->buffer, motion_range->end, vim->find_char.rune, true);
+          break;
+     }
+
+     if(new_position.x < 0) return false;
+     motion_range->end = new_position;
+     return true;
+}
+
+bool ce_vim_motion_prev_find_char(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
+                                  CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
+     CePoint_t new_position = motion_range->end;
+
+     switch(vim->find_char.state){
+     default:
+          break;
+     case CE_VIM_FIND_CHAR_STATE_FIND_FORWARD:
+          new_position = ce_vim_move_find_rune_backward(view->buffer, motion_range->end, vim->find_char.rune, false);
+          break;
+     case CE_VIM_FIND_CHAR_STATE_FIND_BACKWARD:
+          new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, vim->find_char.rune, false);
+          break;
+     case CE_VIM_FIND_CHAR_STATE_UNTIL_FORWARD:
+          new_position = ce_vim_move_find_rune_backward(view->buffer, motion_range->end, vim->find_char.rune, true);
+          break;
+     case CE_VIM_FIND_CHAR_STATE_UNTIL_BACKWARD:
+          new_position = ce_vim_move_find_rune_forward(view->buffer, motion_range->end, vim->find_char.rune, true);
+          break;
+     }
+
      if(new_position.x < 0) return false;
      motion_range->end = new_position;
      return true;
