@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t string_count){
+bool ce_complete_init(CeComplete_t* complete, const char** strings, const char** descriptions, int64_t string_count){
      ce_complete_free(complete);
 
      complete->elements = calloc(string_count, sizeof(*complete->elements));
@@ -11,6 +11,9 @@ bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t stri
 
      for(int64_t i = 0; i < string_count; i++){
           complete->elements[i].string = strdup(strings[i]);
+          if(descriptions && descriptions[i]){
+               complete->elements[i].description = strdup(descriptions[i]);
+          }
           if(!complete->elements[i].string) return false;
           complete->elements[i].match = true;
      }
@@ -109,6 +112,7 @@ void ce_complete_previous_match(CeComplete_t* complete){
 void ce_complete_free(CeComplete_t* complete){
      for(int64_t i = 0; i < complete->count; i++){
           free(complete->elements[i].string);
+          free(complete->elements[i].description);
      }
 
      free(complete->elements);

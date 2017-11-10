@@ -193,3 +193,6 @@ int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
 int64_t istrlen(const CeRune_t* istr);
 
 bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
+
+void ce_app_init_default_commands(CeApp_t* app);
+void ce_app_init_command_completion(CeApp_t* app);

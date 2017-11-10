@@ -4,10 +4,8 @@ todo:
 - message box
 - undo in macros
 - vim increment and decrement number on line
-- history for all input modes
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
-- ctrl+j in completion creates extra lines that ruin drawing
 - python multiline string comments are broken sometimes

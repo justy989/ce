@@ -323,7 +323,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      }
 
      // set the mode line
-     int vim_mode_fg = COLOR_DEFAULT;
+     int vim_mode_fg = ui_fg_color;
      const char* vim_mode_string = NULL;
 
      if(vim){
@@ -362,11 +362,11 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", vim_mode_string);
 
-          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, ui_bg_color);
+          color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           printw(" %s", view->buffer->name);
      }else{
-          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, ui_bg_color);
+          color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", view->buffer->name);
      }
@@ -635,7 +635,7 @@ void draw(CeApp_t* app){
           draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
                     &color_defs, app->syntax_defs);
           if(app->input_mode){
-               int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 2;
+               int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
                draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
                                 app->config_options.ui_fg_color, app->config_options.ui_bg_color);
           }
@@ -1382,7 +1382,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 }
 
 void print_help(char* program){
-     printf("usage  : %s [options]\n", program);
+     printf("usage  : %s [options] [file]\n", program);
      printf("options:\n");
      printf("  -c <config file> path to shared object configuration\n");
 }
@@ -1410,15 +1410,6 @@ int main(int argc, char** argv){
           }
 
           last_arg_index = optind;
-     }
-
-     // validate args
-     {
-          if(!config_filepath){
-               printf("error: please specify a config file\n\n");
-               print_help(argv[0]);
-               return 1;
-          }
      }
 
      setlocale(LC_ALL, "");
@@ -1449,6 +1440,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer = new_buffer();
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
+          CeBuffer_t* scratch_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
           ce_buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
@@ -1462,6 +1454,8 @@ int main(int argc, char** argv){
           ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
           ce_buffer_alloc(app.jump_list_buffer, 1, "[jumps]");
           ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
+          ce_buffer_alloc(scratch_buffer, 1, "scratch");
+          ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
@@ -1469,6 +1463,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          scratch_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.yank_list_buffer->no_line_numbers = true;
@@ -1489,6 +1484,8 @@ int main(int argc, char** argv){
           buffer_data = app.mark_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.jump_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 
           if(argc > 1){
@@ -1530,56 +1527,8 @@ int main(int argc, char** argv){
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
      }
 
-     // init commands
-     CeCommandEntry_t command_entries[] = {
-          {command_quit, "quit", "quit ce"},
-          {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
-          {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
-          {command_show_buffers, "show_buffers", "show the list of buffers"},
-          {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
-          {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
-          {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
-          {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
-          {command_load_file, "load_file", "load a file (optionally specified)"},
-          {command_new_tab, "new_tab", "create a new tab"},
-          {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
-          {command_search, "search", "interactive search 'forward' or 'backward'"},
-          {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
-          {command_noh, "noh", "turn off search highlighting"},
-          {command_setpaste, "setpaste", "about to paste, so turn off auto indentation"},
-          {command_setnopaste, "setnopaste", "done pasting, so turn on auto indentation again"},
-          {command_command, "command", "interactively send a commmand"},
-          {command_redraw, "redraw", "redraw the entire editor"},
-          {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
-          {command_new_terminal, "new_terminal", "open a new terminal and show it in the current view"},
-          {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
-          {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
-          {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
-          {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
-          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
-          {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
-          {command_reload_config, "reload_config", "reload the config shared object"},
-          {command_buffer_type, "buffer_type", "set the current buffer's type: c, cpp, python, java, bash, config, diff, plain"},
-          {command_new_buffer, "new_buffer", "create a new buffer"},
-          {command_rename_buffer, "rename_buffer", "rename the current buffer"},
-          {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
-          {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
-          {command_terminal_command, "terminal_command", "run a command in the terminal"},
-          {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
-          {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
-     };
-
-     int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
-     app.command_entries = malloc(command_entry_count * sizeof(*app.command_entries));
-     app.command_entry_count = command_entry_count;
-     for(int64_t i = 0; i < command_entry_count; i++){
-          app.command_entries[i] = command_entries[i];
-     }
-
-     // init vim
-     {
-          ce_vim_init(&app.vim);
-     }
+     ce_app_init_default_commands(&app);
+     ce_vim_init(&app.vim);
 
      // init layout
      {
@@ -1598,23 +1547,100 @@ int main(int argc, char** argv){
      }
 
      // init user config
-     {
+     if(config_filepath){
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
           app.user_config.init_func(&app);
+     }else{
+          // default config
+
+          // config options
+          CeConfigOptions_t* config_options = &app.config_options;
+          config_options->tab_width = 5;
+          config_options->horizontal_scroll_off = 10;
+          config_options->vertical_scroll_off = 5;
+          config_options->insert_spaces_on_tab = true;
+          config_options->terminal_scroll_back = 1024;
+          config_options->line_number = CE_LINE_NUMBER_NONE;
+
+          // keybinds
+          CeKeyBindDef_t normal_mode_bind_defs[] = {
+               {{'\\', 'q'}, "quit"},
+               {{23, 'h'}, "select_adjacent_layout left"}, // ctrl w
+               {{23, 'l'}, "select_adjacent_layout right"}, // ctrl w
+               {{23, 'k'}, "select_adjacent_layout up"}, // ctrl w
+               {{23, 'j'}, "select_adjacent_layout down"}, // ctrl w
+               {{19}, "save_buffer"}, // ctrl s
+               {{'\\', 'b'}, "show_buffers"},
+               {{6}, "load_file"}, // ctrl f
+               {{'/'}, "search forward"},
+               {{'?'}, "search backward"},
+               {{':'}, "command"},
+               {{'g', 't'}, "select_adjacent_tab right"},
+               {{'g', 'T'}, "select_adjacent_tab left"},
+               {{'\\', '/'}, "regex_search forward"},
+               {{'\\', '?'}, "regex_search backward"},
+               {{'g', 'r'}, "redraw"},
+               {{'\\', 'f'}, "reload_file"},
+               {{2}, "switch_buffer"}, // ctrl b
+               {{9}, "jump_list previous"}, // ctrl + o
+               {{15}, "jump_list next"}, // ctrl + i
+               {{'K'}, "man_page_on_word_under_cursor"},
+          };
+
+          ce_convert_bind_defs(&app.key_binds, normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
+
+          // syntax
+          {
+               CeSyntaxDef_t* syntax_defs = malloc(CE_SYNTAX_COLOR_COUNT * sizeof(*syntax_defs));
+               syntax_defs[CE_SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_NORMAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_TYPE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_KEYWORD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
+               syntax_defs[CE_SYNTAX_COLOR_CONTROL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_STRING].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_STRING].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = COLOR_BLACK;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].fg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].fg = COLOR_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = COLOR_BLACK;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = COLOR_BRIGHT_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].bg = COLOR_DEFAULT;
+
+               app.config_options.ui_fg_color = COLOR_BLACK;
+               app.config_options.ui_bg_color = COLOR_WHITE;
+
+               app.syntax_defs = syntax_defs;
+          }
      }
 
-     // init command complete
-     {
-          const char** commands = malloc(app.command_entry_count * sizeof(*commands));
-          for(int64_t i = 0; i < app.command_entry_count; i++){
-               commands[i] = strdup(app.command_entries[i].name);
-          }
-          ce_complete_init(&app.command_complete, commands, app.command_entry_count);
-          for(int64_t i = 0; i < app.command_entry_count; i++){
-               free((char*)(commands[i]));
-          }
-          free(commands);
-     }
+     ce_app_init_command_completion(&app);
 
      draw(&app);
 
@@ -1746,8 +1772,10 @@ int main(int argc, char** argv){
      }
 
      // cleanup
-     app.user_config.free_func(&app);
-     user_config_free(&app.user_config);
+     if(config_filepath){
+          app.user_config.free_func(&app);
+          user_config_free(&app.user_config);
+     }
 
      ce_macros_free(&app.macros);
      ce_complete_free(&app.command_complete);
