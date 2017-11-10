@@ -39,7 +39,7 @@
 
 ### How to configure
 Build a shared object that implements these functions:
-`
+``` c
 bool ce_init(CeApp_t* app){
      // initialize your config here
      return true;
@@ -49,7 +49,7 @@ bool ce_free(CeApp_t* app){
      // clean up your config here
      return true;
 }
-`
+```
 
 When running ce, pass it the path to the shared object
 `$ ce -c path/to/config.so`
@@ -73,6 +73,8 @@ Key Sequence|Action
 `Ctrl+w l`|move cursor to the view to the right
 `Ctrl+o`|goto previous jump list location
 `Ctrl+i`|goto next jump list location
+`Ctrl+n`|goto the next file definition in the shell command buffer (works with compilation errors, fgrep, etc)
+`Ctrl+p`|goto the previous file definition in the shell command buffer (works with compilation errors, fgrep, etc)
 `i`|enter insert mode
 `esc`|enter normal mode
 `h`|move cursor left

@@ -700,6 +700,8 @@ CeDestination_t scan_line_for_destination(const char* line){
      CeDestination_t destination = {};
      destination.point = (CePoint_t){-1, -1};
 
+     // TODO: more formats, including git grep, valgrind
+
      // grep/gcc format
      char* file_end = strchr(line, ':');
      if(!file_end) return destination;
