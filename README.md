@@ -27,19 +27,15 @@
 - It is fun learning how to make a text editor.
 - Using something on a daily basis that we created gives us the warm and fuzzies.
 
-
 ### How To Build
 - Requirements
   - c11 compiler
   - ncurses library
 
-run make
 `$ make`
-
 
 ### How To Run
 `$ ce path/to/file.c`
-
 
 ### How to configure
 Build a shared object that implements these functions:
@@ -59,7 +55,6 @@ When running ce, pass it the path to the shared object
 `$ ce -c path/to/config.so`
 
 See https://www.github.com/justy989/ce_config for an example configuration  
-
 
 ### Default Keybindings (in normal or visual mode)
 Key Sequence|Action
