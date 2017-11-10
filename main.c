@@ -1449,6 +1449,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer = new_buffer();
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
+          CeBuffer_t* scratch_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
           ce_buffer_node_insert(&app.buffer_node_head, app.buffer_list_buffer);
@@ -1462,6 +1463,8 @@ int main(int argc, char** argv){
           ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
           ce_buffer_alloc(app.jump_list_buffer, 1, "[jumps]");
           ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
+          ce_buffer_alloc(scratch_buffer, 1, "scratch");
+          ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.yank_list_buffer->status = CE_BUFFER_STATUS_NONE;
@@ -1469,6 +1472,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          scratch_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.yank_list_buffer->no_line_numbers = true;
@@ -1489,6 +1493,8 @@ int main(int argc, char** argv){
           buffer_data = app.mark_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.jump_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 
           if(argc > 1){
