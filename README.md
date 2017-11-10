@@ -37,6 +37,26 @@
 ### How To Run
 `$ ce path/to/file.c`
 
+### How to configure
+Build a shared object that implements these functions:
+`
+bool ce_init(CeApp_t* app){
+     // initialize your config here
+     return true;
+}
+
+bool ce_free(CeApp_t* app){
+     // clean up your config here
+     return true;
+}
+`
+
+When running ce, pass it the path to the shared object
+`$ ce -c path/to/config.so`
+
+See https://www.github.com/justy989/ce_config for an example configuration
+
+
 ### Default Keybindings (in normal or visual mode)
 Key Sequence|Action
 ------------|------
