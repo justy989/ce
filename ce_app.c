@@ -912,6 +912,12 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
+          {command_vim_e, "e", "vim's e command to load a file specified"},
+          {command_vim_w, "w", "vim's w command to save the current buffer"},
+          {command_vim_q, "q", "vim's q command to close the current window"},
+          {command_vim_wq, "wq", "vim's w command to save the current buffer and close the current window"},
+          {command_vim_vsp, "vsp", "vim's vsp command to split the window vertically. It optionally takes a file to open"},
+          {command_vim_sp, "sp", "vim's sp command to split the window vertically. It optionally takes a file to open"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

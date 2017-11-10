@@ -4,8 +4,16 @@ todo:
 - message box
 - undo in macros
 - vim increment and decrement number on line
+- vim ctrl+w HJKL to move windows around
+- regex replace for captures
+- vim ';', ','
+- vim :find using bobby's old ce code
+- vim :tabnew :tabn :tabp
+- vim :cn :cp
+- vim :make -> ':terminal_command make'
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - python multiline string comments are broken sometimes
+- can't kill tabs

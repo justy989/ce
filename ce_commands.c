@@ -202,10 +202,7 @@ CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-
-     CeApp_t* app = user_data;
+static bool delete_layout(CeApp_t* app){
      CeView_t* view = NULL;
      CeRect_t view_rect = {};
      int64_t current_index = 0;
@@ -223,14 +220,13 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
         tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
         tab_layout->tab.root->list.layout_count == 1 &&
         tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]){
-          return CE_COMMAND_NO_ACTION;
+          return false;
      }
 
-     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+     if(app->input_mode) return false;
 
      if(!get_view_info_from_tab(tab_layout, &view, &view_rect)){
-          assert(!"unknown layout type");
-          return CE_COMMAND_FAILURE;
+          return false;
      }
 
      CePoint_t cursor = {0, 0};
@@ -251,6 +247,12 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 
+     return true;
+}
+
+CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
      return CE_COMMAND_SUCCESS;
 }
 
@@ -996,4 +998,92 @@ void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* re
      if(ce_point_after(end, start)){
           buffer_replace_all(view->buffer, view->cursor, match, replace, start, end, false);
      }
+}
+
+CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+
+     load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                         command->args[0].string);
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     ce_buffer_save(view->buffer);
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     ce_buffer_save(view->buffer);
+
+     if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
+     if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     ce_layout_split(tab_layout, true);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     if(command->arg_count == 1){
+          if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+          CeView_t* view = NULL;
+          if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                              command->args[0].string);
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
+     if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     ce_layout_split(tab_layout, false);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     if(command->arg_count == 1){
+          if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+          CeView_t* view = NULL;
+          if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                              command->args[0].string);
+     }
+
+     return CE_COMMAND_SUCCESS;
 }
