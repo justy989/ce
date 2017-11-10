@@ -583,8 +583,8 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = i;
                buffer_data->last_goto_destination = i;
+               break;
           }
-          break;
      }
 
      // we didn't find anything, and since the user asked for a destination, find this one
@@ -635,8 +635,8 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
                CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
                if(layout) layout->view.scroll.y = i;
                buffer_data->last_goto_destination = i;
+               break;
           }
-          break;
      }
 
      // we didn't find anything, and since the user asked for a destination, find this one
@@ -703,11 +703,14 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
+     if(app->command_entries) free(app->command_entries);
+     ce_app_init_default_commands(app);
      char* config_path = strdup(app->user_config.filepath);
      user_config_free(&app->user_config);
      user_config_init(&app->user_config, config_path);
      free(config_path);
      app->user_config.init_func(app);
+     ce_app_init_command_completion(app);
      return CE_COMMAND_SUCCESS;
 }
 

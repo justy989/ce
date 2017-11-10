@@ -1527,56 +1527,8 @@ int main(int argc, char** argv){
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
      }
 
-     // init commands
-     CeCommandEntry_t command_entries[] = {
-          {command_quit, "quit", "quit ce"},
-          {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
-          {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
-          {command_show_buffers, "show_buffers", "show the list of buffers"},
-          {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
-          {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
-          {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
-          {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
-          {command_load_file, "load_file", "load a file (optionally specified)"},
-          {command_new_tab, "new_tab", "create a new tab"},
-          {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
-          {command_search, "search", "interactive search 'forward' or 'backward'"},
-          {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
-          {command_noh, "noh", "turn off search highlighting"},
-          {command_setpaste, "setpaste", "about to paste, so turn off auto indentation"},
-          {command_setnopaste, "setnopaste", "done pasting, so turn on auto indentation again"},
-          {command_command, "command", "interactively send a commmand"},
-          {command_redraw, "redraw", "redraw the entire editor"},
-          {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
-          {command_new_terminal, "new_terminal", "open a new terminal and show it in the current view"},
-          {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
-          {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
-          {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
-          {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
-          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search"},
-          {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
-          {command_reload_config, "reload_config", "reload the config shared object"},
-          {command_buffer_type, "buffer_type", "set the current buffer's type: c, cpp, python, java, bash, config, diff, plain"},
-          {command_new_buffer, "new_buffer", "create a new buffer"},
-          {command_rename_buffer, "rename_buffer", "rename the current buffer"},
-          {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
-          {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
-          {command_terminal_command, "terminal_command", "run a command in the terminal"},
-          {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
-          {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
-     };
-
-     int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
-     app.command_entries = malloc(command_entry_count * sizeof(*app.command_entries));
-     app.command_entry_count = command_entry_count;
-     for(int64_t i = 0; i < command_entry_count; i++){
-          app.command_entries[i] = command_entries[i];
-     }
-
-     // init vim
-     {
-          ce_vim_init(&app.vim);
-     }
+     ce_app_init_default_commands(&app);
+     ce_vim_init(&app.vim);
 
      // init layout
      {
@@ -1690,20 +1642,7 @@ int main(int argc, char** argv){
           }
      }
 
-     // init command complete
-     {
-          const char** commands = malloc(app.command_entry_count * sizeof(*commands));
-          const char** descriptions = malloc(app.command_entry_count * sizeof(*descriptions));
-          for(int64_t i = 0; i < app.command_entry_count; i++){
-               commands[i] = strdup(app.command_entries[i].name);
-               descriptions[i] = strdup(app.command_entries[i].description);
-          }
-          ce_complete_init(&app.command_complete, commands, descriptions, app.command_entry_count);
-          for(int64_t i = 0; i < app.command_entry_count; i++){
-               free((char*)(commands[i]));
-          }
-          free(commands);
-     }
+     ce_app_init_command_completion(&app);
 
      draw(&app);
 
