@@ -235,7 +235,7 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
                CeTerminalGlyph_t* glyph = terminal->lines[y] + x;
                if(glyph->foreground != fg || glyph->background != bg){
                     fg = glyph->foreground;
-                    bg = glyph->background;
+                    bg = in_visual ? ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_VISUAL, COLOR_DEFAULT) : glyph->background;
                     ce_draw_color_list_insert(draw_color_list, fg, bg, point);
                }
           }
