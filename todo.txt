@@ -5,7 +5,6 @@ todo:
 - undo in macros
 - vim ctrl+w HJKL to move windows around
 - regex replace for captures
-- vim :find using bobby's old ce code
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet

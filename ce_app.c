@@ -924,6 +924,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_make, "make", "vim's make command run make in the terminal"},
+          {command_vim_find, "find", "vim's find command to search for files recursively"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);
