@@ -1599,6 +1599,7 @@ int main(int argc, char** argv){
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
           app.user_config.init_func(&app);
      }else{
+          // default config
 
           // config options
           CeConfigOptions_t* config_options = &app.config_options;
