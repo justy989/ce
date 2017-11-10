@@ -202,10 +202,7 @@ CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-
-     CeApp_t* app = user_data;
+static bool delete_layout(CeApp_t* app){
      CeView_t* view = NULL;
      CeRect_t view_rect = {};
      int64_t current_index = 0;
@@ -223,14 +220,13 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
         tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
         tab_layout->tab.root->list.layout_count == 1 &&
         tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]){
-          return CE_COMMAND_NO_ACTION;
+          return false;
      }
 
-     if(app->input_mode) return CE_COMMAND_NO_ACTION;
+     if(app->input_mode) return false;
 
      if(!get_view_info_from_tab(tab_layout, &view, &view_rect)){
-          assert(!"unknown layout type");
-          return CE_COMMAND_FAILURE;
+          return false;
      }
 
      CePoint_t cursor = {0, 0};
@@ -251,6 +247,12 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 
+     return true;
+}
+
+CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
      return CE_COMMAND_SUCCESS;
 }
 
@@ -292,6 +294,46 @@ CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+bool select_tab_left(CeApp_t* app){
+     for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
+          if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
+               if(i > 0){
+                    app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i - 1];
+                    ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+                    return true;
+               }else{
+                    // wrap around
+                    app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[app->tab_list_layout->tab_list.tab_count - 1];
+                    ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+                    return true;
+               }
+               break;
+          }
+     }
+
+     return false;
+}
+
+bool select_tab_right(CeApp_t* app){
+     for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
+          if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
+               if(i < (app->tab_list_layout->tab_list.tab_count - 1)){
+                    app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i + 1];
+                    ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+                    return true;
+               }else{
+                    // wrap around
+                    app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[0];
+                    ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+                    return true;
+               }
+               break;
+          }
+     }
+
+     return false;
+}
+
 CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
@@ -299,37 +341,9 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
      CeApp_t* app = user_data;
 
      if(strcmp(command->args[0].string, "left") == 0){
-          for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
-               if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
-                    if(i > 0){
-                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i - 1];
-                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-                         return CE_COMMAND_SUCCESS;
-                    }else{
-                         // wrap around
-                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[app->tab_list_layout->tab_list.tab_count - 1];
-                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-                         return CE_COMMAND_SUCCESS;
-                    }
-                    break;
-               }
-          }
+          select_tab_left(app);
      }else if(strcmp(command->args[0].string, "right") == 0){
-          for(int64_t i = 0; i < app->tab_list_layout->tab_list.tab_count; i++){
-               if(app->tab_list_layout->tab_list.current == app->tab_list_layout->tab_list.tabs[i]){
-                    if(i < (app->tab_list_layout->tab_list.tab_count - 1)){
-                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[i + 1];
-                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-                         return CE_COMMAND_SUCCESS;
-                    }else{
-                         // wrap around
-                         app->tab_list_layout->tab_list.current = app->tab_list_layout->tab_list.tabs[0];
-                         ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-                         return CE_COMMAND_SUCCESS;
-                    }
-                    break;
-               }
-          }
+          select_tab_right(app);
      }else{
           ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
@@ -869,6 +883,7 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
           return CE_COMMAND_FAILURE;
      }
 
+     update_terminal_last_goto_using_cursor(app->last_terminal);
      ce_run_command_in_terminal(app->last_terminal, command->args[0].string);
      CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->last_terminal->buffer);
      if(terminal_layout){
@@ -878,7 +893,6 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
           terminal_layout->view.scroll.x = 0;
      }
 
-     update_terminal_last_goto_using_cursor(app->last_terminal);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -897,6 +911,7 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
 
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
+     update_terminal_last_goto_using_cursor(app->last_terminal);
      ce_run_command_in_terminal(app->last_terminal, command->args[0].string);
      view = ce_switch_to_terminal(app, view, tab_layout);
      view->cursor.x = 0;
@@ -904,7 +919,6 @@ CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* u
      view->scroll.y = app->last_terminal->cursor.y;
      view->scroll.x = 0;
 
-     update_terminal_last_goto_using_cursor(app->last_terminal);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -996,4 +1010,150 @@ void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* re
      if(ce_point_after(end, start)){
           buffer_replace_all(view->buffer, view->cursor, match, replace, start, end, false);
      }
+}
+
+CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+
+     load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                         command->args[0].string);
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     ce_buffer_save(view->buffer);
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     ce_buffer_save(view->buffer);
+
+     if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
+     if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     ce_layout_split(tab_layout, true);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     if(command->arg_count == 1){
+          if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+          CeView_t* view = NULL;
+          if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                              command->args[0].string);
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
+     if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+
+     ce_layout_split(tab_layout, false);
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     if(command->arg_count == 1){
+          if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+          CeView_t* view = NULL;
+          if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                              command->args[0].string);
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_tabnew(CeCommand_t* command, void* user_data){
+     return command_new_tab(command, user_data);
+}
+
+CeCommandStatus_t command_vim_tabnext(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     if(select_tab_right(app)){
+          return CE_COMMAND_SUCCESS;
+     }
+     return CE_COMMAND_NO_ACTION;
+}
+
+CeCommandStatus_t command_vim_tabprevious(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     if(select_tab_left(app)){
+          return CE_COMMAND_SUCCESS;
+     }
+     return CE_COMMAND_NO_ACTION;
+}
+
+CeCommandStatus_t command_vim_cn(CeCommand_t* command, void* user_data){
+     return command_goto_next_destination(command, user_data);
+}
+
+CeCommandStatus_t command_vim_cp(CeCommand_t* command, void* user_data){
+     return command_goto_prev_destination(command, user_data);
+}
+
+CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+
+     if(command->arg_count == 0){
+          update_terminal_last_goto_using_cursor(app->last_terminal);
+          ce_run_command_in_terminal(app->last_terminal, "make");
+     }else if(command->arg_count == 1 &&
+              command->args[0].type == CE_COMMAND_ARG_STRING){
+          char command_string[256];
+          snprintf(command_string, 256, "make %s", command->args[0].string);
+          update_terminal_last_goto_using_cursor(app->last_terminal);
+          ce_run_command_in_terminal(app->last_terminal, command_string);
+     }else{
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->last_terminal->buffer);
+     if(terminal_layout){
+          terminal_layout->view.cursor.x = 0;
+          terminal_layout->view.cursor.y = app->last_terminal->cursor.y;
+          terminal_layout->view.scroll.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
+          terminal_layout->view.scroll.x = 0;
+     }
+
+     return CE_COMMAND_SUCCESS;
 }

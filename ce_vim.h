@@ -110,6 +110,18 @@ typedef struct CeVimBufferData_t{
      int64_t motion_column;
 }CeVimBufferData_t;
 
+typedef enum{
+     CE_VIM_FIND_CHAR_STATE_FIND_FORWARD,
+     CE_VIM_FIND_CHAR_STATE_FIND_BACKWARD,
+     CE_VIM_FIND_CHAR_STATE_UNTIL_FORWARD,
+     CE_VIM_FIND_CHAR_STATE_UNTIL_BACKWARD,
+}CeVimFindCharState_t;
+
+typedef struct{
+     CeRune_t rune;
+     CeVimFindCharState_t state;
+}CeVimFindChar_t;
+
 typedef struct CeVim_t{
      CeVimMode_t mode;
      CeVimKeyBind_t key_binds[CE_VIM_MAX_KEY_BINDS];
@@ -127,6 +139,7 @@ typedef struct CeVim_t{
      CePoint_t visual_block_top_left;
      CePoint_t visual_block_bottom_right;
      CeVimSearchMode_t search_mode;
+     CeVimFindChar_t find_char;
 }CeVim_t;
 
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
@@ -188,6 +201,8 @@ CeVimParseResult_t ce_vim_parse_motion_find_forward(CeVimAction_t* action, CeRun
 CeVimParseResult_t ce_vim_parse_motion_find_backward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_next_find_char(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_motion_prev_find_char(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_around(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune_t key);
@@ -234,6 +249,8 @@ CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t ke
 CeVimParseResult_t ce_vim_parse_verb_join(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_flip_case(CeVimAction_t* action, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_verb_set_mark(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_increment_number(CeVimAction_t* action, CeRune_t key);
+CeVimParseResult_t ce_vim_parse_verb_decrement_number(CeVimAction_t* action, CeRune_t key);
 
 // motion functions
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_left);
@@ -259,6 +276,8 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_find_forward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_find_backward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_forward);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_until_backward);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_next_find_char);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_prev_find_char);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_inside);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_around);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_end_of_file);
@@ -305,3 +324,5 @@ CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_unindent);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_join);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_flip_case);
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_set_mark);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_increment_number);
+CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_decrement_number);
