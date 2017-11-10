@@ -55,3 +55,4 @@ CeCommandStatus_t command_vim_tabprevious(CeCommand_t* command, void* user_data)
 CeCommandStatus_t command_vim_cn(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_cp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data);

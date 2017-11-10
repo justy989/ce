@@ -1157,3 +1157,41 @@ CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data){
 
      return CE_COMMAND_SUCCESS;
 }
+
+static void open_file_in_dir_recursively(char* path, char* match, CeApp_t* app, CeView_t* view){
+     DIR* dir;
+     struct dirent *ent;
+     if((dir = opendir(path)) != NULL){
+          while((ent = readdir(dir)) != NULL){
+               if(ent->d_type == DT_DIR && strcmp(ent->d_name, ".") != 0  && strcmp(ent->d_name, "..") != 0){
+                    char new_path[PATH_MAX];
+                    snprintf(new_path, PATH_MAX, "%s/%s", path, ent->d_name);
+                    open_file_in_dir_recursively(new_path, match, app, view);
+               }else if(strcmp(ent->d_name, match) == 0){
+                    char full_path[PATH_MAX];
+                    snprintf(full_path, PATH_MAX, "%s/%s", path, ent->d_name);
+                    load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+                                        full_path);
+               }
+          }
+          closedir(dir);
+     }
+}
+
+CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeView_t* view = NULL;
+     CeLayout_t* tab_layout = NULL;
+
+     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+
+     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
+     if(!base_directory) base_directory = strdup(".");
+     open_file_in_dir_recursively(base_directory, command->args[0].string, app, view);
+     free(base_directory);
+
+     return CE_COMMAND_SUCCESS;
+}
