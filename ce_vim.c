@@ -112,6 +112,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'J', &ce_vim_parse_verb_join);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '~', &ce_vim_parse_verb_flip_case);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'm', &ce_vim_parse_verb_set_mark);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 1, &ce_vim_parse_verb_increment_number);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 24, &ce_vim_parse_verb_decrement_number);
 
      return true;
 }
@@ -1936,6 +1938,18 @@ CeVimParseResult_t ce_vim_parse_verb_set_mark(CeVimAction_t* action, CeRune_t ke
      return CE_VIM_PARSE_INVALID;
 }
 
+CeVimParseResult_t ce_vim_parse_verb_increment_number(CeVimAction_t* action, CeRune_t key){
+     if(action->motion.function) return CE_VIM_PARSE_INVALID;
+     action->verb.function = ce_vim_verb_increment_number;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_decrement_number(CeVimAction_t* action, CeRune_t key){
+     if(action->motion.function) return CE_VIM_PARSE_INVALID;
+     action->verb.function = ce_vim_verb_decrement_number;
+     return CE_VIM_PARSE_COMPLETE;
+}
+
 static bool motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
                              CeRange_t* motion_range){
      CePoint_t destination = ce_buffer_move_point(view->buffer, motion_range->end, delta, config_options->tab_width, CE_CLAMP_X_INSIDE);
@@ -3178,4 +3192,66 @@ bool ce_vim_verb_set_mark(CeVim_t* vim, const CeVimAction_t* action, CeRange_t m
      CePoint_t* destination = buffer_data->marks + ce_vim_yank_register_index(action->verb.integer);
      *destination = view->cursor;
      return true;
+}
+
+static bool change_number(CeView_t* view, CePoint_t point, int64_t delta){
+     char* start = ce_utf8_iterate_to(view->buffer->lines[point.y], point.x);
+     char* itr = start;
+     while(*itr && !isdigit(*itr)){
+          itr++;
+     }
+
+     if(!(*itr)) return false;
+
+     // loop backward if we are inside a number, checking for the beginning or for the negative sign
+     while(itr > view->buffer->lines[point.y]){
+          itr--;
+          if(!isdigit(*itr)){
+               if(*itr == '-') break;
+               itr++;
+               break;
+          }
+     }
+
+     if(itr < view->buffer->lines[point.y]) itr = view->buffer->lines[point.y];
+
+     char* end = NULL;
+     int64_t value = strtol(itr, &end, 10);
+     value += delta;
+     assert(end);
+
+     int64_t distance_to_number = ce_utf8_strlen_between(view->buffer->lines[point.y], itr) - 1;
+
+     int64_t number_len = 0;
+     if(*end){
+          number_len = ce_utf8_strlen_between(itr, end) - 1;
+     }else{
+          number_len = ce_utf8_strlen(itr);
+     }
+
+     CePoint_t change_point = {distance_to_number, point.y};
+     CePoint_t change_point_save = change_point;
+
+     int64_t digits = ce_count_digits(value);
+     if(value < 0) digits++; // account for negative sign
+     char* new_number_string = malloc(digits + 1);
+     snprintf(new_number_string, digits + 1, "%ld", value);
+     new_number_string[digits] = 0;
+
+     ce_buffer_remove_string_change(view->buffer, change_point, number_len, &change_point_save,
+                                    change_point, false);
+     change_point_save = change_point;
+     ce_buffer_insert_string_change_at_cursor(view->buffer, new_number_string, &change_point_save, true);
+     view->cursor = change_point;
+     return true;
+}
+
+bool ce_vim_verb_increment_number(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
+                                  CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
+     return change_number(view, motion_range.end, 1);
+}
+
+bool ce_vim_verb_decrement_number(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
+                                  CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
+     return change_number(view, motion_range.end, -1);
 }

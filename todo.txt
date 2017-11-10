@@ -3,7 +3,6 @@ todo:
 - dired mode
 - message box
 - undo in macros
-- vim increment and decrement number on line
 - vim ctrl+w HJKL to move windows around
 - regex replace for captures
 - vim :find using bobby's old ce code

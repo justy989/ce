@@ -1712,6 +1712,7 @@ bool ce_range_sort(CeRange_t* range){
 }
 
 int64_t ce_count_digits(int64_t n){
+     if(n < 0) n = -n;
      if(n == 0) return 1;
 
      int count = 0;
