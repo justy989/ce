@@ -491,7 +491,7 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
           itr = itr->next;
      }
 
-     ce_complete_init(&app->switch_buffer_complete, (const char**)filenames, buffer_count);
+     ce_complete_init(&app->switch_buffer_complete, (const char**)filenames, NULL, buffer_count);
      build_complete_list(app->complete_list_buffer, &app->switch_buffer_complete);
 
      for(int64_t i = 0; i < buffer_count; i++){

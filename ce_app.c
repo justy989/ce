@@ -267,6 +267,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
+          char* end_of_match = strchr(line, ':');
           CePoint_t match_point = {0, y};
 
           if(selected == (y - min)){
@@ -281,6 +282,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
                char* prev_match = line;
                char* match = NULL;
                while((match = strstr(prev_match, complete->current_match))){
+                    if(match >= end_of_match) break;
                     match_point.x = ce_utf8_strlen_between(line, match) - 1;
                     prev_match = match + match_len;
                     int fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_MATCH, ce_draw_color_list_last_fg_color(draw_color_list));
@@ -634,7 +636,7 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      }
 
      if(!exact_match){
-          ce_complete_init(complete, (const char**)(files), file_count);
+          ce_complete_init(complete, (const char**)(files), NULL, file_count);
      }
 
      for(int64_t i = 0; i < file_count; i++){
@@ -656,10 +658,21 @@ void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
      buffer->syntax_data = complete;
      char line[256];
      int64_t cursor = 0;
+     int max_string_len = 0;
+     for(int64_t i = 0; i < complete->count; i++){
+          if(complete->elements[i].match){
+               int len = strlen(complete->elements[i].string);
+               if(len > max_string_len) max_string_len = len;
+          }
+     }
      for(int64_t i = 0; i < complete->count; i++){
           if(complete->elements[i].match){
                if(i == complete->current) cursor = buffer->line_count;
-               snprintf(line, 256, "%s", complete->elements[i].string);
+               if(complete->elements[i].description){
+                    snprintf(line, 256, "%-*s : %s", max_string_len, complete->elements[i].string, complete->elements[i].description);
+               }else{
+                    snprintf(line, 256, "%s", complete->elements[i].string);
+               }
                buffer_append_on_new_line(buffer, line);
           }
      }

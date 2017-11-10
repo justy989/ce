@@ -7,6 +7,7 @@
 
 typedef struct{
      char* string;
+     char* description;
      bool match;
 }CeCompleteElement_t;
 
@@ -17,7 +18,7 @@ typedef struct{
      int64_t current;
 }CeComplete_t;
 
-bool ce_complete_init(CeComplete_t* complete, const char** strings, int64_t string_count);
+bool ce_complete_init(CeComplete_t* complete, const char** strings, const char** descriptions, int64_t string_count);
 void ce_complete_reset(CeComplete_t* complete); // reset as if no matching has been done
 void ce_complete_match(CeComplete_t* complete, const char* match);
 void ce_complete_next_match(CeComplete_t* complete);

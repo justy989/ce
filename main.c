@@ -1382,7 +1382,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 }
 
 void print_help(char* program){
-     printf("usage  : %s [options]\n", program);
+     printf("usage  : %s [options] [file]\n", program);
      printf("options:\n");
      printf("  -c <config file> path to shared object configuration\n");
 }
@@ -1410,15 +1410,6 @@ int main(int argc, char** argv){
           }
 
           last_arg_index = optind;
-     }
-
-     // validate args
-     {
-          if(!config_filepath){
-               printf("error: please specify a config file\n\n");
-               print_help(argv[0]);
-               return 1;
-          }
      }
 
      setlocale(LC_ALL, "");
@@ -1604,18 +1595,109 @@ int main(int argc, char** argv){
      }
 
      // init user config
-     {
+     if(config_filepath){
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
           app.user_config.init_func(&app);
+     }else{
+
+          // config options
+          CeConfigOptions_t* config_options = &app.config_options;
+          config_options->tab_width = 5;
+          config_options->horizontal_scroll_off = 10;
+          config_options->vertical_scroll_off = 5;
+          config_options->insert_spaces_on_tab = true;
+          config_options->terminal_scroll_back = 1024;
+          config_options->line_number = CE_LINE_NUMBER_NONE;
+
+          // keybinds
+          CeKeyBindDef_t normal_mode_bind_defs[] = {
+               {{'\\', 'q'}, "quit"},
+               {{23, 'h'}, "select_adjacent_layout left"}, // ctrl w
+               {{23, 'l'}, "select_adjacent_layout right"}, // ctrl w
+               {{23, 'k'}, "select_adjacent_layout up"}, // ctrl w
+               {{23, 'j'}, "select_adjacent_layout down"}, // ctrl w
+               {{22}, "save_buffer"}, // ctrl s
+               {{'\\', 'b'}, "show_buffers"},
+               {{6}, "load_file"}, // ctrl f
+               {{'/'}, "search forward"},
+               {{'?'}, "search backward"},
+               {{':'}, "command"},
+               {{'g', 't'}, "select_adjacent_tab right"},
+               {{'g', 'T'}, "select_adjacent_tab left"},
+               {{'\\', '/'}, "regex_search forward"},
+               {{'\\', '?'}, "regex_search backward"},
+               {{'g', 'r'}, "redraw"},
+               {{'\\', 'f'}, "reload_file"},
+               {{2}, "switch_buffer"}, // ctrl b
+               {{9}, "jump_list previous"}, // ctrl + o
+               {{15}, "jump_list next"}, // ctrl + i
+               {{'K'}, "man_page_on_word_under_cursor"},
+          };
+
+          ce_convert_bind_defs(&app.key_binds, normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
+
+          // syntax
+          {
+               CeSyntaxDef_t* syntax_defs = malloc(CE_SYNTAX_COLOR_COUNT * sizeof(*syntax_defs));
+               syntax_defs[CE_SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_NORMAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_TYPE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_KEYWORD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
+               syntax_defs[CE_SYNTAX_COLOR_CONTROL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_STRING].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_STRING].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_MATCH].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].fg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].fg = COLOR_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = COLOR_WHITE;;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = COLOR_BRIGHT_CYAN;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].bg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].bg = COLOR_DEFAULT;
+
+               app.config_options.ui_fg_color = COLOR_DEFAULT;
+               app.config_options.ui_bg_color = COLOR_WHITE;
+
+               app.syntax_defs = syntax_defs;
+          }
      }
 
      // init command complete
      {
           const char** commands = malloc(app.command_entry_count * sizeof(*commands));
+          const char** descriptions = malloc(app.command_entry_count * sizeof(*descriptions));
           for(int64_t i = 0; i < app.command_entry_count; i++){
                commands[i] = strdup(app.command_entries[i].name);
+               descriptions[i] = strdup(app.command_entries[i].description);
           }
-          ce_complete_init(&app.command_complete, commands, app.command_entry_count);
+          ce_complete_init(&app.command_complete, commands, descriptions, app.command_entry_count);
           for(int64_t i = 0; i < app.command_entry_count; i++){
                free((char*)(commands[i]));
           }
@@ -1752,8 +1834,10 @@ int main(int argc, char** argv){
      }
 
      // cleanup
-     app.user_config.free_func(&app);
-     user_config_free(&app.user_config);
+     if(config_filepath){
+          app.user_config.free_func(&app);
+          user_config_free(&app.user_config);
+     }
 
      ce_macros_free(&app.macros);
      ce_complete_free(&app.command_complete);
