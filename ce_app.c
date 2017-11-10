@@ -918,6 +918,12 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_vim_wq, "wq", "vim's w command to save the current buffer and close the current window"},
           {command_vim_vsp, "vsp", "vim's vsp command to split the window vertically. It optionally takes a file to open"},
           {command_vim_sp, "sp", "vim's sp command to split the window vertically. It optionally takes a file to open"},
+          {command_vim_tabnew, "tabnew", "vim's tabnew command to create a new tab"},
+          {command_vim_tabnext, "tabnext", "vim's tabnext command to select the next tab"},
+          {command_vim_tabprevious, "tabprevious", "vim's tabprevious command to select the previous tab"},
+          {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
+          {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
+          {command_vim_make, "make", "vim's make command run make in the terminal"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

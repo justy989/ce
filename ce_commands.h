@@ -39,9 +39,19 @@ CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data);
+
+// NOTE: these are to make vim users feel at home
 CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_tabnew(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_tabnext(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_tabprevious(CeCommand_t* command, void* user_data);
+// CeCommandStatus_t command_vim_tabclose(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_cn(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_cp(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data);

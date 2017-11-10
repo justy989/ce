@@ -8,9 +8,6 @@ todo:
 - regex replace for captures
 - vim ';', ','
 - vim :find using bobby's old ce code
-- vim :tabnew :tabn :tabp
-- vim :cn :cp
-- vim :make -> ':terminal_command make'
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
