@@ -283,7 +283,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
                char* prev_match = line;
                char* match = NULL;
                while((match = strstr(prev_match, complete->current_match))){
-                    if(match >= end_of_match) break;
+                    if(end_of_match && match >= end_of_match) break;
                     match_point.x = ce_utf8_strlen_between(line, match) - 1;
                     prev_match = match + match_len;
                     int fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_MATCH, ce_draw_color_list_last_fg_color(draw_color_list));
@@ -291,9 +291,14 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
                     ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
 
                     match_point.x += match_len;
-                    fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, ce_draw_color_list_last_fg_color(draw_color_list));
-                    bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, ce_draw_color_list_last_bg_color(draw_color_list));
-                    ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
+
+                    if(selected == (y - min)){
+                         fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, COLOR_DEFAULT);
+                         bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
+                         ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
+                    }else{
+                         ce_draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, match_point);
+                    }
                }
           }
      }
@@ -899,7 +904,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},
-          {command_buffer_type, "buffer_type", "set the current buffer's type: c, cpp, python, java, bash, config, diff, plain"},
+          {command_buffer_type, "buffer_type", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},

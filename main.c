@@ -323,7 +323,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      }
 
      // set the mode line
-     int vim_mode_fg = COLOR_DEFAULT;
+     int vim_mode_fg = ui_fg_color;
      const char* vim_mode_string = NULL;
 
      if(vim){
@@ -362,11 +362,11 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", vim_mode_string);
 
-          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, ui_bg_color);
+          color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           printw(" %s", view->buffer->name);
      }else{
-          color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, ui_bg_color);
+          color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
           mvprintw(bottom, view->rect.left + 1, "%s", view->buffer->name);
      }
@@ -1569,7 +1569,7 @@ int main(int argc, char** argv){
                {{23, 'l'}, "select_adjacent_layout right"}, // ctrl w
                {{23, 'k'}, "select_adjacent_layout up"}, // ctrl w
                {{23, 'j'}, "select_adjacent_layout down"}, // ctrl w
-               {{22}, "save_buffer"}, // ctrl s
+               {{19}, "save_buffer"}, // ctrl s
                {{'\\', 'b'}, "show_buffers"},
                {{6}, "load_file"}, // ctrl f
                {{'/'}, "search forward"},
@@ -1614,10 +1614,8 @@ int main(int argc, char** argv){
                syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
                syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
-               syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = COLOR_BLACK;
                syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
-               syntax_defs[CE_SYNTAX_COLOR_MATCH].fg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_MATCH].bg = COLOR_WHITE;
                syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].fg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].fg = COLOR_GREEN;
@@ -1628,14 +1626,14 @@ int main(int argc, char** argv){
                syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].fg = COLOR_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = COLOR_WHITE;;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = COLOR_BRIGHT_CYAN;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = COLOR_BLACK;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = COLOR_BRIGHT_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = COLOR_DEFAULT;
                syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].bg = COLOR_DEFAULT;
 
-               app.config_options.ui_fg_color = COLOR_DEFAULT;
+               app.config_options.ui_fg_color = COLOR_BLACK;
                app.config_options.ui_bg_color = COLOR_WHITE;
 
                app.syntax_defs = syntax_defs;

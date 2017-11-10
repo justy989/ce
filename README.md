@@ -161,7 +161,7 @@ goto_prev_destination|find the previous line in the buffer that contains a desti
 replace_all|replace all occurances below cursor (or within a visual range) with the previous search
 reload_file|reload the file in the current view, overwriting any changes outstanding
 reload_config|reload the config shared object
-buffer_type|set the current buffer's type: c, cpp, python, java, bash, config, diff, plain
+buffer_type|set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'
 new_buffer|create a new buffer
 rename_buffer|rename the current buffer
 jump_list|jump to 'next' or 'previous' jump location based on argument passed in
