@@ -1553,7 +1553,7 @@ int main(int argc, char** argv){
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
           {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
-          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range)"},
+          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_reload_config, "reload_config", "reload the config shared object"},
           {command_buffer_type, "buffer_type", "set the current buffer's type: c, cpp, python, java, bash, config, diff, plain"},
