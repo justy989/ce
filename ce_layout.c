@@ -420,6 +420,8 @@ static int64_t count_children(CeLayout_t* layout){
      switch(layout->type){
      default:
           break;
+     case CE_LAYOUT_TYPE_VIEW:
+          return 1;
      case CE_LAYOUT_TYPE_LIST:
      {
           int sum = 0;
