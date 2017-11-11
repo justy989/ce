@@ -197,8 +197,8 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
 
 void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeDrawColorList_t* draw_color_list,
                CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
-     int64_t view_height = ce_view_width(view);
-     int64_t view_width = ce_view_height(view);
+     int64_t view_width = ce_view_width(view);
+     int64_t view_height = ce_view_height(view);
      int64_t row_min = view->scroll.y;
      int64_t col_min = view->scroll.x;
      int64_t col_max = col_min + view_width;
