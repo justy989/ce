@@ -197,8 +197,8 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
 
 void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeDrawColorList_t* draw_color_list,
                CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
-     int64_t view_height = view->rect.bottom - view->rect.top;
-     int64_t view_width = view->rect.right - view->rect.left;
+     int64_t view_height = ce_view_width(view);
+     int64_t view_width = ce_view_height(view);
      int64_t row_min = view->scroll.y;
      int64_t col_min = view->scroll.x;
      int64_t col_max = col_min + view_width;
@@ -617,7 +617,7 @@ void draw(CeApp_t* app){
         strlen(app->complete_list_buffer->lines[0])){
           CeLayout_t* view_layout = tab_layout->tab.current;
           app->complete_view.rect.left = view_layout->view.rect.left;
-          app->complete_view.rect.right = view_layout->view.rect.right;
+          app->complete_view.rect.right = view_layout->view.rect.right - 1;
           if(app->input_mode){
                app->complete_view.rect.bottom = app->input_view.rect.top;
           }else{

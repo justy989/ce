@@ -194,6 +194,8 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 void ce_view_scroll_to(CeView_t* view, CePoint_t point);
 void ce_view_center(CeView_t* view);
+int64_t ce_view_width(CeView_t* view);
+int64_t ce_view_height(CeView_t* view);
 
 int64_t ce_utf8_strlen(const char* string);
 int64_t ce_utf8_strlen_between(const char* start, const char* end); // inclusive

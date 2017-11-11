@@ -465,9 +465,8 @@ CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
      CommandContext_t command_context;
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     // TODO: create ce_view_width(), and ce_view_height()
-     int64_t width = command_context.view->rect.right - command_context.view->rect.left;
-     int64_t height = command_context.view->rect.bottom - command_context.view->rect.top;
+     int64_t width = ce_view_width(command_context.view);
+     int64_t height = ce_view_height(command_context.view);
 
      CeTerminal_t* terminal = create_terminal(app, width, height);
      if(terminal){
@@ -806,9 +805,8 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      CeDestination_t* destination = NULL;
-     // TODO: use ce_view_width() and ce_view_height()
-     int64_t view_width = command_context.view->rect.right - command_context.view->rect.left;
-     int64_t view_height = command_context.view->rect.bottom - command_context.view->rect.top;
+     int64_t view_width = ce_view_width(command_context.view);
+     int64_t view_height = ce_view_height(command_context.view);
      CeRect_t view_rect = {command_context.view->scroll.x, command_context.view->scroll.x + view_width,
                            command_context.view->scroll.y, command_context.view->scroll.y + view_height};
      CeAppViewData_t* view_data = command_context.view->user_data;
@@ -884,7 +882,7 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
      ce_run_command_in_terminal(app->last_terminal, command->args[0].string);
      CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->last_terminal->buffer);
      if(terminal_layout){
-          terminal_layout->view.cursor.x = 0;
+          terminal_layout->view.cursor.x = app->last_terminal->cursor.x;
           terminal_layout->view.cursor.y = app->last_terminal->cursor.y;
           terminal_layout->view.scroll.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
           terminal_layout->view.scroll.x = 0;

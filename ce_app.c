@@ -452,7 +452,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
-     input_view->rect.right = view->rect.right;
+     input_view->rect.right = view->rect.right - 1;
      input_view->rect.bottom = view->rect.bottom;
      int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
      int64_t height = input_view->buffer->line_count;
@@ -916,8 +916,8 @@ int64_t istrlen(const CeRune_t* istr){
 bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
      if(!view) return false;
 
-     int64_t view_width = view->rect.right - view->rect.left;
-     int64_t view_height = view->rect.bottom - view->rect.top;
+     int64_t view_width = ce_view_width(view);
+     int64_t view_height = ce_view_height(view);
      CeRect_t view_rect = {view->scroll.x, view->scroll.x + view_width, view->scroll.y, view->scroll.y + view_height};
 
      return strcmp(destination->filepath, view->buffer->name) == 0 &&
