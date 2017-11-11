@@ -678,7 +678,7 @@ CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(command->arg_count == 0){
           app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REPLACE ALL");
      }else if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING){
-          int64_t index = ce_vim_yank_register_index('/');
+          int64_t index = ce_vim_register_index('/');
           CeVimYank_t* yank = app->vim.yanks + index;
           if(yank->text){
                replace_all(view, &app->vim, yank->text, command->args[0].string);

@@ -452,7 +452,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                        input_buffer->line_count && strlen(input_buffer->lines[0])){
                          pattern = input_buffer->lines[0];
                     }else{
-                         const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+                         const CeVimYank_t* yank = vim->yanks + ce_vim_register_index('/');
                          if(yank->text) pattern = yank->text;
                     }
 
@@ -879,7 +879,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     return;
                }else if(app->vim.mode == CE_VIM_MODE_NORMAL){
                     if(key == 'p'){
-                         CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('"');
+                         CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('"');
                          if((yank->type == CE_VIM_YANK_TYPE_STRING ||
                              yank->type == CE_VIM_YANK_TYPE_LINE) &&
                              yank->text){
@@ -1056,7 +1056,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               ce_history_insert(&app->search_history, app->input_view.buffer->lines[0]);
 
                               // update yanks
-                              CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('/');
+                              CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('/');
                               free(yank->text);
                               yank->text = strdup(app->input_view.buffer->lines[0]);
                               yank->type = CE_VIM_YANK_TYPE_STRING;
@@ -1161,7 +1161,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    app->quit = true;
                               }
                          }else if(strcmp(app->input_view.buffer->name, "REPLACE ALL") == 0){
-                              int64_t index = ce_vim_yank_register_index('/');
+                              int64_t index = ce_vim_register_index('/');
                               CeVimYank_t* yank = app->vim.yanks + index;
                               if(yank->text){
                                    replace_all(view, &app->vim, yank->text, app->input_view.buffer->lines[0]);

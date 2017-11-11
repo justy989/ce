@@ -158,7 +158,7 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
 bool ce_vim_append_key(CeVim_t* vim, CeRune_t key);
 
 // util
-int64_t ce_vim_yank_register_index(CeRune_t rune); // TODO: rename since this is used for marks as well !
+int64_t ce_vim_register_index(CeRune_t rune);
 void ce_vim_yank_free(CeVimYank_t* yank);
 
 // TODO: add const, since most of these are just readonly

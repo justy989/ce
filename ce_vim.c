@@ -372,7 +372,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
      } break;
      case KEY_REDO:
      {
-          CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
+          CeVimYank_t* yank = vim->yanks + ce_vim_register_index('"');
           if(!yank) break;
           if(yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
 
@@ -550,9 +550,9 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
           if(action->verb.function == ce_vim_verb_yank ||
              action->verb.function == ce_vim_verb_delete ||
              action->verb.function == ce_vim_verb_change){
-               CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
+               CeVimYank_t* yank = vim->yanks + ce_vim_register_index(action->verb.integer);
                if(action->verb.function == ce_vim_verb_delete || action->verb.function == ce_vim_verb_change){
-                    yank = vim->yanks + ce_vim_yank_register_index('"');
+                    yank = vim->yanks + ce_vim_register_index('"');
                }
                ce_vim_yank_free(yank);
                yank->type = CE_VIM_YANK_TYPE_BLOCK;
@@ -2259,7 +2259,7 @@ bool ce_vim_motion_end_of_file(CeVim_t* vim, CeVimAction_t* action, const CeView
 
 bool ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
-     const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+     const CeVimYank_t* yank = vim->yanks + ce_vim_register_index('/');
      if(!yank->text) return false;
      CePoint_t result = {-1, -1};
      switch(vim->search_mode){
@@ -2311,7 +2311,7 @@ bool ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* action, const CeView
 
 bool ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
-     const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+     const CeVimYank_t* yank = vim->yanks + ce_vim_register_index('/');
      if(!yank->text) return false;
      CePoint_t result = {-1, -1};
      switch(vim->search_mode){
@@ -2362,7 +2362,7 @@ bool ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* action, const CeView
 }
 
 static void search_word(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, CeRange_t* motion_range){
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+     CeVimYank_t* yank = vim->yanks + ce_vim_register_index('/');
      ce_vim_yank_free(yank);
      *motion_range = ce_vim_find_pair(view->buffer, view->cursor, 'w', true);
      int64_t word_len = ce_buffer_range_len(view->buffer, motion_range->start, motion_range->end);
@@ -2406,7 +2406,7 @@ bool ce_vim_motion_match_pair(CeVim_t* vim, CeVimAction_t* action, const CeView_
 
 bool ce_vim_motion_mark(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                         CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
-     CePoint_t* destination = buffer_data->marks + ce_vim_yank_register_index(action->motion.integer);
+     CePoint_t* destination = buffer_data->marks + ce_vim_register_index(action->motion.integer);
      // TODO: come up with better method of determining if a destination is set or not
      if(destination->x != 0 || destination->y != 0){
           motion_range->end = *destination;
@@ -2481,7 +2481,7 @@ bool ce_vim_motion_previous_blank_line(CeVim_t* vim, CeVimAction_t* action, cons
      return true;
 }
 
-int64_t ce_vim_yank_register_index(CeRune_t rune){
+int64_t ce_vim_register_index(CeRune_t rune){
      if(rune < 32 || rune > 126) return -1; // ascii printable character range
      return rune - ' ';
 }
@@ -2567,7 +2567,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      vim->mode = CE_VIM_MODE_NORMAL;
 
      if(!action->do_not_yank){
-          CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('"');
+          CeVimYank_t* yank = vim->yanks + ce_vim_register_index('"');
           ce_vim_yank_free(yank);
           yank->text = strdup(removed_string);
           yank->type = yank_type;
@@ -2673,7 +2673,7 @@ bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* a
 
 bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                       CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
+     CeVimYank_t* yank = vim->yanks + ce_vim_register_index(action->verb.integer);
      ce_vim_yank_free(yank);
      int64_t yank_len = 0;
      yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
@@ -2685,7 +2685,7 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motio
 
 static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                        const CeConfigOptions_t* config_options, bool after){
-     CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index(action->verb.integer);
+     CeVimYank_t* yank = vim->yanks + ce_vim_register_index(action->verb.integer);
      if(!yank->text) return false;
 
      CePoint_t insertion_point = motion_range.end;
@@ -3189,7 +3189,7 @@ bool ce_vim_verb_flip_case(CeVim_t* vim, const CeVimAction_t* action, CeRange_t 
 
 bool ce_vim_verb_set_mark(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                           CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
-     CePoint_t* destination = buffer_data->marks + ce_vim_yank_register_index(action->verb.integer);
+     CePoint_t* destination = buffer_data->marks + ce_vim_register_index(action->verb.integer);
      *destination = view->cursor;
      return true;
 }
