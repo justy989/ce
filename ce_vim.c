@@ -42,7 +42,6 @@ bool vim_mode_is_visual(CeVimMode_t vim_mode){
 bool ce_vim_init(CeVim_t* vim){
      vim->chain_undo = false;
 
-     // TODO: 's', 'S', ctrl + a, ctrl + x
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'w', &ce_vim_parse_motion_little_word);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'W', &ce_vim_parse_motion_big_word);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'e', &ce_vim_parse_motion_end_little_word);
@@ -471,12 +470,14 @@ VIM_PARSE_CONTINUE:
                if(result != CE_VIM_PARSE_KEY_NOT_HANDLED){
                     keys++;
 
-                    // TODO: trust functions to no infinite loop ?
+                    int64_t loops = 0;
                     while(result == CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY){
                          if(*keys == 0) return result;
                          result = key_bind->function(&build_action, *keys);
                          keys++;
                          if(result == CE_VIM_PARSE_CONTINUE) goto VIM_PARSE_CONTINUE;
+                         loops++;
+                         if(loops >= 10) return CE_VIM_PARSE_INVALID;
                     }
 
                     break;
@@ -504,12 +505,14 @@ VIM_PARSE_CONTINUE:
                          if(result != CE_VIM_PARSE_KEY_NOT_HANDLED){
                               keys++;
 
-                              // TODO: trust functions to no infinite loop ?
+                              int64_t loops = 0;
                               while(result == CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY){
                                    if(*keys == 0) return result;
                                    result = key_bind->function(&build_action, *keys);
                                    keys++;
                                    if(result == CE_VIM_PARSE_CONTINUE) goto VIM_PARSE_CONTINUE;
+                                   loops++;
+                                   if(loops >= 10) return CE_VIM_PARSE_INVALID;
                               }
 
                               break;
@@ -558,12 +561,12 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
                yank->type = CE_VIM_YANK_TYPE_BLOCK;
                yank->block_line_count = (vim->visual_block_bottom_right.y - vim->visual_block_top_left.y) + 1;
                yank->block = malloc(yank->block_line_count * sizeof(*yank->block));
+
+               // copy each line into yank
                for(int64_t i = vim->visual_block_top_left.y; i <= vim->visual_block_bottom_right.y; i++){
                     CeRange_t motion_range = {(CePoint_t){vim->visual_block_top_left.x, i},
                                               (CePoint_t){vim->visual_block_bottom_right.x, i}};
                     int64_t yank_string_index = i - vim->visual_block_top_left.y;
-
-                    // TODO: compress code with above code
                     int64_t line_last_index = ce_utf8_last_index(view->buffer->lines[i]);
 
                     // clamp the range to the line length
@@ -2695,7 +2698,6 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
           break;
      case CE_VIM_YANK_TYPE_LINE:
           insertion_point.x = 0;
-          // TODO: insert line if at end of buffer
           if(after) insertion_point.y++;
           break;
      case CE_VIM_YANK_TYPE_STRING:
@@ -2703,6 +2705,7 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
                insertion_point.x++;
                int64_t line_len = ce_utf8_strlen(view->buffer->lines[insertion_point.y]);
                if(insertion_point.x > line_len) insertion_point.x = line_len - 1;
+               if(insertion_point.x < 0) insertion_point.x = 0;
           }
           break;
      case CE_VIM_YANK_TYPE_BLOCK:

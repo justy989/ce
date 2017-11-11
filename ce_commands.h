@@ -37,7 +37,6 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data);
 
 // NOTE: these are to make vim users feel at home

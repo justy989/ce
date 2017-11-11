@@ -6,12 +6,18 @@
 #include <unistd.h>
 #include <ncurses.h>
 
-static bool get_layout_and_view(CeApp_t* app, CeView_t** view, CeLayout_t** tab_layout){ *tab_layout = app->tab_list_layout->tab_list.current;
+typedef struct{
+     CeLayout_t* tab_layout;
+     CeView_t* view;
+}CommandContext_t;
+
+static bool get_command_context(CeApp_t* app, CommandContext_t* command_context){
+     command_context->tab_layout = app->tab_list_layout->tab_list.current;
 
      if(app->input_mode) return false;
 
-     if((*tab_layout)->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-          *view = &(*tab_layout)->tab.current->view;
+     if(command_context->tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+          command_context->view = &command_context->tab_layout->tab.current->view;
           return true;
      }
 
@@ -22,10 +28,9 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      bool unsaved_buffers = false;
      CeBufferNode_t* itr = app->buffer_node_head;
@@ -38,7 +43,7 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      }
 
      if(unsaved_buffers){
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, UNSAVED_BUFFERS_DIALOGUE);
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, UNSAVED_BUFFERS_DIALOGUE);
      }else{
           app->quit = true;
      }
@@ -133,11 +138,11 @@ CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     ce_buffer_save(view->buffer);
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     ce_buffer_save(command_context.view->buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -146,11 +151,11 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     ce_view_switch_buffer(view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     ce_view_switch_buffer(command_context.view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -159,11 +164,11 @@ CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     ce_view_switch_buffer(view, app->yank_list_buffer, &app->vim, &app->config_options, true);
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     ce_view_switch_buffer(command_context.view, app->yank_list_buffer, &app->vim, &app->config_options, true);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -199,6 +204,7 @@ CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_
 
      CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
      if(layout) tab_layout->tab.current = layout;
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -260,19 +266,18 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
      if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+          load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
                               command->args[0].string);
      }else{ // it's 0
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "LOAD FILE");
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "LOAD FILE");
 
-          char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
+          char* base_directory = buffer_base_directory(command_context.view->buffer, &app->terminal_list);
           complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
           free(base_directory);
           build_complete_list(app->complete_list_buffer, &app->load_file_complete);
@@ -357,19 +362,18 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(strcmp(command->args[0].string, "forward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SEARCH");
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_FORWARD;
-          app->search_start = view->cursor;
+          app->search_start = command_context.view->cursor;
      }else if(strcmp(command->args[0].string, "backward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REVERSE SEARCH");
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REVERSE SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_BACKWARD;
-          app->search_start = view->cursor;
+          app->search_start = command_context.view->cursor;
      }else{
           ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
@@ -405,19 +409,18 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(strcmp(command->args[0].string, "forward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REGEX SEARCH");
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REGEX SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_FORWARD;
-          app->search_start = view->cursor;
+          app->search_start = command_context.view->cursor;
      }else if(strcmp(command->args[0].string, "backward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REGEX REVERSE SEARCH");
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REGEX REVERSE SEARCH");
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_BACKWARD;
-          app->search_start = view->cursor;
+          app->search_start = command_context.view->cursor;
      }else{
           ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
@@ -431,14 +434,14 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "COMMAND");
+     app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "COMMAND");
      ce_complete_reset(&app->command_complete);
      build_complete_list(app->complete_list_buffer, &app->command_complete);
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -446,12 +449,12 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     ce_switch_to_terminal(app, view, tab_layout);
+     ce_switch_to_terminal(app, command_context.view, command_context.tab_layout);
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -459,17 +462,16 @@ CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-
-     int64_t width = view->rect.right - view->rect.left;
-     int64_t height = view->rect.bottom - view->rect.top;
+     // TODO: create ce_view_width(), and ce_view_height()
+     int64_t width = command_context.view->rect.right - command_context.view->rect.left;
+     int64_t height = command_context.view->rect.bottom - command_context.view->rect.top;
 
      CeTerminal_t* terminal = create_terminal(app, width, height);
      if(terminal){
-          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options, true);
+          ce_view_switch_buffer(command_context.view, terminal->buffer, &app->vim, &app->config_options, true);
           app->vim.mode = CE_VIM_MODE_INSERT;
           app->last_terminal = terminal;
      }
@@ -481,12 +483,11 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "SWITCH BUFFER");
+     app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "SWITCH BUFFER");
 
      int64_t buffer_count = 0;
      CeBufferNode_t* itr = app->buffer_node_head;
@@ -542,22 +543,22 @@ CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView
 
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(view->buffer->line_count == 0) return CE_COMMAND_NO_ACTION;
+     if(command_context.view->buffer->line_count == 0) return CE_COMMAND_NO_ACTION;
 
-     CeDestination_t destination = scan_line_for_destination(view->buffer->lines[view->cursor.y]);
-     if(destination.point.x < 0) return CE_COMMAND_NO_ACTION;
+     CeDestination_t destination = scan_line_for_destination(command_context.view->buffer->lines[command_context.view->cursor.y]);
+     if(destination.point.x < 0 || destination.point.y < 0) return CE_COMMAND_NO_ACTION;
 
-     CeAppBufferData_t* buffer_data = view->buffer->app_data;
-     buffer_data->last_goto_destination = view->cursor.y;
+     CeAppBufferData_t* buffer_data = command_context.view->buffer->app_data;
+     buffer_data->last_goto_destination = command_context.view->cursor.y;
 
-     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
-     CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+     char* base_directory = buffer_base_directory(command_context.view->buffer, &app->terminal_list);
+     CeBuffer_t* buffer = load_destination_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
                                                      true, base_directory, &destination);
      free(base_directory);
      if(!buffer) return CE_COMMAND_NO_ACTION;
@@ -568,10 +569,9 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
 CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      CeBuffer_t* buffer = app->last_goto_buffer;
      if(!buffer && app->last_terminal) buffer = app->last_terminal->buffer;
@@ -590,11 +590,12 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
           if(destination.point.x < 0 || destination.point.y < 0) continue;
 
           char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
-          CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+          CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, command_context.view,
+                                                                 &app->config_options, &app->vim,
                                                                  true, base_directory, &destination);
           free(base_directory);
           if(loaded_buffer){
-               CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
+               CeLayout_t* layout = ce_layout_buffer_in_view(command_context.tab_layout, buffer);
                if(layout) layout->view.scroll.y = i;
                buffer_data->last_goto_destination = i;
                break;
@@ -605,10 +606,10 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
      if(buffer_data->last_goto_destination == save_destination && save_destination < buffer->line_count){
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
           if(destination.point.x >= 0 && destination.point.y >= 0){
-               CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
+               CeLayout_t* layout = ce_layout_buffer_in_view(command_context.tab_layout, buffer);
                if(layout) layout->view.scroll.y = save_destination;
                char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
-               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+               load_destination_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
                                           true, base_directory, &destination);
                free(base_directory);
           }
@@ -620,10 +621,9 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
 CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      CeBuffer_t* buffer = app->last_goto_buffer;
      if(!buffer && app->last_terminal) buffer = app->last_terminal->buffer;
@@ -642,11 +642,12 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
           if(destination.point.x < 0 || destination.point.y < 0) continue;
 
           char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
-          CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+          CeBuffer_t* loaded_buffer = load_destination_into_view(&app->buffer_node_head, command_context.view,
+                                                                 &app->config_options, &app->vim,
                                                                  true, base_directory, &destination);
           free(base_directory);
           if(loaded_buffer){
-               CeLayout_t* layout = ce_layout_buffer_in_view(tab_layout, buffer);
+               CeLayout_t* layout = ce_layout_buffer_in_view(command_context.tab_layout, buffer);
                if(layout) layout->view.scroll.y = i;
                buffer_data->last_goto_destination = i;
                break;
@@ -658,8 +659,8 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
           CeDestination_t destination = scan_line_for_destination(buffer->lines[save_destination]);
           if(destination.point.x >= 0 && destination.point.y >= 0){
                char* base_directory = buffer_base_directory(buffer, &app->terminal_list);
-               load_destination_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
-                                          base_directory, &destination);
+               load_destination_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
+                                          true, base_directory, &destination);
                free(base_directory);
           }
      }
@@ -670,18 +671,17 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(command->arg_count == 0){
-          app->input_mode = enable_input_mode(&app->input_view, view, &app->vim, "REPLACE ALL");
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REPLACE ALL");
      }else if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING){
           int64_t index = ce_vim_register_index('/');
           CeVimYank_t* yank = app->vim.yanks + index;
           if(yank->text){
-               replace_all(view, &app->vim, yank->text, command->args[0].string);
+               replace_all(command_context.view, &app->vim, yank->text, command->args[0].string);
           }
      }else{
           return CE_COMMAND_PRINT_HELP;
@@ -694,21 +694,20 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(access(view->buffer->name, F_OK) == -1){
-          ce_log("'%s' is not file backed, unable to reload\n", view->buffer->name);
+     if(access(command_context.view->buffer->name, F_OK) == -1){
+          ce_log("'%s' is not file backed, unable to reload\n", command_context.view->buffer->name);
           return CE_COMMAND_NO_ACTION;
      }
 
-     char* filename = strdup(view->buffer->name);
-     CeAppBufferData_t* buffer_data = view->buffer->app_data;
-     ce_buffer_free(view->buffer);
-     view->buffer->app_data = buffer_data; // NOTE: not great that I need to save user data and reset it
-     ce_buffer_load_file(view->buffer, filename);
+     char* filename = strdup(command_context.view->buffer->name);
+     CeAppBufferData_t* buffer_data = command_context.view->buffer->app_data;
+     ce_buffer_free(command_context.view->buffer);
+     command_context.view->buffer->app_data = buffer_data; // NOTE: not great that I need to save user data and reset it
+     ce_buffer_load_file(command_context.view->buffer, filename);
      free(filename);
 
      return CE_COMMAND_SUCCESS;
@@ -732,12 +731,11 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     CeAppBufferData_t* buffer_data = view->buffer->app_data;
+     CeAppBufferData_t* buffer_data = command_context.view->buffer->app_data;
 
      if(strcmp(command->args[0].string, "c") == 0){
           buffer_data->syntax_function = ce_syntax_highlight_c;
@@ -767,18 +765,17 @@ CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      const char* buffer_name = "unnamed";
      if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING) buffer_name = command->args[0].string;
 
      CeBuffer_t* buffer = new_buffer();
      ce_buffer_alloc(buffer, 1, buffer_name);
-     view->buffer = buffer;
-     view->cursor = (CePoint_t){0, 0};
+     command_context.view->buffer = buffer;
+     command_context.view->cursor = (CePoint_t){0, 0};
      ce_buffer_node_insert(&app->buffer_node_head, buffer);
 
      return CE_COMMAND_SUCCESS;
@@ -789,14 +786,13 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     free(view->buffer->name);
-     view->buffer->name = strdup(command->args[0].string);
-     if(view->buffer->status == CE_BUFFER_STATUS_NONE) view->buffer->status = CE_BUFFER_STATUS_MODIFIED;
+     free(command_context.view->buffer->name);
+     command_context.view->buffer->name = strdup(command->args[0].string);
+     if(command_context.view->buffer->status == CE_BUFFER_STATUS_NONE) command_context.view->buffer->status = CE_BUFFER_STATUS_MODIFIED;
 
      return CE_COMMAND_SUCCESS;
 }
@@ -805,44 +801,45 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      CeDestination_t* destination = NULL;
-     int64_t view_width = view->rect.right - view->rect.left;
-     int64_t view_height = view->rect.bottom - view->rect.top;
-     CeRect_t view_rect = {view->scroll.x, view->scroll.x + view_width, view->scroll.y, view->scroll.y + view_height};
-     CeAppViewData_t* view_data = view->user_data;
+     // TODO: use ce_view_width() and ce_view_height()
+     int64_t view_width = command_context.view->rect.right - command_context.view->rect.left;
+     int64_t view_height = command_context.view->rect.bottom - command_context.view->rect.top;
+     CeRect_t view_rect = {command_context.view->scroll.x, command_context.view->scroll.x + view_width,
+                           command_context.view->scroll.y, command_context.view->scroll.y + view_height};
+     CeAppViewData_t* view_data = command_context.view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
 
      if(strcmp(command->args[0].string, "next")){
           // ignore destinations on screen
           while((destination = ce_jump_list_next(jump_list))){
-               if(strcmp(destination->filepath, view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
+               if(strcmp(destination->filepath, command_context.view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
                     break;
                }
           }
      }else if(strcmp(command->args[0].string, "previous")){
           // ignore destinations on screen
           while((destination = ce_jump_list_previous(jump_list))){
-               if(strcmp(destination->filepath, view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
+               if(strcmp(destination->filepath, command_context.view->buffer->name) != 0 || !ce_point_in_rect(destination->point, view_rect)){
                     break;
                }
           }
      }
 
      if(destination){
-          if(load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, false,
+          if(load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, false,
                                  destination->filepath)){
-               view->cursor = destination->point;
+               command_context.view->cursor = destination->point;
           }else{
                CeBufferNode_t* itr = app->buffer_node_head;
                while(itr){
                     if(strcmp(itr->buffer->name, destination->filepath) == 0){
                          itr->buffer->cursor_save = destination->point;
-                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, false);
+                         ce_view_switch_buffer(command_context.view, itr->buffer, &app->vim, &app->config_options, false);
                          break;
                     }
                     itr = itr->next;
@@ -896,48 +893,21 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_terminal_command_in_view(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
-     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-
-     CeApp_t* app = (CeApp_t*)(user_data);
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
-
-     if(!app->last_terminal){
-          ce_log("error in terminal command: no terminal available\n");
-          return CE_COMMAND_FAILURE;
-     }
-
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-
-     update_terminal_last_goto_using_cursor(app->last_terminal);
-     ce_run_command_in_terminal(app->last_terminal, command->args[0].string);
-     view = ce_switch_to_terminal(app, view, tab_layout);
-     view->cursor.x = 0;
-     view->cursor.y = app->last_terminal->cursor.y;
-     view->scroll.y = app->last_terminal->cursor.y;
-     view->scroll.x = 0;
-
-     return CE_COMMAND_SUCCESS;
-}
-
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = (CeApp_t*)(user_data);
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     CeRange_t range = ce_vim_find_little_word_boundaries(view->buffer, view->cursor); // returns -1
-     char* word = ce_buffer_dupe_string(view->buffer, range.start, (range.end.x - range.start.x) + 1);
+     CeRange_t range = ce_vim_find_little_word_boundaries(command_context.view->buffer, command_context.view->cursor); // returns -1
+     char* word = ce_buffer_dupe_string(command_context.view->buffer, range.start, (range.end.x - range.start.x) + 1);
      if(!word) return CE_COMMAND_NO_ACTION;
      char cmd[128];
      snprintf(cmd, 128, "man %s", word);
      free(word);
-     ce_switch_to_terminal(app, view, tab_layout);
+     ce_switch_to_terminal(app, command_context.view, command_context.tab_layout);
      ce_run_command_in_terminal(app->last_terminal, cmd);
 
      return CE_COMMAND_SUCCESS;
@@ -1012,28 +982,18 @@ CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+     load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
                          command->args[0].string);
 
      return CE_COMMAND_SUCCESS;
 }
 
 CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-
-     CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
-
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     ce_buffer_save(view->buffer);
-
-     return CE_COMMAND_SUCCESS;
+     return command_save_buffer(command, user_data);
 }
 
 CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data){
@@ -1044,12 +1004,13 @@ CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data){
 
 CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-     CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-     ce_buffer_save(view->buffer);
+     CeApp_t* app = user_data;
+     CommandContext_t command_context;
+
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     ce_buffer_save(command_context.view->buffer);
 
      if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
      return CE_COMMAND_SUCCESS;
@@ -1066,9 +1027,9 @@ CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          CeView_t* view = NULL;
-          if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+          CommandContext_t command_context;
+          if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+          load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
                               command->args[0].string);
      }
 
@@ -1086,9 +1047,9 @@ CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          CeView_t* view = NULL;
-          if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
-          load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim, true,
+          CommandContext_t command_context;
+          if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+          load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
                               command->args[0].string);
      }
 
@@ -1178,14 +1139,13 @@ CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeView_t* view = NULL;
-     CeLayout_t* tab_layout = NULL;
+     CommandContext_t command_context;
 
-     if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
+     char* base_directory = buffer_base_directory(command_context.view->buffer, &app->terminal_list);
      if(!base_directory) base_directory = strdup(".");
-     open_file_in_dir_recursively(base_directory, command->args[0].string, app, view);
+     open_file_in_dir_recursively(base_directory, command->args[0].string, app, command_context.view);
      free(base_directory);
 
      return CE_COMMAND_SUCCESS;

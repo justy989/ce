@@ -1363,7 +1363,7 @@ bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes
 }
 
 int64_t ce_utf8_rune_len(CeRune_t u){
-     // TODO: optimize
+     // TODO: optimize based on st's bitmasking
      if(u < 0x80){
           return 1;
      }else if(u < 0x0800){

@@ -20,6 +20,13 @@ bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
+static void free_buffer_node(CeBufferNode_t* node){
+     free(node->buffer->app_data);
+     ce_buffer_free(node->buffer);
+     free(node->buffer);
+     free(node);
+}
+
 bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* prev = NULL;
      CeBufferNode_t* itr = *head;
@@ -37,11 +44,7 @@ bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
           *head = (*head)->next;
      }
 
-     // TODO: compress with below
-     free(itr->buffer->app_data);
-     ce_buffer_free(itr->buffer);
-     free(itr->buffer);
-     free(itr);
+     free_buffer_node(itr);
      return true;
 }
 
@@ -50,10 +53,7 @@ void ce_buffer_node_free(CeBufferNode_t** head){
      while(itr){
           CeBufferNode_t* tmp = itr;
           itr = itr->next;
-          free(tmp->buffer->app_data);
-          ce_buffer_free(tmp->buffer);
-          free(tmp->buffer);
-          free(tmp);
+          free_buffer_node(tmp);
      }
      *head = NULL;
 }
@@ -734,31 +734,9 @@ CeDestination_t scan_line_for_destination(const char* line){
           }
      }
 
-     // cscope format
-     // ce_app.c buffer_append_on_new_line 694 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char * string){
-     char* file_end = strchr(line, ' ');
-     if(file_end){
-          char* symbol_end = strchr(file_end + 1, ' ');
-          if(symbol_end){
-               char* row_start = symbol_end + 1;
-               char* end = NULL;
-               destination.point.y = strtol(row_start, &end, 10);
-               if(end != row_start){
-                    if(destination.point.y > 0) destination.point.y--;
-                    destination.point.x = 0;
-
-                    int64_t filepath_len = file_end - line;
-                    if(filepath_len >= PATH_MAX) return destination;
-                    strncpy(destination.filepath, line, filepath_len);
-                    destination.filepath[filepath_len] = 0;
-                    return destination;
-               }
-          }
-     }
-
      // grep/gcc format
      // ce_app.c:1515:23
-     file_end = strchr(line, ':');
+     char* file_end = strchr(line, ':');
      if(file_end){
           char* row_end = strchr(file_end + 1, ':');
           char* col_end = NULL;
@@ -783,13 +761,35 @@ CeDestination_t scan_line_for_destination(const char* line){
                if(col_end){
                     char* col_start = row_end + 1;
                     destination.point.x = strtol(col_start, &end, 10);
-                    if(end == col_start) destination.point.x = -1;
+                    if(end == col_start) destination.point.x = 0;
                     if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
                }else{
                     destination.point.x = 0;
                }
-          }else{
-               destination.point = (CePoint_t){-1, -1};
+          }
+
+          return destination;
+     }
+
+     // cscope format
+     // ce_app.c buffer_append_on_new_line 694 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char * string){
+     file_end = strchr(line, ' ');
+     if(file_end){
+          char* symbol_end = strchr(file_end + 1, ' ');
+          if(symbol_end){
+               char* row_start = symbol_end + 1;
+               char* end = NULL;
+               destination.point.y = strtol(row_start, &end, 10);
+               if(end != row_start){
+                    if(destination.point.y > 0) destination.point.y--;
+                    destination.point.x = 0;
+
+                    int64_t filepath_len = file_end - line;
+                    if(filepath_len >= PATH_MAX) return destination;
+                    strncpy(destination.filepath, line, filepath_len);
+                    destination.filepath[filepath_len] = 0;
+                    return destination;
+               }
           }
      }
 
@@ -959,7 +959,6 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
-          {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
           {command_vim_e, "e", "vim's e command to load a file specified"},
           {command_vim_w, "w", "vim's w command to save the current buffer"},
