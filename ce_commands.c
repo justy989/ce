@@ -929,11 +929,6 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      CeView_t* view = NULL;
      CeLayout_t* tab_layout = NULL;
 
-     if(!app->last_terminal){
-          ce_log("error in terminal command: no terminal available\n");
-          return CE_COMMAND_FAILURE;
-     }
-
      if(!get_layout_and_view(app, &view, &tab_layout)) return CE_COMMAND_NO_ACTION;
 
      CeRange_t range = ce_vim_find_little_word_boundaries(view->buffer, view->cursor); // returns -1
@@ -942,8 +937,8 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      char cmd[128];
      snprintf(cmd, 128, "man %s", word);
      free(word);
-     ce_run_command_in_terminal(app->last_terminal, cmd);
      ce_switch_to_terminal(app, view, tab_layout);
+     ce_run_command_in_terminal(app->last_terminal, cmd);
 
      return CE_COMMAND_SUCCESS;
 }
