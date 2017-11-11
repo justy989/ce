@@ -707,10 +707,58 @@ CeDestination_t scan_line_for_destination(const char* line){
      CeDestination_t destination = {};
      destination.point = (CePoint_t){-1, -1};
 
-     // TODO: more formats, including git grep, valgrind
+     // TODO: more formats, including git grep
+
+     // valgrind format
+     // '==7330==    by 0x638B16A: initializer (ce_config.c:1983)'
+     if(line[0] == '=' && line[1] == '='){
+          char* open_paren = strchr(line, '(');
+          char* close_paren = strchr(line, ')');
+          if(open_paren && close_paren){
+               char* file_end = strchr(open_paren, ':');
+               if(file_end){
+                    char* end = NULL;
+                    char* number_start = file_end + 1;
+                    destination.point.y = strtol(number_start, &end, 10);
+                    if(end != number_start){
+                         if(destination.point.y > 0) destination.point.y--;
+                         destination.point.x = 0;
+
+                         int64_t filepath_len = file_end - (open_paren + 1);
+                         if(filepath_len >= PATH_MAX) return destination;
+                         strncpy(destination.filepath, (open_paren + 1), filepath_len);
+                         destination.filepath[filepath_len] = 0;
+                         return destination;
+                    }
+               }
+          }
+     }
+
+     // cscope format
+     // ce_app.c buffer_append_on_new_line 694 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char * string){
+     char* file_end = strchr(line, ' ');
+     if(file_end){
+          char* symbol_end = strchr(file_end + 1, ' ');
+          if(symbol_end){
+               char* row_start = symbol_end + 1;
+               char* end = NULL;
+               destination.point.y = strtol(row_start, &end, 10);
+               if(end != row_start){
+                    if(destination.point.y > 0) destination.point.y--;
+                    destination.point.x = 0;
+
+                    int64_t filepath_len = file_end - line;
+                    if(filepath_len >= PATH_MAX) return destination;
+                    strncpy(destination.filepath, line, filepath_len);
+                    destination.filepath[filepath_len] = 0;
+                    return destination;
+               }
+          }
+     }
 
      // grep/gcc format
-     char* file_end = strchr(line, ':');
+     // ce_app.c:1515:23
+     file_end = strchr(line, ':');
      if(!file_end) return destination;
      char* row_end = strchr(file_end + 1, ':');
      char* col_end = NULL;
