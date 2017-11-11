@@ -33,6 +33,11 @@ const char* buffer_status_get_str(CeBufferStatus_t status){
      return "";
 }
 
+static void exit_input_mode(CeApp_t* app){
+     app->input_mode = false;
+     app->vim.mode = CE_VIM_MODE_NORMAL;
+}
+
 static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      char buffer_info[BUFSIZ];
      ce_buffer_empty(buffer);
@@ -898,7 +903,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }
      }
 
-     // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
+     // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY
      if(app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONTINUE &&
@@ -1100,10 +1105,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         }
 
                                         if(command_func){
-                                             // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
-                                             app->input_mode = false;
-                                             app->vim.mode = CE_VIM_MODE_NORMAL;
-
+                                             exit_input_mode(app);
                                              command_func(&command, app);
                                              ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
 
@@ -1169,9 +1171,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          }
                     }
 
-                    // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
-                    app->input_mode = false;
-                    app->vim.mode = CE_VIM_MODE_NORMAL;
+                    exit_input_mode(app);
                     return;
                }else{
                     key = CE_NEWLINE;
@@ -1195,8 +1195,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }else if(key == KEY_ESCAPE && app->input_mode && app->vim.mode == CE_VIM_MODE_NORMAL){ // Escape
                ce_history_reset_current(&app->command_history);
                ce_history_reset_current(&app->search_history);
-               app->input_mode = false;
-               app->vim.mode = CE_VIM_MODE_NORMAL;
+               exit_input_mode(app);
 
                CeComplete_t* complete = ce_app_is_completing(app);
                if(complete) ce_complete_reset(complete);

@@ -759,37 +759,38 @@ CeDestination_t scan_line_for_destination(const char* line){
      // grep/gcc format
      // ce_app.c:1515:23
      file_end = strchr(line, ':');
-     if(!file_end) return destination;
-     char* row_end = strchr(file_end + 1, ':');
-     char* col_end = NULL;
-     if(row_end) col_end = strchr(row_end + 1, ':');
-     // col_end and row_end is not always present
+     if(file_end){
+          char* row_end = strchr(file_end + 1, ':');
+          char* col_end = NULL;
+          if(row_end) col_end = strchr(row_end + 1, ':');
+          // col_end and row_end is not always present
 
-     int64_t filepath_len = file_end - line;
-     if(filepath_len >= PATH_MAX) return destination;
-     strncpy(destination.filepath, line, filepath_len);
-     destination.filepath[filepath_len] = 0;
-     char* end = NULL;
+          int64_t filepath_len = file_end - line;
+          if(filepath_len >= PATH_MAX) return destination;
+          strncpy(destination.filepath, line, filepath_len);
+          destination.filepath[filepath_len] = 0;
+          char* end = NULL;
 
-     if(row_end){
-          char* row_start = file_end + 1;
-          destination.point.y = strtol(row_start, &end, 10);
-          if(end == row_start) destination.point.y = -1;
+          if(row_end){
+               char* row_start = file_end + 1;
+               destination.point.y = strtol(row_start, &end, 10);
+               if(end == row_start) destination.point.y = -1;
 
-          if(destination.point.y > 0){
-               destination.point.y--; // account for format which is 1 indexed
-          }
+               if(destination.point.y > 0){
+                    destination.point.y--; // account for format which is 1 indexed
+               }
 
-          if(col_end){
-               char* col_start = row_end + 1;
-               destination.point.x = strtol(col_start, &end, 10);
-               if(end == col_start) destination.point.x = -1;
-               if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
+               if(col_end){
+                    char* col_start = row_end + 1;
+                    destination.point.x = strtol(col_start, &end, 10);
+                    if(end == col_start) destination.point.x = -1;
+                    if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
+               }else{
+                    destination.point.x = 0;
+               }
           }else{
-               destination.point.x = 0;
+               destination.point = (CePoint_t){-1, -1};
           }
-     }else{
-          destination.point = (CePoint_t){-1, -1};
      }
 
      return destination;
