@@ -96,7 +96,7 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
                break;
           }
 
-          if(yank->type ==CE_VIM_YANK_TYPE_BLOCK){
+          if(yank->type == CE_VIM_YANK_TYPE_BLOCK){
                snprintf(line, 256, "// register '%c': type: %s\n", reg, yank_type);
                buffer_append_on_new_line(buffer, line);
                for(int64_t l = 0; l < yank->block_line_count; l++){
@@ -570,7 +570,7 @@ void draw(CeApp_t* app){
 
           for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
                if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
-                    color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, app->config_options.ui_bg_color);
+                    color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_DEFAULT);
                     attron(COLOR_PAIR(color_pair));
                }else{
                     color_pair = ce_color_def_get(&color_defs, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
@@ -862,8 +862,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(view && !app->input_mode){
           CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app->terminal_list);
           if(terminal){
-               int64_t width = (view->rect.right - view->rect.left);
-               int64_t height = (view->rect.bottom - view->rect.top);
+               int64_t width = ce_view_width(view);
+               int64_t height = ce_view_height(view);
                if(terminal->columns != width || terminal->rows != height){
                     ce_terminal_resize(terminal, width, height);
                }
@@ -938,6 +938,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    switch(cs){
                                    default:
                                         app->key_count = 0;
+                                        app->vim.current_command[0] = 0;
                                         return;
                                    case CE_COMMAND_NO_ACTION:
                                         break;
@@ -1315,7 +1316,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      }
 
      // incremental search
-     if(app->input_mode){
+     if(view && app->input_mode){
           if(strcmp(app->input_view.buffer->name, "SEARCH") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, app->input_view.buffer->lines[0]);

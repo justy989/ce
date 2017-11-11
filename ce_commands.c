@@ -28,7 +28,7 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -138,7 +138,7 @@ CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -151,7 +151,7 @@ CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -164,7 +164,7 @@ CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -266,7 +266,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
      if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -346,15 +346,21 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
      CeApp_t* app = user_data;
 
      if(strcmp(command->args[0].string, "left") == 0){
-          select_tab_left(app);
+          if(select_tab_left(app)){
+               return CE_COMMAND_SUCCESS;
+          }
+
+          return CE_COMMAND_NO_ACTION;
      }else if(strcmp(command->args[0].string, "right") == 0){
-          select_tab_right(app);
-     }else{
-          ce_log("unrecognized argument: '%s'\n", command->args[0]);
-          return CE_COMMAND_PRINT_HELP;
+          if(select_tab_right(app)){
+               return CE_COMMAND_SUCCESS;
+          }
+
+          return CE_COMMAND_NO_ACTION;
      }
 
-     return CE_COMMAND_NO_ACTION;
+     ce_log("unrecognized argument: '%s'\n", command->args[0]);
+     return CE_COMMAND_PRINT_HELP;
 }
 
 CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
@@ -362,7 +368,7 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -409,7 +415,7 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -434,13 +440,15 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "COMMAND");
-     ce_complete_reset(&app->command_complete);
-     build_complete_list(app->complete_list_buffer, &app->command_complete);
+     if(command_context.view){
+          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "COMMAND");
+          ce_complete_reset(&app->command_complete);
+          build_complete_list(app->complete_list_buffer, &app->command_complete);
+     }
 
      return CE_COMMAND_SUCCESS;
 }
@@ -449,7 +457,7 @@ CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_da
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -462,7 +470,7 @@ CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      int64_t width = ce_view_width(command_context.view);
@@ -482,7 +490,7 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -544,7 +552,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -568,7 +576,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
 CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -620,7 +628,7 @@ CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user
 CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -670,7 +678,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -693,7 +701,7 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -730,7 +738,7 @@ CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -764,7 +772,7 @@ CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data){
      if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -785,7 +793,7 @@ CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -800,7 +808,7 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -895,7 +903,7 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = (CeApp_t*)(user_data);
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -980,7 +988,7 @@ CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -1004,7 +1012,7 @@ CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
@@ -1025,7 +1033,7 @@ CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          CommandContext_t command_context;
+          CommandContext_t command_context = {};
           if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
           load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
                               command->args[0].string);
@@ -1045,7 +1053,7 @@ CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          CommandContext_t command_context;
+          CommandContext_t command_context = {};
           if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
           load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
                               command->args[0].string);
@@ -1137,7 +1145,7 @@ CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CommandContext_t command_context;
+     CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
