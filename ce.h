@@ -125,6 +125,7 @@ typedef struct{
      bool insert_spaces_on_tab;
      int ui_fg_color;
      int ui_bg_color;
+     int64_t completion_line_limit;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
