@@ -1565,6 +1565,7 @@ int main(int argc, char** argv){
           config_options->insert_spaces_on_tab = true;
           config_options->terminal_scroll_back = 1024;
           config_options->line_number = CE_LINE_NUMBER_NONE;
+          config_options->completion_line_limit = 15;
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
