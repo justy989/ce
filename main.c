@@ -623,7 +623,11 @@ void draw(CeApp_t* app){
           }else{
                app->complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
           }
-          app->complete_view.rect.top = app->complete_view.rect.bottom - app->complete_list_buffer->line_count;
+          int64_t lines_to_show = app->complete_list_buffer->line_count;
+          if(lines_to_show > app->config_options.completion_line_limit){
+               lines_to_show = app->config_options.completion_line_limit;
+          }
+          app->complete_view.rect.top = app->complete_view.rect.bottom - lines_to_show;
           if(app->complete_view.rect.top <= view_layout->view.rect.top){
                app->complete_view.rect.top = view_layout->view.rect.top + 1; // account for current view's status bar
           }
@@ -1561,6 +1565,7 @@ int main(int argc, char** argv){
           config_options->insert_spaces_on_tab = true;
           config_options->terminal_scroll_back = 1024;
           config_options->line_number = CE_LINE_NUMBER_NONE;
+          config_options->completion_line_limit = 15;
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
