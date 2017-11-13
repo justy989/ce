@@ -1,10 +1,12 @@
 #include "test.h"
 #include "ce.h"
 
+#include <stdlib.h>
 #include <string.h>
 #include <locale.h>
 
 FILE* g_ce_log = NULL;
+CeBuffer_t* g_ce_log_buffer = NULL;
 
 const char* g_multiline_string = "0123456789\nabcdefghij\nklmnopqrst";
 const char* g_multiline_string_with_empty_line = "0123456789\n\nabcdefghij\nklmnopqrst";
@@ -573,6 +575,8 @@ TEST(util_visible_index_to_string_index){
 
 int main()
 {
+     g_ce_log_buffer = malloc(sizeof(*g_ce_log_buffer));
+     ce_buffer_alloc(g_ce_log_buffer, 1, "[log]");
      ce_log_init("ce_test.log");
      setlocale(LC_ALL, "");
      RUN_TESTS();

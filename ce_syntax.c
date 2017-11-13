@@ -549,11 +549,12 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                }else{
                     if((match_len = match_c_multiline_comment(str))){
                          multiline_comment = true;
-                         x += match_len;
+                         x += (match_len - 1);
                     }
                }
           }
      }
+
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
@@ -725,6 +726,30 @@ void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list
      CeRangeNode_t* range_node = highlight_range_list->head;
 
      check_visual_start(range_node, min, draw_color_list, syntax_defs, &in_visual);
+
+     int prepass_min = min - SEARCH_BACK_LINES;
+     if(prepass_min < 0) prepass_min = 0;
+
+     // pre-pass to check if we are in a multiline comment
+     for(int64_t y = prepass_min; y < min; y++){
+          char* line = view->buffer->lines[y];
+          int64_t line_len = ce_utf8_strlen(line);
+
+          for(int64_t x = 0; x < line_len; ++x){
+               char* str = ce_utf8_iterate_to(line, x);
+
+               if(multiline_comment){
+                    if(match_c_multiline_comment_end(str)){
+                         multiline_comment = false;
+                    }
+               }else{
+                    if((match_len = match_c_multiline_comment(str))){
+                         multiline_comment = true;
+                         x += (match_len - 1);
+                    }
+               }
+          }
+     }
 
      for(int64_t y = min; y <= max; ++y){
           char* line = view->buffer->lines[y];
@@ -1050,14 +1075,14 @@ static int64_t match_python_docstring(const char* str, PythonDocstring_t* python
      if(strncmp(str, "\"\"\"", 3) == 0){
           *python_docstring = PYTHON_DOCSTRING_DOUBLE_QUOTE;
           char* match = strstr(str, "\"\"\"");
-          if(match) return ce_utf8_strlen_between(str, match) + 3;
+          if(match) return ce_utf8_strlen_between(str, match);
           return ce_utf8_strlen(str);
      }
 
      if(strncmp(str, "'''", 3) == 0){
           *python_docstring = PYTHON_DOCSTRING_SINGLE_QUOTE;
           char* match = strstr(str, "'''");
-          if(match) return ce_utf8_strlen_between(str, match) + 3;
+          if(match) return ce_utf8_strlen_between(str, match);
           return ce_utf8_strlen(str);
      }
 
@@ -1102,12 +1127,16 @@ void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_l
                     if(strncmp(str, "\"\"\"", 3) == 0){
                          docstring = PYTHON_DOCSTRING_NONE;
                          x += 3;
+                    }else if(match_len == 0){
+                         docstring = PYTHON_DOCSTRING_NONE;
                     }
                     break;
                case PYTHON_DOCSTRING_SINGLE_QUOTE:
                     if(strncmp(str, "'''", 3) == 0){
                          docstring = PYTHON_DOCSTRING_NONE;
                          x += 3;
+                    }else if(match_len == 0){
+                         docstring = PYTHON_DOCSTRING_NONE;
                     }
                     break;
                }

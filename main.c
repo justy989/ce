@@ -33,6 +33,11 @@ const char* buffer_status_get_str(CeBufferStatus_t status){
      return "";
 }
 
+static void exit_input_mode(CeApp_t* app){
+     app->input_mode = false;
+     app->vim.mode = CE_VIM_MODE_NORMAL;
+}
+
 static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      char buffer_info[BUFSIZ];
      ce_buffer_empty(buffer);
@@ -91,7 +96,7 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
                break;
           }
 
-          if(yank->type ==CE_VIM_YANK_TYPE_BLOCK){
+          if(yank->type == CE_VIM_YANK_TYPE_BLOCK){
                snprintf(line, 256, "// register '%c': type: %s\n", reg, yank_type);
                buffer_append_on_new_line(buffer, line);
                for(int64_t l = 0; l < yank->block_line_count; l++){
@@ -192,8 +197,8 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
 
 void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeDrawColorList_t* draw_color_list,
                CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
-     int64_t view_height = view->rect.bottom - view->rect.top;
-     int64_t view_width = view->rect.right - view->rect.left;
+     int64_t view_width = ce_view_width(view);
+     int64_t view_height = ce_view_height(view);
      int64_t row_min = view->scroll.y;
      int64_t col_min = view->scroll.x;
      int64_t col_max = col_min + view_width;
@@ -452,7 +457,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                        input_buffer->line_count && strlen(input_buffer->lines[0])){
                          pattern = input_buffer->lines[0];
                     }else{
-                         const CeVimYank_t* yank = vim->yanks + ce_vim_yank_register_index('/');
+                         const CeVimYank_t* yank = vim->yanks + ce_vim_register_index('/');
                          if(yank->text) pattern = yank->text;
                     }
 
@@ -565,7 +570,7 @@ void draw(CeApp_t* app){
 
           for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
                if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
-                    color_pair = ce_color_def_get(&color_defs, COLOR_BRIGHT_WHITE, app->config_options.ui_bg_color);
+                    color_pair = ce_color_def_get(&color_defs, COLOR_DEFAULT, COLOR_DEFAULT);
                     attron(COLOR_PAIR(color_pair));
                }else{
                     color_pair = ce_color_def_get(&color_defs, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
@@ -612,13 +617,17 @@ void draw(CeApp_t* app){
         strlen(app->complete_list_buffer->lines[0])){
           CeLayout_t* view_layout = tab_layout->tab.current;
           app->complete_view.rect.left = view_layout->view.rect.left;
-          app->complete_view.rect.right = view_layout->view.rect.right;
+          app->complete_view.rect.right = view_layout->view.rect.right - 1;
           if(app->input_mode){
                app->complete_view.rect.bottom = app->input_view.rect.top;
           }else{
                app->complete_view.rect.bottom = view_layout->view.rect.bottom - 1;
           }
-          app->complete_view.rect.top = app->complete_view.rect.bottom - app->complete_list_buffer->line_count;
+          int64_t lines_to_show = app->complete_list_buffer->line_count;
+          if(lines_to_show > app->config_options.completion_line_limit){
+               lines_to_show = app->config_options.completion_line_limit;
+          }
+          app->complete_view.rect.top = app->complete_view.rect.bottom - lines_to_show;
           if(app->complete_view.rect.top <= view_layout->view.rect.top){
                app->complete_view.rect.top = view_layout->view.rect.top + 1; // account for current view's status bar
           }
@@ -857,8 +866,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(view && !app->input_mode){
           CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app->terminal_list);
           if(terminal){
-               int64_t width = (view->rect.right - view->rect.left);
-               int64_t height = (view->rect.bottom - view->rect.top);
+               int64_t width = ce_view_width(view);
+               int64_t height = ce_view_height(view);
                if(terminal->columns != width || terminal->rows != height){
                     ce_terminal_resize(terminal, width, height);
                }
@@ -879,7 +888,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     return;
                }else if(app->vim.mode == CE_VIM_MODE_NORMAL){
                     if(key == 'p'){
-                         CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('"');
+                         CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('"');
                          if((yank->type == CE_VIM_YANK_TYPE_STRING ||
                              yank->type == CE_VIM_YANK_TYPE_LINE) &&
                              yank->text){
@@ -898,7 +907,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }
      }
 
-     // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY TODO: is that what we want?
+     // as long as vim isn't in the middle of handling keys, in insert mode vim returns VKH_HANDLED_KEY
      if(app->last_vim_handle_result != CE_VIM_PARSE_IN_PROGRESS &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY &&
         app->last_vim_handle_result != CE_VIM_PARSE_CONTINUE &&
@@ -933,6 +942,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    switch(cs){
                                    default:
                                         app->key_count = 0;
+                                        app->vim.current_command[0] = 0;
                                         return;
                                    case CE_COMMAND_NO_ACTION:
                                         break;
@@ -1056,7 +1066,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               ce_history_insert(&app->search_history, app->input_view.buffer->lines[0]);
 
                               // update yanks
-                              CeVimYank_t* yank = app->vim.yanks + ce_vim_yank_register_index('/');
+                              CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('/');
                               free(yank->text);
                               yank->text = strdup(app->input_view.buffer->lines[0]);
                               yank->type = CE_VIM_YANK_TYPE_STRING;
@@ -1100,10 +1110,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         }
 
                                         if(command_func){
-                                             // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
-                                             app->input_mode = false;
-                                             app->vim.mode = CE_VIM_MODE_NORMAL;
-
+                                             exit_input_mode(app);
                                              command_func(&command, app);
                                              ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
 
@@ -1161,7 +1168,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    app->quit = true;
                               }
                          }else if(strcmp(app->input_view.buffer->name, "REPLACE ALL") == 0){
-                              int64_t index = ce_vim_yank_register_index('/');
+                              int64_t index = ce_vim_register_index('/');
                               CeVimYank_t* yank = app->vim.yanks + index;
                               if(yank->text){
                                    replace_all(view, &app->vim, yank->text, app->input_view.buffer->lines[0]);
@@ -1169,9 +1176,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          }
                     }
 
-                    // TODO: compress this, we do it a lot, and I'm sure there will be more we need to do in the future
-                    app->input_mode = false;
-                    app->vim.mode = CE_VIM_MODE_NORMAL;
+                    exit_input_mode(app);
                     return;
                }else{
                     key = CE_NEWLINE;
@@ -1195,8 +1200,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }else if(key == KEY_ESCAPE && app->input_mode && app->vim.mode == CE_VIM_MODE_NORMAL){ // Escape
                ce_history_reset_current(&app->command_history);
                ce_history_reset_current(&app->search_history);
-               app->input_mode = false;
-               app->vim.mode = CE_VIM_MODE_NORMAL;
+               exit_input_mode(app);
 
                CeComplete_t* complete = ce_app_is_completing(app);
                if(complete) ce_complete_reset(complete);
@@ -1316,7 +1320,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      }
 
      // incremental search
-     if(app->input_mode){
+     if(view && app->input_mode){
           if(strcmp(app->input_view.buffer->name, "SEARCH") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     CePoint_t match_point = ce_buffer_search_forward(view->buffer, view->cursor, app->input_view.buffer->lines[0]);
@@ -1561,6 +1565,7 @@ int main(int argc, char** argv){
           config_options->insert_spaces_on_tab = true;
           config_options->terminal_scroll_back = 1024;
           config_options->line_number = CE_LINE_NUMBER_NONE;
+          config_options->completion_line_limit = 15;
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {

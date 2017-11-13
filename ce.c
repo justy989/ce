@@ -1133,6 +1133,14 @@ void ce_view_center(CeView_t* view){
      ce_view_scroll_to(view, (CePoint_t){0, view->cursor.y - (view_height / 2)});
 }
 
+int64_t ce_view_width(CeView_t* view){
+     return view->rect.right - view->rect.left;
+}
+
+int64_t ce_view_height(CeView_t* view){
+     return view->rect.bottom - view->rect.top;
+}
+
 int64_t ce_utf8_strlen(const char* string){
      int64_t len = 0;
      int64_t byte_count = 0;
@@ -1363,7 +1371,7 @@ bool ce_utf8_encode(CeRune_t u, char* string, int64_t string_len, int64_t* bytes
 }
 
 int64_t ce_utf8_rune_len(CeRune_t u){
-     // TODO: optimize
+     // TODO: optimize based on st's bitmasking
      if(u < 0x80){
           return 1;
      }else if(u < 0x0800){

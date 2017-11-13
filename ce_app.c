@@ -20,6 +20,13 @@ bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      return true;
 }
 
+static void free_buffer_node(CeBufferNode_t* node){
+     free(node->buffer->app_data);
+     ce_buffer_free(node->buffer);
+     free(node->buffer);
+     free(node);
+}
+
 bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* prev = NULL;
      CeBufferNode_t* itr = *head;
@@ -37,11 +44,7 @@ bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
           *head = (*head)->next;
      }
 
-     // TODO: compress with below
-     free(itr->buffer->app_data);
-     ce_buffer_free(itr->buffer);
-     free(itr->buffer);
-     free(itr);
+     free_buffer_node(itr);
      return true;
 }
 
@@ -50,10 +53,7 @@ void ce_buffer_node_free(CeBufferNode_t** head){
      while(itr){
           CeBufferNode_t* tmp = itr;
           itr = itr->next;
-          free(tmp->buffer->app_data);
-          ce_buffer_free(tmp->buffer);
-          free(tmp->buffer);
-          free(tmp);
+          free_buffer_node(tmp);
      }
      *head = NULL;
 }
@@ -452,7 +452,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
-     input_view->rect.right = view->rect.right;
+     input_view->rect.right = view->rect.right - 1;
      input_view->rect.bottom = view->rect.bottom;
      int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
      int64_t height = input_view->buffer->line_count;
@@ -707,41 +707,90 @@ CeDestination_t scan_line_for_destination(const char* line){
      CeDestination_t destination = {};
      destination.point = (CePoint_t){-1, -1};
 
-     // TODO: more formats, including git grep, valgrind
+     // TODO: more formats, including git grep
+
+     // valgrind format
+     // '==7330==    by 0x638B16A: initializer (ce_config.c:1983)'
+     if(line[0] == '=' && line[1] == '='){
+          char* open_paren = strchr(line, '(');
+          char* close_paren = strchr(line, ')');
+          if(open_paren && close_paren){
+               char* file_end = strchr(open_paren, ':');
+               if(file_end){
+                    char* end = NULL;
+                    char* number_start = file_end + 1;
+                    destination.point.y = strtol(number_start, &end, 10);
+                    if(end != number_start){
+                         if(destination.point.y > 0) destination.point.y--;
+                         destination.point.x = 0;
+
+                         int64_t filepath_len = file_end - (open_paren + 1);
+                         if(filepath_len >= PATH_MAX) return destination;
+                         strncpy(destination.filepath, (open_paren + 1), filepath_len);
+                         destination.filepath[filepath_len] = 0;
+                         return destination;
+                    }
+               }
+          }
+     }
 
      // grep/gcc format
+     // ce_app.c:1515:23
      char* file_end = strchr(line, ':');
-     if(!file_end) return destination;
-     char* row_end = strchr(file_end + 1, ':');
-     char* col_end = NULL;
-     if(row_end) col_end = strchr(row_end + 1, ':');
-     // col_end and row_end is not always present
+     if(file_end){
+          char* row_end = strchr(file_end + 1, ':');
+          char* col_end = NULL;
+          if(row_end) col_end = strchr(row_end + 1, ':');
+          // col_end and row_end is not always present
 
-     int64_t filepath_len = file_end - line;
-     if(filepath_len >= PATH_MAX) return destination;
-     strncpy(destination.filepath, line, filepath_len);
-     destination.filepath[filepath_len] = 0;
-     char* end = NULL;
+          int64_t filepath_len = file_end - line;
+          if(filepath_len >= PATH_MAX) return destination;
+          strncpy(destination.filepath, line, filepath_len);
+          destination.filepath[filepath_len] = 0;
+          char* end = NULL;
 
-     if(row_end){
-          char* row_start = file_end + 1;
-          destination.point.y = strtol(row_start, &end, 10);
-          if(end == row_start) destination.point.y = -1;
+          if(row_end){
+               char* row_start = file_end + 1;
+               destination.point.y = strtol(row_start, &end, 10);
+               if(end == row_start) destination.point.y = -1;
 
-          if(destination.point.y > 0){
-               destination.point.y--; // account for format which is 1 indexed
+               if(destination.point.y > 0){
+                    destination.point.y--; // account for format which is 1 indexed
+               }
+
+               if(col_end){
+                    char* col_start = row_end + 1;
+                    destination.point.x = strtol(col_start, &end, 10);
+                    if(end == col_start) destination.point.x = 0;
+                    if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
+               }else{
+                    destination.point.x = 0;
+               }
           }
 
-          if(col_end){
-               char* col_start = row_end + 1;
-               destination.point.x = strtol(col_start, &end, 10);
-               if(end == col_start) destination.point.x = -1;
-               if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
-          }else{
-               destination.point.x = 0;
+          return destination;
+     }
+
+     // cscope format
+     // ce_app.c buffer_append_on_new_line 694 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char * string){
+     file_end = strchr(line, ' ');
+     if(file_end){
+          char* symbol_end = strchr(file_end + 1, ' ');
+          if(symbol_end){
+               char* row_start = symbol_end + 1;
+               char* end = NULL;
+               destination.point.y = strtol(row_start, &end, 10);
+               if(end != row_start){
+                    if(destination.point.y > 0) destination.point.y--;
+                    destination.point.x = 0;
+
+                    int64_t filepath_len = file_end - line;
+                    if(filepath_len >= PATH_MAX) return destination;
+                    strncpy(destination.filepath, line, filepath_len);
+                    destination.filepath[filepath_len] = 0;
+                    return destination;
+               }
           }
-     }else{
-          destination.point = (CePoint_t){-1, -1};
      }
 
      return destination;
@@ -867,8 +916,8 @@ int64_t istrlen(const CeRune_t* istr){
 bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
      if(!view) return false;
 
-     int64_t view_width = view->rect.right - view->rect.left;
-     int64_t view_height = view->rect.bottom - view->rect.top;
+     int64_t view_width = ce_view_width(view);
+     int64_t view_height = ce_view_height(view);
      CeRect_t view_rect = {view->scroll.x, view->scroll.x + view_width, view->scroll.y, view->scroll.y + view_height};
 
      return strcmp(destination->filepath, view->buffer->name) == 0 &&
@@ -910,7 +959,6 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
-          {command_terminal_command_in_view, "terminal_command_in_view", "run a command in the terminal, and switch to it in view"},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
           {command_vim_e, "e", "vim's e command to load a file specified"},
           {command_vim_w, "w", "vim's w command to save the current buffer"},
