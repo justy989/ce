@@ -147,6 +147,22 @@ CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_save_all_and_quit(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(itr->buffer->status == CE_BUFFER_STATUS_MODIFIED){
+               ce_buffer_save(itr->buffer);
+          }
+          itr = itr->next;
+     }
+
+     return command_quit(command, user_data);
+}
+
 CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
@@ -1168,4 +1184,12 @@ CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data){
      free(base_directory);
 
      return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_vim_wqa(CeCommand_t* command, void* user_data){
+     return command_save_all_and_quit(command, user_data);
+}
+
+CeCommandStatus_t command_vim_xa(CeCommand_t* command, void* user_data){
+     return command_save_all_and_quit(command, user_data);
 }

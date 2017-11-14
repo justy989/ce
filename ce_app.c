@@ -929,6 +929,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_quit, "quit", "quit ce"},
           {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
           {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
+          {command_save_all_and_quit, "save_all_and_quit", "save all modified buffers and quit the editor"},
           {command_show_buffers, "show_buffers", "show the list of buffers"},
           {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
           {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
@@ -973,6 +974,8 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_make, "make", "vim's make command run make in the terminal"},
           {command_vim_find, "find", "vim's find command to search for files recursively"},
+          {command_vim_wqa, "wqa", "vim's wqa command save all modified buffers and quit the editor"},
+          {command_vim_xa, "xa", "vim's xa command save all modified buffers and quit the editor"},
      };
 
      int64_t command_entry_count = sizeof(command_entries) / sizeof(command_entries[0]);

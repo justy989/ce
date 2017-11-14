@@ -1092,9 +1092,10 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
                                                               app->config_options.vertical_scroll_off,
                                                               app->config_options.tab_width);
-                                        ce_view_center(view);
                                    }
                               }else{
+                                   apply_completion(app, view);
+
                                    // convert and run the command
                                    CeCommand_t command = {};
                                    if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
@@ -1590,6 +1591,7 @@ int main(int argc, char** argv){
                {{9}, "jump_list previous"}, // ctrl + o
                {{15}, "jump_list next"}, // ctrl + i
                {{'K'}, "man_page_on_word_under_cursor"},
+               {{'Z', 'Z'}, "wq"},
           };
 
           ce_convert_bind_defs(&app.key_binds, normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
