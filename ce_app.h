@@ -91,8 +91,11 @@ typedef struct CeApp_t{
      int terminal_width;
      int terminal_height;
      CeView_t input_view;
+     CeView_t message_view;
      CeView_t complete_view;
      bool input_mode;
+     bool message_mode;
+     struct timeval message_time;
      CeLayout_t* tab_list_layout;
      CeSyntaxDef_t* syntax_defs;
      CeBufferNode_t* buffer_node_head;
@@ -196,3 +199,4 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
 
 void ce_app_init_default_commands(CeApp_t* app);
 void ce_app_init_command_completion(CeApp_t* app);
+void ce_app_message(CeApp_t* app, const char* fmt, ...);

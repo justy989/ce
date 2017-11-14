@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ncurses.h>
+#include <errno.h>
 
 typedef struct{
      CeLayout_t* tab_layout;
@@ -163,30 +164,38 @@ CeCommandStatus_t command_save_all_and_quit(CeCommand_t* command, void* user_dat
      return command_quit(command, user_data);
 }
 
-CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_show_info_buffer(CeCommand_t* command, void* user_data, CeBuffer_t* buffer){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-
      CeApp_t* app = user_data;
      CommandContext_t command_context = {};
-
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
-
-     ce_view_switch_buffer(command_context.view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
-
+     ce_view_switch_buffer(command_context.view, buffer, &app->vim, &app->config_options, true);
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
-
+CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
-     CommandContext_t command_context = {};
+     return command_show_info_buffer(command, user_data, app->buffer_list_buffer);
+}
 
-     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+     return command_show_info_buffer(command, user_data, app->yank_list_buffer);
+}
 
-     ce_view_switch_buffer(command_context.view, app->yank_list_buffer, &app->vim, &app->config_options, true);
+CeCommandStatus_t command_show_macros(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+     return command_show_info_buffer(command, user_data, app->macro_list_buffer);
+}
 
-     return CE_COMMAND_SUCCESS;
+CeCommandStatus_t command_show_marks(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+     return command_show_info_buffer(command, user_data, app->mark_list_buffer);
+}
+
+CeCommandStatus_t command_show_jumps(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+     return command_show_info_buffer(command, user_data, app->jump_list_buffer);
 }
 
 CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
@@ -288,8 +297,10 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
-          load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
-                              command->args[0].string);
+          if(!load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim, true,
+                                  command->args[0].string)){
+               ce_app_message(app, "failed to load file %s: '%s'", command->args[0].string, strerror(errno));
+          }
      }else{ // it's 0
           app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "LOAD FILE");
 
@@ -363,12 +374,14 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
 
      if(strcmp(command->args[0].string, "left") == 0){
           if(select_tab_left(app)){
+               app->message_mode = false;
                return CE_COMMAND_SUCCESS;
           }
 
           return CE_COMMAND_NO_ACTION;
      }else if(strcmp(command->args[0].string, "right") == 0){
           if(select_tab_right(app)){
+               app->message_mode = false;
                return CE_COMMAND_SUCCESS;
           }
 

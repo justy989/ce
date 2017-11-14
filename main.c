@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "ce_app.h"
 #include "ce_commands.h"
@@ -68,6 +69,8 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      itr = head;
      while(itr){
           const char* buffer_flag_str = buffer_status_get_str(itr->buffer->status);
+          // if the current buffer is the one we are putthing this list together on, set it to readonly for visual sake
+          if(itr->buffer == buffer) buffer_flag_str = buffer_status_get_str(CE_BUFFER_STATUS_READONLY);
           snprintf(buffer_info, BUFSIZ, format_string, buffer_flag_str, itr->buffer->name,
                    itr->buffer->line_count);
           buffer_append_on_new_line(buffer, buffer_info);
@@ -650,6 +653,12 @@ void draw(CeApp_t* app){
           }
      }
 
+     if(app->message_mode){
+          CeDrawColorList_t draw_color_list = {};
+          draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
+                    &color_defs, app->syntax_defs);
+     }
+
      // show border when non view is selected
      if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW){
           int64_t rect_height = 0;
@@ -950,11 +959,11 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         ce_log("'%s' failed", entry->name);
                                         break;
                                    case CE_COMMAND_PRINT_HELP:
-                                        ce_log("command help:\n'%s' %s\n", entry->name, entry->description);
+                                        ce_app_message(app, "%s: %s\n", entry->name, entry->description);
                                         break;
                                    }
                               }else{
-                                   ce_log("unknown command: '%s'", command->name);
+                                   ce_app_message(app, "unknown command: '%s'", command->name);
                               }
 
                               app->key_count = 0;
@@ -978,7 +987,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
      if(view){
           if(key == KEY_ENTER){
-               if(view->buffer == app->buffer_list_buffer){
+               if(!app->input_mode && view->buffer == app->buffer_list_buffer){
                     CeBufferNode_t* itr = app->buffer_node_head;
                     int64_t index = 0;
                     while(itr){
@@ -1054,8 +1063,10 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    }else{
                                         strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
                                    }
-                                   load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                       true, filepath);
+                                   if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                                           true, filepath)){
+                                        ce_app_message(app, "failed to load file %s: '%s'", filepath, strerror(errno));
+                                   }
                               }
 
                               free(base_directory);
@@ -1102,8 +1113,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         ce_log("failed to parse command: '%s'\n", app->input_view.buffer->lines[0]);
                                    }else{
                                         CeCommandFunc_t* command_func = NULL;
+                                        CeCommandEntry_t* entry = NULL;
                                         for(int64_t i = 0; i < app->command_entry_count; i++){
-                                             CeCommandEntry_t* entry = app->command_entries + i;
+                                             entry = app->command_entries + i;
                                              if(strcmp(entry->name, command.name) == 0){
                                                   command_func = entry->func;
                                                   break;
@@ -1112,12 +1124,17 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                                         if(command_func){
                                              exit_input_mode(app);
-                                             command_func(&command, app);
+                                             CeCommandStatus_t cs = command_func(&command, app);
+                                             switch(cs){
+                                             default:
+                                                  break;
+                                             case CE_COMMAND_PRINT_HELP:
+                                                  ce_app_message(app, "%s: %s", entry->name, entry->description);
+                                                  break;
+                                             }
                                              ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
-
-                                             return;
                                         }else{
-                                             ce_log("unknown command: '%s'\n", command.name);
+                                             ce_app_message(app, "unknown command: '%s'", command.name);
                                         }
                                    }
                               }
@@ -1551,6 +1568,16 @@ int main(int argc, char** argv){
           ce_buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
+     // setup message buffer
+     {
+          CeBuffer_t* buffer = new_buffer();
+          ce_buffer_alloc(buffer, 1, "[message]");
+          app.message_view.buffer = buffer;
+          app.message_view.buffer->no_line_numbers = true;
+          ce_buffer_node_insert(&app.buffer_node_head, buffer);
+          app.message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
+     }
+
      // init user config
      if(config_filepath){
           if(!user_config_init(&app.user_config, config_filepath)) return 1;
@@ -1567,6 +1594,7 @@ int main(int argc, char** argv){
           config_options->terminal_scroll_back = 1024;
           config_options->line_number = CE_LINE_NUMBER_NONE;
           config_options->completion_line_limit = 15;
+          config_options->message_display_time_usec = 5000000; // 5 seconds
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
@@ -1655,11 +1683,19 @@ int main(int argc, char** argv){
      struct timeval previous_draw_time = {};
      struct timeval current_draw_time = {};
      uint64_t time_since_last_draw = 0;
+     uint64_t time_since_last_message = 0;
 
      // main loop
      while(!app.quit){
           gettimeofday(&current_draw_time, NULL);
           time_since_last_draw = time_between(previous_draw_time, current_draw_time);
+
+          if(app.message_mode){
+               time_since_last_message = time_between(app.message_time, current_draw_time);
+               if(time_since_last_message > app.config_options.message_display_time_usec){
+                    app.message_mode = false;
+               }
+          }
 
           // figure out our current view rect
           CeView_t* view = NULL;
