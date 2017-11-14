@@ -54,6 +54,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'j', &ce_vim_parse_motion_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '^', &ce_vim_parse_motion_soft_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '0', &ce_vim_parse_motion_hard_begin_line);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_HOME, &ce_vim_parse_motion_hard_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '$', &ce_vim_parse_motion_end_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'f', &ce_vim_parse_motion_find_forward);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'F', &ce_vim_parse_motion_find_backward);
@@ -76,6 +77,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '{', &ce_vim_parse_motion_previous_blank_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 2, &ce_vim_parse_motion_page_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 6, &ce_vim_parse_motion_page_down);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_PPAGE, &ce_vim_parse_motion_page_up);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_NPAGE, &ce_vim_parse_motion_page_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 21, &ce_vim_parse_motion_half_page_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 4, &ce_vim_parse_motion_half_page_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '\'', &ce_vim_parse_motion_mark);
@@ -367,7 +370,9 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
 
           vim->mode = CE_VIM_MODE_NORMAL;
           vim->chain_undo = false;
-          view->cursor = ce_buffer_advance_point(view->buffer, view->cursor, -1);
+          if(view->cursor.x > 0){
+               view->cursor = ce_buffer_advance_point(view->buffer, view->cursor, -1);
+          }
      } break;
      case KEY_REDO:
      {
@@ -1889,6 +1894,7 @@ CeVimParseResult_t ce_vim_parse_verb_z_command(CeVimAction_t* action, CeRune_t k
 CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t key){
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_g_command;
+          if(action->multiplier > 1) return CE_VIM_PARSE_COMPLETE;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
      }else if(action->verb.function == ce_vim_verb_g_command){
           action->verb.integer = key;
@@ -3035,6 +3041,16 @@ bool ce_vim_verb_z_command(CeVim_t* vim, const CeVimAction_t* action, CeRange_t 
 
 bool ce_vim_verb_g_command(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                            CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
+     if(action->multiplier){
+          if(action->multiplier > view->buffer->line_count) return false;
+          view->cursor.y = action->multiplier - 1;
+          view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+          ce_view_follow_cursor(view, config_options->horizontal_scroll_off,
+                                config_options->vertical_scroll_off,
+                                config_options->tab_width);
+          return true;
+     }
+
      switch(action->verb.integer){
      default:
           break;
@@ -3044,7 +3060,7 @@ bool ce_vim_verb_g_command(CeVim_t* vim, const CeVimAction_t* action, CeRange_t 
      case 'v':
           vim->visual = view->cursor;
           vim->mode = CE_VIM_MODE_VISUAL_BLOCK;
-          break;
+          return true;
      }
 
      return false;
