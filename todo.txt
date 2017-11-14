@@ -17,3 +17,4 @@ bug:
 - what is home key doing? It seems like it's sending '5~'
 - TERM=xterm-256color needs to be set to view ce correctly
 - sometimes the arrow keys are broken in the terminal on rhel6, not sure how to reproduce, but sometimes they work also?
+- can't pick 'q' as a register when recording a macro
