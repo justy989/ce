@@ -1004,7 +1004,15 @@ CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data){
 
 CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     if(app->tab_list_layout->tab_list.tab_count == 1 &&
+        ce_layout_tab_get_layout_count(app->tab_list_layout->tab_list.current) == 1){
+          return command_quit(command, user_data);
+     }
+
      if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1017,6 +1025,11 @@ CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      ce_buffer_save(command_context.view->buffer);
+
+     if(app->tab_list_layout->tab_list.tab_count == 1 &&
+        ce_layout_tab_get_layout_count(app->tab_list_layout->tab_list.current) == 1){
+          return command_quit(command, user_data);
+     }
 
      if(!delete_layout(user_data)) return CE_COMMAND_FAILURE;
      return CE_COMMAND_SUCCESS;
