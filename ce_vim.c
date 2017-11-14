@@ -52,6 +52,10 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'l', &ce_vim_parse_motion_right);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'k', &ce_vim_parse_motion_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'j', &ce_vim_parse_motion_down);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_LEFT, &ce_vim_parse_motion_left);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_RIGHT, &ce_vim_parse_motion_right);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_UP, &ce_vim_parse_motion_up);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_DOWN, &ce_vim_parse_motion_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '^', &ce_vim_parse_motion_soft_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '0', &ce_vim_parse_motion_hard_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_HOME, &ce_vim_parse_motion_hard_begin_line);
