@@ -9,6 +9,10 @@ todo:
 - commands shouldn't need to be fully typed
 - TERM=xterm-256color needs to be set to view correctly
 - 'ZZ' is save and quit
+- customization:
+  - completion
+  - status bar
+  - key handler ?
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
