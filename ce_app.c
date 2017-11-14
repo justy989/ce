@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dlfcn.h>
+#include <sys/time.h>
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
@@ -932,6 +933,9 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_save_all_and_quit, "save_all_and_quit", "save all modified buffers and quit the editor"},
           {command_show_buffers, "show_buffers", "show the list of buffers"},
           {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
+          {command_show_macros, "show_macros", "show the state of your macros"},
+          {command_show_marks, "show_marks", "show the state of your vim marks"},
+          {command_show_jumps, "show_jumps", "show the state of your jumps"},
           {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
           {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
@@ -999,4 +1003,32 @@ void ce_app_init_command_completion(CeApp_t* app){
      }
      free(commands);
      free(descriptions);
+}
+
+void ce_app_message(CeApp_t* app, const char* fmt, ...){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     app->message_view.rect.left = view->rect.left;
+     app->message_view.rect.right = view->rect.right - 1;
+     app->message_view.rect.bottom = view->rect.bottom + 1;
+     app->message_view.rect.top = view->rect.bottom;
+
+     gettimeofday(&app->message_time, NULL);
+     app->message_mode = true;
+
+     free(app->message_view.buffer->app_data);
+     ce_buffer_alloc(app->message_view.buffer, 1, "[message]");
+     app->message_view.buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     app->message_view.cursor = (CePoint_t){0, 0};
+
+     char message_buffer[BUFSIZ];
+     va_list args;
+     va_start(args, fmt);
+     vsnprintf(message_buffer, BUFSIZ, fmt, args);
+     va_end(args);
+
+     ce_buffer_insert_string(app->message_view.buffer, message_buffer, app->message_view.cursor);
+     app->message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
 }

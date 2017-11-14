@@ -2,18 +2,18 @@ todo:
 - add config option for log destination (we want to init the log before the user config, so can we even do this?)
 - dired mode
 - message box
-- undo in macros
+- undo in macros actually removing some actions
 - vim ctrl+w HJKL to move windows around
 - regex replace for captures
-- 'gf'
-- TERM=xterm-256color needs to be set to view ce correctly
+- vim's 'gf'
 - customization:
   - completion
   - status bar
   - key handler ?
-- message bar
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
-- what is home key doing?
+- what is home key doing? It seems like it's sending '5~'
+- TERM=xterm-256color needs to be set to view ce correctly
+- sometimes the arrow keys are broken in the terminal on rhel6, not sure how to reproduce, but sometimes they work also?

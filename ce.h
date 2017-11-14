@@ -127,6 +127,7 @@ typedef struct{
      int ui_fg_color;
      int ui_bg_color;
      int64_t completion_line_limit;
+     uint64_t message_display_time_usec;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
