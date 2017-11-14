@@ -7,6 +7,7 @@
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_save_all_and_quit(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_show_buffers(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data);
@@ -44,6 +45,8 @@ CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_wqa(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_xa(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data);
