@@ -1327,6 +1327,8 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
      // if we start on a right match, back up the starting point
      if(buffer_rune == right_match){
           itr = ce_buffer_advance_point(buffer, start, -1);
+     }else if(buffer_rune == left_match){
+          itr = ce_buffer_advance_point(buffer, start, 1);
      }
      CePoint_t prev = itr;
      CePoint_t new_start = range.start;
