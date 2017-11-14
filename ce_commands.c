@@ -115,7 +115,6 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
                target = (CePoint_t){view_rect.right + 1, view_rect.top};
           }
      }else{
-          ce_log("unrecognized argument: '%s'\n", command->args[0].string);
           return CE_COMMAND_PRINT_HELP;
      }
 
@@ -211,7 +210,6 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      }else if(strcmp(command->args[0].string, "horizontal") == 0){
           // pass
      }else{
-          ce_log("unrecognized argument '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
      }
 
@@ -228,7 +226,11 @@ CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
      CeLayout_t* layout = ce_layout_find_parent(tab_layout, tab_layout->tab.current);
-     if(layout) tab_layout->tab.current = layout;
+     if(layout){
+          tab_layout->tab.current = layout;
+     }else{
+          ce_app_message(app, "current layout has no parent");
+     }
 
      return CE_COMMAND_SUCCESS;
 }
@@ -373,6 +375,11 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
      CeApp_t* app = user_data;
 
      if(strcmp(command->args[0].string, "left") == 0){
+          if(app->tab_list_layout->tab_list.tab_count == 1){
+               ce_app_message(app, "cannot select adjacent tab, there is only 1 tab");
+               return CE_COMMAND_NO_ACTION;
+          }
+
           if(select_tab_left(app)){
                app->message_mode = false;
                return CE_COMMAND_SUCCESS;
@@ -380,6 +387,11 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
 
           return CE_COMMAND_NO_ACTION;
      }else if(strcmp(command->args[0].string, "right") == 0){
+          if(app->tab_list_layout->tab_list.tab_count == 1){
+               ce_app_message(app, "cannot select adjacent tab, there is only 1 tab");
+               return CE_COMMAND_NO_ACTION;
+          }
+
           if(select_tab_right(app)){
                app->message_mode = false;
                return CE_COMMAND_SUCCESS;
@@ -388,7 +400,6 @@ CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_d
           return CE_COMMAND_NO_ACTION;
      }
 
-     ce_log("unrecognized argument: '%s'\n", command->args[0]);
      return CE_COMMAND_PRINT_HELP;
 }
 
@@ -410,7 +421,6 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
           app->vim.search_mode = CE_VIM_SEARCH_MODE_BACKWARD;
           app->search_start = command_context.view->cursor;
      }else{
-          ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
      }
 
@@ -457,7 +467,6 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_BACKWARD;
           app->search_start = command_context.view->cursor;
      }else{
-          ce_log("unrecognized argument: '%s'\n", command->args[0]);
           return CE_COMMAND_PRINT_HELP;
      }
 
@@ -588,7 +597,10 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
      if(command_context.view->buffer->line_count == 0) return CE_COMMAND_NO_ACTION;
 
      CeDestination_t destination = scan_line_for_destination(command_context.view->buffer->lines[command_context.view->cursor.y]);
-     if(destination.point.x < 0 || destination.point.y < 0) return CE_COMMAND_NO_ACTION;
+     if(destination.point.x < 0 || destination.point.y < 0){
+          ce_app_message(app, "failed to determine file destination at %s:%d", command_context.view->buffer->name, command_context.view->cursor.y);
+          return CE_COMMAND_NO_ACTION;
+     }
 
      CeAppBufferData_t* buffer_data = command_context.view->buffer->app_data;
      buffer_data->last_goto_destination = command_context.view->cursor.y;
@@ -735,7 +747,7 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(access(command_context.view->buffer->name, F_OK) == -1){
-          ce_log("'%s' is not file backed, unable to reload\n", command_context.view->buffer->name);
+          ce_app_message(app, "buffer '%s' is not file backed, unable to reload\n", command_context.view->buffer->name);
           return CE_COMMAND_NO_ACTION;
      }
 
@@ -756,10 +768,14 @@ CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      ce_app_init_default_commands(app);
      char* config_path = strdup(app->user_config.filepath);
      user_config_free(&app->user_config);
-     user_config_init(&app->user_config, config_path);
+     if(user_config_init(&app->user_config, config_path)){
+          app->user_config.init_func(app);
+          ce_app_init_command_completion(app);
+     }else{
+          ce_app_message(app, "failed to reload config: '%s', see log for details", config_path);
+          return CE_COMMAND_FAILURE;
+     }
      free(config_path);
-     app->user_config.init_func(app);
-     ce_app_init_command_completion(app);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -911,7 +927,7 @@ CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
      if(!app->last_terminal){
-          ce_log("error in terminal command: no terminal available\n");
+          ce_app_message(app, "error in terminal command: no terminal available\n");
           return CE_COMMAND_FAILURE;
      }
 
@@ -952,14 +968,17 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
                         bool regex_search){
      bool chain_undo = false;
      int64_t match_len = 0;
-     if(!regex_search) match_len = strlen(match);
      regex_t regex = {};
-     int rc = regcomp(&regex, match, REG_EXTENDED);
-     if(rc != 0){
-          char error_buffer[BUFSIZ];
-          regerror(rc, &regex, error_buffer, BUFSIZ);
-          ce_log("regcomp() failed: '%s'", error_buffer);
-          return;
+     if(!regex_search){
+          int rc = regcomp(&regex, match, REG_EXTENDED);
+          if(rc != 0){
+               char error_buffer[BUFSIZ];
+               regerror(rc, &regex, error_buffer, BUFSIZ);
+               ce_log("regcomp() failed: '%s'", error_buffer);
+               return;
+          }
+     }else{
+           match_len = strlen(match);
      }
      while(true){
           CePoint_t match_point;
