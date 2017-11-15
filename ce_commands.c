@@ -473,6 +473,59 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     char* end_of_number = app->input_view.buffer->lines[0];
+     int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
+     if(end_of_number > app->input_view.buffer->lines[0]){
+          // if the command entered was a number, go to that line
+          if(line_number >= 0 && line_number < view->buffer->line_count){
+               view->cursor.y = line_number - 1;
+               view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+               ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
+                                     app->config_options.vertical_scroll_off,
+                                     app->config_options.tab_width);
+          }
+     }else{
+          ce_app_apply_completion(app);
+
+          // convert and run the command
+          CeCommand_t command = {};
+          if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
+               ce_log("failed to parse command: '%s'\n", app->input_view.buffer->lines[0]);
+          }else{
+               CeCommandFunc_t* command_func = NULL;
+               CeCommandEntry_t* entry = NULL;
+               for(int64_t i = 0; i < app->command_entry_count; i++){
+                    entry = app->command_entries + i;
+                    if(strcmp(entry->name, command.name) == 0){
+                         command_func = entry->func;
+                         break;
+                    }
+               }
+
+               if(command_func){
+                    CeCommandStatus_t cs = command_func(&command, app);
+                    switch(cs){
+                    default:
+                         break;
+                    case CE_COMMAND_PRINT_HELP:
+                         ce_app_message(app, "%s: %s", entry->name, entry->description);
+                         break;
+                    }
+                    ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
+               }else{
+                    ce_app_message(app, "unknown command: '%s'", command.name);
+               }
+          }
+     }
+
+     return true;
+}
+
 // lol
 CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
@@ -483,9 +536,9 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(command_context.view){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "COMMAND");
-          ce_complete_reset(&app->command_complete);
-          build_complete_list(app->complete_list_buffer, &app->command_complete);
+          ce_app_input(app, "COMMAND", command_input_complete_func);
+          ce_app_init_command_completion(app, &app->input_complete);
+          build_complete_list(app->complete_list_buffer, &app->input_complete);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -770,7 +823,7 @@ CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      user_config_free(&app->user_config);
      if(user_config_init(&app->user_config, config_path)){
           app->user_config.init_func(app);
-          ce_app_init_command_completion(app);
+          ce_app_init_command_completion(app, &app->command_complete);
      }else{
           ce_app_message(app, "failed to reload config: '%s', see log for details", config_path);
           return CE_COMMAND_FAILURE;

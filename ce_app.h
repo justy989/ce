@@ -84,6 +84,8 @@ typedef struct{
      int64_t unique_id;
 }CeTerminalList_t;
 
+typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
+
 typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
@@ -94,6 +96,7 @@ typedef struct CeApp_t{
      CeView_t message_view;
      CeView_t complete_view;
      bool input_mode;
+     CeInputCompleteFunc* input_complete_func;
      bool message_mode;
      struct timeval message_time;
      CeLayout_t* tab_list_layout;
@@ -109,6 +112,7 @@ typedef struct CeApp_t{
      CeBuffer_t* mark_list_buffer;
      CeBuffer_t* jump_list_buffer;
      CeBuffer_t* last_goto_buffer;
+     CeComplete_t input_complete;
      CeComplete_t command_complete;
      CeComplete_t load_file_complete;
      CeComplete_t switch_buffer_complete;
@@ -200,5 +204,7 @@ int64_t istrlen(const CeRune_t* istr);
 bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
 
 void ce_app_init_default_commands(CeApp_t* app);
-void ce_app_init_command_completion(CeApp_t* app);
+void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete);
 void ce_app_message(CeApp_t* app, const char* fmt, ...);
+void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input_complete_func);
+bool ce_app_apply_completion(CeApp_t* app);
