@@ -1073,52 +1073,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               destination.point = view->cursor;
                               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                               ce_jump_list_insert(jump_list, destination);
-                         }else if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
-                              char* end_of_number = app->input_view.buffer->lines[0];
-                              int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
-                              if(end_of_number > app->input_view.buffer->lines[0]){
-                                   // if the command entered was a number, go to that line
-                                   if(line_number >= 0 && line_number < view->buffer->line_count){
-                                        view->cursor.y = line_number - 1;
-                                        view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
-                                        ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
-                                                              app->config_options.vertical_scroll_off,
-                                                              app->config_options.tab_width);
-                                   }
-                              }else{
-                                   ce_app_apply_completion(app);
-
-                                   // convert and run the command
-                                   CeCommand_t command = {};
-                                   if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
-                                        ce_log("failed to parse command: '%s'\n", app->input_view.buffer->lines[0]);
-                                   }else{
-                                        CeCommandFunc_t* command_func = NULL;
-                                        CeCommandEntry_t* entry = NULL;
-                                        for(int64_t i = 0; i < app->command_entry_count; i++){
-                                             entry = app->command_entries + i;
-                                             if(strcmp(entry->name, command.name) == 0){
-                                                  command_func = entry->func;
-                                                  break;
-                                             }
-                                        }
-
-                                        if(command_func){
-                                             exit_input_mode(app);
-                                             CeCommandStatus_t cs = command_func(&command, app);
-                                             switch(cs){
-                                             default:
-                                                  break;
-                                             case CE_COMMAND_PRINT_HELP:
-                                                  ce_app_message(app, "%s: %s", entry->name, entry->description);
-                                                  break;
-                                             }
-                                             ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
-                                        }else{
-                                             ce_app_message(app, "unknown command: '%s'", command.name);
-                                        }
-                                   }
-                              }
                          }else if(strcmp(app->input_view.buffer->name, "EDIT YANK") == 0){
                               CeVimYank_t* yank = app->vim.yanks + app->edit_register;
                               CeVimYankType_t yank_type = yank->type;
@@ -1223,6 +1177,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                ce_history_reset_current(&app->command_history);
                ce_history_reset_current(&app->search_history);
                exit_input_mode(app);
+               app->input_complete_func = NULL;
 
                CeComplete_t* complete = ce_app_is_completing(app);
                if(complete) ce_complete_reset(complete);
@@ -1257,9 +1212,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }
 
           if(app->input_mode){
-               if(strcmp(app->input_view.buffer->name, "COMMAND") == 0 && app->input_view.buffer->line_count){
-                    handle_input_history_key(key, &app->command_history, app->input_view.buffer, &app->input_view.cursor);
-               }else if((strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
+               if((strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
                          strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
                          strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
                          strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0) && app->input_view.buffer->line_count){
@@ -1271,10 +1224,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &buffer_data->vim, &app->config_options);
 
                if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count){
-                    if(strcmp(app->input_view.buffer->name, "COMMAND") == 0){
-                         ce_complete_match(&app->command_complete, app->input_view.buffer->lines[0]);
-                         build_complete_list(app->complete_list_buffer, &app->command_complete);
-                    }else if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
+                    if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
                          char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                          complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
                          free(base_directory);
@@ -1285,6 +1235,11 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
                }
           }else if(app->input_complete_func){
+               // TODO: how are we going to let this be supported through customization
+               if(app->input_complete_func == command_input_complete_func && app->input_view.buffer->line_count){
+                    handle_input_history_key(key, &app->command_history, app->input_view.buffer, &app->input_view.cursor);
+               }
+
                CeAppBufferData_t* buffer_data = app->input_view.buffer->app_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &buffer_data->vim, &app->config_options);
 

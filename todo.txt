@@ -10,6 +10,7 @@ todo:
   - completion
   - status bar
   - key handler ?
+- check if file has been modified since we last loaded it
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
@@ -18,3 +19,6 @@ bug:
 - TERM=xterm-256color needs to be set to view ce correctly
 - sometimes the arrow keys are broken in the terminal on rhel6, not sure how to reproduce, but sometimes they work also?
 - can't pick 'q' as a register when recording a macro
+- registers are off by 1 (noticed while pasting)
+- 'v10ld' then '.' doesn't delete 10 characters
+- sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen

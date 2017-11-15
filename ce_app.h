@@ -208,3 +208,5 @@ void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete);
 void ce_app_message(CeApp_t* app, const char* fmt, ...);
 void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input_complete_func);
 bool ce_app_apply_completion(CeApp_t* app);
+
+bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
