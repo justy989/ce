@@ -305,6 +305,12 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
      }
 }
 
+void ce_syntax_highlight_message(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                 CeSyntaxDef_t* syntax_defs, void* user_data){
+     CeConfigOptions_t* config_options = user_data;
+     ce_draw_color_list_insert(draw_color_list, config_options->message_fg_color, config_options->message_bg_color, (CePoint_t){0, 0});
+}
+
 void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
      if(jump_list->count < JUMP_LIST_DESTINATION_COUNT){
           if(jump_list->count > 0){
@@ -444,6 +450,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
      free(input_view->buffer->app_data);
      bool success = ce_buffer_alloc(input_view->buffer, 1, dialogue);
      input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     input_view->buffer->no_line_numbers = true;
      input_view->cursor = (CePoint_t){0, 0};
      vim->mode = CE_VIM_MODE_INSERT;
      ce_rune_node_free(&vim->insert_rune_head);
@@ -1031,4 +1038,9 @@ void ce_app_message(CeApp_t* app, const char* fmt, ...){
 
      ce_buffer_insert_string(app->message_view.buffer, message_buffer, app->message_view.cursor);
      app->message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
+     app->message_view.buffer->no_line_numbers = true;
+
+     CeAppBufferData_t* buffer_data = app->message_view.buffer->app_data;
+     buffer_data->syntax_function = ce_syntax_highlight_message;
+     app->message_view.buffer->syntax_data = &app->config_options;
 }

@@ -655,8 +655,25 @@ void draw(CeApp_t* app){
 
      if(app->message_mode){
           CeDrawColorList_t draw_color_list = {};
+          CeRangeList_t range_list = {};
+          CeAppBufferData_t* buffer_data = app->message_view.buffer->app_data;
+          buffer_data->syntax_function(&app->message_view, &range_list, &draw_color_list, app->syntax_defs,
+                                       app->message_view.buffer->syntax_data);
+          ce_range_list_free(&range_list);
+
           draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
                     &color_defs, app->syntax_defs);
+
+          // set the specified background
+          int message_len = ce_utf8_strlen(app->message_view.buffer->lines[0]);
+          int color_pair = ce_color_def_get(&color_defs, app->config_options.message_fg_color, app->config_options.message_bg_color);
+          attron(COLOR_PAIR(color_pair));
+          int64_t view_width = ce_view_width(&app->message_view);
+          move(app->message_view.rect.top, app->message_view.rect.left + message_len);
+          for(int i = message_len; i < view_width; i++){
+               addch(' ');
+          }
+
      }
 
      // show border when non view is selected
@@ -1662,7 +1679,7 @@ int main(int argc, char** argv){
                syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].fg = COLOR_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = COLOR_BLACK;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = COLOR_YELLOW;
                syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = COLOR_BRIGHT_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = COLOR_DEFAULT;
@@ -1670,6 +1687,8 @@ int main(int argc, char** argv){
 
                app.config_options.ui_fg_color = COLOR_BLACK;
                app.config_options.ui_bg_color = COLOR_WHITE;
+               app.config_options.message_fg_color = COLOR_BLUE;
+               app.config_options.message_bg_color = COLOR_WHITE;
 
                app.syntax_defs = syntax_defs;
           }

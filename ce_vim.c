@@ -3047,7 +3047,7 @@ bool ce_vim_verb_z_command(CeVim_t* vim, const CeVimAction_t* action, CeRange_t 
 
 bool ce_vim_verb_g_command(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                            CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
-     if(action->multiplier){
+     if(action->multiplier > 1){
           if(action->multiplier > view->buffer->line_count) return false;
           view->cursor.y = action->multiplier - 1;
           view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);

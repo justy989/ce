@@ -158,6 +158,8 @@ void ce_syntax_highlight_terminal(CeView_t* view, CeRangeList_t* highlight_range
                                   CeSyntaxDef_t* syntax_defs, void* user_data);
 void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
                                      CeSyntaxDef_t* syntax_defs, void* user_data);
+void ce_syntax_highlight_message(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
+                                 CeSyntaxDef_t* syntax_defs, void* user_data);
 
 void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination);
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list);
