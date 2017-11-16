@@ -934,7 +934,7 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
 
 void ce_app_init_default_commands(CeApp_t* app){
      CeCommandEntry_t command_entries[] = {
-          {command_buffer_type, "buffer_type", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
+          {command_blank, "blank", "empty command"},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
@@ -971,6 +971,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
+          {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
