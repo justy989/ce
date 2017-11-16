@@ -86,7 +86,7 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
      for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           CeVimYank_t* yank = yanks + i;
           if(yank->text == NULL) continue;
-          char reg = i + '!';
+          char reg = i + ' ';
           const char* yank_type = "string";
           switch(yank->type){
           default:
@@ -198,8 +198,8 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeDrawColorList_t* draw_color_list,
-               CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
+void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeVisualLineDisplayType_t visual_line_display_type,
+               CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
      int64_t view_width = ce_view_width(view);
      int64_t view_height = ce_view_height(view);
      int64_t row_min = view->scroll.y;
@@ -256,6 +256,9 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                     int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
                     int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
                     attron(COLOR_PAIR(change_color_pair));
+               }else if(draw_color_node && ce_point_after((CePoint_t){index, y + view->scroll.y}, draw_color_node->point)){
+                    int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, draw_color_node->bg);
+                    attron(COLOR_PAIR(change_color_pair));
                }
 
                if(line_index < view->buffer->line_count){
@@ -266,6 +269,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
 
                          // check if we need to move to the next color
                          while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
+
                               int bg = draw_color_node->bg;
                               if(bg == COLOR_DEFAULT && real_y == view->cursor.y){
                                    bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, bg);
@@ -305,13 +309,26 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                }
 
                if(x < col_min) x = col_min;
-               standend();
-               if(real_y == view->cursor.y){
-                    int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
-                    int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
-                    attron(COLOR_PAIR(change_color_pair));
+               switch(visual_line_display_type){
+               default:
+                    break;
+               case CE_VISUAL_LINE_DISPLAY_TYPE_FULL_LINE:
+                    for(; x <= col_max; x++) addch(' ');
+                    break;
+               case CE_VISUAL_LINE_DISPLAY_TYPE_INCLUDE_NEWLINE:
+                    addch(' ');
+                    x++;
+               // intentional fall through
+               case CE_VISUAL_LINE_DISPLAY_TYPE_EXCLUDE_NEWLINE:
+                    standend();
+                    if(real_y == view->cursor.y){
+                         int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
+                         int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
+                         attron(COLOR_PAIR(change_color_pair));
+                    }
+                    for(; x <= col_max; x++) addch(' ');
+                    break;
                }
-               for(; x <= col_max; x++) addch(' ');
           }
      }else{
           standend();
@@ -391,9 +408,10 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminalList_t* terminal_list, CeBuffer_t* input_buffer,
-                 CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number, CeLayout_t* current,
-                 CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search, int ui_fg_color, int ui_bg_color){
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminalList_t* terminal_list,
+                 CeBuffer_t* input_buffer, CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number,
+                 CeVisualLineDisplayType_t visual_line_display_type, CeLayout_t* current, CeSyntaxDef_t* syntax_defs,
+                 int64_t terminal_width, bool highlight_search, int ui_fg_color, int ui_bg_color){
      switch(layout->type){
      default:
           break;
@@ -424,7 +442,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                          CeRange_t range = {vim->visual, layout->view.cursor};
                          ce_range_sort(&range);
                          range.start.x = 0;
-                         range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]);
+                         range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]) + 1;
                          ce_range_list_insert(&range_list, range.start, range.end);
                     } break;
                     case CE_VIM_MODE_VISUAL_BLOCK:
@@ -523,7 +541,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                ce_range_list_free(&range_list);
           }
 
-          draw_view(&layout->view, tab_width, line_number, &draw_color_list, color_defs, syntax_defs);
+          draw_view(&layout->view, tab_width, line_number, visual_line_display_type, &draw_color_list, color_defs, syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, macros, color_defs, 0, ui_fg_color, ui_bg_color);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
@@ -538,13 +556,13 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
                draw_layout(layout->list.layouts[i], vim, macros, terminal_list, input_buffer, color_defs, tab_width,
-                           line_number, current, syntax_defs, terminal_width, highlight_search, ui_fg_color,
-                           ui_bg_color);
+                           line_number, visual_line_display_type, current, syntax_defs, terminal_width, highlight_search,
+                           ui_fg_color, ui_bg_color);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
           draw_layout(layout->tab.root, vim, macros, terminal_list, input_buffer, color_defs, tab_width, line_number,
-                      current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
+                      visual_line_display_type, current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
           break;
      }
 }
@@ -600,14 +618,15 @@ void draw(CeApp_t* app){
      }
 
      standend();
-     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs, app->config_options.tab_width,
-                 app->config_options.line_number, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
+     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs,
+                 app->config_options.tab_width, app->config_options.line_number, app->config_options.visual_line_display_type,
+                 tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
                  app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
 
      if(app->input_mode){
           CeDrawColorList_t draw_color_list = {};
-          draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
-                    &color_defs, app->syntax_defs);
+          draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number,
+                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
           draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0, app->config_options.ui_fg_color,
                            app->config_options.ui_bg_color);
@@ -644,8 +663,8 @@ void draw(CeApp_t* app){
           buffer_data->syntax_function(&app->complete_view, &range_list, &draw_color_list, app->syntax_defs,
                                        app->complete_view.buffer->syntax_data);
           ce_range_list_free(&range_list);
-          draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
-                    &color_defs, app->syntax_defs);
+          draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number,
+                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
           if(app->input_mode){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
                draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
@@ -661,8 +680,8 @@ void draw(CeApp_t* app){
                                        app->message_view.buffer->syntax_data);
           ce_range_list_free(&range_list);
 
-          draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number, &draw_color_list,
-                    &color_defs, app->syntax_defs);
+          draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number,
+                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
 
           // set the specified background
           int message_len = ce_utf8_strlen(app->message_view.buffer->lines[0]);
@@ -836,14 +855,14 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
         app->vim.mode != CE_VIM_MODE_INSERT &&
         app->vim.mode != CE_VIM_MODE_REPLACE){
           if(key == 'q' && !app->replay_macro){ // TODO: make configurable
-               if(ce_macros_is_recording(&app->macros)){
+               if(app->record_macro && ce_macros_is_recording(&app->macros)){
                     ce_macros_end_recording(&app->macros);
                     app->record_macro = false;
-               }else{
+                    return;
+               }else if(!app->record_macro){
                     app->record_macro = true;
+                    return;
                }
-
-               return;
           }
 
           if(key == '@' && !app->record_macro && !app->replay_macro){
@@ -1069,8 +1088,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          free(macro_string);
                     }
                }else if(app->input_mode){
+                    apply_completion(app, view);
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                         apply_completion(app, view);
                          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
                               char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                               char filepath[PATH_MAX];
@@ -1150,6 +1169,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                                   break;
                                              }
                                              ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
+                                             return;
                                         }else{
                                              ce_app_message(app, "unknown command: '%s'", command.name);
                                         }
@@ -1551,6 +1571,7 @@ int main(int argc, char** argv){
           cbreak();
           noecho();
           raw();
+          set_escdelay(0);
 
           if(has_colors() == FALSE){
                printf("Your terminal doesn't support colors. what year do you live in?\n");
@@ -1615,28 +1636,28 @@ int main(int argc, char** argv){
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
-               {{'\\', 'q'}, "quit"},
-               {{23, 'h'}, "select_adjacent_layout left"}, // ctrl w
-               {{23, 'l'}, "select_adjacent_layout right"}, // ctrl w
-               {{23, 'k'}, "select_adjacent_layout up"}, // ctrl w
-               {{23, 'j'}, "select_adjacent_layout down"}, // ctrl w
-               {{19}, "save_buffer"}, // ctrl s
-               {{'\\', 'b'}, "show_buffers"},
-               {{6}, "load_file"}, // ctrl f
-               {{'/'}, "search forward"},
-               {{'?'}, "search backward"},
-               {{':'}, "command"},
-               {{'g', 't'}, "select_adjacent_tab right"},
-               {{'g', 'T'}, "select_adjacent_tab left"},
-               {{'\\', '/'}, "regex_search forward"},
-               {{'\\', '?'}, "regex_search backward"},
-               {{'g', 'r'}, "redraw"},
-               {{'\\', 'f'}, "reload_file"},
-               {{2}, "switch_buffer"}, // ctrl b
-               {{9}, "jump_list previous"}, // ctrl + o
-               {{15}, "jump_list next"}, // ctrl + i
-               {{'K'}, "man_page_on_word_under_cursor"},
-               {{'Z', 'Z'}, "wq"},
+               {{'\\', 'q'},             "quit"},
+               {{ce_ctrl_key('w'), 'h'}, "select_adjacent_layout left"},
+               {{ce_ctrl_key('w'), 'l'}, "select_adjacent_layout right"},
+               {{ce_ctrl_key('w'), 'k'}, "select_adjacent_layout up"},
+               {{ce_ctrl_key('w'), 'j'}, "select_adjacent_layout down"},
+               {{ce_ctrl_key('s')},      "save_buffer"},
+               {{'\\', 'b'},             "show_buffers"},
+               {{ce_ctrl_key('f')},      "load_file"},
+               {{'/'},                   "search forward"},
+               {{'?'},                   "search backward"},
+               {{':'},                   "command"},
+               {{'g', 't'},              "select_adjacent_tab right"},
+               {{'g', 'T'},              "select_adjacent_tab left"},
+               {{'\\', '/'},             "regex_search forward"},
+               {{'\\', '?'},             "regex_search backward"},
+               {{'g', 'r'},              "redraw"},
+               {{'\\', 'f'},             "reload_file"},
+               {{ce_ctrl_key('b')},      "switch_buffer"},
+               {{ce_ctrl_key('o')},      "jump_list previous"},
+               {{ce_ctrl_key('i')},      "jump_list next"},
+               {{'K'},                   "man_page_on_word_under_cursor"},
+               {{'Z', 'Z'},              "wq"},
           };
 
           ce_convert_bind_defs(&app.key_binds, normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
@@ -1866,11 +1887,13 @@ int main(int argc, char** argv){
                     }else{
                          app.buffer_node_head = itr->next;
                     }
-                    free(itr);
-                    break;
-               }
 
-               itr = itr->next;
+                    CeBufferNode_t* tmp = itr;
+                    itr = itr->next;
+                    free(tmp);
+               }else{
+                    itr = itr->next;
+               }
           }
      }
 

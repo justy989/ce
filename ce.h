@@ -1,6 +1,5 @@
 #pragma once
 
-
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -117,6 +116,12 @@ typedef struct{
      void* user_data;
 }CeView_t;
 
+typedef enum{
+     CE_VISUAL_LINE_DISPLAY_TYPE_FULL_LINE, // emacs style
+     CE_VISUAL_LINE_DISPLAY_TYPE_INCLUDE_NEWLINE, // vim style
+     CE_VISUAL_LINE_DISPLAY_TYPE_EXCLUDE_NEWLINE, // worst style
+}CeVisualLineDisplayType_t;
+
 typedef struct{
      CeLineNumber_t line_number;
      int64_t tab_width;
@@ -124,6 +129,7 @@ typedef struct{
      int64_t vertical_scroll_off;
      int64_t terminal_scroll_back;
      bool insert_spaces_on_tab;
+     CeVisualLineDisplayType_t visual_line_display_type;
      int ui_fg_color;
      int ui_bg_color;
      int64_t completion_line_limit;
@@ -231,6 +237,8 @@ bool ce_range_sort(CeRange_t* range);
 
 int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_line_count, int64_t view_top, int64_t view_bottom);
 int64_t ce_count_digits(int64_t n);
+
+CeRune_t ce_ctrl_key(char ch);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;

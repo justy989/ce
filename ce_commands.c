@@ -25,6 +25,12 @@ static bool get_command_context(CeApp_t* app, CommandContext_t* command_context)
      return true;
 }
 
+CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data){
+     (void)(command);
+     (void)(user_data);
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
@@ -764,6 +770,8 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
+     if(!app->user_config.handle) return CE_COMMAND_NO_ACTION;
+
      if(app->command_entries) free(app->command_entries);
      ce_app_init_default_commands(app);
      char* config_path = strdup(app->user_config.filepath);
@@ -779,7 +787,7 @@ CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_syntax(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;

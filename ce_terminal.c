@@ -220,6 +220,7 @@ static void terminal_move_cursor_to(CeTerminal_t* terminal, int x, int y){
      terminal->cursor.x = CE_CLAMP(x, 0, terminal->columns - 1);
      terminal->cursor.y = CE_CLAMP(y, min_y, max_y);
 }
+
 static void terminal_move_cursor_to_absolute(CeTerminal_t* terminal, int x, int y){
      terminal_move_cursor_to(terminal, x, y + ((terminal->cursor.state & CE_TERMINAL_CURSOR_STATE_ORIGIN) ? terminal->top : 0));
 }
@@ -1312,8 +1313,7 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
      }
 }
 
-static void* tty_reader(void* data)
-{
+static void* tty_reader(void* data){
      CeTerminal_t* terminal = (CeTerminal_t*)(data);
 
      char buffer[BUFSIZ];

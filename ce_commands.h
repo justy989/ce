@@ -4,6 +4,7 @@
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
 
+CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data);
@@ -35,7 +36,7 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_syntax(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data);
