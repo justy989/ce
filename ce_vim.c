@@ -499,7 +499,7 @@ VIM_PARSE_CONTINUE:
 
      // parse multiplier
      if(result != CE_VIM_PARSE_COMPLETE){
-          if(vim_mode_is_visual(vim_mode)){
+          if(vim_mode_is_visual(vim_mode) && multiplier == 0){
                build_action.motion.function = &ce_vim_motion_visual;
                result = CE_VIM_PARSE_COMPLETE;
           }else{
