@@ -113,9 +113,6 @@ typedef struct CeApp_t{
      CeBuffer_t* jump_list_buffer;
      CeBuffer_t* last_goto_buffer;
      CeComplete_t input_complete;
-     CeComplete_t command_complete;
-     CeComplete_t load_file_complete;
-     CeComplete_t switch_buffer_complete;
      CeHistory_t command_history;
      CeHistory_t search_history;
      CeKeyBinds_t key_binds;

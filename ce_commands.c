@@ -317,9 +317,9 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
           ce_app_input(app, "Load File", load_file_input_complete_func);
 
           char* base_directory = buffer_base_directory(command_context.view->buffer, &app->terminal_list);
-          complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
+          complete_files(&app->input_complete, app->input_view.buffer->lines[0], base_directory);
           free(base_directory);
-          build_complete_list(app->complete_list_buffer, &app->load_file_complete);
+          build_complete_list(app->complete_list_buffer, &app->input_complete);
      }
 
      return CE_COMMAND_SUCCESS;
@@ -797,7 +797,6 @@ CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      user_config_free(&app->user_config);
      if(user_config_init(&app->user_config, config_path)){
           app->user_config.init_func(app);
-          ce_app_init_command_completion(app, &app->command_complete);
      }else{
           ce_app_message(app, "failed to reload config: '%s', see log for details", config_path);
           return CE_COMMAND_FAILURE;

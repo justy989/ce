@@ -174,7 +174,7 @@ void ce_app_update_terminal_view(CeApp_t* app){
 }
 
 CeComplete_t* ce_app_is_completing(CeApp_t* app){
-     if(app->input_complete_func) return &app->input_complete;
+     if(app->input_complete_func && app->input_complete.count) return &app->input_complete;
      return NULL;
 }
 
@@ -1196,12 +1196,7 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
      CeView_t* view = &tab_layout->tab.current->view;
 
-     // TODO: do we still need this first part?
      char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
-     complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
-     free(base_directory);
-     build_complete_list(app->complete_list_buffer, &app->load_file_complete);
-
      char filepath[PATH_MAX];
      for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
           if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
@@ -1211,7 +1206,7 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
           }
           if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                   true, filepath)){
-               ce_app_message(app, "failed to load file %s: '%s'", filepath, strerror(errno));
+               ce_app_message(app, "failed to load file '%s': '%s'", filepath, strerror(errno));
                return false;
           }
      }
