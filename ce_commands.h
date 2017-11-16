@@ -3,6 +3,7 @@
 #include "ce_app.h"
 
 #define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
+#define TERMINALS_STILL_RUNNING_DIALOGUE "TERMINALS STILL RUNNING, QUIT? [Y/N]"
 
 CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data);

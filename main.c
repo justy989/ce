@@ -1217,7 +1217,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    }
                                    itr = itr->next;
                               }
-                         }else if(strcmp(app->input_view.buffer->name, UNSAVED_BUFFERS_DIALOGUE) == 0){
+                         }else if(strcmp(app->input_view.buffer->name, UNSAVED_BUFFERS_DIALOGUE) == 0 ||
+                                  strcmp(app->input_view.buffer->name, TERMINALS_STILL_RUNNING_DIALOGUE) == 0){
                               if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
                                  strcmp(app->input_view.buffer->lines[0], "Y") == 0){
                                    app->quit = true;
