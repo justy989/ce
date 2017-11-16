@@ -356,6 +356,8 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      CeAppViewData_t* view_data = view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
 
+     if(view_data->prev_buffer != view->buffer) view_data->prev_buffer = view->buffer;
+
      // if the old buffer is not in the jump list, then add it
      if(insert_into_jump_list){
           bool add_current = false;
@@ -397,6 +399,34 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      }
 
      vim->mode = CE_VIM_MODE_NORMAL;
+}
+
+bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted){
+     CeAppViewData_t* view_data = view->user_data;
+     if(!view_data->prev_buffer) return false;
+
+     bool deleted = true;
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(itr->buffer == view_data->prev_buffer){
+               deleted = false;
+               break;
+          }
+          itr = itr->next;
+     }
+
+     if(deleted){
+          if(switch_if_deleted){
+               view_data->prev_buffer = app->buffer_node_head->buffer;
+          }else{
+               view_data->prev_buffer = NULL;
+               return false;
+          }
+     }
+
+     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, true);
+
+     return true;
 }
 
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command){
@@ -866,7 +896,7 @@ CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* t
      CeTerminalNode_t* itr = terminal_list->head;
      while(itr){
           if(buffer == itr->terminal.lines_buffer || buffer == itr->terminal.alternate_lines_buffer){
-             return &itr->terminal;
+               return &itr->terminal;
           }
           itr = itr->next;
      }
@@ -940,6 +970,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
           {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
+          {command_goto_prev_buffer_in_view, "goto_prev_buffer_in_view", "go to the previous buffer that was shown in the current view"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_load_file, "load_file", "load a file (optionally specified)"},

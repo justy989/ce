@@ -1326,6 +1326,7 @@ static void* tty_reader(void* data){
 
           if(rc < 0){
                ce_log("%s() failed to read from tty file descriptor: '%s'\n", __FUNCTION__, strerror(errno));
+               terminal->killed = true;
                return NULL;
           }else if(rc > 0){
                buffer_length = rc;
