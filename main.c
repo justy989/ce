@@ -1053,7 +1053,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     key = CE_NEWLINE;
                }
           }else if(key == CE_TAB){ // TODO: configure auto complete key?
-               if(ce_app_apply_completion(app)) return;
                // TODO: compress with above "Load File" match
                if(app->input_complete_func == load_file_input_complete_func){
                     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
@@ -1061,6 +1060,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     free(base_directory);
                     build_complete_list(app->complete_list_buffer, &app->input_complete);
                }
+               if(ce_app_apply_completion(app)) return;
           }else if(key == 14){ // ctrl + n
                CeComplete_t* complete = ce_app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
