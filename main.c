@@ -1636,28 +1636,28 @@ int main(int argc, char** argv){
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
-               {{'\\', 'q'}, "quit"},
-               {{23, 'h'}, "select_adjacent_layout left"}, // ctrl w
-               {{23, 'l'}, "select_adjacent_layout right"}, // ctrl w
-               {{23, 'k'}, "select_adjacent_layout up"}, // ctrl w
-               {{23, 'j'}, "select_adjacent_layout down"}, // ctrl w
-               {{19}, "save_buffer"}, // ctrl s
-               {{'\\', 'b'}, "show_buffers"},
-               {{6}, "load_file"}, // ctrl f
-               {{'/'}, "search forward"},
-               {{'?'}, "search backward"},
-               {{':'}, "command"},
-               {{'g', 't'}, "select_adjacent_tab right"},
-               {{'g', 'T'}, "select_adjacent_tab left"},
-               {{'\\', '/'}, "regex_search forward"},
-               {{'\\', '?'}, "regex_search backward"},
-               {{'g', 'r'}, "redraw"},
-               {{'\\', 'f'}, "reload_file"},
-               {{2}, "switch_buffer"}, // ctrl b
-               {{9}, "jump_list previous"}, // ctrl + o
-               {{15}, "jump_list next"}, // ctrl + i
-               {{'K'}, "man_page_on_word_under_cursor"},
-               {{'Z', 'Z'}, "wq"},
+               {{'\\', 'q'},             "quit"},
+               {{ce_ctrl_key('w'), 'h'}, "select_adjacent_layout left"},
+               {{ce_ctrl_key('w'), 'l'}, "select_adjacent_layout right"},
+               {{ce_ctrl_key('w'), 'k'}, "select_adjacent_layout up"},
+               {{ce_ctrl_key('w'), 'j'}, "select_adjacent_layout down"},
+               {{ce_ctrl_key('s')},      "save_buffer"},
+               {{'\\', 'b'},             "show_buffers"},
+               {{ce_ctrl_key('f')},      "load_file"},
+               {{'/'},                   "search forward"},
+               {{'?'},                   "search backward"},
+               {{':'},                   "command"},
+               {{'g', 't'},              "select_adjacent_tab right"},
+               {{'g', 'T'},              "select_adjacent_tab left"},
+               {{'\\', '/'},             "regex_search forward"},
+               {{'\\', '?'},             "regex_search backward"},
+               {{'g', 'r'},              "redraw"},
+               {{'\\', 'f'},             "reload_file"},
+               {{ce_ctrl_key('b')},      "switch_buffer"},
+               {{ce_ctrl_key('o')},      "jump_list previous"},
+               {{ce_ctrl_key('i')},      "jump_list next"},
+               {{'K'},                   "man_page_on_word_under_cursor"},
+               {{'Z', 'Z'},              "wq"},
           };
 
           ce_convert_bind_defs(&app.key_binds, normal_mode_bind_defs, sizeof(normal_mode_bind_defs) / sizeof(normal_mode_bind_defs[0]));
