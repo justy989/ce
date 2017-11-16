@@ -722,6 +722,23 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_goto_prev_buffer_in_view(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CommandContext_t command_context = {};
+
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     CeAppViewData_t* view_data = command_context.view->user_data;
+     if(!view_data->prev_buffer) return CE_COMMAND_NO_ACTION;
+
+     ce_view_switch_buffer(command_context.view, view_data->prev_buffer, &app->vim, &app->config_options,
+                           true);
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;

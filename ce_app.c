@@ -356,6 +356,8 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      CeAppViewData_t* view_data = view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
 
+     if(view_data->prev_buffer != view->buffer) view_data->prev_buffer = view->buffer;
+
      // if the old buffer is not in the jump list, then add it
      if(insert_into_jump_list){
           bool add_current = false;
@@ -940,6 +942,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
           {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
+          {command_goto_prev_buffer_in_view, "goto_prev_buffer_in_view", "go to the previous buffer that was shown in the current view"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_load_file, "load_file", "load a file (optionally specified)"},

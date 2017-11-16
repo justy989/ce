@@ -60,6 +60,7 @@ typedef struct{
 
 typedef struct{
      CeJumpList_t jump_list;
+     CeBuffer_t* prev_buffer;
 }CeAppViewData_t;
 
 struct CeApp_t;

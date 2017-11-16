@@ -33,6 +33,7 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_goto_next_destination(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_goto_prev_buffer_in_view(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data);

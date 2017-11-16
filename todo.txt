@@ -10,7 +10,7 @@ todo:
   - completion
   - status bar
   - key handler ?
-- resurrect a terminal that has died
+- resurrect a terminal that has died? or delete that buffer
 - put log and backup files, and session info in ~/.ce
 - vim :sort
 - add 'c-mode' as an alias command for 'syntax c' as well as others
