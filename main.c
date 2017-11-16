@@ -1069,8 +1069,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          free(macro_string);
                     }
                }else if(app->input_mode){
+                    apply_completion(app, view);
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                         apply_completion(app, view);
                          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
                               char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                               char filepath[PATH_MAX];
@@ -1150,6 +1150,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                                   break;
                                              }
                                              ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
+                                             return;
                                         }else{
                                              ce_app_message(app, "unknown command: '%s'", command.name);
                                         }
