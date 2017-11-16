@@ -131,6 +131,7 @@ bool ce_vim_free(CeVim_t* vim){
      for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           ce_vim_yank_free(vim->yanks + i);
      }
+     ce_rune_node_free(&vim->insert_rune_head);
      return true;
 }
 

@@ -126,7 +126,12 @@ void ce_buffer_free(CeBuffer_t* buffer){
 
      free(buffer->lines);
      free(buffer->name);
-     if(buffer->change_node) ce_buffer_change_node_free(&buffer->change_node);
+
+     if(buffer->change_node){
+          CeBufferChangeNode_t* head = buffer->change_node;
+          while(head->prev) head = head->prev;
+          ce_buffer_change_node_free(&head);
+     }
 
      memset(buffer, 0, sizeof(*buffer));
 }
