@@ -891,6 +891,7 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
      CeAppViewData_t* view_data = command_context.view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
 
+     // TODO: I think these names are backwards ?
      if(strcmp(command->args[0].string, "next")){
           // ignore destinations on screen
           while((destination = ce_jump_list_next(jump_list))){
