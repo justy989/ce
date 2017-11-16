@@ -15,6 +15,7 @@ todo:
 - '`' is the same as '''
 - put log and backup files, and session info in ~/.ce
 - rename 'buffer_type' to 'syntax', 'buffer_mode', 'c-mode', idk
+- vim :sort
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
