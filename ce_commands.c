@@ -480,6 +480,7 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
+     app->highlight_search = true;
      return CE_COMMAND_SUCCESS;
 }
 
