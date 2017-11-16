@@ -50,8 +50,10 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      }
 
      if(unsaved_buffers){
+          ce_view_switch_buffer(command_context.view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
           app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, UNSAVED_BUFFERS_DIALOGUE);
      }else if(app->terminal_list.head){
+          ce_view_switch_buffer(command_context.view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
           app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, TERMINALS_STILL_RUNNING_DIALOGUE);
      }else{
           app->quit = true;
