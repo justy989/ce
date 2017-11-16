@@ -105,6 +105,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 's', &ce_vim_parse_verb_substitute_character);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'S', &ce_vim_parse_verb_substitute_soft_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'y', &ce_vim_parse_verb_yank);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'Y', &ce_vim_parse_verb_yank_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '"', &ce_vim_parse_select_yank_register);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'P', &ce_vim_parse_verb_paste_before);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'p', &ce_vim_parse_verb_paste_after);
@@ -1850,7 +1851,16 @@ CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
 
      action->verb.function = &ce_vim_verb_yank;
      if(action->verb.integer == 0) action->verb.integer = '"';
+
      return CE_VIM_PARSE_IN_PROGRESS;
+}
+
+CeVimParseResult_t ce_vim_parse_verb_yank_line(CeVimAction_t* action, CeRune_t key){
+     action->verb.function = &ce_vim_verb_yank;
+     action->motion.function = &ce_vim_motion_entire_line;
+     if(action->verb.integer == 0) action->verb.integer = '"';
+     action->yank_type = CE_VIM_YANK_TYPE_LINE;
+     return CE_VIM_PARSE_COMPLETE;
 }
 
 CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key){

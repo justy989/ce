@@ -86,7 +86,7 @@ static void build_yank_list(CeBuffer_t* buffer, CeVimYank_t* yanks){
      for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           CeVimYank_t* yank = yanks + i;
           if(yank->text == NULL) continue;
-          char reg = i + '!';
+          char reg = i + ' ';
           const char* yank_type = "string";
           switch(yank->type){
           default:
@@ -836,14 +836,14 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
         app->vim.mode != CE_VIM_MODE_INSERT &&
         app->vim.mode != CE_VIM_MODE_REPLACE){
           if(key == 'q' && !app->replay_macro){ // TODO: make configurable
-               if(ce_macros_is_recording(&app->macros)){
+               if(app->record_macro && ce_macros_is_recording(&app->macros)){
                     ce_macros_end_recording(&app->macros);
                     app->record_macro = false;
-               }else{
+                    return;
+               }else if(!app->record_macro){
                     app->record_macro = true;
+                    return;
                }
-
-               return;
           }
 
           if(key == '@' && !app->record_macro && !app->replay_macro){

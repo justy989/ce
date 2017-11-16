@@ -21,5 +21,4 @@ bug:
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - what is home key doing? It seems like it's sending '5~'
 - TERM=xterm-256color needs to be set to view ce correctly
-- sometimes the arrow keys are broken in the terminal on rhel6, not sure how to reproduce, but sometimes they work also?
-- can't pick 'q' as a register when recording a macro
+- sometimes arrow keys get broken in the terminal, maybe it happens outside the terminal too, unsure
