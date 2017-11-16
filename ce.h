@@ -136,6 +136,9 @@ typedef struct{
      uint64_t message_display_time_usec;
      int message_fg_color;
      int message_bg_color;
+     int apply_completion_key;
+     int cycle_next_completion_key;
+     int cycle_prev_completion_key;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{

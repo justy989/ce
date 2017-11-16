@@ -1100,9 +1100,14 @@ bool ce_app_apply_completion(CeApp_t* app){
      CeComplete_t* complete = ce_app_is_completing(app);
      if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
           if(complete->current >= 0){
-               if(strcmp(complete->elements[complete->current].string, app->input_view.buffer->lines[app->input_view.cursor.y]) == 0){
+               int64_t completion_len = strlen(complete->elements[complete->current].string);
+               int64_t input_len = strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
+               int64_t input_offset = 0;
+               if(input_len > completion_len) input_offset = input_len - completion_len;
+               if(strcmp(complete->elements[complete->current].string, app->input_view.buffer->lines[app->input_view.cursor.y] + input_offset) == 0){
                     return false;
                }
+
                char* insertion = strdup(complete->elements[complete->current].string);
                int64_t insertion_len = strlen(insertion);
                CePoint_t delete_point = app->input_view.cursor;

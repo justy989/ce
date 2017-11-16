@@ -1052,7 +1052,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     key = CE_NEWLINE;
                }
-          }else if(key == CE_TAB){ // TODO: configure auto complete key?
+          }else if(key == app->config_options.apply_completion_key){
                // TODO: compress with above "Load File" match
                if(app->input_complete_func == load_file_input_complete_func){
                     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
@@ -1061,14 +1061,14 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     build_complete_list(app->complete_list_buffer, &app->input_complete);
                }
                if(ce_app_apply_completion(app)) return;
-          }else if(key == 14){ // ctrl + n
+          }else if(key == app->config_options.cycle_next_completion_key){
                CeComplete_t* complete = ce_app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
                     ce_complete_next_match(complete);
                     build_complete_list(app->complete_list_buffer, complete);
                     return;
                }
-          }else if(key == 16){ // ctrl + p
+          }else if(key == app->config_options.cycle_prev_completion_key){
                CeComplete_t* complete = ce_app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
                     ce_complete_previous_match(complete);
@@ -1450,6 +1450,9 @@ int main(int argc, char** argv){
           config_options->line_number = CE_LINE_NUMBER_NONE;
           config_options->completion_line_limit = 15;
           config_options->message_display_time_usec = 5000000; // 5 seconds
+          config_options->apply_completion_key = CE_TAB;
+          config_options->cycle_next_completion_key = ce_ctrl_key('n');
+          config_options->cycle_prev_completion_key = ce_ctrl_key('p');
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
