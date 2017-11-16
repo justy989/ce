@@ -95,7 +95,6 @@ typedef struct CeApp_t{
      CeView_t input_view;
      CeView_t message_view;
      CeView_t complete_view;
-     bool input_mode;
      CeInputCompleteFunc* input_complete_func;
      bool message_mode;
      struct timeval message_time;
@@ -210,3 +209,5 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
 bool ce_app_apply_completion(CeApp_t* app);
 
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);

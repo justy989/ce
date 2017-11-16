@@ -15,7 +15,7 @@ typedef struct{
 static bool get_command_context(CeApp_t* app, CommandContext_t* command_context){
      command_context->tab_layout = app->tab_list_layout->tab_list.current;
 
-     if(app->input_mode) return false;
+     if(app->input_complete_func) return false;
 
      if(command_context->tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
           command_context->view = &command_context->tab_layout->tab.current->view;
@@ -44,7 +44,7 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      }
 
      if(unsaved_buffers){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, UNSAVED_BUFFERS_DIALOGUE);
+          ce_app_input(app, UNSAVED_BUFFERS_DIALOGUE, unsaved_buffers_input_complete_func);
      }else{
           app->quit = true;
      }
@@ -128,7 +128,7 @@ CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* use
      if(layout){
           tab_layout->tab.current = layout;
           app->vim.mode = CE_VIM_MODE_NORMAL;
-          app->input_mode = false;
+          app->input_complete_func = NULL;
      }
 
      return CE_COMMAND_SUCCESS;
@@ -256,7 +256,7 @@ static bool delete_layout(CeApp_t* app){
           return false;
      }
 
-     if(app->input_mode) return false;
+     if(app->input_complete_func) return false;
 
      if(!get_view_info_from_tab(tab_layout, &view, &view_rect)){
           return false;

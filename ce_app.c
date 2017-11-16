@@ -173,12 +173,7 @@ void ce_app_update_terminal_view(CeApp_t* app){
 }
 
 CeComplete_t* ce_app_is_completing(CeApp_t* app){
-     if(app->input_mode){
-          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
-          if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0) return &app->switch_buffer_complete;
-     }
      if(app->input_complete_func) return &app->input_complete;
-
      return NULL;
 }
 
@@ -1100,6 +1095,15 @@ bool ce_app_apply_completion(CeApp_t* app){
      return false;
 }
 
+bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
+        strcmp(app->input_view.buffer->lines[0], "Y") == 0){
+          app->quit = true;
+     }
+
+     return true;
+}
+
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
      if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
@@ -1153,3 +1157,32 @@ bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      return true;
 }
 
+bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     // TODO: do we still need this first part?
+     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
+     complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
+     free(base_directory);
+     build_complete_list(app->complete_list_buffer, &app->load_file_complete);
+
+     char filepath[PATH_MAX];
+     for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
+          if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
+               snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
+          }else{
+               strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
+          }
+          if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                  true, filepath)){
+               ce_app_message(app, "failed to load file %s: '%s'", filepath, strerror(errno));
+               return false;
+          }
+     }
+
+     free(base_directory);
+     return true;
+}

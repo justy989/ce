@@ -1031,27 +1031,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                          ce_app_apply_completion(app);
 
-                         if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0){
-                              char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
-                              complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
-                              free(base_directory);
-                              build_complete_list(app->complete_list_buffer, &app->load_file_complete);
-
-                              char filepath[PATH_MAX];
-                              for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-                                   if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
-                                        snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
-                                   }else{
-                                        strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
-                                   }
-                                   if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                                           true, filepath)){
-                                        ce_app_message(app, "failed to load file %s: '%s'", filepath, strerror(errno));
-                                   }
-                              }
-
-                              free(base_directory);
-                         }else if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
+                         if(strcmp(app->input_view.buffer->name, "SEARCH") == 0 ||
                                   strcmp(app->input_view.buffer->name, "REVERSE SEARCH") == 0 ||
                                   strcmp(app->input_view.buffer->name, "REGEX SEARCH") == 0 ||
                                   strcmp(app->input_view.buffer->name, "REGEX REVERSE SEARCH") == 0){
@@ -1114,11 +1094,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                         break;
                                    }
                                    itr = itr->next;
-                              }
-                         }else if(strcmp(app->input_view.buffer->name, UNSAVED_BUFFERS_DIALOGUE) == 0){
-                              if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
-                                 strcmp(app->input_view.buffer->lines[0], "Y") == 0){
-                                   app->quit = true;
                               }
                          }else if(strcmp(app->input_view.buffer->name, "REPLACE ALL") == 0){
                               int64_t index = ce_vim_register_index('/');
