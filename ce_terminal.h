@@ -135,7 +135,6 @@ typedef struct{
      volatile bool ready_to_draw;
      pthread_t thread;
      pid_t pid;
-     bool done;
 }CeTerminal_t;
 
 bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int64_t line_count, const char* buffer_name);
