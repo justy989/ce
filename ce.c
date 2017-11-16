@@ -1750,3 +1750,8 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
 
      return column_width;
 }
+
+CeRune_t ce_ctrl_key(char ch){
+     if(isalpha(ch)) return (ch - 'a') + 1;
+     return CE_UTF8_INVALID;
+}

@@ -79,12 +79,12 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'L', &ce_vim_parse_motion_bottom_of_view);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '}', &ce_vim_parse_motion_next_blank_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '{', &ce_vim_parse_motion_previous_blank_line);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 2, &ce_vim_parse_motion_page_up);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 6, &ce_vim_parse_motion_page_down);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('b'), &ce_vim_parse_motion_page_up);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('f'), &ce_vim_parse_motion_page_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_PPAGE, &ce_vim_parse_motion_page_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_NPAGE, &ce_vim_parse_motion_page_down);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 21, &ce_vim_parse_motion_half_page_up);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 4, &ce_vim_parse_motion_half_page_down);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('u'), &ce_vim_parse_motion_half_page_up);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('d'), &ce_vim_parse_motion_half_page_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '\'', &ce_vim_parse_motion_mark);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'i', &ce_vim_parse_verb_insert_mode);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'R', &ce_vim_parse_verb_replace_mode);
@@ -118,8 +118,8 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'J', &ce_vim_parse_verb_join);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '~', &ce_vim_parse_verb_flip_case);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'm', &ce_vim_parse_verb_set_mark);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 1, &ce_vim_parse_verb_increment_number);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 24, &ce_vim_parse_verb_decrement_number);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('a'), &ce_vim_parse_verb_increment_number);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('x'), &ce_vim_parse_verb_decrement_number);
 
      return true;
 }
