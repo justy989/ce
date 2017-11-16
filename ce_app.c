@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <sys/time.h>
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
@@ -351,6 +352,8 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      CeAppViewData_t* view_data = view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
 
+     if(view_data->prev_buffer != view->buffer) view_data->prev_buffer = view->buffer;
+
      // if the old buffer is not in the jump list, then add it
      if(insert_into_jump_list){
           bool add_current = false;
@@ -392,6 +395,34 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      }
 
      vim->mode = CE_VIM_MODE_NORMAL;
+}
+
+bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted){
+     CeAppViewData_t* view_data = view->user_data;
+     if(!view_data->prev_buffer) return false;
+
+     bool deleted = true;
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(itr->buffer == view_data->prev_buffer){
+               deleted = false;
+               break;
+          }
+          itr = itr->next;
+     }
+
+     if(deleted){
+          if(switch_if_deleted){
+               view_data->prev_buffer = app->buffer_node_head->buffer;
+          }else{
+               view_data->prev_buffer = NULL;
+               return false;
+          }
+     }
+
+     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, true);
+
+     return true;
 }
 
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command){
@@ -861,7 +892,7 @@ CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* t
      CeTerminalNode_t* itr = terminal_list->head;
      while(itr){
           if(buffer == itr->terminal.lines_buffer || buffer == itr->terminal.alternate_lines_buffer){
-             return &itr->terminal;
+               return &itr->terminal;
           }
           itr = itr->next;
      }
@@ -929,57 +960,59 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
 
 void ce_app_init_default_commands(CeApp_t* app){
      CeCommandEntry_t command_entries[] = {
-          {command_quit, "quit", "quit ce"},
-          {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
-          {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
-          {command_save_all_and_quit, "save_all_and_quit", "save all modified buffers and quit the editor"},
-          {command_show_buffers, "show_buffers", "show the list of buffers"},
-          {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
-          {command_show_macros, "show_macros", "show the state of your macros"},
-          {command_show_marks, "show_marks", "show the state of your vim marks"},
-          {command_show_jumps, "show_jumps", "show the state of your jumps"},
-          {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
-          {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
-          {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
-          {command_load_file, "load_file", "load a file (optionally specified)"},
-          {command_new_tab, "new_tab", "create a new tab"},
-          {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
-          {command_search, "search", "interactive search 'forward' or 'backward'"},
-          {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
-          {command_noh, "noh", "turn off search highlighting"},
-          {command_setpaste, "setpaste", "about to paste, so turn off auto indentation"},
-          {command_setnopaste, "setnopaste", "done pasting, so turn on auto indentation again"},
+          {command_blank, "blank", "empty command"},
           {command_command, "command", "interactively send a commmand"},
-          {command_redraw, "redraw", "redraw the entire editor"},
-          {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
-          {command_new_terminal, "new_terminal", "open a new terminal and show it in the current view"},
-          {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
+          {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
           {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
-          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search"},
-          {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
-          {command_reload_config, "reload_config", "reload the config shared object"},
-          {command_buffer_type, "buffer_type", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
-          {command_new_buffer, "new_buffer", "create a new buffer"},
-          {command_rename_buffer, "rename_buffer", "rename the current buffer"},
+          {command_goto_prev_buffer_in_view, "goto_prev_buffer_in_view", "go to the previous buffer that was shown in the current view"},
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
-          {command_terminal_command, "terminal_command", "run a command in the terminal"},
+          {command_load_file, "load_file", "load a file (optionally specified)"},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
+          {command_new_buffer, "new_buffer", "create a new buffer"},
+          {command_new_tab, "new_tab", "create a new tab"},
+          {command_new_terminal, "new_terminal", "open a new terminal and show it in the current view"},
+          {command_noh, "noh", "turn off search highlighting"},
+          {command_quit, "quit", "quit ce"},
+          {command_redraw, "redraw", "redraw the entire editor"},
+          {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
+          {command_reload_config, "reload_config", "reload the config shared object"},
+          {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
+          {command_rename_buffer, "rename_buffer", "rename the current buffer"},
+          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search"},
+          {command_save_all_and_quit, "save_all_and_quit", "save all modified buffers and quit the editor"},
+          {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
+          {command_search, "search", "interactive search 'forward' or 'backward'"},
+          {command_select_adjacent_layout, "select_adjacent_layout", "select 'left', 'right', 'up' or 'down adjacent layouts"},
+          {command_select_adjacent_tab, "select_adjacent_tab", "selects either the 'left' or 'right' tab"},
+          {command_select_parent_layout, "select_parent_layout", "select the parent of the current layout"},
+          {command_setnopaste, "setnopaste", "done pasting, so turn on auto indentation again"},
+          {command_setpaste, "setpaste", "about to paste, so turn off auto indentation"},
+          {command_show_buffers, "show_buffers", "show the list of buffers"},
+          {command_show_jumps, "show_jumps", "show the state of your jumps"},
+          {command_show_macros, "show_macros", "show the state of your macros"},
+          {command_show_marks, "show_marks", "show the state of your vim marks"},
+          {command_show_yanks, "show_yanks", "show the state of your vim yanks"},
+          {command_split_layout, "split_layout", "split the current layout 'horizontal' or 'vertical' into 2 layouts"},
+          {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
+          {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
+          {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
+          {command_terminal_command, "terminal_command", "run a command in the terminal"},
+          {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
+          {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_e, "e", "vim's e command to load a file specified"},
-          {command_vim_w, "w", "vim's w command to save the current buffer"},
+          {command_vim_find, "find", "vim's find command to search for files recursively"},
+          {command_vim_make, "make", "vim's make command run make in the terminal"},
           {command_vim_q, "q", "vim's q command to close the current window"},
-          {command_vim_wq, "wq", "vim's w command to save the current buffer and close the current window"},
-          {command_vim_vsp, "vsp", "vim's vsp command to split the window vertically. It optionally takes a file to open"},
           {command_vim_sp, "sp", "vim's sp command to split the window vertically. It optionally takes a file to open"},
           {command_vim_tabnew, "tabnew", "vim's tabnew command to create a new tab"},
           {command_vim_tabnext, "tabnext", "vim's tabnext command to select the next tab"},
           {command_vim_tabprevious, "tabprevious", "vim's tabprevious command to select the previous tab"},
-          {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
-          {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
-          {command_vim_make, "make", "vim's make command run make in the terminal"},
-          {command_vim_find, "find", "vim's find command to search for files recursively"},
+          {command_vim_vsp, "vsp", "vim's vsp command to split the window vertically. It optionally takes a file to open"},
+          {command_vim_w, "w", "vim's w command to save the current buffer"},
+          {command_vim_wq, "wq", "vim's w command to save the current buffer and close the current window"},
           {command_vim_wqa, "wqa", "vim's wqa command save all modified buffers and quit the editor"},
           {command_vim_xa, "xa", "vim's xa command save all modified buffers and quit the editor"},
      };
@@ -1184,5 +1217,103 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      }
 
      free(base_directory);
+     return true;
+}
+
+bool search_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     ce_history_insert(&app->search_history, app->input_view.buffer->lines[0]);
+
+     // update yanks
+     CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('/');
+     free(yank->text);
+     yank->text = strdup(app->input_view.buffer->lines[0]);
+     yank->type = CE_VIM_YANK_TYPE_STRING;
+
+     // clear input buffer
+     app->input_view.buffer->lines[0][0] = 0;
+
+     // insert jump
+     CeAppViewData_t* view_data = view->user_data;
+     CeJumpList_t* jump_list = &view_data->jump_list;
+     CeDestination_t destination = {};
+     destination.point = view->cursor;
+     strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+     ce_jump_list_insert(jump_list, destination);
+     return true;
+}
+
+bool switch_buffer_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     CeAppViewData_t* view_data = view->user_data;
+     CeJumpList_t* jump_list = &view_data->jump_list;
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
+               ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, jump_list);
+               break;
+          }
+          itr = itr->next;
+     }
+
+     return true;
+}
+
+bool replace_all_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     int64_t index = ce_vim_register_index('/');
+     CeVimYank_t* yank = app->vim.yanks + index;
+     if(yank->text){
+          replace_all(view, &app->vim, yank->text, app->input_view.buffer->lines[0]);
+     }
+     return true;
+}
+
+bool edit_macro_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
+     if(rune_string){
+          ce_rune_node_free(app->macros.rune_head + app->edit_register);
+          CeRune_t* itr = rune_string;
+          while(*itr){
+               ce_rune_node_insert(app->macros.rune_head + app->edit_register, *itr);
+               itr++;
+          }
+
+          free(rune_string);
+     }
+     return true;
+}
+
+bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     CeVimYank_t* yank = app->vim.yanks + app->edit_register;
+     CeVimYankType_t yank_type = yank->type;
+     ce_vim_yank_free(yank);
+     if(yank_type == CE_VIM_YANK_TYPE_BLOCK){
+          yank->block_line_count = app->input_view.buffer->line_count;
+          yank->block = malloc(yank->block_line_count * sizeof(*yank->block));
+          for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
+               if(strlen(app->input_view.buffer->lines[i])){
+                    yank->block[i] = strdup(app->input_view.buffer->lines[i]);
+               }else{
+                    yank->block[i] = NULL;
+               }
+          }
+          yank->type = yank_type;
+     }else{
+          yank->text = ce_buffer_dupe(app->input_view.buffer);
+          yank->type = yank_type;
+     }
      return true;
 }

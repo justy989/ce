@@ -60,6 +60,7 @@ typedef struct{
 
 typedef struct{
      CeJumpList_t jump_list;
+     CeBuffer_t* prev_buffer;
 }CeAppViewData_t;
 
 struct CeApp_t;
@@ -209,5 +210,12 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
 bool ce_app_apply_completion(CeApp_t* app);
 
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
-bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool search_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool switch_buffer_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool replace_all_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool edit_macro_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+
+bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);

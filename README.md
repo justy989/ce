@@ -134,38 +134,56 @@ Key Sequence|Action
 ### Commands (press `:` in normal mode)
 Name|Action
 ----|------
-quit|quit ce
-select_adjacent_layout|select 'left', 'right', 'up' or 'down adjacent layouts
-save_buffer|save the currently selected view's buffer
-show_buffers|show the list of buffers
-show_yanks|show the state of your vim yanks
-split_layout|split the current layout 'horizontal' or 'vertical' into 2 layouts
-select_parent_layout|select the parent of the current layout
-delete_layout|delete the current layout (unless it's the only one left)
-load_file|load a file (optionally specified)
-new_tab|create a new tab
-select_adjacent_tab|selects either the 'left' or 'right' tab
-search|interactive search 'forward' or 'backward'
-regex_search|interactive regex search 'forward' or 'backward'
-noh|turn off search highlighting
-setpaste|about to paste, so turn off auto indentation
-setnopaste|done pasting, so turn on auto indentation again
+buffer_type|set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'
 command|interactively send a commmand
-redraw|redraw the entire editor
-switch_to_terminal|if the terminal is in view, goto it, otherwise, open the terminal in the current view
-new_terminal|open a new terminal and show it in the current view
-switch_buffer|open dialogue to switch buffer by name
+delete_layout|delete the current layout (unless it's the only one left)
 goto_destination_in_line|scan current line for destination formats
 goto_next_destination|find the next line in the buffer that contains a destination to goto
 goto_prev_destination|find the previous line in the buffer that contains a destination to goto
-replace_all|replace all occurances below cursor (or within a visual range) with the previous search
-reload_file|reload the file in the current view, overwriting any changes outstanding
-reload_config|reload the config shared object
-buffer_type|set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'
-new_buffer|create a new buffer
-rename_buffer|rename the current buffer
 jump_list|jump to 'next' or 'previous' jump location based on argument passed in
 line_number|change line number mode: 'none', 'absolute', 'relative', or 'both'
-terminal_command|run a command in the terminal
-terminal_command_in_view|run a command in the terminal, and switch to it in view
+load_file|load a file (optionally specified)
 man_page_on_word_under_cursor|run man on the word under the cursor
+new_buffer|create a new buffer
+new_tab|create a new tab
+new_terminal|open a new terminal and show it in the current view
+noh|turn off search highlighting
+quit|quit ce
+redraw|redraw the entire editor
+regex_search|interactive regex search 'forward' or 'backward'
+reload_config|reload the config shared object
+reload_file|reload the file in the current view, overwriting any changes outstanding
+rename_buffer|rename the current buffer
+replace_all|replace all occurances below cursor (or within a visual range) with the previous search
+save_all_and_quit|save all modified buffers and quit the editor
+save_buffer|save the currently selected view's buffer
+search|interactive search 'forward' or 'backward'
+select_adjacent_layout|select 'left', 'right', 'up' or 'down adjacent layouts
+select_adjacent_tab|selects either the 'left' or 'right' tab
+select_parent_layout|select the parent of the current layout
+setnopaste|done pasting, so turn on auto indentation again
+setpaste|about to paste, so turn off auto indentation
+show_buffers|show the list of buffers
+show_jumps|show the state of your jumps
+show_macros|show the state of your macros
+show_marks|show the state of your vim marks
+show_yanks|show the state of your vim yanks
+split_layout|split the current layout 'horizontal' or 'vertical' into 2 layouts
+switch_buffer|open dialogue to switch buffer by name
+switch_to_terminal|if the terminal is in view, goto it, otherwise, open the terminal in the current view
+terminal_command|run a command in the terminal
+cn|vim's cn command to select the goto the next build error
+cp|vim's cn command to select the goto the previous build error
+e|vim's e command to load a file specified
+find|vim's find command to search for files recursively
+make|vim's make command run make in the terminal
+q|vim's q command to close the current window
+sp|vim's sp command to split the window vertically. It optionally takes a file to open
+tabnew|vim's tabnew command to create a new tab
+tabnext|vim's tabnext command to select the next tab
+tabprevious|vim's tabprevious command to select the previous tab
+vsp|vim's vsp command to split the window vertically. It optionally takes a file to open
+w|vim's w command to save the current buffer
+wq|vim's w command to save the current buffer and close the current window
+wqa|vim's wqa command save all modified buffers and quit the editor
+xa|vim's xa command save all modified buffers and quit the editor

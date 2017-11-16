@@ -568,6 +568,8 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
 
           ce_syntax_highlight_visual(&range_node, &in_visual, match_point, draw_color_list, syntax_defs);
 
+          if(in_visual && line_len == 0) change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
+
           for(int64_t x = 0; x < line_len; ++x){
                char* str = ce_utf8_iterate_to(line, x);
                match_point.x = x;

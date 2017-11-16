@@ -25,6 +25,12 @@ static bool get_command_context(CeApp_t* app, CommandContext_t* command_context)
      return true;
 }
 
+CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data){
+     (void)(command);
+     (void)(user_data);
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
@@ -44,7 +50,11 @@ CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data){
      }
 
      if(unsaved_buffers){
+          ce_view_switch_buffer(command_context.view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
           ce_app_input(app, UNSAVED_BUFFERS_DIALOGUE, unsaved_buffers_input_complete_func);
+     }else if(app->terminal_list.head){
+          ce_view_switch_buffer(command_context.view, app->buffer_list_buffer, &app->vim, &app->config_options, true);
+          ce_app_input(app, TERMINALS_STILL_RUNNING_DIALOGUE, unsaved_buffers_input_complete_func);
      }else{
           app->quit = true;
      }
@@ -304,7 +314,7 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
                ce_app_message(app, "failed to load file %s: '%s'", command->args[0].string, strerror(errno));
           }
      }else{ // it's 0
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "LOAD FILE");
+          ce_app_input(app, "Load File", load_file_input_complete_func);
 
           char* base_directory = buffer_base_directory(command_context.view->buffer, &app->terminal_list);
           complete_files(&app->load_file_complete, app->input_view.buffer->lines[0], base_directory);
@@ -413,11 +423,11 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(strcmp(command->args[0].string, "forward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "SEARCH");
+          ce_app_input(app, "Search", search_input_complete_func);
           app->vim.search_mode = CE_VIM_SEARCH_MODE_FORWARD;
           app->search_start = command_context.view->cursor;
      }else if(strcmp(command->args[0].string, "backward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REVERSE SEARCH");
+          ce_app_input(app, "Reverse Search", search_input_complete_func);
           app->vim.search_mode = CE_VIM_SEARCH_MODE_BACKWARD;
           app->search_start = command_context.view->cursor;
      }else{
@@ -459,11 +469,11 @@ CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(strcmp(command->args[0].string, "forward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REGEX SEARCH");
+          ce_app_input(app, "Regex Search", search_input_complete_func);
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_FORWARD;
           app->search_start = command_context.view->cursor;
      }else if(strcmp(command->args[0].string, "backward") == 0){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REGEX REVERSE SEARCH");
+          ce_app_input(app, "Reverse Regex Search", search_input_complete_func);
           app->vim.search_mode = CE_VIM_SEARCH_MODE_REGEX_BACKWARD;
           app->search_start = command_context.view->cursor;
      }else{
@@ -483,7 +493,7 @@ CeCommandStatus_t command_command(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(command_context.view){
-          ce_app_input(app, "COMMAND", command_input_complete_func);
+          ce_app_input(app, "Run Command", command_input_complete_func);
           ce_app_init_command_completion(app, &app->input_complete);
           build_complete_list(app->complete_list_buffer, &app->input_complete);
      }
@@ -532,7 +542,7 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "SWITCH BUFFER");
+     ce_app_input(app, "Switch Buffer", switch_buffer_input_complete_func);
 
      int64_t buffer_count = 0;
      CeBufferNode_t* itr = app->buffer_node_head;
@@ -551,8 +561,8 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
           itr = itr->next;
      }
 
-     ce_complete_init(&app->switch_buffer_complete, (const char**)filenames, NULL, buffer_count);
-     build_complete_list(app->complete_list_buffer, &app->switch_buffer_complete);
+     ce_complete_init(&app->input_complete, (const char**)filenames, NULL, buffer_count);
+     build_complete_list(app->complete_list_buffer, &app->input_complete);
 
      for(int64_t i = 0; i < buffer_count; i++){
           free(filenames[i]);
@@ -716,6 +726,21 @@ CeCommandStatus_t command_goto_prev_destination(CeCommand_t* command, void* user
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_goto_prev_buffer_in_view(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CommandContext_t command_context = {};
+
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_app_switch_to_prev_buffer_in_view(app, command_context.view, false)){
+          return CE_COMMAND_NO_ACTION;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
@@ -724,7 +749,7 @@ CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(command->arg_count == 0){
-          app->input_mode = enable_input_mode(&app->input_view, command_context.view, &app->vim, "REPLACE ALL");
+          ce_app_input(app, "Replace All Occurances", switch_buffer_input_complete_func);
      }else if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING){
           int64_t index = ce_vim_register_index('/');
           CeVimYank_t* yank = app->vim.yanks + index;
@@ -764,6 +789,8 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
+     if(!app->user_config.handle) return CE_COMMAND_NO_ACTION;
+
      if(app->command_entries) free(app->command_entries);
      ce_app_init_default_commands(app);
      char* config_path = strdup(app->user_config.filepath);
@@ -779,7 +806,7 @@ CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_buffer_type(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_syntax(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
