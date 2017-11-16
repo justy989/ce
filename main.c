@@ -1052,7 +1052,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                          input_complete_func(app, app->input_view.buffer);
                     }
-
                }else{
                     key = CE_NEWLINE;
                }
@@ -1790,6 +1789,9 @@ int main(int argc, char** argv){
 
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
+     ce_history_free(&app.command_history);
+     ce_history_free(&app.search_history);
+
      endwin();
      return 0;
 }

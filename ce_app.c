@@ -137,6 +137,10 @@ void ce_history_reset_current(CeHistory_t* history){
      history->current = NULL;
 }
 
+void ce_history_free(CeHistory_t* history){
+     ce_string_node_free(&history->head);
+}
+
 void ce_convert_bind_defs(CeKeyBinds_t* binds, CeKeyBindDef_t* bind_defs, int64_t bind_def_count){
      if(binds->count){
           for(int64_t i = 0; i < binds->count; ++i){
@@ -1035,6 +1039,7 @@ void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete){
      ce_complete_init(complete, commands, descriptions, app->command_entry_count);
      for(int64_t i = 0; i < app->command_entry_count; i++){
           free((char*)(commands[i]));
+          free((char*)(descriptions[i]));
      }
      free(commands);
      free(descriptions);
@@ -1187,6 +1192,8 @@ bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
                }else{
                     ce_app_message(app, "unknown command: '%s'", command.name);
                }
+
+               ce_command_free(&command);
           }
      }
 

@@ -146,6 +146,7 @@ bool ce_history_insert(CeHistory_t* history, const char* string);
 char* ce_history_previous(CeHistory_t* history);
 char* ce_history_next(CeHistory_t* history);
 void ce_history_reset_current(CeHistory_t* history);
+void ce_history_free(CeHistory_t* history);
 
 void ce_convert_bind_defs(CeKeyBinds_t* binds, CeKeyBindDef_t* bind_defs, int64_t bind_def_count);
 void ce_set_vim_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* parse_func);
