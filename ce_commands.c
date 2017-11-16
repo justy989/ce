@@ -733,6 +733,21 @@ CeCommandStatus_t command_goto_prev_buffer_in_view(CeCommand_t* command, void* u
      CeAppViewData_t* view_data = command_context.view->user_data;
      if(!view_data->prev_buffer) return CE_COMMAND_NO_ACTION;
 
+     bool deleted = true;
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(itr->buffer == view_data->prev_buffer){
+               deleted = false;
+               break;
+          }
+          itr = itr->next;
+     }
+
+     if(deleted){
+          view_data->prev_buffer = NULL;
+          return CE_COMMAND_NO_ACTION;
+     }
+
      ce_view_switch_buffer(command_context.view, view_data->prev_buffer, &app->vim, &app->config_options,
                            true);
 
