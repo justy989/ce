@@ -241,7 +241,7 @@ bool ce_buffer_empty(CeBuffer_t* buffer){
      if(buffer->lines == NULL) return false;
 
      // free all lines after the first
-     for(int64_t i = 1; i < buffer->line_count; ++i){
+     for(int64_t i = 0; i < buffer->line_count; ++i){
           free(buffer->lines[i]);
      }
 
