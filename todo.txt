@@ -10,6 +10,10 @@ todo:
   - completion
   - status bar
   - key handler ?
+- vim '[' and ']' which goes between functions as a motion
+- resurrect a terminal that has died
+- blank enter on autocomplete should use that option?
+- '`' is the same as '''
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet

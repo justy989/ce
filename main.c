@@ -1551,6 +1551,7 @@ int main(int argc, char** argv){
           cbreak();
           noecho();
           raw();
+          set_escdelay(0);
 
           if(has_colors() == FALSE){
                printf("Your terminal doesn't support colors. what year do you live in?\n");
