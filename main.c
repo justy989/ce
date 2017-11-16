@@ -1044,11 +1044,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else if(app->input_complete_func){
                     ce_app_apply_completion(app);
                     app->vim.mode = CE_VIM_MODE_NORMAL;
+                    CeInputCompleteFunc* input_complete_func = app->input_complete_func;
+                    app->input_complete_func = NULL;
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                         app->input_complete_func(app, app->input_view.buffer);
+                         input_complete_func(app, app->input_view.buffer);
                     }
 
-                    app->input_complete_func = NULL;
                }else{
                     key = CE_NEWLINE;
                }
