@@ -344,12 +344,10 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                CePoint_t visual_bottom_right = vim->visual_block_bottom_right;
 
                // adjust range because we've already inserted text the line the cursor is on
-               CePoint_t cursor_end;
+               CePoint_t cursor_end = view->cursor;
                if(visual_top_left.y == view->cursor.y){
-                    cursor_end = visual_top_left;
                     visual_top_left.y++;
                }else{
-                    cursor_end = visual_bottom_right;
                     visual_bottom_right.y--;
                }
 
@@ -371,8 +369,8 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                }
 
                free(rune_string);
-               if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = cursor_end;
                view->cursor = cursor_end;
+               if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = view->cursor;
           }
 
           vim->mode = CE_VIM_MODE_NORMAL;
@@ -593,13 +591,14 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
                     yank->block[yank_string_index] = ce_buffer_dupe_string(view->buffer, motion_range.start, motion_range_len);
                }
 
+               action->do_not_yank = true;
+
                if(action->verb.function == ce_vim_verb_yank){
                     vim->visual_block_top_left = (CePoint_t){0, 0};
                     vim->visual_block_bottom_right = (CePoint_t){0, 0};
                     vim->mode = CE_VIM_MODE_NORMAL;
+                    return success;
                }
-
-               action->do_not_yank = true;
           }
 
           if(action->verb.function == ce_vim_verb_insert_mode ||
@@ -627,9 +626,8 @@ bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, Ce
                     vim->visual_block_top_left = (CePoint_t){0, 0};
                     vim->visual_block_bottom_right = (CePoint_t){0, 0};
                }
+               return success;
           }
-
-          return success;
      }
 
      CeRange_t motion_range = {view->cursor, view->cursor};
