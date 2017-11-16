@@ -2554,8 +2554,7 @@ bool ce_vim_motion_next_zero_indentation_line(CeVim_t* vim, CeVimAction_t* actio
           if(buffer_app_data->syntax_function == ce_syntax_highlight_c ||
              buffer_app_data->syntax_function == ce_syntax_highlight_cpp){
                if(view->buffer->lines[y][0] == '#' ||
-                  view->buffer->lines[y][0] == '{' ||
-                  view->buffer->lines[y][0] == '}'){
+                  view->buffer->lines[y][0] == '/'){
                     continue;
                }
           }
@@ -2576,8 +2575,7 @@ bool ce_vim_motion_previous_zero_indentation_line(CeVim_t* vim, CeVimAction_t* a
           if(buffer_app_data->syntax_function == ce_syntax_highlight_c ||
              buffer_app_data->syntax_function == ce_syntax_highlight_cpp){
                if(view->buffer->lines[y][0] == '#' ||
-                  view->buffer->lines[y][0] == '{' ||
-                  view->buffer->lines[y][0] == '}'){
+                  view->buffer->lines[y][0] == '/'){
                     continue;
                }
           }
