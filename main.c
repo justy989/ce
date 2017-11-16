@@ -57,10 +57,9 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
 
      // build format string, OMG THIS IS SO UNREADABLE HOLY MOLY BATMAN
      char format_string[BUFSIZ];
-
-     // build buffer info
      snprintf(format_string, BUFSIZ, "%%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
 
+     // build buffer info
      itr = head;
      while(itr){
           const char* buffer_flag_str = buffer_status_get_str(itr->buffer->status);
@@ -1772,8 +1771,10 @@ int main(int argc, char** argv){
                     itr = itr->next;
                     free(tmp);
                }else{
+                    prev = itr;
                     itr = itr->next;
                }
+
           }
      }
 
