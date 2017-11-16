@@ -10,9 +10,7 @@ todo:
   - completion
   - status bar
   - key handler ?
-- vim '[' and ']' which goes between functions as a motion
 - resurrect a terminal that has died
-- '`' is the same as '''
 - put log and backup files, and session info in ~/.ce
 - rename 'buffer_type' to 'syntax', 'buffer_mode', 'c-mode', idk
 - vim :sort
