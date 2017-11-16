@@ -33,6 +33,7 @@ void ce_complete_reset(CeComplete_t* complete){
 }
 
 void ce_complete_match(CeComplete_t* complete, const char* match){
+     if(complete->count == 0) return;
      if(strlen(match)){
           for(int64_t i = 0; i < complete->count; i++){
                const char* str = strstr(complete->elements[i].string, match);

@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <sys/time.h>
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
@@ -173,12 +174,7 @@ void ce_app_update_terminal_view(CeApp_t* app){
 }
 
 CeComplete_t* ce_app_is_completing(CeApp_t* app){
-     if(app->input_mode){
-          if(strcmp(app->input_view.buffer->name, "COMMAND") == 0) return &app->command_complete;
-          if(strcmp(app->input_view.buffer->name, "LOAD FILE") == 0) return &app->load_file_complete;
-          if(strcmp(app->input_view.buffer->name, "SWITCH BUFFER") == 0) return &app->switch_buffer_complete;
-     }
-
+     if(app->input_complete_func && app->input_complete.count) return &app->input_complete;
      return NULL;
 }
 
@@ -332,18 +328,18 @@ void ce_jump_list_insert(CeJumpList_t* jump_list, CeDestination_t destination){
 
 CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list){
      if(jump_list->count == 0) return NULL;
-     if(jump_list->itr < 0) return NULL;
-     jump_list->current = jump_list->itr;
-     jump_list->itr--;
-     return jump_list->destinations + jump_list->current;
-}
-
-CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
-     if(jump_list->count == 0) return NULL;
      if(jump_list->itr >= (jump_list->count - 1)) return 0;
      jump_list->itr++;
      jump_list->current = jump_list->itr;
      return jump_list->destinations + jump_list->itr;
+}
+
+CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list){
+     if(jump_list->count == 0) return NULL;
+     if(jump_list->itr < 0) return NULL;
+     jump_list->current = jump_list->itr;
+     jump_list->itr--;
+     return jump_list->destinations + jump_list->current;
 }
 
 CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list){
@@ -1029,14 +1025,14 @@ void ce_app_init_default_commands(CeApp_t* app){
      }
 }
 
-void ce_app_init_command_completion(CeApp_t* app){
+void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete){
      const char** commands = malloc(app->command_entry_count * sizeof(*commands));
      const char** descriptions = malloc(app->command_entry_count * sizeof(*descriptions));
      for(int64_t i = 0; i < app->command_entry_count; i++){
           commands[i] = strdup(app->command_entries[i].name);
           descriptions[i] = strdup(app->command_entries[i].description);
      }
-     ce_complete_init(&app->command_complete, commands, descriptions, app->command_entry_count);
+     ce_complete_init(complete, commands, descriptions, app->command_entry_count);
      for(int64_t i = 0; i < app->command_entry_count; i++){
           free((char*)(commands[i]));
      }
@@ -1075,4 +1071,249 @@ void ce_app_message(CeApp_t* app, const char* fmt, ...){
      CeAppBufferData_t* buffer_data = app->message_view.buffer->app_data;
      buffer_data->syntax_function = ce_syntax_highlight_message;
      app->message_view.buffer->syntax_data = &app->config_options;
+}
+
+void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input_complete_func){
+     CeView_t* input_view = &app->input_view;
+
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     input_view_overlay(input_view, view);
+
+     free(input_view->buffer->app_data);
+
+     ce_buffer_alloc(input_view->buffer, 1, dialogue);
+     input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
+     input_view->buffer->no_line_numbers = true;
+     input_view->cursor = (CePoint_t){0, 0};
+
+     app->vim.mode = CE_VIM_MODE_INSERT;
+     ce_rune_node_free(&app->vim.insert_rune_head);
+
+     app->input_complete_func = input_complete_func;
+     ce_complete_free(&app->input_complete);
+}
+
+bool ce_app_apply_completion(CeApp_t* app){
+     CeComplete_t* complete = ce_app_is_completing(app);
+     if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
+          if(complete->current >= 0){
+               int64_t completion_len = strlen(complete->elements[complete->current].string);
+               int64_t input_len = strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
+               int64_t input_offset = 0;
+               if(input_len > completion_len) input_offset = input_len - completion_len;
+               if(strcmp(complete->elements[complete->current].string, app->input_view.buffer->lines[app->input_view.cursor.y] + input_offset) == 0){
+                    return false;
+               }
+
+               char* insertion = strdup(complete->elements[complete->current].string);
+               int64_t insertion_len = strlen(insertion);
+               CePoint_t delete_point = app->input_view.cursor;
+               if(complete->current_match){
+                    int64_t delete_len = strlen(complete->current_match);
+                    delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
+                    if(delete_len > 0){
+                         ce_buffer_remove_string_change(app->input_view.buffer, delete_point, delete_len,
+                                                        &app->input_view.cursor, app->input_view.cursor, true);
+                    }
+               }
+
+               if(insertion_len > 0){
+                    CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
+                    ce_buffer_insert_string_change(app->input_view.buffer, insertion, delete_point, &app->input_view.cursor,
+                                                   cursor_end, true);
+               }
+          }
+
+          return true;
+     }
+
+     return false;
+}
+
+bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
+        strcmp(app->input_view.buffer->lines[0], "Y") == 0){
+          app->quit = true;
+     }
+
+     return true;
+}
+
+bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     char* end_of_number = app->input_view.buffer->lines[0];
+     int64_t line_number = strtol(app->input_view.buffer->lines[0], &end_of_number, 10);
+     if(end_of_number > app->input_view.buffer->lines[0]){
+          // if the command entered was a number, go to that line
+          if(line_number >= 0 && line_number < view->buffer->line_count){
+               view->cursor.y = line_number - 1;
+               view->cursor.x = ce_vim_soft_begin_line(view->buffer, view->cursor.y);
+               ce_view_follow_cursor(view, app->config_options.horizontal_scroll_off,
+                                     app->config_options.vertical_scroll_off,
+                                     app->config_options.tab_width);
+          }
+     }else{
+          ce_app_apply_completion(app);
+
+          // convert and run the command
+          CeCommand_t command = {};
+          if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
+               ce_log("failed to parse command: '%s'\n", app->input_view.buffer->lines[0]);
+          }else{
+               CeCommandFunc_t* command_func = NULL;
+               CeCommandEntry_t* entry = NULL;
+               for(int64_t i = 0; i < app->command_entry_count; i++){
+                    entry = app->command_entries + i;
+                    if(strcmp(entry->name, command.name) == 0){
+                         command_func = entry->func;
+                         break;
+                    }
+               }
+
+               if(command_func){
+                    CeCommandStatus_t cs = command_func(&command, app);
+                    switch(cs){
+                    default:
+                         break;
+                    case CE_COMMAND_PRINT_HELP:
+                         ce_app_message(app, "%s: %s", entry->name, entry->description);
+                         break;
+                    }
+                    ce_history_insert(&app->command_history, app->input_view.buffer->lines[0]);
+               }else{
+                    ce_app_message(app, "unknown command: '%s'", command.name);
+               }
+          }
+     }
+
+     return true;
+}
+
+bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
+     char filepath[PATH_MAX];
+     for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
+          if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
+               snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
+          }else{
+               strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
+          }
+          if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                  true, filepath)){
+               ce_app_message(app, "failed to load file '%s': '%s'", filepath, strerror(errno));
+               return false;
+          }
+     }
+
+     free(base_directory);
+     return true;
+}
+
+bool search_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     ce_history_insert(&app->search_history, app->input_view.buffer->lines[0]);
+
+     // update yanks
+     CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('/');
+     free(yank->text);
+     yank->text = strdup(app->input_view.buffer->lines[0]);
+     yank->type = CE_VIM_YANK_TYPE_STRING;
+
+     // clear input buffer
+     app->input_view.buffer->lines[0][0] = 0;
+
+     // insert jump
+     CeAppViewData_t* view_data = view->user_data;
+     CeJumpList_t* jump_list = &view_data->jump_list;
+     CeDestination_t destination = {};
+     destination.point = view->cursor;
+     strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+     ce_jump_list_insert(jump_list, destination);
+     return true;
+}
+
+bool switch_buffer_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     CeAppViewData_t* view_data = view->user_data;
+     CeJumpList_t* jump_list = &view_data->jump_list;
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
+               ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, jump_list);
+               break;
+          }
+          itr = itr->next;
+     }
+
+     return true;
+}
+
+bool replace_all_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     int64_t index = ce_vim_register_index('/');
+     CeVimYank_t* yank = app->vim.yanks + index;
+     if(yank->text){
+          replace_all(view, &app->vim, yank->text, app->input_view.buffer->lines[0]);
+     }
+     return true;
+}
+
+bool edit_macro_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     CeRune_t* rune_string = ce_char_string_to_rune_string(app->input_view.buffer->lines[0]);
+     if(rune_string){
+          ce_rune_node_free(app->macros.rune_head + app->edit_register);
+          CeRune_t* itr = rune_string;
+          while(*itr){
+               ce_rune_node_insert(app->macros.rune_head + app->edit_register, *itr);
+               itr++;
+          }
+
+          free(rune_string);
+     }
+     return true;
+}
+
+bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     CeVimYank_t* yank = app->vim.yanks + app->edit_register;
+     CeVimYankType_t yank_type = yank->type;
+     ce_vim_yank_free(yank);
+     if(yank_type == CE_VIM_YANK_TYPE_BLOCK){
+          yank->block_line_count = app->input_view.buffer->line_count;
+          yank->block = malloc(yank->block_line_count * sizeof(*yank->block));
+          for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
+               if(strlen(app->input_view.buffer->lines[i])){
+                    yank->block[i] = strdup(app->input_view.buffer->lines[i]);
+               }else{
+                    yank->block[i] = NULL;
+               }
+          }
+          yank->type = yank_type;
+     }else{
+          yank->text = ce_buffer_dupe(app->input_view.buffer);
+          yank->type = yank_type;
+     }
+     return true;
 }

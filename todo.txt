@@ -10,13 +10,15 @@ todo:
   - completion
   - status bar
   - key handler ?
+- check if file has been modified since we last loaded it
 - put log and backup files, and session info in ~/.ce
 - vim :sort
 - add 'c-mode' as an alias command for 'syntax c' as well as others
+- trim extra whitespace when yanking from terminal
 
 bug:
 - shifting right/left on visual selection can lead to cursor getting set to -1, -1, not sure the exact case yet
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - what is home key doing? It seems like it's sending '5~'
 - TERM=xterm-256color needs to be set to view ce correctly
-- sometimes arrow keys get broken in the terminal, maybe it happens outside the terminal too, unsure
+- sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
