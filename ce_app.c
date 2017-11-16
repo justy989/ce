@@ -1159,8 +1159,6 @@ bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
                                      app->config_options.tab_width);
           }
      }else{
-          ce_app_apply_completion(app);
-
           // convert and run the command
           CeCommand_t command = {};
           if(!ce_command_parse(&command, app->input_view.buffer->lines[0])){
