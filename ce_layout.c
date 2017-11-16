@@ -105,7 +105,7 @@ static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
 }
 
 bool ce_layout_split(CeLayout_t* layout, bool vertical){
-     assert(layout->type = CE_LAYOUT_TYPE_TAB);
+     assert(layout->type == CE_LAYOUT_TYPE_TAB);
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
      if(parent_of_current){
           CeBuffer_t* buffer = ce_layout_find_buffer(layout->tab.current);
