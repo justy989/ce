@@ -203,3 +203,4 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
 void ce_app_init_default_commands(CeApp_t* app);
 void ce_app_init_command_completion(CeApp_t* app);
 void ce_app_message(CeApp_t* app, const char* fmt, ...);
+bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);

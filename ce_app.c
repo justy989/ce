@@ -401,6 +401,34 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeC
      vim->mode = CE_VIM_MODE_NORMAL;
 }
 
+bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted){
+     CeAppViewData_t* view_data = view->user_data;
+     if(!view_data->prev_buffer) return false;
+
+     bool deleted = true;
+     CeBufferNode_t* itr = app->buffer_node_head;
+     while(itr){
+          if(itr->buffer == view_data->prev_buffer){
+               deleted = false;
+               break;
+          }
+          itr = itr->next;
+     }
+
+     if(deleted){
+          if(switch_if_deleted){
+               view_data->prev_buffer = app->buffer_node_head->buffer;
+          }else{
+               view_data->prev_buffer = NULL;
+               return false;
+          }
+     }
+
+     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, true);
+
+     return true;
+}
+
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command){
      while(*command){
           ce_terminal_send_key(terminal, *command);
@@ -868,7 +896,7 @@ CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* t
      CeTerminalNode_t* itr = terminal_list->head;
      while(itr){
           if(buffer == itr->terminal.lines_buffer || buffer == itr->terminal.alternate_lines_buffer){
-             return &itr->terminal;
+               return &itr->terminal;
           }
           itr = itr->next;
      }

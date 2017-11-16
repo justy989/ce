@@ -1790,6 +1790,67 @@ int main(int argc, char** argv){
                }
           }
 
+          // check if any terminals have been killed
+          CeTerminalNode_t* itr = app.terminal_list.head;
+          CeTerminalNode_t* prev = NULL;
+          while(itr){
+               if(itr->terminal.killed){
+                    if(prev){
+                         prev->next = itr->next;
+                    }else{
+                         app.terminal_list.head = itr->next;
+                    }
+
+                    if(itr == app.terminal_list.tail){
+                         app.terminal_list.tail = prev;
+                    }
+
+                    if(app.last_terminal == &itr->terminal) app.last_terminal = NULL;
+
+                    // if we have any views referencing this terminal, switch to a valid view
+                    for(int64_t i = 0; i < app.tab_list_layout->tab_list.tab_count; i++){
+                         CeLayout_t* terminal_layout = ce_layout_buffer_in_view(app.tab_list_layout->tab_list.tabs[i],
+                                                                                itr->terminal.lines_buffer);
+                         if(!terminal_layout) terminal_layout = ce_layout_buffer_in_view(app.tab_list_layout->tab_list.tabs[i],
+                                                                                         itr->terminal.alternate_lines_buffer);
+                         if(terminal_layout){
+                              ce_app_switch_to_prev_buffer_in_view(&app, &terminal_layout->view, true);
+                         }
+                    }
+
+                    // unlink terminal buffer node from buffer list
+                    // TODO: compress with cleanup code below
+                    {
+                         CeBufferNode_t* buf_itr = app.buffer_node_head;
+                         CeBufferNode_t* buf_prev = NULL;
+                         while(buf_itr){
+                              if(buf_itr->buffer == itr->terminal.lines_buffer || buf_itr->buffer == itr->terminal.alternate_lines_buffer){
+                                   if(buf_prev){
+                                        buf_prev->next = buf_itr->next;
+                                   }else{
+                                        app.buffer_node_head = buf_itr->next;
+                                   }
+
+                                   CeBufferNode_t* tmp = buf_itr;
+                                   buf_itr = buf_itr->next;
+                                   free(tmp);
+                              }else{
+                                   buf_itr = buf_itr->next;
+                              }
+                         }
+                    }
+
+                    ce_terminal_free(&itr->terminal);
+
+                    CeTerminalNode_t* tmp = itr;
+                    itr = itr->next;
+                    free(tmp);
+                    app.ready_to_draw = true;
+               }else{
+                    itr = itr->next;
+               }
+          }
+
           if(key == ERR){
                sleep(0);
                continue;
@@ -1875,7 +1936,7 @@ int main(int argc, char** argv){
 
      free(app.command_entries);
 
-     // unlink terminal node from buffer no list
+     // unlink terminal buffer node from buffer list
      {
           CeBufferNode_t* itr = app.buffer_node_head;
           CeBufferNode_t* prev = NULL;
