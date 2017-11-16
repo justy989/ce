@@ -1474,8 +1474,8 @@ int main(int argc, char** argv){
                {{'g', 'r'},              "redraw"},
                {{'\\', 'f'},             "reload_file"},
                {{ce_ctrl_key('b')},      "switch_buffer"},
-               {{ce_ctrl_key('i')},      "jump_list previous"},
-               {{ce_ctrl_key('o')},      "jump_list next"},
+               {{ce_ctrl_key('o')},      "jump_list previous"},
+               {{ce_ctrl_key('i')},      "jump_list next"},
                {{'K'},                   "man_page_on_word_under_cursor"},
                {{'Z', 'Z'},              "wq"},
           };
