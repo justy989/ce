@@ -622,6 +622,7 @@ void draw(CeApp_t* app){
           CeDrawColorList_t draw_color_list = {};
           draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number,
                     app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+          ce_draw_color_list_free(&draw_color_list);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
           draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0, app->config_options.ui_fg_color,
                            app->config_options.ui_bg_color);
@@ -660,6 +661,7 @@ void draw(CeApp_t* app){
           ce_range_list_free(&range_list);
           draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number,
                     app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+          ce_draw_color_list_free(&draw_color_list);
           if(app->input_complete_func){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
                draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
@@ -677,6 +679,7 @@ void draw(CeApp_t* app){
 
           draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number,
                     app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+          ce_draw_color_list_free(&draw_color_list);
 
           // set the specified background
           int message_len = ce_utf8_strlen(app->message_view.buffer->lines[0]);
