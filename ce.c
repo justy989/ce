@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <ncurses.h>
+#include <sys/stat.h>
 
 static void ce_buffer_change_node_free(CeBufferChangeNode_t** head){
      CeBufferChangeNode_t* itr = *head;
@@ -131,6 +132,13 @@ void ce_buffer_free(CeBuffer_t* buffer){
 }
 
 bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
+     struct stat statbuf;
+     if (stat(filename, &statbuf) != 0) return false;
+     if(S_ISDIR(statbuf.st_mode)){
+          errno = EPERM;
+          return false;
+     }
+
      // read the entire file
      size_t content_size;
      char* contents = NULL;
