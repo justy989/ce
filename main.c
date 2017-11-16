@@ -1867,11 +1867,13 @@ int main(int argc, char** argv){
                     }else{
                          app.buffer_node_head = itr->next;
                     }
-                    free(itr);
-                    break;
-               }
 
-               itr = itr->next;
+                    CeBufferNode_t* tmp = itr;
+                    itr = itr->next;
+                    free(tmp);
+               }else{
+                    itr = itr->next;
+               }
           }
      }
 
