@@ -57,10 +57,9 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
 
      // build format string, OMG THIS IS SO UNREADABLE HOLY MOLY BATMAN
      char format_string[BUFSIZ];
-
-     // build buffer info
      snprintf(format_string, BUFSIZ, "%%5s %%-%"PRId64"s %%%"PRId64 PRId64, max_name_len, max_buffer_lines_digits);
 
+     // build buffer info
      itr = head;
      while(itr){
           const char* buffer_flag_str = buffer_status_get_str(itr->buffer->status);
@@ -622,6 +621,7 @@ void draw(CeApp_t* app){
           CeDrawColorList_t draw_color_list = {};
           draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number,
                     app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+          ce_draw_color_list_free(&draw_color_list);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
           draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0, app->config_options.ui_fg_color,
                            app->config_options.ui_bg_color);
@@ -660,6 +660,7 @@ void draw(CeApp_t* app){
           ce_range_list_free(&range_list);
           draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number,
                     app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+          ce_draw_color_list_free(&draw_color_list);
           if(app->input_complete_func){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
                draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
@@ -677,6 +678,7 @@ void draw(CeApp_t* app){
 
           draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number,
                     app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+          ce_draw_color_list_free(&draw_color_list);
 
           // set the specified background
           int message_len = ce_utf8_strlen(app->message_view.buffer->lines[0]);
@@ -1049,7 +1051,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                          input_complete_func(app, app->input_view.buffer);
                     }
-
                }else{
                     key = CE_NEWLINE;
                }
@@ -1770,8 +1771,10 @@ int main(int argc, char** argv){
                     itr = itr->next;
                     free(tmp);
                }else{
+                    prev = itr;
                     itr = itr->next;
                }
+
           }
      }
 
@@ -1787,6 +1790,9 @@ int main(int argc, char** argv){
 
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
+     ce_history_free(&app.command_history);
+     ce_history_free(&app.search_history);
+
      endwin();
      return 0;
 }

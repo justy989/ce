@@ -131,6 +131,7 @@ bool ce_vim_free(CeVim_t* vim){
      for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
           ce_vim_yank_free(vim->yanks + i);
      }
+     ce_rune_node_free(&vim->insert_rune_head);
      return true;
 }
 
@@ -2512,8 +2513,8 @@ static bool string_is_blank(const char* string){
 
 bool ce_vim_motion_next_blank_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                    CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
-     bool start_blank = string_is_blank(view->buffer->lines[view->cursor.y]);
-     for(int64_t y = view->cursor.y + 1; y < view->buffer->line_count; y++){
+     bool start_blank = string_is_blank(view->buffer->lines[motion_range->end.y]);
+     for(int64_t y = motion_range->end.y + 1; y < view->buffer->line_count; y++){
           bool current_blank = string_is_blank(view->buffer->lines[y]);
           if(current_blank){
                if(!start_blank){
@@ -2529,8 +2530,8 @@ bool ce_vim_motion_next_blank_line(CeVim_t* vim, CeVimAction_t* action, const Ce
 
 bool ce_vim_motion_previous_blank_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                        CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
-     bool start_blank = string_is_blank(view->buffer->lines[view->cursor.y]);
-     for(int64_t y = view->cursor.y - 1; y >= 0; y--){
+     bool start_blank = string_is_blank(view->buffer->lines[motion_range->end.y]);
+     for(int64_t y = motion_range->end.y - 1; y >= 0; y--){
           bool current_blank = string_is_blank(view->buffer->lines[y]);
           if(current_blank){
                if(!start_blank){
@@ -2547,7 +2548,7 @@ bool ce_vim_motion_previous_blank_line(CeVim_t* vim, CeVimAction_t* action, cons
 bool ce_vim_motion_next_zero_indentation_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                               CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
      CeAppBufferData_t* buffer_app_data = view->buffer->app_data;
-     for(int64_t y = view->cursor.y + 1; y < view->buffer->line_count; y++){
+     for(int64_t y = motion_range->end.y + 1; y < view->buffer->line_count; y++){
           if(ce_utf8_strlen(view->buffer->lines[y]) == 0) continue;
           if(buffer_app_data->syntax_function == ce_syntax_highlight_c ||
              buffer_app_data->syntax_function == ce_syntax_highlight_cpp){
@@ -2568,7 +2569,7 @@ bool ce_vim_motion_next_zero_indentation_line(CeVim_t* vim, CeVimAction_t* actio
 bool ce_vim_motion_previous_zero_indentation_line(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CeConfigOptions_t* config_options,
                                                   CeVimBufferData_t* buffer_data, CeRange_t* motion_range){
      CeAppBufferData_t* buffer_app_data = view->buffer->app_data;
-     for(int64_t y = view->cursor.y - 1; y >= 0; y--){
+     for(int64_t y = motion_range->end.y - 1; y >= 0; y--){
           if(ce_utf8_strlen(view->buffer->lines[y]) == 0) continue;
           if(buffer_app_data->syntax_function == ce_syntax_highlight_c ||
              buffer_app_data->syntax_function == ce_syntax_highlight_cpp){

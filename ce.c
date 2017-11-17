@@ -126,7 +126,12 @@ void ce_buffer_free(CeBuffer_t* buffer){
 
      free(buffer->lines);
      free(buffer->name);
-     if(buffer->change_node) ce_buffer_change_node_free(&buffer->change_node);
+
+     if(buffer->change_node){
+          CeBufferChangeNode_t* head = buffer->change_node;
+          while(head->prev) head = head->prev;
+          ce_buffer_change_node_free(&head);
+     }
 
      memset(buffer, 0, sizeof(*buffer));
 }
@@ -241,7 +246,7 @@ bool ce_buffer_empty(CeBuffer_t* buffer){
      if(buffer->lines == NULL) return false;
 
      // free all lines after the first
-     for(int64_t i = 1; i < buffer->line_count; ++i){
+     for(int64_t i = 0; i < buffer->line_count; ++i){
           free(buffer->lines[i]);
      }
 
