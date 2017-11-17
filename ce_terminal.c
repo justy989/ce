@@ -1469,6 +1469,10 @@ bool ce_terminal_init(CeTerminal_t* terminal, int64_t width, int64_t height, int
      ce_buffer_alloc(terminal->alternate_lines_buffer, line_count, buffer_name);
      terminal->lines_buffer->status = CE_BUFFER_STATUS_READONLY;
      terminal->alternate_lines_buffer->status = CE_BUFFER_STATUS_READONLY;
+     terminal->lines_buffer->no_highlight_current_line = true;
+     terminal->alternate_lines_buffer->no_highlight_current_line = true;
+     terminal->lines_buffer->no_line_numbers = true;
+     terminal->alternate_lines_buffer->no_line_numbers = true;
      terminal->buffer = terminal->lines_buffer;
 
      for(int r = 0; r < line_count; ++r){

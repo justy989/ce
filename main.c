@@ -246,7 +246,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                }
 
                standend();
-               if(real_y == view->cursor.y){
+               if(!view->buffer->no_highlight_current_line && real_y == view->cursor.y){
                     int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
                     int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
                     attron(COLOR_PAIR(change_color_pair));
@@ -265,7 +265,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                          while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
 
                               int bg = draw_color_node->bg;
-                              if(bg == COLOR_DEFAULT && real_y == view->cursor.y){
+                              if(!view->buffer->no_highlight_current_line && bg == COLOR_DEFAULT && real_y == view->cursor.y){
                                    bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, bg);
                               }
 
@@ -315,7 +315,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                // intentional fall through
                case CE_VISUAL_LINE_DISPLAY_TYPE_EXCLUDE_NEWLINE:
                     standend();
-                    if(real_y == view->cursor.y){
+                    if(!view->buffer->no_highlight_current_line && real_y == view->cursor.y){
                          int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_DEFAULT);
                          int change_color_pair = ce_color_def_get(color_defs, COLOR_DEFAULT, bg);
                          attron(COLOR_PAIR(change_color_pair));
@@ -1349,6 +1349,8 @@ int main(int argc, char** argv){
           app.macro_list_buffer->no_line_numbers = true;
           app.mark_list_buffer->no_line_numbers = true;
           app.jump_list_buffer->no_line_numbers = true;
+
+          app.complete_list_buffer->no_highlight_current_line = true;
 
           CeAppBufferData_t* buffer_data = app.complete_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_completions;

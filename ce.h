@@ -98,6 +98,7 @@ typedef struct{
      CeBufferChangeNode_t* save_at_change_node;
 
      bool no_line_numbers;
+     bool no_highlight_current_line;
 
      void* app_data; // TODO: this doesn't need to be a void*
      void* syntax_data;
