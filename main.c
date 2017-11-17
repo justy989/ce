@@ -11,8 +11,13 @@
 #include "ce_app.h"
 #include "ce_commands.h"
 
+#define ENABLE_DEBUG_KEY_PRESS_INFO
+
 FILE* g_ce_log = NULL;
 CeBuffer_t* g_ce_log_buffer = NULL;
+#ifdef ENABLE_DEBUG_KEY_PRESS_INFO
+int g_last_key = 0;
+#endif
 
 // limit to 60 fps
 #define DRAW_USEC_LIMIT 16666
@@ -396,6 +401,10 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      if(vim_mode_string && ce_macros_is_recording(macros)){
           printw(" RECORDING %c", macros->recording);
      }
+
+#ifdef ENABLE_DEBUG_KEY_PRESS_INFO
+     if(vim_mode_string) printw(" %s %d ", keyname(g_last_key), g_last_key);
+#endif
 
      char cursor_pos_string[32];
      int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x + 1, view->cursor.y + 1);
@@ -1677,6 +1686,10 @@ int main(int argc, char** argv){
                sleep(0);
                continue;
           }
+
+#ifdef ENABLE_DEBUG_KEY_PRESS_INFO
+          g_last_key = key;
+#endif
 
           // handle input from the user
           app_handle_key(&app, view, key);
