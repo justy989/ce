@@ -272,7 +272,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
           char* end_of_match = strchr(line, ':');
           CePoint_t match_point = {0, y};
 
-          if(selected == (y - min)){
+          if(selected == y){
                int fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_fg_color(draw_color_list));
                int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
                ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
@@ -293,7 +293,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
 
                     match_point.x += match_len;
 
-                    if(selected == (y - min)){
+                    if(selected == y){
                          fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, COLOR_DEFAULT);
                          bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
                          ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
@@ -910,13 +910,11 @@ CeTerminal_t* create_terminal(CeApp_t* app, int width, int height){
      ce_buffer_node_insert(&app->buffer_node_head, terminal->buffer);
 
      terminal->lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
-     terminal->lines_buffer->no_line_numbers = true;
      CeAppBufferData_t* buffer_data = terminal->lines_buffer->app_data;
      buffer_data->syntax_function = ce_syntax_highlight_terminal;
      terminal->lines_buffer->syntax_data = terminal;
 
      terminal->alternate_lines_buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
-     terminal->alternate_lines_buffer->no_line_numbers = true;
      buffer_data = terminal->alternate_lines_buffer->app_data;
      buffer_data->syntax_function = ce_syntax_highlight_terminal;
      terminal->alternate_lines_buffer->syntax_data = terminal;
