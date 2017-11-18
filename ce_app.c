@@ -1091,6 +1091,7 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      ce_buffer_alloc(input_view->buffer, 1, dialogue);
      input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
      input_view->buffer->no_line_numbers = true;
+     input_view->buffer->no_highlight_current_line = true;
      input_view->cursor = (CePoint_t){0, 0};
 
      app->vim.mode = CE_VIM_MODE_INSERT;

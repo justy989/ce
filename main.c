@@ -1430,7 +1430,6 @@ int main(int argc, char** argv){
           CeBuffer_t* buffer = new_buffer();
           ce_buffer_alloc(buffer, 1, "input");
           app.input_view.buffer = buffer;
-          app.input_view.buffer->no_line_numbers = true;
           ce_buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
