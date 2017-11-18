@@ -11,7 +11,7 @@ todo:
   - status bar
   - key handler ?
 - check if file has been modified since we last loaded it
-- put log and backup files, and session info in ~/.ce
+- backup files, and session info in ~/.ce
 - vim :sort
 - add 'c-mode' as an alias command for 'syntax c' as well as others
 - trim extra whitespace when yanking from terminal

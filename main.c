@@ -2,6 +2,7 @@
 #include <string.h>
 #include <locale.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <ncurses.h>
 #include <unistd.h>
 #include <assert.h>
@@ -1311,8 +1312,21 @@ int main(int argc, char** argv){
           g_ce_log_buffer->no_line_numbers = true;
      }
 
+     char ce_dir[PATH_MAX];
+     snprintf(ce_dir, PATH_MAX, "%s/.ce", getenv("HOME"));
+
+     struct stat st = {};
+     if(stat(ce_dir, &st) == -1){
+          mode_t permissions = S_IRWXU | S_IRWXG;
+          int rc = mkdir(ce_dir, permissions);
+          if(rc != 0){
+               fprintf(stderr, "mkdir('%s', %d) failed: '%s'\n", ce_dir, permissions, strerror(errno));
+               return 1;
+          }
+     }
+
      char log_filepath[PATH_MAX];
-     snprintf(log_filepath, PATH_MAX, "%s/ce.log", getenv("HOME"));
+     snprintf(log_filepath, PATH_MAX, "%s/ce.log", ce_dir);
      if(!ce_log_init(log_filepath)){
           return 1;
      }
