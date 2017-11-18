@@ -11,8 +11,6 @@
 #include "ce_app.h"
 #include "ce_commands.h"
 
-#define ENABLE_DEBUG_KEY_PRESS_INFO
-
 FILE* g_ce_log = NULL;
 CeBuffer_t* g_ce_log_buffer = NULL;
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -1689,6 +1687,7 @@ int main(int argc, char** argv){
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
           g_last_key = key;
+          if(app.log_key_presses) ce_log("key: %s %d\n", keyname(key), key);
 #endif
 
           // handle input from the user

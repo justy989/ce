@@ -1253,3 +1253,11 @@ CeCommandStatus_t command_vim_wqa(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_vim_xa(CeCommand_t* command, void* user_data){
      return command_save_all_and_quit(command, user_data);
 }
+
+#ifdef ENABLE_DEBUG_KEY_PRESS_INFO
+CeCommandStatus_t command_toggle_log_keys_pressed(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+     app->log_key_presses = !app->log_key_presses;
+     return CE_COMMAND_SUCCESS;
+}
+#endif
