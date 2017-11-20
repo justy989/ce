@@ -813,6 +813,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      int64_t save_current_line = current_line;
      int64_t line_len = 0;
      int64_t last_line_offset = 0;
+     bool do_join = false;
 
      // how many lines do we have to delete?
      for(; current_line < buffer->line_count; current_line++){
@@ -820,9 +821,13 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
 
           if(length_left >= line_len){
                length_left -= line_len;
+               if(length_left == 0){
+                    do_join = true;
+                    current_line++;
+                    break;
+               }
           }else{
                last_line_offset = length_left;
-               length_left = 0;
                break;
           }
      }
@@ -830,7 +835,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
      int64_t lines_to_delete = current_line - point.y;
 
      // join the rest of the last line in the deletion, to the first line
-     if(last_line_offset){
+     if(last_line_offset || do_join){
           char* end_to_join = ce_utf8_iterate_to(buffer->lines[current_line], last_line_offset);
           int64_t join_len = strlen(end_to_join);
           int64_t new_len = point.x + join_len;

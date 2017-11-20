@@ -352,6 +352,14 @@ TEST(buffer_remove_string_last_empty_line){
      EXPECT(strcmp(buffer.lines[2], "klmnopqrst") == 0);
 }
 
+TEST(buffer_remove_string_end_of_line_to_beginning_of_line){
+     CeBuffer_t buffer = {};
+     ce_buffer_load_string(&buffer, "if(a){\n   int tacos = 5;\n}", g_name);
+     EXPECT(ce_buffer_remove_string(&buffer, (CePoint_t){6, 0}, 19));
+     EXPECT(buffer.line_count == 1);
+     EXPECT(strcmp(buffer.lines[0], "if(a){}") == 0);
+}
+
 TEST(buffer_dupe_string_portion_of_line){
      CeBuffer_t buffer = {};
      ce_buffer_load_string(&buffer, g_multiline_string, g_name);
@@ -499,7 +507,7 @@ TEST(view_follow_cursor){
      view.cursor.y = 3;
      ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
      EXPECT(view.scroll.x == 0);
-     EXPECT(view.scroll.y == 2);
+     EXPECT(view.scroll.y == 3);
 
      // scroll back to origin
      view.cursor.x = 0;
