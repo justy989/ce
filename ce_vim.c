@@ -2756,7 +2756,7 @@ bool ce_vim_verb_substitute_character(CeVim_t* vim, const CeVimAction_t* action,
      bool success = ce_vim_verb_delete_character(vim, action, motion_range, view, buffer_data, config_options);
      if(success){
           vim->chain_undo = true;
-          vim->mode = CE_VIM_MODE_INSERT;
+          insert_mode(vim);
      }
      return success;
 }
@@ -2769,10 +2769,17 @@ bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* a
      view->cursor.x = soft_begin_index;
      motion_range.start = view->cursor;
      motion_range.end.x = ce_utf8_last_index(view->buffer->lines[motion_range.end.y]);
+
+     // if the line is empty, just enter insert mode
+     if(motion_range.end.x == 0){
+          insert_mode(vim);
+          return true;
+     }
+
      bool success = ce_vim_verb_change(vim, action, motion_range, view, buffer_data, config_options);
      if(success){
           vim->chain_undo = true;
-          vim->mode = CE_VIM_MODE_INSERT;
+          insert_mode(vim);
      }
      return success;
 }
