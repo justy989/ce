@@ -2651,6 +2651,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
           }
      }
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
+     if(delete_len <= 0) return true;
      // if the end of the range is at the end of the buffer, take off the extra newline, unless the line is empty
      if(ce_points_equal(motion_range.end, ce_buffer_end_point(view->buffer)) && motion_range.end.x != 0){
           delete_len--;
@@ -2658,7 +2659,7 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
      if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len)){
           free(removed_string);
-          return CE_VIM_MOTION_RESULT_FAIL;
+          return false;
      }
 
      CePoint_t end_cursor = ce_buffer_clamp_point(view->buffer, motion_range.start, action->clamp_x);
