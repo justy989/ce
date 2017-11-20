@@ -1427,6 +1427,7 @@ int main(int argc, char** argv){
           define_key("\x12", KEY_REDO);
           define_key(NULL, KEY_ENTER);       // Blow away enter
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
+          define_key("\x7F", KEY_BACKSPACE); // Backspace  (127) (0x7F) ASCII "DEL" Delete
      }
 
      ce_app_init_default_commands(&app);
