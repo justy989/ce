@@ -52,6 +52,8 @@ CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_wqa(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_q_exclam(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_qa_exclam(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_xa(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data);

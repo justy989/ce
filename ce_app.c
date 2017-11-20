@@ -1017,6 +1017,8 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_vim_w, "w", "vim's w command to save the current buffer"},
           {command_vim_wq, "wq", "vim's w command to save the current buffer and close the current window"},
           {command_vim_wqa, "wqa", "vim's wqa command save all modified buffers and quit the editor"},
+          {command_vim_q_exclam, "q!", "vim's q! command to delete the current view and if it is the only view then to quit the editor"},
+          {command_vim_qa_exclam, "qa!", "vim's qa! command to quit the editor regardless of the open views"},
           {command_vim_xa, "xa", "vim's xa command save all modified buffers and quit the editor"},
      };
 
