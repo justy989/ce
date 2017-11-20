@@ -3061,8 +3061,9 @@ bool ce_vim_verb_normal_mode(CeVim_t* vim, const CeVimAction_t* action, CeRange_
 
 bool ce_vim_verb_append(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                         CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
+     int64_t last_valid_index = ce_utf8_strlen(view->buffer->lines[view->cursor.y]);
      view->cursor.x++;
-     if(ce_utf8_strlen(view->buffer->lines[view->cursor.y]) == 0) view->cursor.x = 0;
+     if(view->cursor.x > last_valid_index) view->cursor.x = last_valid_index;
      insert_mode(vim);
      return true;
 }
