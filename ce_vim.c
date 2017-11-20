@@ -1219,6 +1219,8 @@ CeRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, cha
           itr += rune_len;
      }
 
+     if(!(*itr)) end_x = -1;
+
      int64_t start_x = start.x + 1;
      itr = save_start;
      previous_rune = ce_utf8_decode_reverse(itr, line_start, &rune_len);
@@ -1229,6 +1231,8 @@ CeRange_t ce_vim_find_string_boundaries(CeBuffer_t* buffer, CePoint_t start, cha
           start_x--;
           itr -= rune_len;
      }
+
+     if(itr == line_start) start_x = -1;
 
      if(start_x > end_x) return range;
 
@@ -1321,7 +1325,7 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
      case '\'':
      {
           CeRange_t string_range = ce_vim_find_string_boundaries(buffer, start, rune);
-          if(inside && string_range.start.x >= 0){
+          if(inside && string_range.start.x >= 0 && string_range.end.x >= 0){
                string_range.start = ce_buffer_advance_point(buffer, string_range.start, 1);
                string_range.end = ce_buffer_advance_point(buffer, string_range.end, -1);
                if(ce_point_after(string_range.start, string_range.end)) return range; // empty in between
