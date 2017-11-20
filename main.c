@@ -1468,7 +1468,7 @@ int main(int argc, char** argv){
           CeConfigOptions_t* config_options = &app.config_options;
           config_options->tab_width = 5;
           config_options->horizontal_scroll_off = 10;
-          config_options->vertical_scroll_off = 5;
+          config_options->vertical_scroll_off = 0;
           config_options->insert_spaces_on_tab = true;
           config_options->terminal_scroll_back = 1024;
           config_options->line_number = CE_LINE_NUMBER_NONE;

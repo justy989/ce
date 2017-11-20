@@ -1104,7 +1104,7 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
 void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
      if(!view->buffer) return;
 
-     int64_t view_height = (view->rect.bottom - view->rect.top);
+     int64_t view_height = (view->rect.bottom - view->rect.top) - 1; // account for status bar
      int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
      int64_t scroll_top = view->scroll.y + vertical_scroll_off;
      int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;
