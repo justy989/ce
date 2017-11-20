@@ -1312,6 +1312,11 @@ CeRange_t ce_vim_find_pair(CeBuffer_t* buffer, CePoint_t start, CeRune_t rune, b
           left_match = '[';
           right_match = ']';
           break;
+     case '<':
+     case '>':
+          left_match = '<';
+          right_match = '>';
+          break;
      case '"':
      case '\'':
      {
