@@ -1063,14 +1063,20 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     key = CE_NEWLINE;
                }
           }else if(key == app->config_options.apply_completion_key){
-               // TODO: compress with above "Load File" match
+               ce_app_apply_completion(app);
+
+               // TODO: compress with other similar code elsewhere
                if(app->input_complete_func == load_file_input_complete_func){
                     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
                     complete_files(&app->input_complete, app->input_view.buffer->lines[0], base_directory);
                     free(base_directory);
                     build_complete_list(app->complete_list_buffer, &app->input_complete);
+               }else{
+                    ce_complete_match(&app->input_complete, app->input_view.buffer->lines[0]);
+                    build_complete_list(app->complete_list_buffer, &app->input_complete);
                }
-               if(ce_app_apply_completion(app)) return;
+
+               return;
           }else if(key == app->config_options.cycle_next_completion_key){
                CeComplete_t* complete = ce_app_is_completing(app);
                if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
