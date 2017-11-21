@@ -9,6 +9,8 @@
 #include "ce_complete.h"
 #include "ce_macros.h"
 
+#define ENABLE_DEBUG_KEY_PRESS_INFO
+
 #define APP_MAX_KEY_COUNT 16
 #define JUMP_LIST_DESTINATION_COUNT 16
 
@@ -133,6 +135,9 @@ typedef struct CeApp_t{
      CeUserConfig_t user_config;
      CeTerminalList_t terminal_list;
      CeTerminal_t* last_terminal;
+
+     // debug
+     bool log_key_presses;
 }CeApp_t;
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);

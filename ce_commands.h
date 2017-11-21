@@ -52,6 +52,8 @@ CeCommandStatus_t command_vim_w(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_q(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_wqa(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_q_exclam(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_vim_qa_exclam(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_xa(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data);
@@ -64,3 +66,7 @@ CeCommandStatus_t command_vim_cn(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_cp(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data);
+
+#ifdef ENABLE_DEBUG_KEY_PRESS_INFO
+CeCommandStatus_t command_toggle_log_keys_pressed(CeCommand_t* command, void* user_data);
+#endif

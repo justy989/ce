@@ -1002,6 +1002,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_switch_to_terminal, "switch_to_terminal", "if the terminal is in view, goto it, otherwise, open the terminal in the current view"},
           {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
+          {command_toggle_log_keys_pressed, "toggle_log_keys_pressed", "debug command to log key presses"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_e, "e", "vim's e command to load a file specified"},
@@ -1016,6 +1017,8 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_vim_w, "w", "vim's w command to save the current buffer"},
           {command_vim_wq, "wq", "vim's w command to save the current buffer and close the current window"},
           {command_vim_wqa, "wqa", "vim's wqa command save all modified buffers and quit the editor"},
+          {command_vim_q_exclam, "q!", "vim's q! command to delete the current view and if it is the only view then to quit the editor"},
+          {command_vim_qa_exclam, "qa!", "vim's qa! command to quit the editor regardless of the open views"},
           {command_vim_xa, "xa", "vim's xa command save all modified buffers and quit the editor"},
      };
 
@@ -1090,6 +1093,7 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      ce_buffer_alloc(input_view->buffer, 1, dialogue);
      input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
      input_view->buffer->no_line_numbers = true;
+     input_view->buffer->no_highlight_current_line = true;
      input_view->cursor = (CePoint_t){0, 0};
 
      app->vim.mode = CE_VIM_MODE_INSERT;

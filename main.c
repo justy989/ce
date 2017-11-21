@@ -2,6 +2,7 @@
 #include <string.h>
 #include <locale.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <ncurses.h>
 #include <unistd.h>
 #include <assert.h>
@@ -10,8 +11,6 @@
 
 #include "ce_app.h"
 #include "ce_commands.h"
-
-#define ENABLE_DEBUG_KEY_PRESS_INFO
 
 FILE* g_ce_log = NULL;
 CeBuffer_t* g_ce_log_buffer = NULL;
@@ -1313,8 +1312,21 @@ int main(int argc, char** argv){
           g_ce_log_buffer->no_line_numbers = true;
      }
 
+     char ce_dir[PATH_MAX];
+     snprintf(ce_dir, PATH_MAX, "%s/.ce", getenv("HOME"));
+
+     struct stat st = {};
+     if(stat(ce_dir, &st) == -1){
+          mode_t permissions = S_IRWXU | S_IRWXG;
+          int rc = mkdir(ce_dir, permissions);
+          if(rc != 0){
+               fprintf(stderr, "mkdir('%s', %d) failed: '%s'\n", ce_dir, permissions, strerror(errno));
+               return 1;
+          }
+     }
+
      char log_filepath[PATH_MAX];
-     snprintf(log_filepath, PATH_MAX, "%s/ce.log", getenv("HOME"));
+     snprintf(log_filepath, PATH_MAX, "%s/ce.log", ce_dir);
      if(!ce_log_init(log_filepath)){
           return 1;
      }
@@ -1415,6 +1427,7 @@ int main(int argc, char** argv){
           define_key("\x12", KEY_REDO);
           define_key(NULL, KEY_ENTER);       // Blow away enter
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
+          define_key("\x7F", KEY_BACKSPACE); // Backspace  (127) (0x7F) ASCII "DEL" Delete
      }
 
      ce_app_init_default_commands(&app);
@@ -1432,7 +1445,6 @@ int main(int argc, char** argv){
           CeBuffer_t* buffer = new_buffer();
           ce_buffer_alloc(buffer, 1, "input");
           app.input_view.buffer = buffer;
-          app.input_view.buffer->no_line_numbers = true;
           ce_buffer_node_insert(&app.buffer_node_head, buffer);
      }
 
@@ -1457,7 +1469,7 @@ int main(int argc, char** argv){
           CeConfigOptions_t* config_options = &app.config_options;
           config_options->tab_width = 5;
           config_options->horizontal_scroll_off = 10;
-          config_options->vertical_scroll_off = 5;
+          config_options->vertical_scroll_off = 0;
           config_options->insert_spaces_on_tab = true;
           config_options->terminal_scroll_back = 1024;
           config_options->line_number = CE_LINE_NUMBER_NONE;
@@ -1689,6 +1701,7 @@ int main(int argc, char** argv){
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
           g_last_key = key;
+          if(app.log_key_presses) ce_log("key: %s %d\n", keyname(key), key);
 #endif
 
           // handle input from the user
