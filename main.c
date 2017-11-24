@@ -659,7 +659,9 @@ void draw(CeApp_t* app){
           app->complete_view.buffer = app->complete_list_buffer;
           app->complete_view.cursor.y = app->complete_list_buffer->cursor_save.y;
           app->complete_view.cursor.x = 0;
-          ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
+          app->complete_view.scroll.y = 0;
+          app->complete_view.scroll.x = 0;
+          ce_view_follow_cursor(&app->complete_view, 0, 0, 0); // NOTE: I don't think anyone wants their settings applied here
           CeDrawColorList_t draw_color_list = {};
           CeRangeList_t range_list = {};
           CeAppBufferData_t* buffer_data = app->complete_view.buffer->app_data;
