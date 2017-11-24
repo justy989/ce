@@ -441,8 +441,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                break;
           }
 
-          CeVimParseResult_t result = ce_vim_parse_action(&action, vim->current_command, vim->key_binds,
-                                                          vim->key_bind_count, vim->mode);
+          CeVimParseResult_t result = ce_vim_parse_action(&action, vim);
 
           if(result == CE_VIM_PARSE_COMPLETE){
                ce_vim_apply_action(vim, &action, view, buffer_data, config_options);
@@ -469,8 +468,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* keys, CeVimKeyBind_t* key_binds,
-                                       int64_t key_bind_count, CeVimMode_t vim_mode){
+CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeVim_t* vim){
      CeVimParseResult_t result = CE_VIM_PARSE_INVALID;
      CeVimAction_t build_action = {};
 
@@ -480,6 +478,7 @@ CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* ke
 
      // parse multiplier if it exists
      const CeRune_t* end_of_multiplier = NULL;
+     const CeRune_t* keys = vim->current_command;
      int64_t multiplier = istrtol(keys, &end_of_multiplier);
      if(end_of_multiplier && multiplier != 0){
           build_action.multiplier = multiplier;
@@ -489,17 +488,17 @@ CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeRune_t* ke
 
      // parse verb
 VIM_PARSE_CONTINUE:
-     for(int64_t i = 0; i < key_bind_count; ++i){
-          CeVimKeyBind_t* key_bind = key_binds + i;
+     for(int64_t i = 0; i < vim->key_bind_count; ++i){
+          const CeVimKeyBind_t* key_bind = vim->key_binds + i;
           if(*keys == key_bind->key){
-               result = key_bind->function(&build_action, *keys);
+               result = key_bind->function(&build_action, vim, *keys);
                if(result != CE_VIM_PARSE_KEY_NOT_HANDLED){
                     keys++;
 
                     int64_t loops = 0;
                     while(result == CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY){
                          if(*keys == 0) return result;
-                         result = key_bind->function(&build_action, *keys);
+                         result = key_bind->function(&build_action, vim, *keys);
                          keys++;
                          if(result == CE_VIM_PARSE_CONTINUE) goto VIM_PARSE_CONTINUE;
                          loops++;
@@ -513,7 +512,7 @@ VIM_PARSE_CONTINUE:
 
      // parse multiplier
      if(result != CE_VIM_PARSE_COMPLETE){
-          if(vim_mode_is_visual(vim_mode) && multiplier == 0){
+          if(vim_mode_is_visual(vim->mode) && multiplier == 0){
                build_action.motion.function = &ce_vim_motion_visual;
                result = CE_VIM_PARSE_COMPLETE;
           }else{
@@ -524,17 +523,17 @@ VIM_PARSE_CONTINUE:
                }
 
                // parse motion
-               for(int64_t i = 0; i < key_bind_count; ++i){
-                    CeVimKeyBind_t* key_bind = key_binds + i;
+               for(int64_t i = 0; i < vim->key_bind_count; ++i){
+                    const CeVimKeyBind_t* key_bind = vim->key_binds + i;
                     if(*keys == key_bind->key){
-                         result = key_bind->function(&build_action, *keys);
+                         result = key_bind->function(&build_action, vim, *keys);
                          if(result != CE_VIM_PARSE_KEY_NOT_HANDLED){
                               keys++;
 
                               int64_t loops = 0;
                               while(result == CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY){
                                    if(*keys == 0) return result;
-                                   result = key_bind->function(&build_action, *keys);
+                                   result = key_bind->function(&build_action, vim, *keys);
                                    keys++;
                                    if(result == CE_VIM_PARSE_CONTINUE) goto VIM_PARSE_CONTINUE;
                                    loops++;
@@ -546,7 +545,7 @@ VIM_PARSE_CONTINUE:
                     }
                }
           }
-     }else if(vim_mode_is_visual(vim_mode) && !build_action.motion.function){
+     }else if(vim_mode_is_visual(vim->mode) && !build_action.motion.function){
           build_action.motion.function = &ce_vim_motion_visual;
      }
 
@@ -1476,7 +1475,7 @@ bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, b
      return true;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
@@ -1485,7 +1484,7 @@ CeVimParseResult_t ce_vim_parse_verb_insert_mode(CeVimAction_t* action, CeRune_t
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_replace_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_replace_mode(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
@@ -1493,7 +1492,7 @@ CeVimParseResult_t ce_vim_parse_verb_replace_mode(CeVimAction_t* action, CeRune_
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
@@ -1501,7 +1500,7 @@ CeVimParseResult_t ce_vim_parse_verb_visual_mode(CeVimAction_t* action, CeRune_t
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_visual_line_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_visual_line_mode(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
@@ -1509,7 +1508,7 @@ CeVimParseResult_t ce_vim_parse_verb_visual_line_mode(CeVimAction_t* action, CeR
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
@@ -1517,7 +1516,7 @@ CeVimParseResult_t ce_vim_parse_verb_normal_mode(CeVimAction_t* action, CeRune_t
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_append(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_append(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_append;
@@ -1525,7 +1524,7 @@ CeVimParseResult_t ce_vim_parse_verb_append(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_append_at_end_of_line;
@@ -1533,7 +1532,7 @@ CeVimParseResult_t ce_vim_parse_verb_append_at_end_of_line(CeVimAction_t* action
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_insert_at_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_insert_at_soft_begin_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_insert_at_soft_begin_line;
@@ -1551,15 +1550,15 @@ static CeVimParseResult_t parse_motion_direction(CeVimAction_t* action, CeVimMot
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_left);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_right);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      action->motion.function = ce_vim_motion_up;
 
@@ -1572,7 +1571,7 @@ CeVimParseResult_t ce_vim_parse_motion_up(CeVimAction_t* action, CeRune_t key){
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
      action->motion.function = ce_vim_motion_down;
 
@@ -1585,62 +1584,68 @@ CeVimParseResult_t ce_vim_parse_motion_down(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_little_word(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_little_word);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_big_word(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_big_word(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_big_word);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_end_little_word(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_end_little_word(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_end_little_word);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_end_big_word(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_end_big_word(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_end_big_word);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_begin_little_word(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_begin_little_word(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_begin_little_word);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_begin_big_word(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_begin_big_word);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_soft_begin_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_soft_begin_line);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_hard_begin_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_hard_begin_line);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_end_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_end_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_end_line);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_page_up(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_page_up(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_page_up);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_page_down(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_page_down(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_page_down);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_half_page_up(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_half_page_up(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_half_page_up);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_half_page_down);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, CeRune_t key){
-     if(!action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
+     if(!action->verb.function){
+          if(vim_mode_is_visual(vim->mode)){
+               action->verb.function = ce_vim_verb_motion;
+          }else{
+               return CE_VIM_PARSE_KEY_NOT_HANDLED;
+          }
+     }
 
      if(action->motion.function == NULL){
           action->motion.function = &ce_vim_motion_inside;
@@ -1653,9 +1658,15 @@ CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, CeRune_t ke
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_around(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_around(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      // around requires a verb
-     if(!action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
+     if(!action->verb.function){
+          if(vim_mode_is_visual(vim->mode)){
+               action->verb.function = ce_vim_verb_motion;
+          }else{
+               return CE_VIM_PARSE_KEY_NOT_HANDLED;
+          }
+     }
 
      if(action->motion.function == NULL){
           action->motion.function = &ce_vim_motion_around;
@@ -1682,61 +1693,61 @@ static CeVimParseResult_t vim_parse_motion_find(CeVimAction_t* action, CeRune_t 
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_find_forward(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_find_forward(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return vim_parse_motion_find(action, key, ce_vim_motion_find_forward);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_find_backward(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_find_backward(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return vim_parse_motion_find(action, key, ce_vim_motion_find_backward);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_until_forward(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return vim_parse_motion_find(action, key, ce_vim_motion_until_forward);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_until_backward(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return vim_parse_motion_find(action, key, ce_vim_motion_until_backward);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_next_find_char(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_next_find_char(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_next_find_char);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_prev_find_char(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_prev_find_char(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_prev_find_char);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_end_of_file(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_end_of_file);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_search_next(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_search_next);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_search_prev(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_search_prev);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_match_pair(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_match_pair(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_match_pair);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_search_word_forward(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->motion.function = ce_vim_motion_search_word_forward;
      action->verb.function = ce_vim_verb_motion;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_search_word_backward(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->motion.function = ce_vim_motion_search_word_backward;
      action->verb.function = ce_vim_verb_motion;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_mark(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_mark(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(!action->motion.function){
           action->motion.function = ce_vim_motion_mark;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1749,7 +1760,7 @@ CeVimParseResult_t ce_vim_parse_motion_mark(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_mark_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_mark_soft_begin_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(!action->motion.function){
           action->motion.function = ce_vim_motion_mark_soft_begin_line;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1762,39 +1773,39 @@ CeVimParseResult_t ce_vim_parse_motion_mark_soft_begin_line(CeVimAction_t* actio
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_motion_top_of_view(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_top_of_view(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_top_of_view);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_middle_of_view(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_middle_of_view(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_middle_of_view);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_bottom_of_view(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_bottom_of_view(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      return parse_motion_direction(action, ce_vim_motion_bottom_of_view);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_next_blank_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_next_blank_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_next_blank_line);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_previous_blank_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_previous_blank_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_previous_blank_line);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_next_zero_indentation_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_next_zero_indentation_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_next_zero_indentation_line);
 }
 
-CeVimParseResult_t ce_vim_parse_motion_previous_zero_indentation_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_motion_previous_zero_indentation_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->exclude_end = true;
      return parse_motion_direction(action, ce_vim_motion_previous_zero_indentation_line);
 }
 
-CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      if(action->verb.function == ce_vim_verb_delete){
           action->motion.function = &ce_vim_motion_entire_line;
@@ -1807,7 +1818,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_delete;
@@ -1815,7 +1826,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      if(action->verb.function == ce_vim_verb_change){
           action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
@@ -1827,7 +1838,7 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_change;
@@ -1835,7 +1846,7 @@ CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      if(action->verb.function == NULL){
           action->verb.function = &ce_vim_verb_set_character;
@@ -1849,27 +1860,27 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, CeRune
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_delete_character(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_delete_character;
      action->clamp_x = CE_CLAMP_X_INSIDE;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_substitute_character(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_substitute_character;
      action->clamp_x = CE_CLAMP_X_ON;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_substitute_soft_begin_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_substitute_soft_begin_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_substitute_soft_begin_line;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function == &ce_vim_verb_yank){
           action->motion.function = &ce_vim_motion_entire_line;
           action->yank_type = CE_VIM_YANK_TYPE_LINE;
@@ -1882,7 +1893,7 @@ CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, CeRune_t key){
      return CE_VIM_PARSE_IN_PROGRESS;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_yank_line(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_yank_line(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->verb.function = &ce_vim_verb_yank;
      action->motion.function = &ce_vim_motion_entire_line;
      if(action->verb.integer == 0) action->verb.integer = '"';
@@ -1890,49 +1901,49 @@ CeVimParseResult_t ce_vim_parse_verb_yank_line(CeVimAction_t* action, CeRune_t k
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_paste_before(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_paste_before;
      if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_paste_after(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_paste_after;
      if(action->verb.integer == 0) action->verb.integer = '"';
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_open_above(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_open_above(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_open_above;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_open_below(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_open_below(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_open_below;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_undo(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->verb.function = &ce_vim_verb_undo;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_redo(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->verb.function = &ce_vim_verb_redo;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_join(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_join(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->verb.function = &ce_vim_verb_join;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.integer == 0){
           action->verb.integer = '"';
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1944,12 +1955,12 @@ CeVimParseResult_t ce_vim_parse_select_yank_register(CeVimAction_t* action, CeRu
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_last_action(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->verb.function = &ce_vim_verb_last_action;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_z_command(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_z_command(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_z_command;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -1961,7 +1972,7 @@ CeVimParseResult_t ce_vim_parse_verb_z_command(CeVimAction_t* action, CeRune_t k
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_g_command;
           if(action->multiplier > 1) return CE_VIM_PARSE_COMPLETE;
@@ -1974,7 +1985,7 @@ CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, CeRune_t k
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_indent;
@@ -1986,7 +1997,7 @@ CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, CeRune_t key)
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_unindent;
@@ -1998,14 +2009,14 @@ CeVimParseResult_t ce_vim_parse_verb_unindent(CeVimAction_t* action, CeRune_t ke
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_flip_case(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_flip_case(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      action->repeatable = true;
      action->motion.function = ce_vim_motion_right;
      action->verb.function = ce_vim_verb_flip_case;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_set_mark(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_set_mark(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->verb.function == NULL){
           action->verb.function = ce_vim_verb_set_mark;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
@@ -2017,13 +2028,13 @@ CeVimParseResult_t ce_vim_parse_verb_set_mark(CeVimAction_t* action, CeRune_t ke
      return CE_VIM_PARSE_INVALID;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_increment_number(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_increment_number(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_INVALID;
      action->verb.function = ce_vim_verb_increment_number;
      return CE_VIM_PARSE_COMPLETE;
 }
 
-CeVimParseResult_t ce_vim_parse_verb_decrement_number(CeVimAction_t* action, CeRune_t key){
+CeVimParseResult_t ce_vim_parse_verb_decrement_number(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(action->motion.function) return CE_VIM_PARSE_INVALID;
      action->verb.function = ce_vim_verb_decrement_number;
      return CE_VIM_PARSE_COMPLETE;
@@ -2651,6 +2662,13 @@ bool ce_vim_verb_motion(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      view->cursor = ce_buffer_clamp_point(view->buffer, motion_range.end, CE_CLAMP_X_INSIDE);
      if(ce_points_equal(motion_range.end, view->cursor)) buffer_data->motion_column = view->cursor.x;
      CePoint_t before_follow = view->scroll;
+
+     if(vim->mode == CE_VIM_MODE_VISUAL &&
+        (action->motion.function == ce_vim_motion_inside ||
+         action->motion.function == ce_vim_motion_around) &&
+        ce_point_after(vim->visual, motion_range.start)){
+          vim->visual = motion_range.start;
+     }
 
      // if we are searching, and our cursor goes off the screen, center it
      if(!ce_points_equal(before_follow, view->scroll) &&
