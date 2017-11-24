@@ -425,7 +425,6 @@ bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool swi
      }
 
      ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, true);
-
      return true;
 }
 
@@ -730,15 +729,16 @@ void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
 }
 
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
-     int64_t last_line = buffer->line_count;
-     if(last_line) last_line--;
-     int64_t line_len = ce_utf8_strlen(buffer->lines[last_line]);
-     if(line_len){
-          if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     int64_t old_line_count = buffer->line_count;
+     if(old_line_count == 1 && strlen(buffer->lines[0]) == 0){
+          return ce_buffer_insert_string(buffer, string, (CePoint_t){0, 0});
      }
-     int64_t next_line = last_line;
-     if(line_len) next_line++;
-     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
+     int64_t new_line_count = buffer->line_count + 1;
+     buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
+     if(buffer->lines == NULL) return false;
+     buffer->line_count = new_line_count;
+     buffer->lines[old_line_count] = calloc(1, sizeof(buffer->lines[old_line_count]));
+     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, old_line_count});
 }
 
 CeDestination_t scan_line_for_destination(const char* line){

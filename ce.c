@@ -648,6 +648,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           }
      }
 
+     int64_t len = strlen(string);
      int64_t string_lines = ce_util_count_string_lines(string);
      if(string_lines == 0){
           return true; // sure, yeah, we inserted that empty string
@@ -675,6 +676,9 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           buffer->lines[point.y] = line;
           buffer->status = CE_BUFFER_STATUS_MODIFIED;
           return true;
+     }else if(string_lines > 1 && string[len - 1] == '\n' && ce_points_equal(point, ce_buffer_end_point(buffer))){
+          // if we insert at the end of a buffer and the last character in the string is a newline, then don't insert the extra blank line
+          string_lines--;
      }
 
      int64_t shift_lines = string_lines - 1;
