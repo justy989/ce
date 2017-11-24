@@ -132,6 +132,7 @@ bool ce_vim_free(CeVim_t* vim){
           ce_vim_yank_free(vim->yanks + i);
      }
      ce_rune_node_free(&vim->insert_rune_head);
+     ce_rune_node_free(&vim->last_insert_rune_head);
      return true;
 }
 
@@ -332,6 +333,18 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
           break;
      case 27: // escape
      {
+          if(!vim->insert_rune_head &&
+             (vim->current_action.verb.function == ce_vim_verb_insert_mode ||
+              vim->current_action.verb.function == ce_vim_verb_append ||
+              vim->current_action.verb.function == ce_vim_verb_append_at_end_of_line)){
+               // pass
+          }else{
+               vim->last_action = vim->current_action;
+               if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
+               vim->last_insert_rune_head = vim->insert_rune_head;
+               vim->insert_rune_head = NULL;
+          }
+
           // check if previous line was all whitespace, if so, remove it
           CePoint_t remove_loc = {0, view->cursor.y};
           if(string_is_whitespace(view->buffer->lines[view->cursor.y])){
@@ -404,7 +417,6 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
           return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
           if(!vim->verb_last_action && key != 27) ce_rune_node_insert(&vim->insert_rune_head, key);
-          memset(&vim->current_action, 0, sizeof(vim->current_action));
           return insert_mode_handle_key(vim, view, key, config_options);
      case CE_VIM_MODE_REPLACE:
           if(key != CE_NEWLINE && key != 27){ // escape
@@ -416,7 +428,6 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
               }
           }
 
-          memset(&vim->current_action, 0, sizeof(vim->current_action));
           return insert_mode_handle_key(vim, view, key, config_options);
      case CE_VIM_MODE_NORMAL:
      case CE_VIM_MODE_VISUAL:
@@ -438,8 +449,12 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                vim->current_command[0] = 0;
 
                if(!vim->verb_last_action && action.repeatable){
-                    vim->last_action = action;
-                    ce_rune_node_free(&vim->insert_rune_head);
+                    if(vim->mode == CE_VIM_MODE_NORMAL){
+                         vim->last_action = action;
+                         if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
+                         vim->last_insert_rune_head = vim->insert_rune_head;
+                         vim->insert_rune_head = NULL;
+                    }
                }
           }else if(result == CE_VIM_PARSE_INVALID ||
                    result == CE_VIM_PARSE_KEY_NOT_HANDLED){
@@ -3118,8 +3133,8 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
           return false;
      }
 
-     if(vim->insert_rune_head){
-          CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
+     if(vim->last_insert_rune_head){
+          CeRune_t* rune_string = ce_rune_node_string(vim->last_insert_rune_head);
           CeRune_t* itr = rune_string;
 
           while(*itr){
