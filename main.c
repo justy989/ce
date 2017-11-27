@@ -1616,6 +1616,12 @@ int main(int argc, char** argv){
                if(app.ready_to_draw){
                     draw(&app);
                     app.ready_to_draw = false;
+                    app.shell_command_ready_to_draw = false;
+                    previous_draw_time = current_draw_time;
+               }else if(app.shell_command_ready_to_draw && ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer)){
+                    draw(&app);
+                    app.ready_to_draw = false;
+                    app.shell_command_ready_to_draw = false;
                     previous_draw_time = current_draw_time;
                }else{
                     CeTerminalNode_t* itr = app.terminal_list.head;
@@ -1633,7 +1639,9 @@ int main(int argc, char** argv){
                     // if we did draw, turn of any outstanding draw flags
                     if(do_draw){
                          draw(&app);
+                         app.shell_command_ready_to_draw = false;
                          app.ready_to_draw = false;
+                         previous_draw_time = current_draw_time;
                     }
                }
           }

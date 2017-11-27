@@ -137,6 +137,9 @@ typedef struct CeApp_t{
      CeTerminalList_t terminal_list;
      CeTerminal_t* last_terminal;
 
+     pthread_t shell_command_thread;
+     bool shell_command_ready_to_draw;
+
      // debug
      bool log_key_presses;
 }CeApp_t;

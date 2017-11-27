@@ -1050,23 +1050,30 @@ static pid_t bidirectional_popen(const char* cmd, int* in_fd, int* out_fd){
      return pid;
 }
 
-CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
-     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+typedef struct{
+     CeBuffer_t* buffer;
+     char* command;
+     bool* ready_to_draw;
+}ShellCommandData_t;
 
-     CeApp_t* app = (CeApp_t*)(user_data);
+void run_shell_command_cleanup(void* data){
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+     free(shell_command_data->command);
+     free(shell_command_data);
+}
+
+static void* run_shell_command_and_output_to_buffer(void* data){
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+     pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
 
      int input_fd = -1;
      int output_fd = -1;
-     pid_t pid = bidirectional_popen(command->args[0].string, &input_fd, &output_fd);
+     pid_t pid = bidirectional_popen(shell_command_data->command, &input_fd, &output_fd);
      if(pid == 0){
-          ce_app_message(app, "failed to run shell command '%s': '%s'", command->args[0].string, strerror(errno));
-          return CE_COMMAND_FAILURE;
+          ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
+          return NULL;
      }
 
-     ce_buffer_empty(app->shell_command_buffer);
-
-     // collect output
      char bytes[BUFSIZ];
      int status = 0;
      pid_t w;
@@ -1076,31 +1083,58 @@ CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
                byte_count = read(output_fd, bytes, BUFSIZ);
                if(byte_count < 0){
                     ce_log("shell command: read from pid %d failed\n", pid);
-                    return CE_COMMAND_FAILURE;
+                    return NULL;
                }else if(byte_count > 0){
-                    if(bytes[byte_count - 1] == CE_NEWLINE){
-                         bytes[byte_count - 1] = 0;
-                    }else{
-                         bytes[byte_count] = 0;
-                    }
-                    buffer_append_on_new_line(app->shell_command_buffer, bytes);
+                    bytes[byte_count] = 0;
+                    ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+                    *shell_command_data->ready_to_draw = true;
                }
           }
 
           w = waitpid(pid, &status, WNOHANG);
-          if(w == -1) return CE_COMMAND_FAILURE;
+          if(w == -1) return NULL;
 
           if(WIFEXITED(status)){
-               int rc = WEXITSTATUS(status);
-               if(rc != 0) ce_log("shell command proccess pid %d exited, status = %d\n", pid, WEXITSTATUS(status));
+               snprintf(bytes, BUFSIZ, "\npid %d exited with code %d\n", pid, WEXITSTATUS(status));
           }else if(WIFSIGNALED(status)){
-               ce_log("shell command proccess pid %d killed by signal %d\n", pid, WTERMSIG(status));
+               snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d\n", pid, WTERMSIG(status));
           }else if(WIFSTOPPED(status)){
-               ce_log("shell command proccess pid %d stopped by signal %d\n", pid, WSTOPSIG(status));
+               snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d\n", pid, WSTOPSIG(status));
           }else if (WIFCONTINUED(status)){
-               ce_log("shell command proccess pid %d continued\n", pid);
+               snprintf(bytes, BUFSIZ, "\npid %d continued\n", pid);
           }
      }while(!WIFEXITED(status) && !WIFSIGNALED(status));
+
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
+     *shell_command_data->ready_to_draw = true;
+     pthread_cleanup_pop(1);
+     return NULL;
+}
+
+CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = (CeApp_t*)(user_data);
+
+     if(app->shell_command_thread){
+          pthread_cancel(app->shell_command_thread);
+          pthread_join(app->shell_command_thread, NULL);
+     }
+
+     ce_buffer_empty(app->shell_command_buffer);
+
+     ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
+     shell_command_data->buffer = app->shell_command_buffer;
+     shell_command_data->command = strdup(command->args[0].string);
+     shell_command_data->ready_to_draw = &app->shell_command_ready_to_draw;
+
+     int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
+     if(rc != 0){
+          ce_log("pthread_create() failed: '%s'\n", strerror(errno));
+          return false;
+     }
 
      return CE_COMMAND_SUCCESS;
 }
