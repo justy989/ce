@@ -994,7 +994,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
-                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, true);
+                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
+                                                    &app->terminal_list, &app->last_terminal, true);
                               break;
                          }
                          itr = itr->next;
