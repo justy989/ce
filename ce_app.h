@@ -113,6 +113,7 @@ typedef struct CeApp_t{
      CeBuffer_t* macro_list_buffer;
      CeBuffer_t* mark_list_buffer;
      CeBuffer_t* jump_list_buffer;
+     CeBuffer_t* shell_command_buffer;
      CeBuffer_t* last_goto_buffer;
      CeComplete_t input_complete;
      CeHistory_t command_history;

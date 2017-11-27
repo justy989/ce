@@ -1016,6 +1016,11 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
+     // CeApp_t* app = (CeApp_t*)(user_data);
+     return CE_COMMAND_SUCCESS;
+}
+
 void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match, const char* replacement, CePoint_t start, CePoint_t end,
                         bool regex_search){
      bool chain_undo = false;
