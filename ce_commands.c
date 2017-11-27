@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include <errno.h>
-#include <sys/wait.h>
 
 typedef struct{
      CeLayout_t* tab_layout;
@@ -1011,109 +1010,9 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      char cmd[128];
      snprintf(cmd, 128, "man %s", word);
      free(word);
-     ce_switch_to_terminal(app, command_context.view, command_context.tab_layout);
-     ce_run_command_in_terminal(app->last_terminal, cmd);
+     ce_app_run_shell_command(app, cmd, command_context.tab_layout, command_context.view);
 
      return CE_COMMAND_SUCCESS;
-}
-
-// NOTE: stderr is redirected to stdout
-static pid_t bidirectional_popen(const char* cmd, int* in_fd, int* out_fd){
-     int input_fds[2];
-     int output_fds[2];
-
-     if(pipe(input_fds) != 0) return 0;
-     if(pipe(output_fds) != 0) return 0;
-
-     pid_t pid = fork();
-     if(pid < 0) return 0;
-
-     if(pid == 0){
-          close(input_fds[1]);
-          close(output_fds[0]);
-
-          dup2(input_fds[0], STDIN_FILENO);
-          dup2(output_fds[1], STDOUT_FILENO);
-          dup2(output_fds[1], STDERR_FILENO);
-
-          // TODO: run user's SHELL ?
-          execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
-          assert(0);
-     }else{
-         close(input_fds[0]);
-         close(output_fds[1]);
-
-         *in_fd = input_fds[1];
-         *out_fd = output_fds[0];
-     }
-
-     return pid;
-}
-
-typedef struct{
-     CeBuffer_t* buffer;
-     char* command;
-     bool* ready_to_draw;
-}ShellCommandData_t;
-
-void run_shell_command_cleanup(void* data){
-     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
-     free(shell_command_data->command);
-     free(shell_command_data);
-}
-
-static void* run_shell_command_and_output_to_buffer(void* data){
-     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
-     pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
-
-     int input_fd = -1;
-     int output_fd = -1;
-     pid_t pid = bidirectional_popen(shell_command_data->command, &input_fd, &output_fd);
-     if(pid == 0){
-          ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
-          return NULL;
-     }
-
-     char bytes[BUFSIZ];
-     int status = 0;
-     pid_t w;
-     ssize_t byte_count = 1;
-     do{
-          while(byte_count != 0){
-               byte_count = read(output_fd, bytes, BUFSIZ);
-               if(byte_count < 0){
-                    ce_log("shell command: read from pid %d failed\n", pid);
-                    return NULL;
-               }else if(byte_count > 0){
-                    bytes[byte_count] = 0;
-                    ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-                    *shell_command_data->ready_to_draw = true;
-               }
-          }
-
-          w = waitpid(pid, &status, WNOHANG);
-          if(w == -1) return NULL;
-
-          if(WIFEXITED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", pid, WEXITSTATUS(status));
-               bytes[byte_count] = 0;
-          }else if(WIFSIGNALED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", pid, WTERMSIG(status));
-               bytes[byte_count] = 0;
-          }else if(WIFSTOPPED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", pid, WSTOPSIG(status));
-               bytes[byte_count] = 0;
-          }else if (WIFCONTINUED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d continued", pid);
-               bytes[byte_count] = 0;
-          }
-     }while(!WIFEXITED(status) && !WIFSIGNALED(status));
-
-     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-     shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
-     *shell_command_data->ready_to_draw = true;
-     pthread_cleanup_pop(1);
-     return NULL;
 }
 
 CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
@@ -1125,29 +1024,8 @@ CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(app->shell_command_thread){
-          pthread_cancel(app->shell_command_thread);
-          pthread_join(app->shell_command_thread, NULL);
-     }
-
-     ce_buffer_empty(app->shell_command_buffer);
-     CeAppBufferData_t* buffer_data = app->shell_command_buffer->app_data;
-     buffer_data->last_goto_destination = 0;
-     app->last_goto_buffer = app->shell_command_buffer;
-     if(!ce_layout_buffer_in_view(command_context.tab_layout, app->shell_command_buffer)){
-          ce_view_switch_buffer(command_context.view, app->shell_command_buffer, &app->vim, &app->config_options,
-                                &app->terminal_list, &app->last_terminal, true);
-     }
-
-     ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
-     shell_command_data->buffer = app->shell_command_buffer;
-     shell_command_data->command = strdup(command->args[0].string);
-     shell_command_data->ready_to_draw = &app->shell_command_ready_to_draw;
-
-     int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
-     if(rc != 0){
-          ce_log("pthread_create() failed: '%s'\n", strerror(errno));
-          return false;
+     if(!ce_app_run_shell_command(app, command->args[0].string, command_context.tab_layout, command_context.view)){
+          return CE_COMMAND_FAILURE;
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1368,25 +1246,18 @@ CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
 
      if(command->arg_count == 0){
-          update_terminal_last_goto_using_cursor(app->last_terminal);
-          ce_run_command_in_terminal(app->last_terminal, "make");
+          CommandContext_t command_context = {};
+          if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+          ce_app_run_shell_command(app, "make", command_context.tab_layout, command_context.view);
      }else if(command->arg_count == 1 &&
               command->args[0].type == CE_COMMAND_ARG_STRING){
+          CommandContext_t command_context = {};
+          if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
           char command_string[256];
           snprintf(command_string, 256, "make %s", command->args[0].string);
-          update_terminal_last_goto_using_cursor(app->last_terminal);
-          ce_run_command_in_terminal(app->last_terminal, command_string);
+          ce_app_run_shell_command(app, command_string, command_context.tab_layout, command_context.view);
      }else{
           return CE_COMMAND_PRINT_HELP;
-     }
-
-     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
-     CeLayout_t* terminal_layout = ce_layout_buffer_in_view(tab_layout, app->last_terminal->buffer);
-     if(terminal_layout){
-          terminal_layout->view.cursor.x = 0;
-          terminal_layout->view.cursor.y = app->last_terminal->cursor.y;
-          terminal_layout->view.scroll.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
-          terminal_layout->view.scroll.x = 0;
      }
 
      return CE_COMMAND_SUCCESS;
