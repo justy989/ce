@@ -20,7 +20,7 @@ int ce_syntax_def_get_bg(CeSyntaxDef_t* syntax_defs, CeSyntaxColor_t syntax_colo
 }
 
 bool ce_draw_color_list_insert(CeDrawColorList_t* list, int fg, int bg, CePoint_t point){
-     if(list->tail && list->tail->fg == fg && list->tail->bg == bg) return true;
+     if(list->tail && list->tail->fg == fg && list->tail->bg == bg && list->tail->point.y == point.y) return true;
      CeDrawColorNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
      node->fg = fg;
@@ -634,18 +634,15 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                                                         (CePoint_t){0, match_point.y + 1});
                          }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
-
                          }
-                    }
-
-                    if(in_visual){
-                         change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
                     }
 
                     if(match_len) current_match_len = match_len;
                }else{
                     current_match_len--;
                }
+
+               if(in_visual) change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_VISUAL, match_point);
           }
 
           check_visual_mode_end(range_node, &in_visual, match_point.y, line_len, draw_color_list);
