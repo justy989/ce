@@ -1010,6 +1010,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_toggle_log_keys_pressed, "toggle_log_keys_pressed", "debug command to log key presses"},
+          {command_shell_command, "shell_command", "run a shell command"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_e, "e", "vim's e command to load a file specified"},

@@ -1171,10 +1171,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                          ce_jump_list_insert(jump_list, destination);
-                    }else if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
-                             app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
-                             app->vim.current_action.motion.function == ce_vim_motion_search_next ||
-                             app->vim.current_action.motion.function == ce_vim_motion_search_prev){
+                    }
+
+                    if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_next ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_prev){
                          app->highlight_search = true;
                     }
                }
@@ -1348,6 +1350,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer = new_buffer();
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
+          app.shell_command_buffer = new_buffer();
           CeBuffer_t* scratch_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
@@ -1362,6 +1365,8 @@ int main(int argc, char** argv){
           ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
           ce_buffer_alloc(app.jump_list_buffer, 1, "[jumps]");
           ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
+          ce_buffer_alloc(app.shell_command_buffer, 1, "[shell command]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.shell_command_buffer);
           ce_buffer_alloc(scratch_buffer, 1, "scratch");
           ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
 
@@ -1371,6 +1376,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.shell_command_buffer->status = CE_BUFFER_STATUS_NONE;
           scratch_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
@@ -1379,6 +1385,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->no_line_numbers = true;
           app.mark_list_buffer->no_line_numbers = true;
           app.jump_list_buffer->no_line_numbers = true;
+          app.shell_command_buffer->no_line_numbers = true;
 
           app.complete_list_buffer->no_highlight_current_line = true;
 
@@ -1394,6 +1401,8 @@ int main(int argc, char** argv){
           buffer_data = app.mark_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.jump_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.shell_command_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;

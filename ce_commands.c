@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 typedef struct{
      CeLayout_t* tab_layout;
@@ -1016,8 +1017,91 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      return CE_COMMAND_SUCCESS;
 }
 
+// NOTE: stderr is redirected to stdout
+static pid_t bidirectional_popen(const char* cmd, int* in_fd, int* out_fd){
+     int input_fds[2];
+     int output_fds[2];
+
+     if(pipe(input_fds) != 0) return 0;
+     if(pipe(output_fds) != 0) return 0;
+
+     pid_t pid = fork();
+     if(pid < 0) return 0;
+
+     if(pid == 0){
+          close(input_fds[1]);
+          close(output_fds[0]);
+
+          dup2(input_fds[0], STDIN_FILENO);
+          dup2(output_fds[1], STDOUT_FILENO);
+          dup2(output_fds[1], STDERR_FILENO);
+
+          // TODO: run user's SHELL ?
+          execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+          assert(0);
+     }else{
+         close(input_fds[0]);
+         close(output_fds[1]);
+
+         *in_fd = input_fds[1];
+         *out_fd = output_fds[0];
+     }
+
+     return pid;
+}
+
 CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
-     // CeApp_t* app = (CeApp_t*)(user_data);
+     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = (CeApp_t*)(user_data);
+
+     int input_fd = -1;
+     int output_fd = -1;
+     pid_t pid = bidirectional_popen(command->args[0].string, &input_fd, &output_fd);
+     if(pid == 0){
+          ce_app_message(app, "failed to run shell command '%s': '%s'", command->args[0].string, strerror(errno));
+          return CE_COMMAND_FAILURE;
+     }
+
+     ce_buffer_empty(app->shell_command_buffer);
+
+     // collect output
+     char bytes[BUFSIZ];
+     int status = 0;
+     pid_t w;
+     ssize_t byte_count = 1;
+     do{
+          while(byte_count != 0){
+               byte_count = read(output_fd, bytes, BUFSIZ);
+               if(byte_count < 0){
+                    ce_log("shell command: read from pid %d failed\n", pid);
+                    return CE_COMMAND_FAILURE;
+               }else if(byte_count > 0){
+                    if(bytes[byte_count - 1] == CE_NEWLINE){
+                         bytes[byte_count - 1] = 0;
+                    }else{
+                         bytes[byte_count] = 0;
+                    }
+                    buffer_append_on_new_line(app->shell_command_buffer, bytes);
+               }
+          }
+
+          w = waitpid(pid, &status, WNOHANG);
+          if(w == -1) return CE_COMMAND_FAILURE;
+
+          if(WIFEXITED(status)){
+               int rc = WEXITSTATUS(status);
+               if(rc != 0) ce_log("shell command proccess pid %d exited, status = %d\n", pid, WEXITSTATUS(status));
+          }else if(WIFSIGNALED(status)){
+               ce_log("shell command proccess pid %d killed by signal %d\n", pid, WTERMSIG(status));
+          }else if(WIFSTOPPED(status)){
+               ce_log("shell command proccess pid %d stopped by signal %d\n", pid, WSTOPSIG(status));
+          }else if (WIFCONTINUED(status)){
+               ce_log("shell command proccess pid %d continued\n", pid);
+          }
+     }while(!WIFEXITED(status) && !WIFSIGNALED(status));
+
      return CE_COMMAND_SUCCESS;
 }
 
