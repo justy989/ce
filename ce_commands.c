@@ -1095,13 +1095,17 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           if(w == -1) return NULL;
 
           if(WIFEXITED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d exited with code %d\n", pid, WEXITSTATUS(status));
+               byte_count = snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", pid, WEXITSTATUS(status));
+               bytes[byte_count] = 0;
           }else if(WIFSIGNALED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d\n", pid, WTERMSIG(status));
+               byte_count = snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", pid, WTERMSIG(status));
+               bytes[byte_count] = 0;
           }else if(WIFSTOPPED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d\n", pid, WSTOPSIG(status));
+               byte_count = snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", pid, WSTOPSIG(status));
+               bytes[byte_count] = 0;
           }else if (WIFCONTINUED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d continued\n", pid);
+               byte_count = snprintf(bytes, BUFSIZ, "\npid %d continued", pid);
+               bytes[byte_count] = 0;
           }
      }while(!WIFEXITED(status) && !WIFSIGNALED(status));
 
@@ -1117,6 +1121,9 @@ CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
      if(app->shell_command_thread){
           pthread_cancel(app->shell_command_thread);
@@ -1124,6 +1131,13 @@ CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
      }
 
      ce_buffer_empty(app->shell_command_buffer);
+     CeAppBufferData_t* buffer_data = app->shell_command_buffer->app_data;
+     buffer_data->last_goto_destination = 0;
+     app->last_goto_buffer = app->shell_command_buffer;
+     if(!ce_layout_buffer_in_view(command_context.tab_layout, app->shell_command_buffer)){
+          ce_view_switch_buffer(command_context.view, app->shell_command_buffer, &app->vim, &app->config_options,
+                                &app->terminal_list, &app->last_terminal, true);
+     }
 
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
      shell_command_data->buffer = app->shell_command_buffer;
