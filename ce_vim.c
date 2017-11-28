@@ -2837,6 +2837,9 @@ bool ce_vim_verb_yank(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motio
      CeVimYank_t* yank = vim->yanks + ce_vim_register_index(action->verb.integer);
      ce_vim_yank_free(yank);
      int64_t yank_len = 0;
+     if(action->exclude_end){
+          motion_range.end = ce_buffer_advance_point(view->buffer, motion_range.end, -1);
+     }
      yank_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      yank->text = ce_buffer_dupe_string(view->buffer, motion_range.start, yank_len);
      yank->type = action->yank_type;
