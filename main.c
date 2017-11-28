@@ -659,7 +659,9 @@ void draw(CeApp_t* app){
           app->complete_view.buffer = app->complete_list_buffer;
           app->complete_view.cursor.y = app->complete_list_buffer->cursor_save.y;
           app->complete_view.cursor.x = 0;
-          ce_view_follow_cursor(&app->complete_view, 1, 1, 1); // NOTE: I don't think anyone wants their settings applied here
+          app->complete_view.scroll.y = 0;
+          app->complete_view.scroll.x = 0;
+          ce_view_follow_cursor(&app->complete_view, 0, 0, 0); // NOTE: I don't think anyone wants their settings applied here
           CeDrawColorList_t draw_color_list = {};
           CeRangeList_t range_list = {};
           CeAppBufferData_t* buffer_data = app->complete_view.buffer->app_data;
@@ -992,7 +994,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     int64_t index = 0;
                     while(itr){
                          if(index == view->cursor.y){
-                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, true);
+                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
+                                                    &app->terminal_list, &app->last_terminal, true);
                               break;
                          }
                          itr = itr->next;
@@ -1168,10 +1171,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          destination.point = view->cursor;
                          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
                          ce_jump_list_insert(jump_list, destination);
-                    }else if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
-                             app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
-                             app->vim.current_action.motion.function == ce_vim_motion_search_next ||
-                             app->vim.current_action.motion.function == ce_vim_motion_search_prev){
+                    }
+
+                    if(app->vim.current_action.motion.function == ce_vim_motion_search_word_forward ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_word_backward ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_next ||
+                       app->vim.current_action.motion.function == ce_vim_motion_search_prev){
                          app->highlight_search = true;
                     }
                }
@@ -1345,6 +1350,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer = new_buffer();
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
+          app.shell_command_buffer = new_buffer();
           CeBuffer_t* scratch_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
@@ -1359,6 +1365,8 @@ int main(int argc, char** argv){
           ce_buffer_node_insert(&app.buffer_node_head, app.mark_list_buffer);
           ce_buffer_alloc(app.jump_list_buffer, 1, "[jumps]");
           ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
+          ce_buffer_alloc(app.shell_command_buffer, 1, "[shell command]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.shell_command_buffer);
           ce_buffer_alloc(scratch_buffer, 1, "scratch");
           ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
 
@@ -1368,6 +1376,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.mark_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.shell_command_buffer->status = CE_BUFFER_STATUS_NONE;
           scratch_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
@@ -1376,6 +1385,7 @@ int main(int argc, char** argv){
           app.macro_list_buffer->no_line_numbers = true;
           app.mark_list_buffer->no_line_numbers = true;
           app.jump_list_buffer->no_line_numbers = true;
+          app.shell_command_buffer->no_line_numbers = true;
 
           app.complete_list_buffer->no_highlight_current_line = true;
 
@@ -1391,6 +1401,8 @@ int main(int argc, char** argv){
           buffer_data = app.mark_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.jump_list_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.shell_command_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
@@ -1604,6 +1616,12 @@ int main(int argc, char** argv){
                if(app.ready_to_draw){
                     draw(&app);
                     app.ready_to_draw = false;
+                    app.shell_command_ready_to_draw = false;
+                    previous_draw_time = current_draw_time;
+               }else if(app.shell_command_ready_to_draw && ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer)){
+                    draw(&app);
+                    app.ready_to_draw = false;
+                    app.shell_command_ready_to_draw = false;
                     previous_draw_time = current_draw_time;
                }else{
                     CeTerminalNode_t* itr = app.terminal_list.head;
@@ -1621,7 +1639,9 @@ int main(int argc, char** argv){
                     // if we did draw, turn of any outstanding draw flags
                     if(do_draw){
                          draw(&app);
+                         app.shell_command_ready_to_draw = false;
                          app.ready_to_draw = false;
+                         previous_draw_time = current_draw_time;
                     }
                }
           }

@@ -12,6 +12,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
@@ -352,11 +353,14 @@ CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list){
 }
 
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options,
-                           bool insert_into_jump_list){
+                           CeTerminalList_t* terminal_list, CeTerminal_t** last_terminal, bool insert_into_jump_list){
      CeAppViewData_t* view_data = view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
 
      if(view_data->prev_buffer != view->buffer) view_data->prev_buffer = view->buffer;
+
+     CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, terminal_list);
+     if(terminal) *last_terminal = terminal;
 
      // if the old buffer is not in the jump list, then add it
      if(insert_into_jump_list){
@@ -424,8 +428,8 @@ bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool swi
           }
      }
 
-     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, true);
-
+     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, &app->terminal_list,
+                           &app->last_terminal, true);
      return true;
 }
 
@@ -457,13 +461,15 @@ CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_la
      if(app->last_terminal){
           app->last_terminal->buffer->cursor_save.x = app->last_terminal->cursor.x;
           app->last_terminal->buffer->cursor_save.y = app->last_terminal->cursor.y + app->last_terminal->start_line;
-          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options, true);
+          ce_view_switch_buffer(view, app->last_terminal->buffer, &app->vim, &app->config_options, &app->terminal_list,
+                                &app->last_terminal, true);
           ce_terminal_resize(app->last_terminal, width, height);
      }else{
           CeTerminal_t* terminal = create_terminal(app, width, height);
           terminal->buffer->cursor_save.x = terminal->cursor.x;
           terminal->buffer->cursor_save.y = terminal->cursor.y + terminal->start_line;
-          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options, true);
+          ce_view_switch_buffer(view, terminal->buffer, &app->vim, &app->config_options, &app->terminal_list,
+                                &app->last_terminal, true);
           app->last_terminal = terminal;
           update_terminal_last_goto_using_cursor(terminal);
      }
@@ -518,6 +524,7 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
 
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
+                                CeTerminalList_t* terminal_list, CeTerminal_t** last_terminal,
                                 bool insert_into_jump_list, const char* filepath){
      // adjust the filepath if it doesn't match our pwd
      char real_path[PATH_MAX + 1];
@@ -547,7 +554,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBufferNode_t* itr = *buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, load_path) == 0){
-               ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options, terminal_list, last_terminal, insert_into_jump_list);
                return itr->buffer;
           }
           itr = itr->next;
@@ -557,7 +564,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBuffer_t* buffer = new_buffer();
      if(ce_buffer_load_file(buffer, load_path)){
           ce_buffer_node_insert(buffer_node_head, buffer);
-          ce_view_switch_buffer(view, buffer, vim, config_options, insert_into_jump_list);
+          ce_view_switch_buffer(view, buffer, vim, config_options, terminal_list, last_terminal, insert_into_jump_list);
           determine_buffer_syntax(buffer);
      }else{
           free(buffer);
@@ -730,15 +737,16 @@ void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete){
 }
 
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string){
-     int64_t last_line = buffer->line_count;
-     if(last_line) last_line--;
-     int64_t line_len = ce_utf8_strlen(buffer->lines[last_line]);
-     if(line_len){
-          if(!ce_buffer_insert_string(buffer, "\n", (CePoint_t){line_len, last_line})) return false;
+     int64_t old_line_count = buffer->line_count;
+     if(old_line_count == 1 && strlen(buffer->lines[0]) == 0){
+          return ce_buffer_insert_string(buffer, string, (CePoint_t){0, 0});
      }
-     int64_t next_line = last_line;
-     if(line_len) next_line++;
-     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, next_line});
+     int64_t new_line_count = buffer->line_count + 1;
+     buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
+     if(buffer->lines == NULL) return false;
+     buffer->line_count = new_line_count;
+     buffer->lines[old_line_count] = calloc(1, sizeof(buffer->lines[old_line_count]));
+     return ce_buffer_insert_string(buffer, string, (CePoint_t){0, old_line_count});
 }
 
 CeDestination_t scan_line_for_destination(const char* line){
@@ -1003,6 +1011,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_toggle_log_keys_pressed, "toggle_log_keys_pressed", "debug command to log key presses"},
+          {command_shell_command, "shell_command", "run a shell command"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_e, "e", "vim's e command to load a file specified"},
@@ -1217,7 +1226,7 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
                strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
           }
           if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                  true, filepath)){
+                                  &app->terminal_list, &app->last_terminal, true, filepath)){
                ce_app_message(app, "failed to load file '%s': '%s'", filepath, strerror(errno));
                return false;
           }
@@ -1265,7 +1274,8 @@ bool switch_buffer_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      CeBufferNode_t* itr = app->buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-               ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, jump_list);
+               ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, &app->terminal_list,
+                                     &app->last_terminal, jump_list);
                break;
           }
           itr = itr->next;
@@ -1322,5 +1332,138 @@ bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
           yank->text = ce_buffer_dupe(app->input_view.buffer);
           yank->type = yank_type;
      }
+     return true;
+}
+
+// NOTE: stderr is redirected to stdout
+static pid_t bidirectional_popen(const char* cmd, int* in_fd, int* out_fd){
+     int input_fds[2];
+     int output_fds[2];
+
+     if(pipe(input_fds) != 0) return 0;
+     if(pipe(output_fds) != 0) return 0;
+
+     pid_t pid = fork();
+     if(pid < 0) return 0;
+
+     if(pid == 0){
+          close(input_fds[1]);
+          close(output_fds[0]);
+
+          dup2(input_fds[0], STDIN_FILENO);
+          dup2(output_fds[1], STDOUT_FILENO);
+          dup2(output_fds[1], STDERR_FILENO);
+
+          // TODO: run user's SHELL ?
+          execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+     }else{
+         close(input_fds[0]);
+         close(output_fds[1]);
+
+         *in_fd = input_fds[1];
+         *out_fd = output_fds[0];
+     }
+
+     return pid;
+}
+
+typedef struct{
+     CeBuffer_t* buffer;
+     char* command;
+     volatile bool* ready_to_draw;
+}ShellCommandData_t;
+
+void run_shell_command_cleanup(void* data){
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+     free(shell_command_data->command);
+     free(shell_command_data);
+}
+
+static void* run_shell_command_and_output_to_buffer(void* data){
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+     pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
+
+     int input_fd = -1;
+     int output_fd = -1;
+     pid_t pid = bidirectional_popen(shell_command_data->command, &input_fd, &output_fd);
+     if(pid == 0){
+          ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
+          return NULL;
+     }
+
+     char bytes[BUFSIZ];
+     snprintf(bytes, BUFSIZ, "pid %d started\n\n", pid);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+
+     int status = 0;
+     pid_t w;
+     ssize_t byte_count = 1;
+     do{
+          while(byte_count != 0){
+               byte_count = read(output_fd, bytes, BUFSIZ);
+               if(byte_count < 0){
+                    ce_log("shell command: read from pid %d failed\n", pid);
+                    return NULL;
+               }else if(byte_count > 0){
+                    bytes[byte_count] = 0;
+                    ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+                    *shell_command_data->ready_to_draw = true;
+               }
+          }
+
+          w = waitpid(pid, &status, WNOHANG);
+          if(w == -1) return NULL;
+
+          if(WIFEXITED(status)){
+               snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", pid, WEXITSTATUS(status));
+          }else if(WIFSIGNALED(status)){
+               snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", pid, WTERMSIG(status));
+          }else if(WIFSTOPPED(status)){
+               snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", pid, WSTOPSIG(status));
+          }else if (WIFCONTINUED(status)){
+               snprintf(bytes, BUFSIZ, "\npid %d continued", pid);
+          }
+     }while(!WIFEXITED(status) && !WIFSIGNALED(status));
+
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
+     *shell_command_data->ready_to_draw = true;
+     pthread_cleanup_pop(1);
+     return NULL;
+}
+
+bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view){
+     if(app->shell_command_thread){
+          pthread_cancel(app->shell_command_thread);
+          pthread_join(app->shell_command_thread, NULL);
+     }
+
+     ce_buffer_empty(app->shell_command_buffer);
+
+     CeAppBufferData_t* buffer_data = app->shell_command_buffer->app_data;
+     buffer_data->last_goto_destination = 0;
+     app->last_goto_buffer = app->shell_command_buffer;
+     CeLayout_t* view_layout = ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer);
+     if(view_layout){
+          view_layout->view.cursor = (CePoint_t){0, 0};
+          view_layout->view.scroll = (CePoint_t){0, 0};
+     }else{
+          ce_view_switch_buffer(view, app->shell_command_buffer, &app->vim, &app->config_options,
+                                &app->terminal_list, &app->last_terminal, true);
+          view->cursor = (CePoint_t){0, 0};
+          view->scroll = (CePoint_t){0, 0};
+     }
+
+     ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
+     shell_command_data->buffer = app->shell_command_buffer;
+     shell_command_data->command = strdup(command);
+     shell_command_data->ready_to_draw = &app->shell_command_ready_to_draw;
+
+     int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
+     if(rc != 0){
+          ce_log("pthread_create() failed: '%s'\n", strerror(errno));
+          return false;
+     }
+
      return true;
 }

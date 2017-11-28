@@ -2,8 +2,8 @@
 
 #include "ce_app.h"
 
-#define UNSAVED_BUFFERS_DIALOGUE "UNSAVED BUFFERS, QUIT? [Y/N]"
-#define TERMINALS_STILL_RUNNING_DIALOGUE "TERMINALS STILL RUNNING, QUIT? [Y/N]"
+#define UNSAVED_BUFFERS_DIALOGUE "Unsaved buffers, quit? [y/n]"
+#define TERMINALS_STILL_RUNNING_DIALOGUE "Terminals still running, quit? [y/n]"
 
 CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data);
@@ -45,6 +45,7 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data);
 
 // NOTE: these are to make vim users feel at home
 CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);

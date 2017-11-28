@@ -86,6 +86,8 @@ static bool buffer_realloc_lines(CeBuffer_t* buffer, int64_t new_line_count){
           buffer->lines = NULL;
           buffer->line_count = 0;
           return true;
+     }else if(new_line_count == buffer->line_count){
+          return true;
      }
 
      buffer->lines = realloc(buffer->lines, new_line_count * sizeof(buffer->lines[0]));
@@ -733,6 +735,7 @@ bool ce_buffer_insert_string(CeBuffer_t* buffer, const char* string, CePoint_t p
           memcpy(buffer->lines[next_line] + new_line_len, end_string, end_string_len);
           free(end_string);
      }
+
      buffer->lines[next_line][last_line_len] = 0;
 
      buffer->status = CE_BUFFER_STATUS_MODIFIED;
