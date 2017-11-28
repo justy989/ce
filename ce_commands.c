@@ -601,9 +601,12 @@ CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView
                                        bool insert_into_jump_list, const char* base_directory,
                                        CeDestination_t* destination){
      char full_path[PATH_MAX];
-     if(!base_directory) base_directory = ".";
-     strncpy(full_path, base_directory, PATH_MAX);
-     snprintf(full_path, PATH_MAX, "%s/%s", base_directory, destination->filepath);
+     if(!base_directory && destination->filepath[0] != '/') base_directory = ".";
+     if(base_directory){
+          snprintf(full_path, PATH_MAX, "%s/%s", base_directory, destination->filepath);
+     }else{
+          strncpy(full_path, destination->filepath, PATH_MAX);
+     }
      CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim,
                                                    terminal_list, last_terminal,
                                                    insert_into_jump_list, full_path);
