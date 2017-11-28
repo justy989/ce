@@ -1370,7 +1370,7 @@ static pid_t bidirectional_popen(const char* cmd, int* in_fd, int* out_fd){
 typedef struct{
      CeBuffer_t* buffer;
      char* command;
-     bool* ready_to_draw;
+     volatile bool* ready_to_draw;
 }ShellCommandData_t;
 
 void run_shell_command_cleanup(void* data){
@@ -1392,6 +1392,9 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      }
 
      char bytes[BUFSIZ];
+     snprintf(bytes, BUFSIZ, "pid %d started\n\n", pid);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+
      int status = 0;
      pid_t w;
      ssize_t byte_count = 1;
@@ -1412,17 +1415,13 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           if(w == -1) return NULL;
 
           if(WIFEXITED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", pid, WEXITSTATUS(status));
-               bytes[byte_count] = 0;
+               snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", pid, WEXITSTATUS(status));
           }else if(WIFSIGNALED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", pid, WTERMSIG(status));
-               bytes[byte_count] = 0;
+               snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", pid, WTERMSIG(status));
           }else if(WIFSTOPPED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", pid, WSTOPSIG(status));
-               bytes[byte_count] = 0;
+               snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", pid, WSTOPSIG(status));
           }else if (WIFCONTINUED(status)){
-               byte_count = snprintf(bytes, BUFSIZ, "\npid %d continued", pid);
-               bytes[byte_count] = 0;
+               snprintf(bytes, BUFSIZ, "\npid %d continued", pid);
           }
      }while(!WIFEXITED(status) && !WIFSIGNALED(status));
 
@@ -1444,9 +1443,15 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      CeAppBufferData_t* buffer_data = app->shell_command_buffer->app_data;
      buffer_data->last_goto_destination = 0;
      app->last_goto_buffer = app->shell_command_buffer;
-     if(!ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer)){
+     CeLayout_t* view_layout = ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer);
+     if(view_layout){
+          view_layout->view.cursor = (CePoint_t){0, 0};
+          view_layout->view.scroll = (CePoint_t){0, 0};
+     }else{
           ce_view_switch_buffer(view, app->shell_command_buffer, &app->vim, &app->config_options,
                                 &app->terminal_list, &app->last_terminal, true);
+          view->cursor = (CePoint_t){0, 0};
+          view->scroll = (CePoint_t){0, 0};
      }
 
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
