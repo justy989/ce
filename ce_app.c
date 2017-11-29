@@ -1447,6 +1447,8 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      CeAppBufferData_t* buffer_data = app->shell_command_buffer->app_data;
      buffer_data->last_goto_destination = 0;
      app->last_goto_buffer = app->shell_command_buffer;
+
+     char* base_directory = buffer_base_directory(view->buffer, &app->terminal_list);
      CeLayout_t* view_layout = ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer);
      if(view_layout){
           view_layout->view.cursor = (CePoint_t){0, 0};
@@ -1456,11 +1458,23 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
                                 &app->terminal_list, &app->last_terminal, true);
           view->cursor = (CePoint_t){0, 0};
           view->scroll = (CePoint_t){0, 0};
+          free(buffer_data->base_directory);
+          buffer_data->base_directory = NULL;
+          if(base_directory){
+               buffer_data->base_directory = strdup(base_directory);
+          }
+     }
+
+     char updated_command[BUFSIZ];
+     if(base_directory){
+          snprintf(updated_command, BUFSIZ, "cd %s && %s", base_directory, command);
+     }else{
+          strncpy(updated_command, command, BUFSIZ);
      }
 
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
      shell_command_data->buffer = app->shell_command_buffer;
-     shell_command_data->command = strdup(command);
+     shell_command_data->command = strdup(updated_command);
      shell_command_data->ready_to_draw = &app->shell_command_ready_to_draw;
 
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
