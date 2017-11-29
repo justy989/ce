@@ -58,6 +58,7 @@ typedef struct{
      CeVimBufferData_t vim;
      int64_t last_goto_destination;
      CeSyntaxHighlightFunc_t* syntax_function;
+     char* base_directory;
 }CeAppBufferData_t;
 
 typedef struct{
