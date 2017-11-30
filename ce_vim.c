@@ -217,17 +217,17 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                }
           }else if(key == CE_TAB){
                // build a string to insert
-               int64_t insert_len = 1;
-               if(config_options->insert_spaces_on_tab){
-                    insert_len = config_options->tab_width;
-               }
-               char* insert_string = malloc(insert_len + 1);
-               if(config_options->insert_spaces_on_tab){
+               char* insert_string = NULL;
+               if(config_options->insert_spaces_on_tab && !vim->pasting){
+                    int64_t insert_len = config_options->tab_width;
+                    insert_string = malloc(insert_len + 1);
                     memset(insert_string, ' ', insert_len);
+                    insert_string[insert_len] = 0;
                }else{
-                    *insert_string = key;
+                    insert_string = malloc(2);
+                    insert_string[0] = key;
+                    insert_string[1] = 0;
                }
-               insert_string[insert_len] = 0;
 
                if(!ce_buffer_insert_string_change_at_cursor(view->buffer, insert_string, &view->cursor, vim->chain_undo)){
                     break;
