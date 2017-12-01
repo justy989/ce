@@ -2704,6 +2704,14 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
           return false;
      }
 
+     // do not include the CE_NEWLINE if it is the final newline in the buffer
+     if(ce_point_after(motion_range.end, ce_buffer_end_point(view->buffer))){
+          int64_t last_index = ce_utf8_last_index(removed_string);
+          if(last_index >= 0 && removed_string[last_index] == CE_NEWLINE){
+               removed_string[last_index] = 0;
+          }
+     }
+
      CePoint_t end_cursor = ce_buffer_clamp_point(view->buffer, motion_range.start, action->clamp_x);
 
      // commit the change
