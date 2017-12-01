@@ -824,7 +824,7 @@ bool ce_buffer_remove_string(CeBuffer_t* buffer, CePoint_t point, int64_t length
 
           if(length_left >= line_len){
                length_left -= line_len;
-               if(length_left == 0){
+               if(length_left == 0 && point.x != 0 && point.y != 0){
                     do_join = true;
                     current_line++;
                     break;
