@@ -368,7 +368,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t
                vim->visual_block_top_left = (CePoint_t){0, 0};
                vim->visual_block_bottom_right = (CePoint_t){0, 0};
 
-               CeRune_t* rune_string = ce_rune_node_string(vim->insert_rune_head);
+               CeRune_t* rune_string = ce_rune_node_string(vim->last_insert_rune_head);
 
                if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
                vim->chain_undo = true;
@@ -1640,7 +1640,7 @@ CeVimParseResult_t ce_vim_parse_motion_half_page_down(CeVimAction_t* action, con
 
 CeVimParseResult_t ce_vim_parse_motion_inside(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
      if(!action->verb.function){
-          if(vim_mode_is_visual(vim->mode)){
+          if(vim->mode == CE_VIM_MODE_VISUAL || vim->mode == CE_VIM_MODE_VISUAL_LINE){
                action->verb.function = ce_vim_verb_motion;
           }else{
                return CE_VIM_PARSE_KEY_NOT_HANDLED;
