@@ -1561,6 +1561,9 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
                case '\\':
                     len += 2;
                     break;
+               case KEY_REDO:
+                    len += 3;
+                    break;
                }
           }
 
@@ -1640,6 +1643,11 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'i'; char_itr++; // NOTE: not happy with 'i'
                     break;
+               case KEY_REDO:
+                    *char_itr = '\\'; char_itr++;
+                    *char_itr = '^'; char_itr++;
+                    *char_itr = 'r'; char_itr++;
+                    break;
                case '\\':
                     *char_itr = '\\'; char_itr++;
                     *char_itr = '\\'; char_itr++;
@@ -1707,7 +1715,11 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
                case '^':
                     char_itr++;
                     if(*char_itr >= 'a' && *char_itr <= 'z'){
-                         *int_itr = (*char_itr - 'a') + 1;
+                         if(*char_itr == 'r'){
+                              *int_itr = KEY_REDO;
+                         }else{
+                              *int_itr = (*char_itr - 'a') + 1;
+                         }
                     }else if(*char_itr == '['){
                          *int_itr = 27;
                     }else if(*char_itr == '\\'){

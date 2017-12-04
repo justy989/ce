@@ -1021,7 +1021,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
 
                     if(app->edit_register >= 0){
-                         ce_app_input(app, "Edit Yank", load_file_input_complete_func);
+                         ce_app_input(app, "Edit Yank", edit_yank_input_complete_func);
                          ce_buffer_insert_string(app->input_view.buffer, selected_yank->text, (CePoint_t){0, 0});
                          app->input_view.cursor.y = app->input_view.buffer->line_count;
                          if(app->input_view.cursor.y) app->input_view.cursor.y--;
@@ -1047,7 +1047,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
 
                     if(app->edit_register >= 0){
-                         ce_app_input(app, "Edit Macro", load_file_input_complete_func);
+                         ce_app_input(app, "Edit Macro", edit_macro_input_complete_func);
                          ce_buffer_insert_string(app->input_view.buffer, macro_string, (CePoint_t){0, 0});
                          app->input_view.cursor.y = app->input_view.buffer->line_count;
                          if(app->input_view.cursor.y) app->input_view.cursor.y--;

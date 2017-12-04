@@ -3122,6 +3122,8 @@ bool ce_vim_verb_visual_line_mode(CeVim_t* vim, const CeVimAction_t* action, CeR
 bool ce_vim_verb_normal_mode(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                              CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      vim->mode = CE_VIM_MODE_NORMAL;
+     vim->visual_block_top_left = (CePoint_t){0, 0};
+     vim->visual_block_bottom_right = (CePoint_t){0, 0};
      return true;
 }
 
