@@ -447,13 +447,11 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key,
                ce_vim_apply_action(vim, &action, view, buffer_data, config_options);
                vim->current_command[0] = 0;
 
-               if(!vim->verb_last_action && action.repeatable){
-                    if(vim->mode == CE_VIM_MODE_NORMAL){
-                         vim->last_action = action;
-                         if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
-                         vim->last_insert_rune_head = vim->insert_rune_head;
-                         vim->insert_rune_head = NULL;
-                    }
+               if(!vim->verb_last_action && action.repeatable && vim->mode == CE_VIM_MODE_NORMAL && action.verb.function != ce_vim_verb_last_action){
+                    vim->last_action = action;
+                    if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
+                    vim->last_insert_rune_head = vim->insert_rune_head;
+                    vim->insert_rune_head = NULL;
                }
           }else if(result == CE_VIM_PARSE_INVALID ||
                    result == CE_VIM_PARSE_KEY_NOT_HANDLED){
