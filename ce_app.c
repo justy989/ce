@@ -25,14 +25,14 @@ bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
 
 static void free_buffer_node(CeBufferNode_t* node){
      CeAppBufferData_t* buffer_data = node->buffer->app_data;
-     free(buffer_data->base_directory);
+     if(buffer_data) free(buffer_data->base_directory);
      free(node->buffer->app_data);
      ce_buffer_free(node->buffer);
      free(node->buffer);
      free(node);
 }
 
-bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
+CeBufferNode_t* ce_buffer_node_unlink(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* prev = NULL;
      CeBufferNode_t* itr = *head;
      while(itr){
@@ -41,7 +41,7 @@ bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
           itr = itr->next;
      }
 
-     if(!itr) return false;
+     if(!itr) return NULL;
 
      if(prev){
           prev->next = itr->next;
@@ -49,7 +49,12 @@ bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
           *head = (*head)->next;
      }
 
-     free_buffer_node(itr);
+     return itr;
+}
+
+bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer){
+     CeBufferNode_t* node = ce_buffer_node_unlink(head, buffer);
+     free_buffer_node(node);
      return true;
 }
 
@@ -916,7 +921,6 @@ CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* t
      return NULL;
 }
 
-
 CeTerminal_t* create_terminal(CeApp_t* app, int width, int height){
      CeTerminal_t* terminal = ce_terminal_list_new_terminal(&app->terminal_list, width, height, app->config_options.terminal_scroll_back);
      ce_buffer_node_insert(&app->buffer_node_head, terminal->buffer);
@@ -932,6 +936,44 @@ CeTerminal_t* create_terminal(CeApp_t* app, int width, int height){
      terminal->alternate_lines_buffer->syntax_data = terminal;
 
      return terminal;
+}
+
+void ce_terminal_list_free_terminal(CeTerminalList_t* terminal_list, CeTerminal_t* terminal){
+     CeTerminalNode_t* itr = terminal_list->head;
+     CeTerminalNode_t* prev = NULL;
+     while(itr){
+          if(&itr->terminal == terminal){
+               if(prev){
+                    prev->next = itr->next;
+               }else{
+                    terminal_list->head = itr->next;
+               }
+
+               if(itr == terminal_list->tail){
+                    terminal_list->tail = prev;
+               }
+
+               ce_terminal_free(&itr->terminal);
+               free(itr);
+               return;
+          }
+
+          prev = itr;
+          itr = itr->next;
+     }
+}
+
+void ce_terminal_list_free(CeTerminalList_t* terminal_list){
+     CeTerminalNode_t* itr = terminal_list->head;
+     while(itr){
+          CeTerminalNode_t* tmp = itr;
+          itr = itr->next;
+          ce_terminal_free(&tmp->terminal);
+          free(tmp);
+     }
+
+     terminal_list->head = NULL;
+     terminal_list->tail = NULL;
 }
 
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers){

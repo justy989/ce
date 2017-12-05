@@ -146,6 +146,7 @@ typedef struct CeApp_t{
 }CeApp_t;
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);
+CeBufferNode_t* ce_buffer_node_unlink(CeBufferNode_t** head, CeBuffer_t* buffer);
 bool ce_buffer_node_delete(CeBufferNode_t** head, CeBuffer_t* buffer);
 void ce_buffer_node_free(CeBufferNode_t** head);
 
@@ -206,6 +207,8 @@ void update_terminal_last_goto_using_cursor(CeTerminal_t* terminal);
 CeTerminal_t* ce_terminal_list_new_terminal(CeTerminalList_t* terminal_list, int width, int height, int64_t scroll_back);
 CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);
 CeTerminal_t* create_terminal(CeApp_t* app, int width, int height);
+void ce_terminal_list_free_terminal(CeTerminalList_t* terminal_list, CeTerminal_t* terminal);
+void ce_terminal_list_free(CeTerminalList_t* terminal_list);
 
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
 int64_t istrlen(const CeRune_t* istr);

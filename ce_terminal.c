@@ -1609,12 +1609,16 @@ void ce_terminal_free(CeTerminal_t* terminal){
      terminal->tabs = NULL;
 
      free(terminal->lines_buffer->app_data);
+     terminal->lines_buffer->app_data = NULL;
      ce_buffer_free(terminal->lines_buffer);
      free(terminal->lines_buffer);
+     terminal->lines_buffer = NULL;
 
      free(terminal->alternate_lines_buffer->app_data);
+     terminal->alternate_lines_buffer->app_data = NULL;
      ce_buffer_free(terminal->alternate_lines_buffer);
      free(terminal->alternate_lines_buffer);
+     terminal->alternate_lines_buffer = NULL;
 
      terminal->lines_buffer = NULL;
      terminal->alternate_lines_buffer = NULL;

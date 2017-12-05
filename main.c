@@ -1129,7 +1129,14 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               }
                          }
 
-                         ce_buffer_node_delete(&app->buffer_node_head, itr->buffer);
+                         CeTerminal_t* terminal = ce_buffer_in_terminal_list(itr->buffer, &app->terminal_list);
+                         if(terminal){
+                              ce_terminal_list_free_terminal(&app->terminal_list, terminal);
+                              CeBufferNode_t* node = ce_buffer_node_unlink(&app->buffer_node_head, itr->buffer);
+                              free(node);
+                         }else{
+                              ce_buffer_node_delete(&app->buffer_node_head, itr->buffer);
+                         }
                     }
                }
           }else if(app->input_complete_func){
@@ -1837,13 +1844,7 @@ int main(int argc, char** argv){
 
      ce_buffer_node_free(&app.buffer_node_head);
 
-     CeTerminalNode_t* itr = app.terminal_list.head;
-     while(itr){
-          CeTerminalNode_t* tmp = itr;
-          itr = itr->next;
-          ce_terminal_free(&tmp->terminal);
-          free(tmp);
-     }
+     ce_terminal_list_free(&app.terminal_list);
 
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
