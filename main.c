@@ -27,7 +27,7 @@ void handle_sigint(int signal){
 
 const char* buffer_status_get_str(CeBufferStatus_t status){
      if(status == CE_BUFFER_STATUS_READONLY){
-           return "[RO]";
+          return "[RO]";
      }
 
      if(status == CE_BUFFER_STATUS_MODIFIED ||
@@ -988,82 +988,79 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      }
 
      if(view){
-          if(key == KEY_ENTER){
-               if(!app->input_complete_func && view->buffer == app->buffer_list_buffer){
-                    CeBufferNode_t* itr = app->buffer_node_head;
-                    int64_t index = 0;
-                    while(itr){
-                         if(index == view->cursor.y){
-                              ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
-                                                    &app->terminal_list, &app->last_terminal, true);
+          if(key == KEY_ENTER) key = CE_NEWLINE;
+          if(key == CE_NEWLINE && !app->input_complete_func && view->buffer == app->buffer_list_buffer){
+               CeBufferNode_t* itr = app->buffer_node_head;
+               int64_t index = 0;
+               while(itr){
+                    if(index == view->cursor.y){
+                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
+                                               &app->terminal_list, &app->last_terminal, true);
+                         break;
+                    }
+                    itr = itr->next;
+                    index++;
+               }
+          }else if(key == CE_NEWLINE && !app->input_complete_func && view->buffer == app->yank_list_buffer){
+               // TODO: move to command
+               app->edit_register = -1;
+               int64_t line = view->cursor.y;
+               CeVimYank_t* selected_yank = NULL;
+               for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
+                    CeVimYank_t* yank = app->vim.yanks + i;
+                    if(yank->text != NULL){
+                         int64_t line_count = 2;
+                         line_count += ce_util_count_string_lines(yank->text);
+                         line -= line_count;
+                         if(line <= 0){
+                              app->edit_register = i;
+                              selected_yank = yank;
                               break;
                          }
-                         itr = itr->next;
-                         index++;
                     }
-               }else if(!app->input_complete_func && view->buffer == app->yank_list_buffer){
-                    // TODO: move to command
-                    app->edit_register = -1;
-                    int64_t line = view->cursor.y;
-                    CeVimYank_t* selected_yank = NULL;
-                    for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
-                         CeVimYank_t* yank = app->vim.yanks + i;
-                         if(yank->text != NULL){
-                              int64_t line_count = 2;
-                              line_count += ce_util_count_string_lines(yank->text);
-                              line -= line_count;
-                              if(line <= 0){
-                                   app->edit_register = i;
-                                   selected_yank = yank;
-                                   break;
-                              }
+               }
+
+               if(app->edit_register >= 0){
+                    ce_app_input(app, "Edit Yank", edit_yank_input_complete_func);
+                    ce_buffer_insert_string(app->input_view.buffer, selected_yank->text, (CePoint_t){0, 0});
+                    app->input_view.cursor.y = app->input_view.buffer->line_count;
+                    if(app->input_view.cursor.y) app->input_view.cursor.y--;
+                    app->input_view.cursor.x = ce_utf8_strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
+               }
+          }else if(key == CE_NEWLINE && !app->input_complete_func && view->buffer == app->macro_list_buffer){
+               // TODO: move to command
+               app->edit_register = -1;
+               int64_t line = view->cursor.y;
+               char* macro_string = NULL;
+               for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
+                    CeRuneNode_t* rune_node = app->macros.rune_head[i];
+                    if(rune_node){
+                         line -= 2;
+                         if(line <= 2){
+                              app->edit_register = i;
+                              CeRune_t* rune_string = ce_rune_node_string(rune_node);
+                              macro_string = ce_rune_string_to_char_string(rune_string);
+                              free(rune_string);
+                              break;
                          }
                     }
+               }
 
-                    if(app->edit_register >= 0){
-                         ce_app_input(app, "Edit Yank", edit_yank_input_complete_func);
-                         ce_buffer_insert_string(app->input_view.buffer, selected_yank->text, (CePoint_t){0, 0});
-                         app->input_view.cursor.y = app->input_view.buffer->line_count;
-                         if(app->input_view.cursor.y) app->input_view.cursor.y--;
-                         app->input_view.cursor.x = ce_utf8_strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
-                    }
-               }else if(!app->input_complete_func && view->buffer == app->macro_list_buffer){
-                    // TODO: move to command
-                    app->edit_register = -1;
-                    int64_t line = view->cursor.y;
-                    char* macro_string = NULL;
-                    for(int64_t i = 0; i < CE_ASCII_PRINTABLE_CHARACTERS; i++){
-                         CeRuneNode_t* rune_node = app->macros.rune_head[i];
-                         if(rune_node){
-                              line -= 2;
-                              if(line <= 2){
-                                   app->edit_register = i;
-                                   CeRune_t* rune_string = ce_rune_node_string(rune_node);
-                                   macro_string = ce_rune_string_to_char_string(rune_string);
-                                   free(rune_string);
-                                   break;
-                              }
-                         }
-                    }
-
-                    if(app->edit_register >= 0){
-                         ce_app_input(app, "Edit Macro", edit_macro_input_complete_func);
-                         ce_buffer_insert_string(app->input_view.buffer, macro_string, (CePoint_t){0, 0});
-                         app->input_view.cursor.y = app->input_view.buffer->line_count;
-                         if(app->input_view.cursor.y) app->input_view.cursor.y--;
-                         app->input_view.cursor.x = ce_utf8_strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
-                         free(macro_string);
-                    }
-               }else if(app->input_complete_func){
-                    ce_app_apply_completion(app);
-                    app->vim.mode = CE_VIM_MODE_NORMAL;
-                    CeInputCompleteFunc* input_complete_func = app->input_complete_func;
-                    app->input_complete_func = NULL;
-                    if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                         input_complete_func(app, app->input_view.buffer);
-                    }
-               }else{
-                    key = CE_NEWLINE;
+               if(app->edit_register >= 0){
+                    ce_app_input(app, "Edit Macro", edit_macro_input_complete_func);
+                    ce_buffer_insert_string(app->input_view.buffer, macro_string, (CePoint_t){0, 0});
+                    app->input_view.cursor.y = app->input_view.buffer->line_count;
+                    if(app->input_view.cursor.y) app->input_view.cursor.y--;
+                    app->input_view.cursor.x = ce_utf8_strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
+                    free(macro_string);
+               }
+          }else if(key == CE_NEWLINE && app->input_complete_func){
+               ce_app_apply_completion(app);
+               app->vim.mode = CE_VIM_MODE_NORMAL;
+               CeInputCompleteFunc* input_complete_func = app->input_complete_func;
+               app->input_complete_func = NULL;
+               if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+                    input_complete_func(app, app->input_view.buffer);
                }
           }else if(key == app->config_options.apply_completion_key && ce_app_is_completing(app)){
                if(ce_app_apply_completion(app)){
@@ -1111,27 +1108,32 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     itr = itr->next;
                }
 
-               if(buffer_index == view->cursor.y &&
-                  (itr->buffer != app->buffer_list_buffer &&
-                   itr->buffer != app->yank_list_buffer &&
-                   itr->buffer != app->complete_list_buffer &&
-                   itr->buffer != app->macro_list_buffer &&
-                   itr->buffer != app->mark_list_buffer &&
-                   itr->buffer != app->jump_list_buffer &&
-                   itr->buffer != g_ce_log_buffer)){
-                    // find all the views showing this buffer and switch to a different view
-                    for(int64_t t = 0; t < app->tab_list_layout->tab_list.tab_count; t++){
-                         CeLayoutBufferInViewsResult_t result = ce_layout_buffer_in_views(app->tab_list_layout->tab_list.tabs[t], itr->buffer);
-                         for(int64_t i = 0; i < result.layout_count; i++){
-                              result.layouts[i]->view.buffer = app->buffer_list_buffer;
+               if(buffer_index == view->cursor.y){
+                    if(itr->buffer == app->buffer_list_buffer ||
+                       itr->buffer == app->yank_list_buffer ||
+                       itr->buffer == app->complete_list_buffer ||
+                       itr->buffer == app->macro_list_buffer ||
+                       itr->buffer == app->mark_list_buffer ||
+                       itr->buffer == app->jump_list_buffer ||
+                       itr->buffer == app->shell_command_buffer ||
+                       itr->buffer == g_ce_log_buffer ||
+                       itr->buffer == app->message_view.buffer ||
+                       itr->buffer == app->input_view.buffer){
+                         ce_app_message(app, "cannot delete buffer '%s'", itr->buffer->name);
+                    }else{
+                         // find all the views showing this buffer and switch to a different view
+                         for(int64_t t = 0; t < app->tab_list_layout->tab_list.tab_count; t++){
+                              CeLayoutBufferInViewsResult_t result = ce_layout_buffer_in_views(app->tab_list_layout->tab_list.tabs[t], itr->buffer);
+                              for(int64_t i = 0; i < result.layout_count; i++){
+                                   result.layouts[i]->view.buffer = app->buffer_list_buffer;
+                              }
                          }
+
+                         ce_buffer_node_delete(&app->buffer_node_head, itr->buffer);
                     }
-
-                    ce_buffer_node_delete(&app->buffer_node_head, itr->buffer);
                }
-          }
+          }else if(app->input_complete_func){
 
-          if(app->input_complete_func){
                // TODO: how are we going to let this be supported through customization
                if(app->input_complete_func == command_input_complete_func && app->input_view.buffer->line_count){
                     handle_input_history_key(key, &app->command_history, app->input_view.buffer, &app->input_view.cursor);
@@ -1154,6 +1156,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
                }
           }else{
+               // TODO: how are we going to let this be supported through customization
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
 
