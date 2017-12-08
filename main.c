@@ -278,7 +278,9 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                               draw_color_node = draw_color_node->next;
                          }
 
-                         if(x >= col_min && x <= col_max && rune > 0){
+                         if(x >= col_min &&
+                            x <= col_max &&
+                            rune > 0){
                               if(rune == CE_TAB){
                                    x += tab_width;
                                    addstr(tab_str);

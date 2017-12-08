@@ -1183,6 +1183,7 @@ int64_t ce_utf8_strlen(const char* string){
           }else if((*string & 0xF8) == 0xF0){
                byte_count = 4;
           }else{
+               assert(!"unicode character claiming it has more than 4 bytes?!");
                return -1;
           }
 
@@ -1212,6 +1213,7 @@ int64_t ce_utf8_strlen_between(const char* start, const char* end){
           }else if((*start & 0xF8) == 0xF0){
                byte_count = 4;
           }else{
+               assert(!"unicode character claiming it has more than 4 bytes?!");
                return -1;
           }
 
@@ -1246,11 +1248,14 @@ char* ce_utf8_iterate_to(char* string, int64_t index){
           }else if((*string & 0xF8) == 0xF0){
                bytes = 4;
           }else{
+               assert(!"unicode character claiming it has more than 4 bytes?!");
                return NULL;
           }
 
           for(int64_t i = 0; i < bytes; ++i){
-               if(*string == 0) return NULL;
+               if(*string == 0){
+                    return NULL;
+               }
                string++;
           }
 
@@ -1272,6 +1277,7 @@ char* ce_utf8_iterate_to_include_end(char* string, int64_t index){
           }else if((*string & 0xF8) == 0xF0){
                bytes = 4;
           }else{
+               assert(!"unicode character claiming it has more than 4 bytes?!");
                return NULL;
           }
 
@@ -1279,7 +1285,9 @@ char* ce_utf8_iterate_to_include_end(char* string, int64_t index){
 
           for(int64_t i = 0; i < bytes; ++i){
                if(*string == 0){
-                    if(index == 0) return string;
+                    if(index == 0){
+                         return string;
+                    }
                     return NULL;
                }
                string++;
@@ -1290,7 +1298,7 @@ char* ce_utf8_iterate_to_include_end(char* string, int64_t index){
 }
 
 CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
-     CeRune_t rune;
+     CeRune_t rune = CE_UTF8_INVALID;
 
      // 0xxxxxxx is just ascii
      if((*string & 0x80) == 0){
@@ -1320,8 +1328,6 @@ CeRune_t ce_utf8_decode(const char* string, int64_t* bytes_consumed){
           rune |= string[2] & 0x3F;
           rune <<= 6;
           rune |= string[3] & 0x3F;
-     }else{
-          return CE_UTF8_INVALID;
      }
 
      return rune;

@@ -88,14 +88,19 @@ static void terminal_clear_region(CeTerminal_t* terminal, int left, int top, int
 
           char* start = ce_utf8_iterate_to(terminal->buffer->lines[y], left);
           char* end = ce_utf8_iterate_to(terminal->buffer->lines[y], right);
-          int64_t length = ce_utf8_strlen_between(start, end);
+          assert(ce_utf8_strlen(terminal->buffer->lines[y]) != -1);
+          int64_t length = (end - start) + 1;
           if(length > width){
-               char* shift_src = start + length;
+               char* shift_src = end;
                char* shift_dst = start + width;
                int64_t shift_len = strlen(shift_src) + 1; // include null terminator
                memmove(shift_dst, shift_src, shift_len);
+               memset(start, ' ', width);
+               shift_dst[shift_len - 1] = 0;
+               assert(ce_utf8_strlen(terminal->buffer->lines[y]) != -1);
+          }else{
+               memset(start, ' ', width);
           }
-          memset(start, ' ', width);
      }
 }
 
@@ -195,24 +200,16 @@ static void terminal_insert_blank(CeTerminal_t* terminal, int n){
      memmove(&line[dst], &line[src], size * sizeof(*line));
 
      // figure out our start and end
-     char* line_dst = ce_utf8_iterate_to(terminal->buffer->lines[cursor_line], dst);
      char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[cursor_line], src);
+     assert(ce_utf8_strlen(terminal->buffer->lines[cursor_line]) != -1);
 
-     // copy into tmp array
-     CeRune_t runes[size];
-     for(int i = 0; i < size; i++){
-          int64_t rune_len = 0;
-          runes[i] = ce_utf8_decode(line_src, &rune_len);
-          line_src += rune_len;
-     }
+     // shift over line
+     memmove(line_src + n, line_src, strlen(line_src) + 1);
 
-     // overwrite dst
-     char* itr_dst = line_dst;
-     for(int i = 0; i < size; i++){
-          int64_t rune_len = 0;
-          ce_utf8_encode(runes[i], itr_dst, strlen(itr_dst), &rune_len);
-          itr_dst += rune_len;
-     }
+     // overwrite what we shifted over with spaces
+     memset(line_src, ' ', n);
+
+     assert(ce_utf8_strlen(terminal->buffer->lines[cursor_line]) != -1);
 
      terminal_clear_region(terminal, src, terminal->cursor.y, dst - 1, terminal->cursor.y);
 }
@@ -276,6 +273,7 @@ static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminal
      assert(x >= 0 && x < terminal->columns);
      assert(y >= 0 && y < terminal->rows);
      y += terminal->start_line;
+     assert(ce_utf8_strlen(terminal->buffer->lines[y]) != -1);
      terminal->lines[y][x] = *attributes;
      char* str = ce_utf8_iterate_to(terminal->buffer->lines[y], x);
      assert(str);
@@ -284,23 +282,14 @@ static void terminal_set_glyph(CeTerminal_t* terminal, CeRune_t rune, CeTerminal
      ce_utf8_decode(str, &replacing_len);
 
      // shift over line if necessary
-     if(rune_len == replacing_len){
-          // pass
-     }else if(rune_len < replacing_len){
-          // the current rune takes up more space than we need, so shift left
-          int64_t diff = replacing_len - rune_len;
-          char* dst = str;
-          char* src = str + diff;
-          memmove(dst, src, strlen(src) + 1); // include null terminator
-     }else if(rune_len > replacing_len){
-          // the current rune is smaller than we need, so shift right
-          int64_t diff = rune_len - replacing_len;
-          char* src = str;
-          char* dst = str + diff;
+     if(rune_len != replacing_len){
+          char* dst = str + rune_len;
+          char* src = str + replacing_len;
           memmove(dst, src, strlen(src) + 1); // include null terminator
      }
 
-     ce_utf8_encode(rune, str, strlen(str), &rune_len);
+     ce_utf8_encode(rune, str, rune_len, &rune_len);
+     assert(ce_utf8_strlen(terminal->buffer->lines[y]) != -1);
 }
 
 static void terminal_cursor_save(CeTerminal_t* terminal){
@@ -352,22 +341,13 @@ static void terminal_delete_char(CeTerminal_t* terminal, int n){
      // figure out our start and end
      char* line_dst = ce_utf8_iterate_to(terminal->buffer->lines[cursor_line], dst);
      char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[cursor_line], src);
+     assert(ce_utf8_strlen(terminal->buffer->lines[cursor_line]) != -1);
 
-     // copy into tmp array
-     CeRune_t runes[size];
-     for(int i = 0; i < size; i++){
-          int64_t rune_len = 0;
-          runes[i] = ce_utf8_decode(line_src, &rune_len);
-          line_src += rune_len;
-     }
-
-     // overwrite dst
-     char* itr_dst = line_dst;
-     for(int i = 0; i < size; i++){
-          int64_t rune_len = 0;
-          ce_utf8_encode(runes[i], itr_dst, strlen(itr_dst), &rune_len);
-          itr_dst += rune_len;
-     }
+     int64_t line_move_len = strlen(line_src);
+     memmove(line_dst, line_src, line_move_len);
+     memset(line_dst + line_move_len, ' ', n);
+     line_dst[line_move_len + n] = 0;
+     assert(ce_utf8_strlen(terminal->buffer->lines[cursor_line]) != -1);
 
      terminal_clear_region(terminal, terminal->columns - n, terminal->cursor.y, terminal->columns - 1, terminal->cursor.y);
 }
@@ -1292,32 +1272,27 @@ static void terminal_put(CeTerminal_t* terminal, CeRune_t rune){
           memmove(current_glyph + width, current_glyph, size * sizeof(*current_glyph));
 
           // TODO: compress with similar code above
-          // figure out our start and end
-          char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y], terminal->cursor.x);
+          char* line_src = ce_utf8_iterate_to(terminal->buffer->lines[terminal->cursor.y + terminal->start_line], terminal->cursor.x);
           char* line_dst = line_src + width;
 
-          // copy into tmp array
-          CeRune_t runes[size];
-          for(int i = 0; i < size; i++){
-               int64_t rune_len = 0;
-               runes[i] = ce_utf8_decode(line_src, &rune_len);
-               line_src += rune_len;
-          }
+          assert(ce_utf8_strlen(terminal->buffer->lines[terminal->cursor.y + terminal->start_line]) != -1);
 
-          // overwrite dst
-          char* itr_dst = line_dst;
-          for(int i = 0; i < size; i++){
-               int64_t rune_len = 0;
-               ce_utf8_encode(runes[i], itr_dst, strlen(itr_dst), &rune_len);
-               itr_dst += rune_len;
-          }
+          int64_t line_move_len = strlen(line_src); // include null terminator
+          memmove(line_dst, line_src, line_move_len);
+          line_dst[line_move_len] = 0;
+
+          assert(ce_utf8_strlen(terminal->buffer->lines[terminal->cursor.y + terminal->start_line]) != -1);
      }
+
+     assert(ce_utf8_strlen(terminal->buffer->lines[terminal->cursor.y + terminal->start_line]) != -1);
 
      if(terminal->cursor.x + width > terminal->columns){
           terminal_put_newline(terminal, true);
      }
 
+     assert(ce_utf8_strlen(terminal->buffer->lines[terminal->cursor.y + terminal->start_line]) != -1);
      terminal_set_glyph(terminal, rune, &terminal->cursor.attributes, terminal->cursor.x, terminal->cursor.y);
+     assert(ce_utf8_strlen(terminal->buffer->lines[terminal->cursor.y + terminal->start_line]) != -1);
 
      if(terminal->cursor.x + width < terminal->columns){
           terminal_move_cursor_to(terminal, terminal->cursor.x + width, terminal->cursor.y);
@@ -1331,8 +1306,8 @@ static void* tty_reader(void* data){
 
      char buffer[BUFSIZ];
      int buffer_length = 0;
-     CeRune_t decoded;
-     int64_t decoded_length;
+     CeRune_t decoded = CE_UTF8_INVALID;
+     int64_t decoded_length = 0;
 
      while(true){
           int rc = read(terminal->file_descriptor, buffer, ELEM_COUNT(buffer));
@@ -1346,6 +1321,7 @@ static void* tty_reader(void* data){
 
                for(int i = 0; i < buffer_length; ++i){
                     decoded = ce_utf8_decode(buffer + i, &decoded_length);
+                    if(decoded == CE_UTF8_INVALID) break;
                     terminal_put(terminal, decoded);
                     i += (decoded_length - 1);
                }
