@@ -14,7 +14,6 @@ todo:
 - backup files, and session info in ~/.ce
 - vim :sort
 - trim extra whitespace when yanking from terminal
-- when splitting the screen, keep the scroll
 
 bug:
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet

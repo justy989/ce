@@ -234,8 +234,11 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
-     ce_layout_split(tab_layout, vertical);
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     tab_layout->tab.current = new_layout;
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1183,8 +1186,12 @@ CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     ce_layout_split(tab_layout, true);
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, true);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     tab_layout->tab.current = new_layout;
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
@@ -1203,8 +1210,12 @@ CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     ce_layout_split(tab_layout, false);
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, false);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     tab_layout->tab.current = new_layout;
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;

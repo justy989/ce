@@ -104,7 +104,7 @@ static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
      return NULL;
 }
 
-bool ce_layout_split(CeLayout_t* layout, bool vertical){
+CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
      assert(layout->type == CE_LAYOUT_TYPE_TAB);
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
      if(parent_of_current){
@@ -116,20 +116,26 @@ bool ce_layout_split(CeLayout_t* layout, bool vertical){
           case CE_LAYOUT_TYPE_LIST:
                if(parent_of_current->list.vertical == vertical){
                     CeLayout_t* new_layout = ce_layout_view_init(buffer);
-                    if(!new_layout) return false;
+                    if(!new_layout) return NULL;
+                    new_layout->view.scroll = layout->tab.current->view.scroll;
+                    new_layout->view.cursor = layout->tab.current->view.cursor;
 
                     int64_t new_layout_count = parent_of_current->list.layout_count + 1;
                     parent_of_current->list.layouts = realloc(parent_of_current->list.layouts,
                                                               new_layout_count * sizeof(*parent_of_current->list.layouts));
                     if(parent_of_current->list.layouts) parent_of_current->list.layout_count = new_layout_count;
-                    else return false;
-                    parent_of_current->list.layouts[new_layout_count - 1] = new_layout;
+                    else return NULL;
+                    for(int64_t i = parent_of_current->list.layout_count - 1; i > 0; i--){
+                         parent_of_current->list.layouts[i] = parent_of_current->list.layouts[i - 1];
+                    }
+                    parent_of_current->list.layouts[0] = new_layout;
+                    return new_layout;
                }else{
                     CeLayout_t* new_list_layout = calloc(1, sizeof(*new_list_layout));
-                    if(!new_list_layout) return false;
+                    if(!new_list_layout) return NULL;
                     new_list_layout->type = CE_LAYOUT_TYPE_LIST;
                     new_list_layout->list.layouts = malloc(sizeof(*new_list_layout->list.layouts));
-                    if(!new_list_layout->list.layouts) return false;
+                    if(!new_list_layout->list.layouts) return NULL;
                     new_list_layout->list.layout_count = 1;
                     new_list_layout->list.vertical = vertical;
                     new_list_layout->list.layouts[0] = layout->tab.current;
@@ -162,11 +168,9 @@ bool ce_layout_split(CeLayout_t* layout, bool vertical){
                if(layout->tab_list.current) return ce_layout_split(layout->tab_list.current, vertical);
                break;
           }
-
-          return true;
      }
 
-     return false;
+     return NULL;
 }
 
 void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
