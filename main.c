@@ -1439,6 +1439,7 @@ int main(int argc, char** argv){
      {
           initscr();
           nodelay(stdscr, TRUE);
+          noqiflush();
           keypad(stdscr, TRUE);
           cbreak();
           noecho();
@@ -1627,23 +1628,24 @@ int main(int argc, char** argv){
           if(time_since_last_draw >= DRAW_USEC_LIMIT){
                if(app.ready_to_draw){
                     draw(&app);
+                    gettimeofday(&previous_draw_time, NULL);
                     app.ready_to_draw = false;
                     app.shell_command_ready_to_draw = false;
-                    previous_draw_time = current_draw_time;
                }else if(app.shell_command_ready_to_draw && ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer)){
                     draw(&app);
+                    gettimeofday(&previous_draw_time, NULL);
                     app.ready_to_draw = false;
                     app.shell_command_ready_to_draw = false;
-                    previous_draw_time = current_draw_time;
                }else{
                     CeTerminalNode_t* itr = app.terminal_list.head;
                     bool do_draw = false;
 
                     while(itr){
                          if(itr->terminal.ready_to_draw){
-                              do_draw = true;
                               itr->terminal.ready_to_draw = false;
-                              break;
+                              if(ce_layout_buffer_in_view(tab_layout, itr->terminal.buffer)){
+                                   do_draw = true;
+                              }
                          }
                          itr = itr->next;
                     }
@@ -1651,9 +1653,9 @@ int main(int argc, char** argv){
                     // if we did draw, turn of any outstanding draw flags
                     if(do_draw){
                          draw(&app);
+                         gettimeofday(&previous_draw_time, NULL);
                          app.shell_command_ready_to_draw = false;
                          app.ready_to_draw = false;
-                         previous_draw_time = current_draw_time;
                     }
                }
           }
