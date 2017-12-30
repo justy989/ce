@@ -23,4 +23,3 @@ bug:
 - crash where assertion fails when vim last action is verb_last_action
 - using word motions to go passed the end of a line doesn't work
 - ce is taking 100% cpu on prada!
-- when the buffer is a single line long, and you do 'C' in normal mode, it doesn't kill the last character

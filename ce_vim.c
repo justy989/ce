@@ -2693,8 +2693,10 @@ bool ce_vim_verb_delete(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      int64_t delete_len = ce_buffer_range_len(view->buffer, motion_range.start, motion_range.end);
      if(delete_len <= 0) return true;
      // if the end of the range is at the end of the buffer, take off the extra newline, unless the line is empty
-     if(ce_points_equal(motion_range.end, ce_buffer_end_point(view->buffer)) && motion_range.end.x != 0){
-          delete_len--;
+     CePoint_t buffer_end = ce_buffer_end_point(view->buffer);
+     buffer_end.x++; // include the final newline
+     if(ce_point_after(motion_range.end, buffer_end) && motion_range.end.x != 0){
+          delete_len = ce_buffer_range_len(view->buffer, motion_range.start, buffer_end);
      }
      char* removed_string = ce_buffer_dupe_string(view->buffer, motion_range.start, delete_len);
      if(!ce_buffer_remove_string(view->buffer, motion_range.start, delete_len)){
