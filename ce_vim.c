@@ -711,6 +711,17 @@ CePoint_t ce_vim_move_little_word(CeBuffer_t* buffer, CePoint_t start){
      itr += rune_len;
      start.x++;
 
+     if(*itr == 0){
+          if(start.y >= buffer->line_count - 1){
+               start.x--;
+               return start;
+          }
+          start.x = 0;
+          start.y++;
+          itr = buffer->lines[start.y];
+          state = WORD_NEW_LINE;
+     }
+
      while(true){
           rune = ce_utf8_decode(itr, &rune_len);
 
