@@ -1296,6 +1296,20 @@ void print_help(char* program){
      printf("  -c <config file> path to shared object configuration\n");
 }
 
+void done_drawing(CeApp_t* app, struct timeval* previous_draw_time){
+     CeTerminalNode_t* itr = app->terminal_list.head;
+     while(itr){
+          if(itr->terminal.ready_to_draw){
+               itr->terminal.ready_to_draw = false;
+          }
+          itr = itr->next;
+     }
+
+     gettimeofday(previous_draw_time, NULL);
+     app->shell_command_ready_to_draw = false;
+     app->ready_to_draw = false;
+}
+
 int main(int argc, char** argv){
      const char* config_filepath = NULL;
      int last_arg_index = 0;
@@ -1628,22 +1642,18 @@ int main(int argc, char** argv){
           if(time_since_last_draw >= DRAW_USEC_LIMIT){
                if(app.ready_to_draw){
                     draw(&app);
-                    gettimeofday(&previous_draw_time, NULL);
-                    app.ready_to_draw = false;
-                    app.shell_command_ready_to_draw = false;
+                    done_drawing(&app, &previous_draw_time);
                }else if(app.shell_command_ready_to_draw && ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer)){
                     draw(&app);
-                    gettimeofday(&previous_draw_time, NULL);
-                    app.ready_to_draw = false;
-                    app.shell_command_ready_to_draw = false;
+                    done_drawing(&app, &previous_draw_time);
                }else{
                     CeTerminalNode_t* itr = app.terminal_list.head;
                     bool do_draw = false;
 
                     while(itr){
                          if(itr->terminal.ready_to_draw){
-                              itr->terminal.ready_to_draw = false;
-                              if(ce_layout_buffer_in_view(tab_layout, itr->terminal.buffer)){
+                              if(ce_layout_buffer_in_view(tab_layout, itr->terminal.lines_buffer) ||
+                                 ce_layout_buffer_in_view(tab_layout, itr->terminal.alternate_lines_buffer)){
                                    do_draw = true;
                               }
                          }
@@ -1653,9 +1663,7 @@ int main(int argc, char** argv){
                     // if we did draw, turn of any outstanding draw flags
                     if(do_draw){
                          draw(&app);
-                         gettimeofday(&previous_draw_time, NULL);
-                         app.shell_command_ready_to_draw = false;
-                         app.ready_to_draw = false;
+                         done_drawing(&app, &previous_draw_time);
                     }
                }
           }
