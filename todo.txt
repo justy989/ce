@@ -22,8 +22,6 @@ bug:
 - TERM=xterm-256color needs to be set to view ce correctly
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
 - crash where assertion fails when vim last action is verb_last_action
-- '\x' bound as a command will perform 'x' in normal mode
-- replace all doesn't seem to do anything
 - using word motions to go passed the end of a line doesn't work
 - ce is taking 100% cpu on prada!
 - when the buffer is a single line long, and you do 'C' in normal mode, it doesn't kill the last character

@@ -88,11 +88,17 @@ typedef struct{
      int64_t unique_id;
 }CeTerminalList_t;
 
+typedef struct{
+     CeVimMode_t mode;
+     CePoint_t visual_point;
+}CeVimVisualSave_t;
+
 typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
 
 typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
+     CeVimVisualSave_t vim_visual_save;
      CeConfigOptions_t config_options;
      int terminal_width;
      int terminal_height;
@@ -198,7 +204,7 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
 void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete);
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string);
 CeDestination_t scan_line_for_destination(const char* line);
-void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* replace);
+void replace_all(CeView_t* view, CeVimVisualSave_t* vim_visual_save, const char* match, const char* replace);
 
 bool user_config_init(CeUserConfig_t* user_config, const char* filepath);
 void user_config_free(CeUserConfig_t* user_config);
