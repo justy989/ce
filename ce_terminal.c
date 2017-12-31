@@ -31,6 +31,8 @@
 #define BETWEEN(n, min, max) ((min <= n) && (n <= max))
 #define CHANGE_BIT(a, set, bit) ((set) ? ((a) |= (bit)) : ((a) &= ~(bit)))
 
+int g_terminal_ready_fds[2];
+
 static bool is_controller_c0(CeRune_t rune){
      if(BETWEEN(rune, 0, 0x1f) || rune == '\177'){
           return true;
@@ -1326,7 +1328,11 @@ static void* tty_reader(void* data){
                     i += (decoded_length - 1);
                }
 
-               terminal->ready_to_draw = true;
+               rc = write(g_terminal_ready_fds[1], "1", 2);
+               if(rc < 0){
+                    ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+                    return false;
+               }
           }
 
           sleep(0);

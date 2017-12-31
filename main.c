@@ -1606,31 +1606,18 @@ int main(int argc, char** argv){
           }
      }
 
+     pipe(g_terminal_ready_fds);
+
      draw(&app);
 
      // init draw thread
-     struct timeval previous_draw_time = {};
      struct timeval current_draw_time = {};
-     uint64_t time_since_last_draw = 0;
      uint64_t time_since_last_message = 0;
 
      // main loop
      while(!app.quit){
-          gettimeofday(&current_draw_time, NULL);
-          time_since_last_draw = time_between(previous_draw_time, current_draw_time);
-
           // TODO: add shell command buffer
-          int input_fd_count = 1; // stdin
-
-          // count fds we care about blocking, waiting for input
-          {
-               CeTerminalNode_t* itr = app.terminal_list.head;
-               while(itr){
-                    itr = itr->next;
-                    input_fd_count++;
-               }
-          }
-
+          int input_fd_count = 2; // stdin and terminal_ready_fd
           struct pollfd input_fds[input_fd_count];
 
           // populate fd array
@@ -1639,22 +1626,26 @@ int main(int argc, char** argv){
 
                input_fds[0].fd = STDIN_FILENO;
                input_fds[0].events = POLLIN;
-
-               CeTerminalNode_t* itr = app.terminal_list.head;
-               int fd_index = 1;
-               while(itr){
-                    input_fds[fd_index].fd = itr->terminal.file_descriptor;
-                    input_fds[fd_index].events = POLLIN;
-                    itr = itr->next;
-                    fd_index++;
-               }
+               input_fds[1].fd = g_terminal_ready_fds[0];
+               input_fds[1].events = POLLIN;
           }
 
           int poll_rc = poll(input_fds, input_fd_count, 10);
           assert(poll_rc >= 0);
           if(poll_rc == 0) continue;
 
-          bool check_stdin = (input_fds[0].revents != 0);
+          bool check_stdin = false;
+
+          if(input_fds[0].revents != 0){
+               check_stdin = true;
+          }else if(input_fds[1].revents != 0){
+               char buffer[BUFSIZ];
+               int rc = read(g_terminal_ready_fds[0], buffer, BUFSIZ);
+               if(rc < 0){
+                    ce_log("failed to read from terminal ready fd: '%s'\n", strerror(errno));
+                    continue;
+               }
+          }
 
           if(app.message_mode){
                time_since_last_message = time_between(app.message_time, current_draw_time);
@@ -1812,10 +1803,7 @@ int main(int argc, char** argv){
                build_jump_list(app.jump_list_buffer, &view_data->jump_list);
           }
 
-          if(time_since_last_draw >= DRAW_USEC_LIMIT){
-               draw(&app);
-               done_drawing(&app, &previous_draw_time);
-          }
+          draw(&app);
      }
 
      // cleanup
