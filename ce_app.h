@@ -137,7 +137,6 @@ typedef struct CeApp_t{
      int64_t macro_multiplier;
      char last_macro_register;
      int64_t last_macro_multiplier;
-     bool ready_to_draw;
      bool quit;
      bool highlight_search;
      CeUserConfig_t user_config;

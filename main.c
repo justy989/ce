@@ -3,6 +3,7 @@
 #include <locale.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/poll.h>
 #include <ncurses.h>
 #include <unistd.h>
 #include <assert.h>
@@ -799,6 +800,8 @@ bool handle_input_history_key(int key, CeHistory_t* history, CeBuffer_t* input_b
 }
 
 void app_handle_key(CeApp_t* app, CeView_t* view, int key){
+     if(key == ERR) return;
+
      if(key == KEY_RESIZE){
           ce_app_update_terminal_view(app);
           return;
@@ -1307,7 +1310,6 @@ void done_drawing(CeApp_t* app, struct timeval* previous_draw_time){
 
      gettimeofday(previous_draw_time, NULL);
      app->shell_command_ready_to_draw = false;
-     app->ready_to_draw = false;
 }
 
 int main(int argc, char** argv){
@@ -1452,7 +1454,6 @@ int main(int argc, char** argv){
      // init ncurses
      {
           initscr();
-          nodelay(stdscr, TRUE);
           noqiflush();
           keypad(stdscr, TRUE);
           cbreak();
@@ -1618,6 +1619,43 @@ int main(int argc, char** argv){
           gettimeofday(&current_draw_time, NULL);
           time_since_last_draw = time_between(previous_draw_time, current_draw_time);
 
+          // TODO: add shell command buffer
+          int input_fd_count = 1; // stdin
+
+          // count fds we care about blocking, waiting for input
+          {
+               CeTerminalNode_t* itr = app.terminal_list.head;
+               while(itr){
+                    itr = itr->next;
+                    input_fd_count++;
+               }
+          }
+
+          struct pollfd input_fds[input_fd_count];
+
+          // populate fd array
+          {
+               memset(input_fds, 0, input_fd_count * sizeof(*input_fds));
+
+               input_fds[0].fd = STDIN_FILENO;
+               input_fds[0].events = POLLIN;
+
+               CeTerminalNode_t* itr = app.terminal_list.head;
+               int fd_index = 1;
+               while(itr){
+                    input_fds[fd_index].fd = itr->terminal.file_descriptor;
+                    input_fds[fd_index].events = POLLIN;
+                    itr = itr->next;
+                    fd_index++;
+               }
+          }
+
+          int poll_rc = poll(input_fds, input_fd_count, 10);
+          assert(poll_rc >= 0);
+          if(poll_rc == 0) continue;
+
+          bool check_stdin = (input_fds[0].revents != 0);
+
           if(app.message_mode){
                time_since_last_message = time_between(app.message_time, current_draw_time);
                if(time_since_last_message > app.config_options.message_display_time_usec){
@@ -1637,36 +1675,9 @@ int main(int argc, char** argv){
                break;
           }
 
-          int key = getch();
+          int key = ERR;
 
-          if(time_since_last_draw >= DRAW_USEC_LIMIT){
-               if(app.ready_to_draw){
-                    draw(&app);
-                    done_drawing(&app, &previous_draw_time);
-               }else if(app.shell_command_ready_to_draw && ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer)){
-                    draw(&app);
-                    done_drawing(&app, &previous_draw_time);
-               }else{
-                    CeTerminalNode_t* itr = app.terminal_list.head;
-                    bool do_draw = false;
-
-                    while(itr){
-                         if(itr->terminal.ready_to_draw){
-                              if(ce_layout_buffer_in_view(tab_layout, itr->terminal.lines_buffer) ||
-                                 ce_layout_buffer_in_view(tab_layout, itr->terminal.alternate_lines_buffer)){
-                                   do_draw = true;
-                              }
-                         }
-                         itr = itr->next;
-                    }
-
-                    // if we did draw, turn of any outstanding draw flags
-                    if(do_draw){
-                         draw(&app);
-                         done_drawing(&app, &previous_draw_time);
-                    }
-               }
-          }
+          if(check_stdin) key = getch();
 
           // TODO: compress with below
           if(view){
@@ -1736,19 +1747,13 @@ int main(int argc, char** argv){
                     CeTerminalNode_t* tmp = itr;
                     itr = itr->next;
                     free(tmp);
-                    app.ready_to_draw = true;
                }else{
                     itr = itr->next;
                }
           }
 
-          if(key == ERR){
-               sleep(0);
-               continue;
-          }
-
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
-          g_last_key = key;
+          if(check_stdin) g_last_key = key;
           if(app.log_key_presses) ce_log("key: %s %d\n", keyname(key), key);
 #endif
 
@@ -1807,8 +1812,10 @@ int main(int argc, char** argv){
                build_jump_list(app.jump_list_buffer, &view_data->jump_list);
           }
 
-          // tell the draw thread we are ready to draw
-          app.ready_to_draw = true;
+          if(time_since_last_draw >= DRAW_USEC_LIMIT){
+               draw(&app);
+               done_drawing(&app, &previous_draw_time);
+          }
      }
 
      // cleanup
@@ -1850,7 +1857,6 @@ int main(int argc, char** argv){
                     prev = itr;
                     itr = itr->next;
                }
-
           }
      }
 
