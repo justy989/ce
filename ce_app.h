@@ -96,6 +96,7 @@ typedef struct{
 typedef struct{
      CePoint_t* cursors;
      CePoint_t* visuals;
+     int64_t* motion_columns;
      int64_t count;
      bool active;
 }CeMultipleCursors_t;

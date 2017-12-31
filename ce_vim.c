@@ -411,8 +411,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
 
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeRune_t key, CeVimBufferData_t* buffer_data,
                                      const CeConfigOptions_t* config_options, bool track){
-     CeVimMode_t save_mode = vim->mode;
-
      switch(vim->mode){
      default:
           return CE_VIM_PARSE_INVALID;
@@ -466,7 +464,6 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
                // undo the command
                int64_t command_len = istrlen(vim->current_command);
                vim->current_command[command_len - 1] = 0;
-               vim->mode = save_mode;
           }
 
           return result;

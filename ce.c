@@ -1118,12 +1118,12 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor){
 
 static CePoint_t move_point_based_on_buffer_change(CeBuffer_t* buffer, CeBufferChangeNode_t* change, CePoint_t point){
      if(!change->change.string) return point;
+     if(!ce_point_after(point, change->change.location)) return point;
 
      int64_t change_line_count = ce_util_count_string_lines(change->change.string);
 
      if(change_line_count == 1){
           if(point.y != change->change.location.y) return point;
-          if(!ce_point_after(point, change->change.location)) return point;
 
           int64_t change_len = ce_utf8_strlen(change->change.string);
 
@@ -1132,13 +1132,24 @@ static CePoint_t move_point_based_on_buffer_change(CeBuffer_t* buffer, CeBufferC
           }else{
                return ce_buffer_advance_point(buffer, point, -change_len);
           }
+     }else if(change_line_count > 1){
+          if(point.y < change->change.location.y + change_line_count){
+               point = change->change.location;
+          }else{
+               if(change->change.insertion){
+                    point.y += change_line_count - 1;
+               }else{
+                    point.y -= change_line_count - 1;
+               }
+          }
      }
+
      return point;
 }
 
 CePoint_t ce_move_point_based_on_buffer_changes(CeBuffer_t* buffer, CeBufferChangeNode_t* before, CePoint_t point){
      CeBufferChangeNode_t* itr = buffer->change_node;
-     while(itr != before){
+     while(itr && itr != before){
           point = move_point_based_on_buffer_change(buffer, itr, point);
           itr = itr->prev;
      }

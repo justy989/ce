@@ -1202,10 +1202,25 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
 
                if(app->multiple_cursors.active){
+                    int64_t save_motion_column = buffer_data->vim.motion_column;
+
                     for(int64_t i = 0; i < app->multiple_cursors.count; i++){
                          CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
 
+                         CeVimMode_t save_vim_mode = app->vim.mode;
+                         CePoint_t save_cursor = app->multiple_cursors.cursors[i];
+
+                         buffer_data->vim.motion_column = app->multiple_cursors.motion_columns[i];
+
                          ce_vim_handle_key(&app->vim, view, app->multiple_cursors.cursors + i, key, &buffer_data->vim, &app->config_options, false);
+
+                         app->multiple_cursors.motion_columns[i] = buffer_data->vim.motion_column;
+
+                         if(vim_mode_is_visual(app->vim.mode)){
+                              app->multiple_cursors.visuals[i] = save_cursor;
+                         }
+
+                         app->vim.mode = save_vim_mode;
 
                          for(int64_t j = 0; j < app->multiple_cursors.count; j++){
                               if(i == j) break;
@@ -1214,6 +1229,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                          view->cursor = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, view->cursor);
                     }
+
+                    buffer_data->vim.motion_column = save_motion_column;
                }
 
                CeBufferChangeNode_t* before_change_node = view->buffer->change_node;

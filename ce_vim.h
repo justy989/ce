@@ -135,7 +135,6 @@ typedef struct CeVim_t{
      int64_t key_bind_count;
      CeRune_t current_command[CE_VIM_MAX_COMMAND_LEN];
      CeVimYank_t yanks[CE_ASCII_PRINTABLE_CHARACTERS];
-     int64_t motion_column;
      CePoint_t visual;
      CeVimAction_t last_action;
      CeVimAction_t current_action;

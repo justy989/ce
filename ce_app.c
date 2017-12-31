@@ -982,8 +982,10 @@ void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t po
      int64_t new_count = multiple_cursors->count + 1;
      multiple_cursors->cursors = realloc(multiple_cursors->cursors, new_count * sizeof(multiple_cursors->cursors[0]));
      multiple_cursors->visuals = realloc(multiple_cursors->visuals, new_count * sizeof(multiple_cursors->visuals[0]));
+     multiple_cursors->motion_columns = realloc(multiple_cursors->motion_columns, new_count * sizeof(multiple_cursors->motion_columns[0]));
      multiple_cursors->cursors[multiple_cursors->count] = point;
      multiple_cursors->visuals[multiple_cursors->count] = point;
+     multiple_cursors->motion_columns[multiple_cursors->count] = point.x;
      multiple_cursors->count = new_count;
 }
 
@@ -992,6 +994,8 @@ void ce_multiple_cursors_clear(CeMultipleCursors_t* multiple_cursors){
      multiple_cursors->cursors = NULL;
      free(multiple_cursors->visuals);
      multiple_cursors->visuals = NULL;
+     free(multiple_cursors->motion_columns);
+     multiple_cursors->motion_columns = NULL;
      multiple_cursors->count = 0;
      multiple_cursors->active = false;
 }
