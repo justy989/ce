@@ -5,14 +5,14 @@
 #define CE_VIM_MAX_COMMAND_LEN 16
 #define CE_VIM_MAX_KEY_BINDS 256
 
-#define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                                              \
-CeVimMotionResult_t function_name(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,               \
-                                  const CeConfigOptions_t* config_options, CeVimBufferData_t* buffer_data, \
+#define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                                                     \
+CeVimMotionResult_t function_name(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CePoint_t* cursor, \
+                                  const CeConfigOptions_t* config_options, CeVimBufferData_t* buffer_data,            \
                                   CeRange_t* motion_range);
 
 #define CE_VIM_DECLARE_VERB_FUNC(function_name)                                                       \
 bool function_name(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view, \
-                   CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
+                   CePoint_t* cursor, CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
 
 
 typedef enum{
@@ -27,10 +27,10 @@ struct CeVimBufferData_t;
 enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, const struct CeVim_t*, CeRune_t);
-typedef CeVimMotionResult_t CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*,
+typedef CeVimMotionResult_t CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*, const CePoint_t*,
                                               const CeConfigOptions_t*, struct CeVimBufferData_t*, CeRange_t*);
 typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, CeRange_t, CeView_t*,
-                             struct CeVimBufferData_t*, const CeConfigOptions_t*);
+                             CePoint_t*, struct CeVimBufferData_t*, const CeConfigOptions_t*);
 
 typedef enum CeVimParseResult_t{
      CE_VIM_PARSE_INVALID,
@@ -153,14 +153,14 @@ typedef struct CeVim_t{
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
 bool ce_vim_free(CeVim_t* vim);
 bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
-CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeVimBufferData_t* buffer_data,
-                                     const CeConfigOptions_t* config_options);
+CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeRune_t key, CeVimBufferData_t* buffer_data,
+                                     const CeConfigOptions_t* config_options, bool track);
 
 bool vim_mode_is_visual(CeVimMode_t mode);
 
 // action
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeVim_t* vim);
-bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, CeVimBufferData_t* buffer_data,
+bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, CePoint_t* cursor, CeVimBufferData_t* buffer_data,
                          const CeConfigOptions_t* config_options);
 bool ce_vim_append_key(CeVim_t* vim, CeRune_t key);
 

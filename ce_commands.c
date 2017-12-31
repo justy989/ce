@@ -25,6 +25,39 @@ static bool get_command_context(CeApp_t* app, CommandContext_t* command_context)
      return true;
 }
 
+CeCommandStatus_t command_add_cursor(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CommandContext_t command_context = {};
+
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     ce_multiple_cursors_add(&app->multiple_cursors, command_context.view->cursor);
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clear_cursors(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+
+     ce_multiple_cursors_clear(&app->multiple_cursors);
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_toggle_cursors_active(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+
+     ce_multiple_cursors_toggle_active(&app->multiple_cursors);
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data){
      (void)(command);
      (void)(user_data);

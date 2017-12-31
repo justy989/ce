@@ -978,6 +978,28 @@ void ce_terminal_list_free(CeTerminalList_t* terminal_list){
      terminal_list->tail = NULL;
 }
 
+void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t point){
+     int64_t new_count = multiple_cursors->count + 1;
+     multiple_cursors->cursors = realloc(multiple_cursors->cursors, new_count * sizeof(multiple_cursors->cursors[0]));
+     multiple_cursors->visuals = realloc(multiple_cursors->visuals, new_count * sizeof(multiple_cursors->visuals[0]));
+     multiple_cursors->cursors[multiple_cursors->count] = point;
+     multiple_cursors->visuals[multiple_cursors->count] = point;
+     multiple_cursors->count = new_count;
+}
+
+void ce_multiple_cursors_clear(CeMultipleCursors_t* multiple_cursors){
+     free(multiple_cursors->cursors);
+     multiple_cursors->cursors = NULL;
+     free(multiple_cursors->visuals);
+     multiple_cursors->visuals = NULL;
+     multiple_cursors->count = 0;
+     multiple_cursors->active = false;
+}
+
+void ce_multiple_cursors_toggle_active(CeMultipleCursors_t* multiple_cursors){
+     multiple_cursors->active = !multiple_cursors->active;
+}
+
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers){
      int64_t value = 0;
      const CeRune_t* itr = istr;
@@ -1018,7 +1040,9 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
 
 void ce_app_init_default_commands(CeApp_t* app){
      CeCommandEntry_t command_entries[] = {
+          {command_add_cursor, "add_cursor", "add cursor so you have multiple cursors to edit the buffer with"},
           {command_blank, "blank", "empty command"},
+          {command_clear_cursors, "clear_cursors", "clear multiple cursors so you go back to having one cursor"},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
@@ -1059,6 +1083,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_terminal_command, "terminal_command", "run a command in the terminal"},
           {command_toggle_log_keys_pressed, "toggle_log_keys_pressed", "debug command to log key presses"},
+          {command_toggle_cursors_active, "toggle_cursors_active", "toggle whether the multiple cursors are active or not"},
           {command_shell_command, "shell_command", "run a shell command"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},

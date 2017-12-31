@@ -93,6 +93,13 @@ typedef struct{
      CePoint_t visual_point;
 }CeVimVisualSave_t;
 
+typedef struct{
+     CePoint_t* cursors;
+     CePoint_t* visuals;
+     int64_t count;
+     bool active;
+}CeMultipleCursors_t;
+
 typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
 
 typedef struct CeApp_t{
@@ -145,6 +152,8 @@ typedef struct CeApp_t{
 
      pthread_t shell_command_thread;
      volatile bool shell_command_ready_to_draw;
+
+     CeMultipleCursors_t multiple_cursors;
 
      // debug
      bool log_key_presses;
@@ -214,6 +223,10 @@ CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* t
 CeTerminal_t* create_terminal(CeApp_t* app, int width, int height);
 void ce_terminal_list_free_terminal(CeTerminalList_t* terminal_list, CeTerminal_t* terminal);
 void ce_terminal_list_free(CeTerminalList_t* terminal_list);
+
+void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t point);
+void ce_multiple_cursors_clear(CeMultipleCursors_t* multiple_cursors);
+void ce_multiple_cursors_toggle_active(CeMultipleCursors_t* multiple_cursors);
 
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
 int64_t istrlen(const CeRune_t* istr);
