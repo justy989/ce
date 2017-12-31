@@ -14,6 +14,8 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
+int g_shell_command_ready_fds[2];
+
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
@@ -1456,7 +1458,12 @@ static void* run_shell_command_and_output_to_buffer(void* data){
                }else if(byte_count > 0){
                     bytes[byte_count] = 0;
                     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-                    *shell_command_data->ready_to_draw = true;
+
+                    int rc = write(g_shell_command_ready_fds[1], "1", 2);
+                    if(rc < 0){
+                         ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+                         return false;
+                    }
                }
           }
 

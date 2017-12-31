@@ -1607,6 +1607,7 @@ int main(int argc, char** argv){
      }
 
      pipe(g_terminal_ready_fds);
+     pipe(g_shell_command_ready_fds);
 
      draw(&app);
 
@@ -1617,7 +1618,7 @@ int main(int argc, char** argv){
      // main loop
      while(!app.quit){
           // TODO: add shell command buffer
-          int input_fd_count = 2; // stdin and terminal_ready_fd
+          int input_fd_count = 3; // stdin and terminal_ready_fd
           struct pollfd input_fds[input_fd_count];
 
           // populate fd array
@@ -1628,6 +1629,8 @@ int main(int argc, char** argv){
                input_fds[0].events = POLLIN;
                input_fds[1].fd = g_terminal_ready_fds[0];
                input_fds[1].events = POLLIN;
+               input_fds[2].fd = g_shell_command_ready_fds[0];
+               input_fds[2].events = POLLIN;
           }
 
           int poll_rc = poll(input_fds, input_fd_count, 10);
@@ -1638,11 +1641,22 @@ int main(int argc, char** argv){
 
           if(input_fds[0].revents != 0){
                check_stdin = true;
-          }else if(input_fds[1].revents != 0){
+          }
+
+          if(input_fds[1].revents != 0){
                char buffer[BUFSIZ];
                int rc = read(g_terminal_ready_fds[0], buffer, BUFSIZ);
                if(rc < 0){
                     ce_log("failed to read from terminal ready fd: '%s'\n", strerror(errno));
+                    continue;
+               }
+          }
+
+          if(input_fds[2].revents != 0){
+               char buffer[BUFSIZ];
+               int rc = read(g_shell_command_ready_fds[0], buffer, BUFSIZ);
+               if(rc < 0){
+                    ce_log("failed to read from shell command ready fd: '%s'\n", strerror(errno));
                     continue;
                }
           }
