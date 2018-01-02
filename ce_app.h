@@ -95,7 +95,7 @@ typedef struct{
 
 typedef struct{
      CePoint_t* cursors;
-     CePoint_t* visuals;
+     CeVimVisualData_t* visuals;
      int64_t* motion_columns;
      int64_t count;
      bool active;
@@ -107,7 +107,7 @@ typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
      CeVimVisualSave_t vim_visual_save;
-     CePoint_t visual;
+     CeVimVisualData_t visual;
      CeConfigOptions_t config_options;
      int terminal_width;
      int terminal_height;

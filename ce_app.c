@@ -984,7 +984,7 @@ void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t po
      multiple_cursors->visuals = realloc(multiple_cursors->visuals, new_count * sizeof(multiple_cursors->visuals[0]));
      multiple_cursors->motion_columns = realloc(multiple_cursors->motion_columns, new_count * sizeof(multiple_cursors->motion_columns[0]));
      multiple_cursors->cursors[multiple_cursors->count] = point;
-     multiple_cursors->visuals[multiple_cursors->count] = point;
+     multiple_cursors->visuals[multiple_cursors->count].point = point;
      multiple_cursors->motion_columns[multiple_cursors->count] = point.x;
      multiple_cursors->count = new_count;
 }
@@ -1183,7 +1183,7 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      input_view->cursor = (CePoint_t){0, 0};
 
      app->vim_visual_save.mode = app->vim.mode;
-     app->vim_visual_save.visual_point = app->visual;
+     app->vim_visual_save.visual_point = app->visual.point;
 
      app->vim.mode = CE_VIM_MODE_INSERT;
      ce_rune_node_free(&app->vim.insert_rune_head);
