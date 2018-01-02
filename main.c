@@ -515,6 +515,28 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, Ce
                               CePoint_t end = {range.end.x, i};
                               ce_range_list_insert(&range_list, start, end);
                          }
+
+                         if(multiple_cursors && multiple_cursors->active){
+                              for(int64_t c = 0; c < multiple_cursors->count; c++){
+                                   range = (CeRange_t){multiple_cursors->visuals[c].point, multiple_cursors->cursors[c]};
+
+                                   if(range.start.x > range.end.x){
+                                        int64_t tmp = range.start.x;
+                                        range.start.x = range.end.x;
+                                        range.end.x = tmp;
+                                   }
+                                   if(range.start.y > range.end.y){
+                                        int64_t tmp = range.start.y;
+                                        range.start.y = range.end.y;
+                                        range.end.y = tmp;
+                                   }
+                                   for(int64_t i = range.start.y; i <= range.end.y; i++){
+                                        CePoint_t start = {range.start.x, i};
+                                        CePoint_t end = {range.end.x, i};
+                                        ce_range_list_insert_sorted(&range_list, start, end);
+                                   }
+                              }
+                         }
                     } break;
                     }
                }
