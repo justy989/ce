@@ -441,7 +441,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminalList_t* terminal_list,
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, CePoint_t visual, CeMacros_t* macros, CeTerminalList_t* terminal_list,
                  CeBuffer_t* input_buffer, CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number,
                  CeVisualLineDisplayType_t visual_line_display_type, CeMultipleCursors_t* multiple_cursors,
                  CeLayout_t* current, CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search,
@@ -467,21 +467,39 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                          break;
                     case CE_VIM_MODE_VISUAL:
                     {
-                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         CeRange_t range = {visual, layout->view.cursor};
                          ce_range_sort(&range);
                          ce_range_list_insert(&range_list, range.start, range.end);
+
+                         if(multiple_cursors && multiple_cursors->active){
+                              for(int64_t i = 0; i < multiple_cursors->count; i++){
+                                   range = (CeRange_t){multiple_cursors->visuals[i], multiple_cursors->cursors[i]};
+                                   ce_range_sort(&range);
+                                   ce_range_list_insert_sorted(&range_list, range.start, range.end);
+                              }
+                         }
                     } break;
                     case CE_VIM_MODE_VISUAL_LINE:
                     {
-                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         CeRange_t range = {visual, layout->view.cursor};
                          ce_range_sort(&range);
                          range.start.x = 0;
                          range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]) + 1;
                          ce_range_list_insert(&range_list, range.start, range.end);
+
+                         if(multiple_cursors && multiple_cursors->active){
+                              for(int64_t i = 0; i < multiple_cursors->count; i++){
+                                   range = (CeRange_t){multiple_cursors->visuals[i], multiple_cursors->cursors[i]};
+                                   ce_range_sort(&range);
+                                   range.start.x = 0;
+                                   range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]) + 1;
+                                   ce_range_list_insert_sorted(&range_list, range.start, range.end);
+                              }
+                         }
                     } break;
                     case CE_VIM_MODE_VISUAL_BLOCK:
                     {
-                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         CeRange_t range = {visual, layout->view.cursor};
                          if(range.start.x > range.end.x){
                               int64_t tmp = range.start.x;
                               range.start.x = range.end.x;
@@ -589,13 +607,13 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               draw_layout(layout->list.layouts[i], vim, macros, terminal_list, input_buffer, color_defs, tab_width,
+               draw_layout(layout->list.layouts[i], vim, visual, macros, terminal_list, input_buffer, color_defs, tab_width,
                            line_number, visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search,
                            ui_fg_color, ui_bg_color);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          draw_layout(layout->tab.root, vim, macros, terminal_list, input_buffer, color_defs, tab_width, line_number,
+          draw_layout(layout->tab.root, vim, visual, macros, terminal_list, input_buffer, color_defs, tab_width, line_number,
                       visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
           break;
      }
@@ -652,7 +670,7 @@ void draw(CeApp_t* app){
      }
 
      standend();
-     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs,
+     draw_layout(tab_layout, &app->vim, app->visual, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs,
                  app->config_options.tab_width, app->config_options.line_number, app->config_options.visual_line_display_type,
                  &app->multiple_cursors, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
                  app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
@@ -1184,7 +1202,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                CeAppBufferData_t* buffer_data = app->input_view.buffer->app_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, &app->input_view.cursor,
-                                                               key, &buffer_data->vim, &app->config_options, true);
+                                                               &app->visual, key, &buffer_data->vim, &app->config_options, true);
 
                if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count){
                     if(app->input_complete_func == load_file_input_complete_func){
@@ -1212,11 +1230,13 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                          buffer_data->vim.motion_column = app->multiple_cursors.motion_columns[i];
 
-                         ce_vim_handle_key(&app->vim, view, app->multiple_cursors.cursors + i, key, &buffer_data->vim, &app->config_options, false);
+                         ce_vim_handle_key(&app->vim, view, app->multiple_cursors.cursors + i,
+                                           app->multiple_cursors.visuals + i, key, &buffer_data->vim,
+                                           &app->config_options, false);
 
                          app->multiple_cursors.motion_columns[i] = buffer_data->vim.motion_column;
 
-                         if(vim_mode_is_visual(app->vim.mode)){
+                         if(vim_mode_is_visual(app->vim.mode) && !vim_mode_is_visual(save_vim_mode)){
                               app->multiple_cursors.visuals[i] = save_cursor;
                          }
 
@@ -1224,7 +1244,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                          for(int64_t j = 0; j < app->multiple_cursors.count; j++){
                               if(i == j) break;
-                              app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, app->multiple_cursors.cursors[j]);
+                              app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer,
+                                                                                                       before_change_node,
+                                                                                                       app->multiple_cursors.cursors[j]);
                          }
 
                          view->cursor = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, view->cursor);
@@ -1235,7 +1257,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
 
-               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, &view->cursor, key, &buffer_data->vim, &app->config_options, true);
+               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, &view->cursor, &app->visual,
+                                                               key, &buffer_data->vim, &app->config_options, true);
 
                for(int64_t j = 0; j < app->multiple_cursors.count; j++){
                     app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, app->multiple_cursors.cursors[j]);

@@ -1183,7 +1183,7 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      input_view->cursor = (CePoint_t){0, 0};
 
      app->vim_visual_save.mode = app->vim.mode;
-     app->vim_visual_save.visual_point = app->vim.visual;
+     app->vim_visual_save.visual_point = app->visual;
 
      app->vim.mode = CE_VIM_MODE_INSERT;
      ce_rune_node_free(&app->vim.insert_rune_head);

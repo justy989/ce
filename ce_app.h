@@ -107,6 +107,7 @@ typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
      CeVimVisualSave_t vim_visual_save;
+     CePoint_t visual;
      CeConfigOptions_t config_options;
      int terminal_width;
      int terminal_height;
