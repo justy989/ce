@@ -364,8 +364,8 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
      }
 }
 
-void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorDefs_t* color_defs, int64_t height_offset,
-                      int ui_fg_color, int ui_bg_color){
+void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeMultipleCursors_t* multiple_cursors,
+                      CeColorDefs_t* color_defs, int64_t height_offset, int ui_fg_color, int ui_bg_color){
      // create bottom bar bg
      int64_t bottom = view->rect.bottom + height_offset;
      int color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
@@ -439,6 +439,19 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      char cursor_pos_string[32];
      int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x + 1, view->cursor.y + 1);
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
+
+     if(multiple_cursors && multiple_cursors->count){
+          if(multiple_cursors->active){
+               color_pair = ce_color_def_get(color_defs, COLOR_GREEN, ui_bg_color);
+          }else{
+               color_pair = ce_color_def_get(color_defs, COLOR_RED, ui_bg_color);
+          }
+
+          attron(COLOR_PAIR(color_pair));
+
+          int64_t multiple_cursor_string_len = snprintf(cursor_pos_string, 32, "(%ld)", multiple_cursors->count);
+          mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1) - (multiple_cursor_string_len + 1), "%s", cursor_pos_string);
+     }
 }
 
 void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, CeMacros_t* macros, CeTerminalList_t* terminal_list,
@@ -617,7 +630,8 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, Ce
 
           draw_view(&layout->view, tab_width, line_number, visual_line_display_type, multiple_cursors, &draw_color_list, color_defs, syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
-          draw_view_status(&layout->view, layout == current ? vim : NULL, macros, color_defs, 0, ui_fg_color, ui_bg_color);
+          draw_view_status(&layout->view, layout == current ? vim : NULL, macros, multiple_cursors, color_defs, 0,
+                           ui_fg_color, ui_bg_color);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
           int color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
@@ -703,10 +717,10 @@ void draw(CeApp_t* app){
                     app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
-          draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0, app->config_options.ui_fg_color,
-                           app->config_options.ui_bg_color);
-          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
+          draw_view_status(&app->input_view, &app->vim, &app->macros, &app->multiple_cursors, &color_defs, 0,
                            app->config_options.ui_fg_color, app->config_options.ui_bg_color);
+          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &app->multiple_cursors, &color_defs,
+                           -new_status_bar_offset, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -745,8 +759,9 @@ void draw(CeApp_t* app){
           ce_draw_color_list_free(&draw_color_list);
           if(app->input_complete_func){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
-               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
-                                app->config_options.ui_fg_color, app->config_options.ui_bg_color);
+               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &app->multiple_cursors,
+                                &color_defs, -new_status_bar_offset, app->config_options.ui_fg_color,
+                                app->config_options.ui_bg_color);
           }
      }
 
@@ -1068,7 +1083,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                int64_t index = 0;
                while(itr){
                     if(index == view->cursor.y){
-                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
+                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->multiple_cursors, &app->config_options,
                                                &app->terminal_list, &app->last_terminal, true);
                          break;
                     }
