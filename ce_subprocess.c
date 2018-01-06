@@ -44,15 +44,19 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command){
      return true;
 }
 
+void _close_file(FILE **file){
+     FILE *to_close = *file;
+     if(to_close == NULL) return;
+     *file = NULL;
+     // because fclose() is a cancellation point for pthread, I need to NULL
+     // stdin prior to calling fclose() so we are guaranteed we don't do it
+     // again in a cleanup handler
+     fclose(to_close);
+}
+
 void ce_subprocess_close_stdin(CeSubprocess_t* subprocess){
      if(!subprocess->stdin) return;
-
-     FILE *in = subprocess->stdin;
-     subprocess->stdin = NULL;
-     // because fclose() is a cancellation point for pthread, I need to NULL
-     // stdout prior to calling fclose so we are guaranteed we don't call it
-     // again in a cleanup handler's call to ce_subprocess_close
-     fclose(in);
+     _close_file(&subprocess->stdin);
      subprocess->stdin_fd = 0;
 }
 
@@ -82,12 +86,6 @@ int ce_subprocess_close(CeSubprocess_t* subprocess){
      }while(!WIFEXITED(status) && !WIFSIGNALED(status));
      assert(!(WIFCONTINUED(status)));
 
-     FILE *out = subprocess->stdout;
-     subprocess->stdout = NULL;
-     // because fclose() will be a cancellation point for pthread, I need to NULL
-     // stdout prior to calling fclose so we are guaranteed we don't call it
-     // again in a cleanup handler's call to ce_subprocess_close
-     if(out) fclose(out);
-
+     _close_file(&subprocess->stdout);
      return status;
 }
