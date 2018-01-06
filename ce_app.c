@@ -1437,7 +1437,9 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 
      while(fgets(bytes, BUFSIZ, subprocess.stdout) != NULL){
           ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+          do{
           rc = write(g_shell_command_ready_fds[1], "1", 2);
+          }while(rc == -1 && errno == EINTR);
           if(rc < 0){
                ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
                pthread_exit(NULL);
@@ -1445,7 +1447,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      }
 
      if(ferror(subprocess.stdout)){
-          ce_log("shell command: fread from pid %d failed\n", subprocess.pid);
+          ce_log("shell command: fgets() from pid %d failed\n", subprocess.pid);
           pthread_exit(NULL);
      }
 
@@ -1464,7 +1466,9 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
-     rc = write(g_shell_command_ready_fds[1], "1", 2);
+     do{
+          rc = write(g_shell_command_ready_fds[1], "1", 2);
+     }while(rc == -1 && errno == EINTR);
      if(rc < 0){
           ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
           pthread_exit(NULL);
