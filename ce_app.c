@@ -16,6 +16,8 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
+int g_shell_command_ready_fds[2];
+
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
      if(!node) return false;
@@ -1039,7 +1041,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_reload_config, "reload_config", "reload the config shared object"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
-          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search"},
+          {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search if 1 argument is given, if 2 are given replaces the first argument with the second argument"},
           {command_save_all_and_quit, "save_all_and_quit", "save all modified buffers and quit the editor"},
           {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
           {command_search, "search", "interactive search 'forward' or 'backward'"},
@@ -1152,6 +1154,9 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      input_view->buffer->no_line_numbers = true;
      input_view->buffer->no_highlight_current_line = true;
      input_view->cursor = (CePoint_t){0, 0};
+
+     app->vim_visual_save.mode = app->vim.mode;
+     app->vim_visual_save.visual_point = app->vim.visual;
 
      app->vim.mode = CE_VIM_MODE_INSERT;
      ce_rune_node_free(&app->vim.insert_rune_head);
@@ -1341,7 +1346,7 @@ bool replace_all_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      int64_t index = ce_vim_register_index('/');
      CeVimYank_t* yank = app->vim.yanks + index;
      if(yank->text){
-          replace_all(view, &app->vim, yank->text, app->input_view.buffer->lines[0]);
+          replace_all(view, &app->vim_visual_save, yank->text, app->input_view.buffer->lines[0]);
      }
      return true;
 }
@@ -1436,7 +1441,11 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           size_t byte_count = fread(bytes, 1, BUFSIZ, subprocess.stdout);
           if(byte_count > 0){
                ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-               *shell_command_data->ready_to_draw = true;
+               rc = write(g_shell_command_ready_fds[1], "1", 2);
+               if(rc < 0){
+                    ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+                    return false;
+               }
           }
 
           if(ferror(subprocess.stdout)){
@@ -1460,7 +1469,11 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
-     *shell_command_data->ready_to_draw = true;
+     rc = write(g_shell_command_ready_fds[1], "1", 2);
+     if(rc < 0){
+          ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+          return false;
+     }
      // no need to run our cleanup a second time
      pthread_cleanup_pop(0);
      pthread_cleanup_pop(1);

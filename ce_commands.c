@@ -234,8 +234,11 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
-     ce_layout_split(tab_layout, vertical);
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     tab_layout->tab.current = new_layout;
 
      return CE_COMMAND_SUCCESS;
 }
@@ -769,20 +772,22 @@ CeCommandStatus_t command_goto_prev_buffer_in_view(CeCommand_t* command, void* u
 }
 
 CeCommandStatus_t command_replace_all(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
      CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(command->arg_count == 0){
-          ce_app_input(app, "Replace All Occurances", switch_buffer_input_complete_func);
-     }else if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING){
+     if(command->arg_count == 1 && command->args[0].type == CE_COMMAND_ARG_STRING){
           int64_t index = ce_vim_register_index('/');
           CeVimYank_t* yank = app->vim.yanks + index;
           if(yank->text){
-               replace_all(command_context.view, &app->vim, yank->text, command->args[0].string);
+               replace_all(command_context.view, &app->vim_visual_save, yank->text, command->args[0].string);
+          }else{
+               ce_app_message(app, "only 1 argument used for replace_all, but search yank register is empty");
+               return CE_COMMAND_NO_ACTION;
           }
+     }else if(command->arg_count == 2 && command->args[0].type == CE_COMMAND_ARG_STRING && command->args[1].type == CE_COMMAND_ARG_STRING){
+          replace_all(command_context.view, &app->vim_visual_save, command->args[0].string, command->args[1].string);
      }else{
           return CE_COMMAND_PRINT_HELP;
      }
@@ -1039,7 +1044,7 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
      bool chain_undo = false;
      int64_t match_len = 0;
      regex_t regex = {};
-     if(!regex_search){
+     if(regex_search){
           int rc = regcomp(&regex, match, REG_EXTENDED);
           if(rc != 0){
                char error_buffer[BUFSIZ];
@@ -1072,24 +1077,24 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
      }
 }
 
-void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* replace){
+void replace_all(CeView_t* view, CeVimVisualSave_t* vim_visual_save, const char* match, const char* replace){
      CePoint_t start;
      CePoint_t end;
-     if(vim->mode == CE_VIM_MODE_VISUAL){
-          if(ce_point_after(view->cursor, vim->visual)){
-               start = vim->visual;
+     if(vim_visual_save->mode == CE_VIM_MODE_VISUAL){
+          if(ce_point_after(view->cursor, vim_visual_save->visual_point)){
+               start = vim_visual_save->visual_point;
                end = view->cursor;
           }else{
                start = view->cursor;
-               end = vim->visual;
+               end = vim_visual_save->visual_point;
           }
-     }else if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
-          if(ce_point_after(view->cursor, vim->visual)){
-               start = (CePoint_t){0, vim->visual.y};
+     }else if(vim_visual_save->mode == CE_VIM_MODE_VISUAL_LINE){
+          if(ce_point_after(view->cursor, vim_visual_save->visual_point)){
+               start = (CePoint_t){0, vim_visual_save->visual_point.y};
                end = (CePoint_t){ce_utf8_last_index(view->buffer->lines[view->cursor.y]), view->cursor.y};
           }else{
                start = (CePoint_t){0, view->cursor.y};
-               end = (CePoint_t){ce_utf8_last_index(view->buffer->lines[vim->visual.y]), vim->visual.y};
+               end = (CePoint_t){ce_utf8_last_index(view->buffer->lines[vim_visual_save->visual_point.y]), vim_visual_save->visual_point.y};
           }
      }else{
           start = view->cursor;
@@ -1181,8 +1186,12 @@ CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     ce_layout_split(tab_layout, true);
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, true);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     tab_layout->tab.current = new_layout;
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
@@ -1201,8 +1210,12 @@ CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
      CeApp_t* app = user_data;
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     ce_layout_split(tab_layout, false);
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, false);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+
+     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
+     tab_layout->tab.current = new_layout;
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;

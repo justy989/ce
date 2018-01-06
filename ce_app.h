@@ -88,11 +88,17 @@ typedef struct{
      int64_t unique_id;
 }CeTerminalList_t;
 
+typedef struct{
+     CeVimMode_t mode;
+     CePoint_t visual_point;
+}CeVimVisualSave_t;
+
 typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
 
 typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
+     CeVimVisualSave_t vim_visual_save;
      CeConfigOptions_t config_options;
      int terminal_width;
      int terminal_height;
@@ -131,7 +137,6 @@ typedef struct CeApp_t{
      int64_t macro_multiplier;
      char last_macro_register;
      int64_t last_macro_multiplier;
-     bool ready_to_draw;
      bool quit;
      bool highlight_search;
      CeUserConfig_t user_config;
@@ -198,7 +203,7 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
 void build_complete_list(CeBuffer_t* buffer, CeComplete_t* complete);
 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char* string);
 CeDestination_t scan_line_for_destination(const char* line);
-void replace_all(CeView_t* view, CeVim_t* vim, const char* match, const char* replace);
+void replace_all(CeView_t* view, CeVimVisualSave_t* vim_visual_save, const char* match, const char* replace);
 
 bool user_config_init(CeUserConfig_t* user_config, const char* filepath);
 void user_config_free(CeUserConfig_t* user_config);
@@ -232,3 +237,5 @@ bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer)
 
 bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view);
+
+extern int g_shell_command_ready_fds[2];

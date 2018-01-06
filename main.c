@@ -3,6 +3,7 @@
 #include <locale.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/poll.h>
 #include <ncurses.h>
 #include <unistd.h>
 #include <assert.h>
@@ -278,7 +279,9 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                               draw_color_node = draw_color_node->next;
                          }
 
-                         if(x >= col_min && x <= col_max && rune > 0){
+                         if(x >= col_min &&
+                            x <= col_max &&
+                            rune > 0){
                               if(rune == CE_TAB){
                                    x += tab_width;
                                    addstr(tab_str);
@@ -797,6 +800,8 @@ bool handle_input_history_key(int key, CeHistory_t* history, CeBuffer_t* input_b
 }
 
 void app_handle_key(CeApp_t* app, CeView_t* view, int key){
+     if(key == ERR) return;
+
      if(key == KEY_RESIZE){
           ce_app_update_terminal_view(app);
           return;
@@ -1294,6 +1299,19 @@ void print_help(char* program){
      printf("  -c <config file> path to shared object configuration\n");
 }
 
+void done_drawing(CeApp_t* app, struct timeval* previous_draw_time){
+     CeTerminalNode_t* itr = app->terminal_list.head;
+     while(itr){
+          if(itr->terminal.ready_to_draw){
+               itr->terminal.ready_to_draw = false;
+          }
+          itr = itr->next;
+     }
+
+     gettimeofday(previous_draw_time, NULL);
+     app->shell_command_ready_to_draw = false;
+}
+
 int main(int argc, char** argv){
      const char* config_filepath = NULL;
      int last_arg_index = 0;
@@ -1436,7 +1454,7 @@ int main(int argc, char** argv){
      // init ncurses
      {
           initscr();
-          nodelay(stdscr, TRUE);
+          noqiflush();
           keypad(stdscr, TRUE);
           cbreak();
           noecho();
@@ -1588,18 +1606,60 @@ int main(int argc, char** argv){
           }
      }
 
+     pipe(g_terminal_ready_fds);
+     pipe(g_shell_command_ready_fds);
+
      draw(&app);
 
      // init draw thread
-     struct timeval previous_draw_time = {};
      struct timeval current_draw_time = {};
-     uint64_t time_since_last_draw = 0;
      uint64_t time_since_last_message = 0;
 
      // main loop
      while(!app.quit){
-          gettimeofday(&current_draw_time, NULL);
-          time_since_last_draw = time_between(previous_draw_time, current_draw_time);
+          // TODO: add shell command buffer
+          int input_fd_count = 3; // stdin and terminal_ready_fd
+          struct pollfd input_fds[input_fd_count];
+
+          // populate fd array
+          {
+               memset(input_fds, 0, input_fd_count * sizeof(*input_fds));
+
+               input_fds[0].fd = STDIN_FILENO;
+               input_fds[0].events = POLLIN;
+               input_fds[1].fd = g_terminal_ready_fds[0];
+               input_fds[1].events = POLLIN;
+               input_fds[2].fd = g_shell_command_ready_fds[0];
+               input_fds[2].events = POLLIN;
+          }
+
+          int poll_rc = poll(input_fds, input_fd_count, 10);
+          assert(poll_rc >= 0);
+          if(poll_rc == 0) continue;
+
+          bool check_stdin = false;
+
+          if(input_fds[0].revents != 0){
+               check_stdin = true;
+          }
+
+          if(input_fds[1].revents != 0){
+               char buffer[BUFSIZ];
+               int rc = read(g_terminal_ready_fds[0], buffer, BUFSIZ);
+               if(rc < 0){
+                    ce_log("failed to read from terminal ready fd: '%s'\n", strerror(errno));
+                    continue;
+               }
+          }
+
+          if(input_fds[2].revents != 0){
+               char buffer[BUFSIZ];
+               int rc = read(g_shell_command_ready_fds[0], buffer, BUFSIZ);
+               if(rc < 0){
+                    ce_log("failed to read from shell command ready fd: '%s'\n", strerror(errno));
+                    continue;
+               }
+          }
 
           if(app.message_mode){
                time_since_last_message = time_between(app.message_time, current_draw_time);
@@ -1620,41 +1680,9 @@ int main(int argc, char** argv){
                break;
           }
 
-          int key = getch();
+          int key = ERR;
 
-          if(time_since_last_draw >= DRAW_USEC_LIMIT){
-               if(app.ready_to_draw){
-                    draw(&app);
-                    app.ready_to_draw = false;
-                    app.shell_command_ready_to_draw = false;
-                    previous_draw_time = current_draw_time;
-               }else if(app.shell_command_ready_to_draw && ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer)){
-                    draw(&app);
-                    app.ready_to_draw = false;
-                    app.shell_command_ready_to_draw = false;
-                    previous_draw_time = current_draw_time;
-               }else{
-                    CeTerminalNode_t* itr = app.terminal_list.head;
-                    bool do_draw = false;
-
-                    while(itr){
-                         if(itr->terminal.ready_to_draw){
-                              do_draw = true;
-                              itr->terminal.ready_to_draw = false;
-                              break;
-                         }
-                         itr = itr->next;
-                    }
-
-                    // if we did draw, turn of any outstanding draw flags
-                    if(do_draw){
-                         draw(&app);
-                         app.shell_command_ready_to_draw = false;
-                         app.ready_to_draw = false;
-                         previous_draw_time = current_draw_time;
-                    }
-               }
-          }
+          if(check_stdin) key = getch();
 
           // TODO: compress with below
           if(view){
@@ -1724,19 +1752,13 @@ int main(int argc, char** argv){
                     CeTerminalNode_t* tmp = itr;
                     itr = itr->next;
                     free(tmp);
-                    app.ready_to_draw = true;
                }else{
                     itr = itr->next;
                }
           }
 
-          if(key == ERR){
-               sleep(0);
-               continue;
-          }
-
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
-          g_last_key = key;
+          if(check_stdin) g_last_key = key;
           if(app.log_key_presses) ce_log("key: %s %d\n", keyname(key), key);
 #endif
 
@@ -1795,8 +1817,7 @@ int main(int argc, char** argv){
                build_jump_list(app.jump_list_buffer, &view_data->jump_list);
           }
 
-          // tell the draw thread we are ready to draw
-          app.ready_to_draw = true;
+          draw(&app);
      }
 
      // cleanup
@@ -1838,7 +1859,6 @@ int main(int argc, char** argv){
                     prev = itr;
                     itr = itr->next;
                }
-
           }
      }
 
