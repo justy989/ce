@@ -1,7 +1,9 @@
 #include "ce_app.h"
-#include "ce_syntax.h"
 #include "ce_commands.h"
+#include "ce_subprocess.h"
+#include "ce_syntax.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1381,38 +1383,6 @@ bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      return true;
 }
 
-// NOTE: stderr is redirected to stdout
-static pid_t bidirectional_popen(const char* cmd, int* in_fd, int* out_fd){
-     int input_fds[2];
-     int output_fds[2];
-
-     if(pipe(input_fds) != 0) return 0;
-     if(pipe(output_fds) != 0) return 0;
-
-     pid_t pid = fork();
-     if(pid < 0) return 0;
-
-     if(pid == 0){
-          close(input_fds[1]);
-          close(output_fds[0]);
-
-          dup2(input_fds[0], STDIN_FILENO);
-          dup2(output_fds[1], STDOUT_FILENO);
-          dup2(output_fds[1], STDERR_FILENO);
-
-          // TODO: run user's SHELL ?
-          execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
-     }else{
-         close(input_fds[0]);
-         close(output_fds[1]);
-
-         *in_fd = input_fds[1];
-         *out_fd = output_fds[0];
-     }
-
-     return pid;
-}
-
 typedef struct{
      CeBuffer_t* buffer;
      char* command;
@@ -1425,55 +1395,74 @@ void run_shell_command_cleanup(void* data){
      free(shell_command_data);
 }
 
+void cleanup_subprocess(void* data){
+     CeSubprocess_t* subprocess = (CeSubprocess_t*)(data);
+     // kill the subprocess and wait for it to be cleaned up
+     ce_subprocess_kill(subprocess, -9);
+     ce_subprocess_close(subprocess);
+}
+
 static void* run_shell_command_and_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
      pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
 
-     int input_fd = -1;
-     int output_fd = -1;
-     pid_t pid = bidirectional_popen(shell_command_data->command, &input_fd, &output_fd);
-     if(pid == 0){
+     // guarantee we get to register our cleanup handler before the thread is canceled
+     int old;
+     int rc = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
+     assert(rc == 0);
+
+     CeSubprocess_t subprocess;
+     if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
           ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
           return NULL;
      }
 
-     char bytes[BUFSIZ];
-     snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", pid, shell_command_data->command);
+     // we aren't using stdin here, so we should close it in case the
+     // subprocess waits for stdin to close before it completes which is common
+     // in filter applications
+     ce_subprocess_close_stdin(&subprocess);
+
+     pthread_cleanup_push(cleanup_subprocess, &subprocess);
+     rc = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old);
+     assert(rc == 0);
+
+     char bytes[BUFSIZ+1];
+     // nul terminate even in the event that we fill our buffer during fread()
+     bytes[BUFSIZ] = 0;
+     snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.pid, shell_command_data->command);
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
 
-     int status = 0;
-     pid_t w;
-     ssize_t byte_count = 1;
      do{
-          while(byte_count != 0){
-               byte_count = read(output_fd, bytes, BUFSIZ);
-               if(byte_count < 0){
-                    ce_log("shell command: read from pid %d failed\n", pid);
-                    return NULL;
-               }else if(byte_count > 0){
-                    bytes[byte_count] = 0;
-                    ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-                    *shell_command_data->ready_to_draw = true;
-               }
+          size_t byte_count = fread(bytes, 1, BUFSIZ, subprocess.stdout);
+          if(byte_count > 0){
+               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+               *shell_command_data->ready_to_draw = true;
           }
 
-          w = waitpid(pid, &status, WNOHANG);
-          if(w == -1) return NULL;
-
-          if(WIFEXITED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", pid, WEXITSTATUS(status));
-          }else if(WIFSIGNALED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", pid, WTERMSIG(status));
-          }else if(WIFSTOPPED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", pid, WSTOPSIG(status));
-          }else if (WIFCONTINUED(status)){
-               snprintf(bytes, BUFSIZ, "\npid %d continued", pid);
+          if(ferror(subprocess.stdout)){
+               ce_log("shell command: fread from pid %d failed\n", subprocess.pid);
+               return NULL;
           }
-     }while(!WIFEXITED(status) && !WIFSIGNALED(status));
+     } while(!feof(subprocess.stdout));
+
+     int status = ce_subprocess_close(&subprocess);
+
+     if(WIFEXITED(status)){
+          snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", subprocess.pid, WEXITSTATUS(status));
+     }else if(WIFSIGNALED(status)){
+          snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", subprocess.pid, WTERMSIG(status));
+     }else if(WIFSTOPPED(status)){
+          snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", subprocess.pid, WSTOPSIG(status));
+     }else{
+          snprintf(bytes, BUFSIZ, "\npid %d stopped with unexpected status %d", subprocess.pid, status);
+     }
+
 
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
      *shell_command_data->ready_to_draw = true;
+     // no need to run our cleanup a second time
+     pthread_cleanup_pop(0);
      pthread_cleanup_pop(1);
      return NULL;
 }
