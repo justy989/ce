@@ -1431,28 +1431,23 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      rc = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old);
      assert(rc == 0);
 
-     char bytes[BUFSIZ+1];
-     // nul terminate even in the event that we fill our buffer during fread()
-     bytes[BUFSIZ] = 0;
+     char bytes[BUFSIZ];
      snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.pid, shell_command_data->command);
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
 
-     do{
-          size_t byte_count = fread(bytes, 1, BUFSIZ, subprocess.stdout);
-          if(byte_count > 0){
-               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-               rc = write(g_shell_command_ready_fds[1], "1", 2);
-               if(rc < 0){
-                    ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-                    return false;
-               }
+     while(fgets(bytes, BUFSIZ, subprocess.stdout) != NULL){
+          ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+          rc = write(g_shell_command_ready_fds[1], "1", 2);
+          if(rc < 0){
+               ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+               return false;
           }
+     }
 
-          if(ferror(subprocess.stdout)){
-               ce_log("shell command: fread from pid %d failed\n", subprocess.pid);
-               return NULL;
-          }
-     } while(!feof(subprocess.stdout));
+     if(ferror(subprocess.stdout)){
+          ce_log("shell command: fread from pid %d failed\n", subprocess.pid);
+          return NULL;
+     }
 
      int status = ce_subprocess_close(&subprocess);
 
