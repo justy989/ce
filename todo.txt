@@ -19,3 +19,4 @@ bug:
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
 - crash where assertion fails when vim last action is verb_last_action
 - sometimes doing dot inserts some text you don't expect it to insert based on the last action you did
+- when you close a terminal, like all terminals stop working
