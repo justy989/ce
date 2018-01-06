@@ -206,6 +206,8 @@ bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change); // TODO: un
 bool ce_buffer_undo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 
+CePoint_t ce_move_point_based_on_buffer_changes(CeBuffer_t* buffer, CeBufferChangeNode_t* before, CePoint_t before_point);
+
 void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 void ce_view_scroll_to(CeView_t* view, CePoint_t point);
 void ce_view_center(CeView_t* view);

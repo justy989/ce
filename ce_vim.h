@@ -5,14 +5,15 @@
 #define CE_VIM_MAX_COMMAND_LEN 16
 #define CE_VIM_MAX_KEY_BINDS 256
 
-#define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                                              \
-CeVimMotionResult_t function_name(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view,               \
-                                  const CeConfigOptions_t* config_options, CeVimBufferData_t* buffer_data, \
-                                  CeRange_t* motion_range);
+#define CE_VIM_DECLARE_MOTION_FUNC(function_name)                                                                     \
+CeVimMotionResult_t function_name(CeVim_t* vim, CeVimAction_t* action, const CeView_t* view, const CePoint_t* cursor, \
+                                  CeVimVisualData_t* visual, const CeConfigOptions_t* config_options,                   \
+                                  CeVimBufferData_t* buffer_data, CeRange_t* motion_range);
 
 #define CE_VIM_DECLARE_VERB_FUNC(function_name)                                                       \
 bool function_name(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view, \
-                   CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
+                   CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,              \
+                   const CeConfigOptions_t* config_options);
 
 
 typedef enum{
@@ -24,13 +25,14 @@ typedef enum{
 struct CeVimAction_t;
 struct CeVim_t;
 struct CeVimBufferData_t;
+struct CeVimVisualData_t;
 enum CeVimParseResult_t;
 
 typedef enum CeVimParseResult_t CeVimParseFunc_t(struct CeVimAction_t*, const struct CeVim_t*, CeRune_t);
-typedef CeVimMotionResult_t CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*,
-                                              const CeConfigOptions_t*, struct CeVimBufferData_t*, CeRange_t*);
+typedef CeVimMotionResult_t CeVimMotionFunc_t(struct CeVim_t*, struct CeVimAction_t*, const CeView_t*, const CePoint_t*,
+                                              struct CeVimVisualData_t*, const CeConfigOptions_t*, struct CeVimBufferData_t*, CeRange_t*);
 typedef bool CeVimVerbFunc_t(struct CeVim_t*, const struct CeVimAction_t*, CeRange_t, CeView_t*,
-                             struct CeVimBufferData_t*, const CeConfigOptions_t*);
+                             CePoint_t*, struct CeVimVisualData_t*, struct CeVimBufferData_t*, const CeConfigOptions_t*);
 
 typedef enum CeVimParseResult_t{
      CE_VIM_PARSE_INVALID,
@@ -129,14 +131,18 @@ typedef struct{
      CeVimFindCharState_t state;
 }CeVimFindChar_t;
 
+typedef struct CeVimVisualData_t{
+     CePoint_t point;
+     CePoint_t block_top_left;
+     CePoint_t block_bottom_right;
+}CeVimVisualData_t;
+
 typedef struct CeVim_t{
      CeVimMode_t mode;
      CeVimKeyBind_t key_binds[CE_VIM_MAX_KEY_BINDS];
      int64_t key_bind_count;
      CeRune_t current_command[CE_VIM_MAX_COMMAND_LEN];
      CeVimYank_t yanks[CE_ASCII_PRINTABLE_CHARACTERS];
-     int64_t motion_column;
-     CePoint_t visual;
      CeVimAction_t last_action;
      CeVimAction_t current_action;
      CeRuneNode_t* insert_rune_head;
@@ -144,8 +150,6 @@ typedef struct CeVim_t{
      bool chain_undo;
      bool verb_last_action; // flag whether or not we are repeating our last action
      bool pasting;
-     CePoint_t visual_block_top_left;
-     CePoint_t visual_block_bottom_right;
      CeVimSearchMode_t search_mode;
      CeVimFindChar_t find_char;
 }CeVim_t;
@@ -153,15 +157,15 @@ typedef struct CeVim_t{
 bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overriden
 bool ce_vim_free(CeVim_t* vim);
 bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
-CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CeRune_t key, CeVimBufferData_t* buffer_data,
-                                     const CeConfigOptions_t* config_options);
+CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeVimVisualData_t* visual, CeRune_t key,
+                                     CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options, bool track);
 
 bool vim_mode_is_visual(CeVimMode_t mode);
 
 // action
 CeVimParseResult_t ce_vim_parse_action(CeVimAction_t* action, const CeVim_t* vim);
-bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, CeVimBufferData_t* buffer_data,
-                         const CeConfigOptions_t* config_options);
+bool ce_vim_apply_action(CeVim_t* vim, CeVimAction_t* action, CeView_t* view, CePoint_t* cursor, CeVimVisualData_t* visual,
+                         CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
 bool ce_vim_append_key(CeVim_t* vim, CeRune_t key);
 
 // util
@@ -306,6 +310,7 @@ CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_next_blank_line);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_previous_blank_line);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_next_zero_indentation_line);
 CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_previous_zero_indentation_line);
+CE_VIM_DECLARE_MOTION_FUNC(ce_vim_motion_other_end_of_selection);
 
 // verb functions
 CE_VIM_DECLARE_VERB_FUNC(ce_vim_verb_motion);

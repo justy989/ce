@@ -76,7 +76,7 @@ bool ce_range_list_insert_sorted(CeRangeList_t* list, CePoint_t start, CePoint_t
           itr = itr->next;
      }
 
-     if(!itr){
+     if(itr){
           if(!ce_point_after(end, itr->range.start)) return false;
      }
 

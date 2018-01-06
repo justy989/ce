@@ -93,12 +93,21 @@ typedef struct{
      CePoint_t visual_point;
 }CeVimVisualSave_t;
 
+typedef struct{
+     CePoint_t* cursors;
+     CeVimVisualData_t* visuals;
+     int64_t* motion_columns;
+     int64_t count;
+     bool active;
+}CeMultipleCursors_t;
+
 typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
 
 typedef struct CeApp_t{
      CeRect_t terminal_rect;
      CeVim_t vim;
      CeVimVisualSave_t vim_visual_save;
+     CeVimVisualData_t visual;
      CeConfigOptions_t config_options;
      int terminal_width;
      int terminal_height;
@@ -146,6 +155,8 @@ typedef struct CeApp_t{
      pthread_t shell_command_thread;
      volatile bool shell_command_ready_to_draw;
 
+     CeMultipleCursors_t multiple_cursors;
+
      // debug
      bool log_key_presses;
 }CeApp_t;
@@ -184,8 +195,9 @@ CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list);
 
-void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeConfigOptions_t* config_options,
-                           CeTerminalList_t* terminal_list, CeTerminal_t** last_termin, bool insert_into_jump_list);
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeMultipleCursors_t* multiple_cursors,
+                           CeConfigOptions_t* config_options, CeTerminalList_t* terminal_list, CeTerminal_t** last_termin,
+                           bool insert_into_jump_list);
 void ce_run_command_in_terminal(CeTerminal_t* terminal, const char* command);
 CeView_t* ce_switch_to_terminal(CeApp_t* app, CeView_t* view, CeLayout_t* tab_layout);
 
@@ -194,8 +206,8 @@ void input_view_overlay(CeView_t* input_view, CeView_t* view);
 CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number);
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
-                                CeTerminalList_t* terminal_list, CeTerminal_t** last_terminal,
-                                bool insert_into_jump_list, const char* filepath);
+                                CeMultipleCursors_t* multiple_cursors, CeTerminalList_t* terminal_list,
+                                CeTerminal_t** last_terminal, bool insert_into_jump_list, const char* filepath);
 CeBuffer_t* new_buffer();
 void determine_buffer_syntax(CeBuffer_t* buffer);
 char* buffer_base_directory(CeBuffer_t* buffer, CeTerminalList_t* terminal_list);
@@ -214,6 +226,10 @@ CeTerminal_t* ce_buffer_in_terminal_list(CeBuffer_t* buffer, CeTerminalList_t* t
 CeTerminal_t* create_terminal(CeApp_t* app, int width, int height);
 void ce_terminal_list_free_terminal(CeTerminalList_t* terminal_list, CeTerminal_t* terminal);
 void ce_terminal_list_free(CeTerminalList_t* terminal_list);
+
+void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t point);
+void ce_multiple_cursors_clear(CeMultipleCursors_t* multiple_cursors);
+void ce_multiple_cursors_toggle_active(CeMultipleCursors_t* multiple_cursors);
 
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
 int64_t istrlen(const CeRune_t* istr);

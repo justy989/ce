@@ -1,16 +1,13 @@
 todo:
+- check if file has been modified since we last loaded it
 - add config option for log destination (we want to init the log before the user config, so can we even do this?)
 - dired mode
-- message box
 - undo in macros actually removing some actions
 - vim ctrl+w HJKL to move windows around
 - regex replace for captures
 - vim's 'gf'
 - customization:
-  - completion
   - status bar
-  - key handler ?
-- check if file has been modified since we last loaded it
 - backup files, and session info in ~/.ce
 - vim :sort
 - trim extra whitespace when yanking from terminal
@@ -22,3 +19,4 @@ bug:
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
 - crash where assertion fails when vim last action is verb_last_action
 - sometimes doing dot inserts some text you don't expect it to insert based on the last action you did
+- when you close a terminal, like all terminals stop working

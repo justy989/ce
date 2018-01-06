@@ -51,7 +51,7 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      while(itr){
           if(max_buffer_lines < itr->buffer->line_count) max_buffer_lines = itr->buffer->line_count;
           int64_t name_len = strlen(itr->buffer->name);
-          if(max_name_len < name_len) max_name_len = name_len;
+          if(max_name_len < name_len) max_buffer_lines = name_len;
           buffer_count++;
           itr = itr->next;
      }
@@ -198,7 +198,7 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
 }
 
 void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeVisualLineDisplayType_t visual_line_display_type,
-               CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
+               CeMultipleCursors_t* multiple_cursors, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
      int64_t view_width = ce_view_width(view);
      int64_t view_height = ce_view_height(view);
      int64_t row_min = view->scroll.y;
@@ -222,6 +222,9 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
      }
 
      if(view->buffer->line_count >= 0){
+          int last_bg = COLOR_DEFAULT;
+          int last_fg = COLOR_DEFAULT;
+
           for(int64_t y = 0; y < view_height; y++){
                int64_t index = 0;
                int64_t x = 0;
@@ -267,8 +270,7 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                          rune = ce_utf8_decode(line, &rune_len);
 
                          // check if we need to move to the next color
-                         while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, y + view->scroll.y})){
-
+                         while(draw_color_node && !ce_point_after(draw_color_node->point, (CePoint_t){index, real_y})){
                               int bg = draw_color_node->bg;
                               if(!view->buffer->no_highlight_current_line && bg == COLOR_DEFAULT && real_y == view->cursor.y){
                                    bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, bg);
@@ -276,12 +278,33 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
 
                               int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, bg);
                               attron(COLOR_PAIR(change_color_pair));
+                              last_bg = bg;
+                              last_fg = draw_color_node->fg;
                               draw_color_node = draw_color_node->next;
                          }
 
                          if(x >= col_min &&
                             x <= col_max &&
                             rune > 0){
+                              bool showed_one_of_the_multiple_cursors = false;
+
+                              if(multiple_cursors){
+                                   for(int64_t m = 0; m < multiple_cursors->count; m++){
+                                        if(real_y == multiple_cursors->cursors[m].y && x == multiple_cursors->cursors[m].x){
+                                             int new_bg = 0;
+                                             if(multiple_cursors->active){
+                                                  new_bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE, last_bg);
+                                             }else{
+                                                  new_bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE, last_bg);
+                                             }
+                                             int change_color_pair = ce_color_def_get(color_defs, last_fg, new_bg);
+                                             attron(COLOR_PAIR(change_color_pair));
+                                             showed_one_of_the_multiple_cursors = true;
+                                             break;
+                                        }
+                                   }
+                              }
+
                               if(rune == CE_TAB){
                                    x += tab_width;
                                    addstr(tab_str);
@@ -295,6 +318,11 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                               }else{
                                    addch(rune);
                                    x++;
+                              }
+
+                              if(showed_one_of_the_multiple_cursors){
+                                   int change_color_pair = ce_color_def_get(color_defs, last_fg, last_bg);
+                                   attron(COLOR_PAIR(change_color_pair));
                               }
                          }else if(rune == CE_TAB){
                               x += tab_width;
@@ -336,8 +364,8 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
      }
 }
 
-void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorDefs_t* color_defs, int64_t height_offset,
-                      int ui_fg_color, int ui_bg_color){
+void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeMultipleCursors_t* multiple_cursors,
+                      CeColorDefs_t* color_defs, int64_t height_offset, int ui_fg_color, int ui_bg_color){
      // create bottom bar bg
      int64_t bottom = view->rect.bottom + height_offset;
      int color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
@@ -411,12 +439,26 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeColorD
      char cursor_pos_string[32];
      int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x + 1, view->cursor.y + 1);
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
+
+     if(multiple_cursors && multiple_cursors->count){
+          if(multiple_cursors->active){
+               color_pair = ce_color_def_get(color_defs, COLOR_GREEN, ui_bg_color);
+          }else{
+               color_pair = ce_color_def_get(color_defs, COLOR_RED, ui_bg_color);
+          }
+
+          attron(COLOR_PAIR(color_pair));
+
+          int64_t multiple_cursor_string_len = snprintf(cursor_pos_string, 32, "(%ld)", multiple_cursors->count);
+          mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1) - (multiple_cursor_string_len + 1), "%s", cursor_pos_string);
+     }
 }
 
-void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTerminalList_t* terminal_list,
+void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, CeMacros_t* macros, CeTerminalList_t* terminal_list,
                  CeBuffer_t* input_buffer, CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number,
-                 CeVisualLineDisplayType_t visual_line_display_type, CeLayout_t* current, CeSyntaxDef_t* syntax_defs,
-                 int64_t terminal_width, bool highlight_search, int ui_fg_color, int ui_bg_color){
+                 CeVisualLineDisplayType_t visual_line_display_type, CeMultipleCursors_t* multiple_cursors,
+                 CeLayout_t* current, CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search,
+                 int ui_fg_color, int ui_bg_color){
      switch(layout->type){
      default:
           break;
@@ -438,21 +480,39 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                          break;
                     case CE_VIM_MODE_VISUAL:
                     {
-                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         CeRange_t range = {visual->point, layout->view.cursor};
                          ce_range_sort(&range);
                          ce_range_list_insert(&range_list, range.start, range.end);
+
+                         if(multiple_cursors && multiple_cursors->active){
+                              for(int64_t i = 0; i < multiple_cursors->count; i++){
+                                   range = (CeRange_t){multiple_cursors->visuals[i].point, multiple_cursors->cursors[i]};
+                                   ce_range_sort(&range);
+                                   ce_range_list_insert_sorted(&range_list, range.start, range.end);
+                              }
+                         }
                     } break;
                     case CE_VIM_MODE_VISUAL_LINE:
                     {
-                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         CeRange_t range = {visual->point, layout->view.cursor};
                          ce_range_sort(&range);
                          range.start.x = 0;
                          range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]) + 1;
                          ce_range_list_insert(&range_list, range.start, range.end);
+
+                         if(multiple_cursors && multiple_cursors->active){
+                              for(int64_t i = 0; i < multiple_cursors->count; i++){
+                                   range = (CeRange_t){multiple_cursors->visuals[i].point, multiple_cursors->cursors[i]};
+                                   ce_range_sort(&range);
+                                   range.start.x = 0;
+                                   range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]) + 1;
+                                   ce_range_list_insert_sorted(&range_list, range.start, range.end);
+                              }
+                         }
                     } break;
                     case CE_VIM_MODE_VISUAL_BLOCK:
                     {
-                         CeRange_t range = {vim->visual, layout->view.cursor};
+                         CeRange_t range = {visual->point, layout->view.cursor};
                          if(range.start.x > range.end.x){
                               int64_t tmp = range.start.x;
                               range.start.x = range.end.x;
@@ -467,6 +527,28 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                               CePoint_t start = {range.start.x, i};
                               CePoint_t end = {range.end.x, i};
                               ce_range_list_insert(&range_list, start, end);
+                         }
+
+                         if(multiple_cursors && multiple_cursors->active){
+                              for(int64_t c = 0; c < multiple_cursors->count; c++){
+                                   range = (CeRange_t){multiple_cursors->visuals[c].point, multiple_cursors->cursors[c]};
+
+                                   if(range.start.x > range.end.x){
+                                        int64_t tmp = range.start.x;
+                                        range.start.x = range.end.x;
+                                        range.end.x = tmp;
+                                   }
+                                   if(range.start.y > range.end.y){
+                                        int64_t tmp = range.start.y;
+                                        range.start.y = range.end.y;
+                                        range.end.y = tmp;
+                                   }
+                                   for(int64_t i = range.start.y; i <= range.end.y; i++){
+                                        CePoint_t start = {range.start.x, i};
+                                        CePoint_t end = {range.end.x, i};
+                                        ce_range_list_insert_sorted(&range_list, start, end);
+                                   }
+                              }
                          }
                     } break;
                     }
@@ -546,9 +628,10 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
                ce_range_list_free(&range_list);
           }
 
-          draw_view(&layout->view, tab_width, line_number, visual_line_display_type, &draw_color_list, color_defs, syntax_defs);
+          draw_view(&layout->view, tab_width, line_number, visual_line_display_type, multiple_cursors, &draw_color_list, color_defs, syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
-          draw_view_status(&layout->view, layout == current ? vim : NULL, macros, color_defs, 0, ui_fg_color, ui_bg_color);
+          draw_view_status(&layout->view, layout == current ? vim : NULL, macros, multiple_cursors, color_defs, 0,
+                           ui_fg_color, ui_bg_color);
           int64_t rect_height = layout->view.rect.bottom - layout->view.rect.top;
           int color_pair = ce_color_def_get(color_defs, ui_fg_color, ui_bg_color);
           attron(COLOR_PAIR(color_pair));
@@ -560,14 +643,14 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeMacros_t* macros, CeTermina
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               draw_layout(layout->list.layouts[i], vim, macros, terminal_list, input_buffer, color_defs, tab_width,
-                           line_number, visual_line_display_type, current, syntax_defs, terminal_width, highlight_search,
+               draw_layout(layout->list.layouts[i], vim, visual, macros, terminal_list, input_buffer, color_defs, tab_width,
+                           line_number, visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search,
                            ui_fg_color, ui_bg_color);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          draw_layout(layout->tab.root, vim, macros, terminal_list, input_buffer, color_defs, tab_width, line_number,
-                      visual_line_display_type, current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
+          draw_layout(layout->tab.root, vim, visual, macros, terminal_list, input_buffer, color_defs, tab_width, line_number,
+                      visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
           break;
      }
 }
@@ -623,21 +706,21 @@ void draw(CeApp_t* app){
      }
 
      standend();
-     draw_layout(tab_layout, &app->vim, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs,
+     draw_layout(tab_layout, &app->vim, &app->visual, &app->macros, &app->terminal_list, app->input_view.buffer, &color_defs,
                  app->config_options.tab_width, app->config_options.line_number, app->config_options.visual_line_display_type,
-                 tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
+                 &app->multiple_cursors, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
                  app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
 
      if(app->input_complete_func){
           CeDrawColorList_t draw_color_list = {};
           draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number,
-                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
-          draw_view_status(&app->input_view, &app->vim, &app->macros, &color_defs, 0, app->config_options.ui_fg_color,
-                           app->config_options.ui_bg_color);
-          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
+          draw_view_status(&app->input_view, &app->vim, &app->macros, &app->multiple_cursors, &color_defs, 0,
                            app->config_options.ui_fg_color, app->config_options.ui_bg_color);
+          draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &app->multiple_cursors, &color_defs,
+                           -new_status_bar_offset, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -672,12 +755,13 @@ void draw(CeApp_t* app){
                                        app->complete_view.buffer->syntax_data);
           ce_range_list_free(&range_list);
           draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number,
-                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
           if(app->input_complete_func){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
-               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &color_defs, -new_status_bar_offset,
-                                app->config_options.ui_fg_color, app->config_options.ui_bg_color);
+               draw_view_status(&tab_layout->tab.current->view, NULL, &app->macros, &app->multiple_cursors,
+                                &color_defs, -new_status_bar_offset, app->config_options.ui_fg_color,
+                                app->config_options.ui_bg_color);
           }
      }
 
@@ -690,7 +774,7 @@ void draw(CeApp_t* app){
           ce_range_list_free(&range_list);
 
           draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number,
-                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs);
+                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
           ce_draw_color_list_free(&draw_color_list);
 
           // set the specified background
@@ -999,7 +1083,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                int64_t index = 0;
                while(itr){
                     if(index == view->cursor.y){
-                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
+                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->multiple_cursors, &app->config_options,
                                                &app->terminal_list, &app->last_terminal, true);
                          break;
                     }
@@ -1154,7 +1238,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }
 
                CeAppBufferData_t* buffer_data = app->input_view.buffer->app_data;
-               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, key, &buffer_data->vim, &app->config_options);
+               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, &app->input_view.cursor,
+                                                               &app->visual, key, &buffer_data->vim, &app->config_options, true);
 
                if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count){
                     if(app->input_complete_func == load_file_input_complete_func){
@@ -1170,7 +1255,51 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }else{
                // TODO: how are we going to let this be supported through customization
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
-               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, key, &buffer_data->vim, &app->config_options);
+
+               if(app->multiple_cursors.active){
+                    int64_t save_motion_column = buffer_data->vim.motion_column;
+
+                    for(int64_t i = 0; i < app->multiple_cursors.count; i++){
+                         CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
+
+                         CeVimMode_t save_vim_mode = app->vim.mode;
+                         CePoint_t save_cursor = app->multiple_cursors.cursors[i];
+
+                         buffer_data->vim.motion_column = app->multiple_cursors.motion_columns[i];
+
+                         ce_vim_handle_key(&app->vim, view, app->multiple_cursors.cursors + i,
+                                           app->multiple_cursors.visuals + i, key, &buffer_data->vim,
+                                           &app->config_options, false);
+
+                         app->multiple_cursors.motion_columns[i] = buffer_data->vim.motion_column;
+
+                         if(vim_mode_is_visual(app->vim.mode) && !vim_mode_is_visual(save_vim_mode)){
+                              app->multiple_cursors.visuals[i].point = save_cursor;
+                         }
+
+                         app->vim.mode = save_vim_mode;
+
+                         for(int64_t j = 0; j < app->multiple_cursors.count; j++){
+                              if(i == j) break;
+                              app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer,
+                                                                                                       before_change_node,
+                                                                                                       app->multiple_cursors.cursors[j]);
+                         }
+
+                         view->cursor = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, view->cursor);
+                    }
+
+                    buffer_data->vim.motion_column = save_motion_column;
+               }
+
+               CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
+
+               app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, &view->cursor, &app->visual,
+                                                               key, &buffer_data->vim, &app->config_options, true);
+
+               for(int64_t j = 0; j < app->multiple_cursors.count; j++){
+                    app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, app->multiple_cursors.cursors[j]);
+               }
 
                // A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
                // "N", "%", "(", ")", "[[", "]]", "{", "}", ":s", ":tag", "L", "M", "H" and
@@ -1200,6 +1329,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                   app->vim.current_action.repeatable){
                     app->last_macro_register = 0;
                }
+
           }
      }else{
           if(key == KEY_ESCAPE){
@@ -1596,6 +1726,10 @@ int main(int argc, char** argv){
                syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].bg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = COLOR_DEFAULT;
                syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].bg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].bg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].bg = COLOR_GREEN;
 
                app.config_options.ui_fg_color = COLOR_BLACK;
                app.config_options.ui_bg_color = COLOR_WHITE;
@@ -1645,7 +1779,7 @@ int main(int argc, char** argv){
 
           bool check_stdin = false;
 
-          if(input_fds[0].revents != 0){
+          if(poll_rc < 0 || input_fds[0].revents != 0){
                check_stdin = true;
           }
 
