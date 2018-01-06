@@ -126,9 +126,9 @@ int ce_draw_color_list_last_bg_color(CeDrawColorList_t* draw_color_list){
 
 int ce_draw_color_list_next_to_last_fg_color(CeDrawColorList_t* draw_color_list){
      int fg = COLOR_DEFAULT;
-     if(draw_color_list->tail){
+     if(draw_color_list->tail && (draw_color_list->head != draw_color_list->tail)){
           CeDrawColorNode_t* itr = draw_color_list->head;
-          while(itr && itr->next != draw_color_list->tail) itr = itr->next;
+          while(itr->next != draw_color_list->tail) itr = itr->next;
           fg = itr->fg;
      }
      return fg;
