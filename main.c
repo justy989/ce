@@ -1634,8 +1634,14 @@ int main(int argc, char** argv){
           }
 
           int poll_rc = poll(input_fds, input_fd_count, 10);
-          assert(poll_rc >= 0);
-          if(poll_rc == 0) continue;
+          switch(poll_rc){
+          default:
+               break;
+          case -1:
+               assert(errno == EINTR);
+          case 0:
+               continue;
+          }
 
           bool check_stdin = false;
 
@@ -1645,7 +1651,10 @@ int main(int argc, char** argv){
 
           if(input_fds[1].revents != 0){
                char buffer[BUFSIZ];
-               int rc = read(g_terminal_ready_fds[0], buffer, BUFSIZ);
+               int rc;
+               do{
+                    rc = read(g_terminal_ready_fds[0], buffer, BUFSIZ);
+               }while(rc == -1 && errno == EINTR);
                if(rc < 0){
                     ce_log("failed to read from terminal ready fd: '%s'\n", strerror(errno));
                     continue;
@@ -1654,7 +1663,10 @@ int main(int argc, char** argv){
 
           if(input_fds[2].revents != 0){
                char buffer[BUFSIZ];
-               int rc = read(g_shell_command_ready_fds[0], buffer, BUFSIZ);
+               int rc;
+               do{
+                    rc = read(g_shell_command_ready_fds[0], buffer, BUFSIZ);
+               }while(rc == -1 && errno == EINTR);
                if(rc < 0){
                     ce_log("failed to read from shell command ready fd: '%s'\n", strerror(errno));
                     continue;
