@@ -1419,7 +1419,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      CeSubprocess_t subprocess;
      if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
           ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
-          return NULL;
+          pthread_exit(NULL);
      }
 
      // we aren't using stdin here, so we should close it in case the
@@ -1440,13 +1440,13 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           rc = write(g_shell_command_ready_fds[1], "1", 2);
           if(rc < 0){
                ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-               return false;
+               pthread_exit(NULL);
           }
      }
 
      if(ferror(subprocess.stdout)){
           ce_log("shell command: fread from pid %d failed\n", subprocess.pid);
-          return NULL;
+          pthread_exit(NULL);
      }
 
      int status = ce_subprocess_close(&subprocess);
@@ -1467,7 +1467,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      rc = write(g_shell_command_ready_fds[1], "1", 2);
      if(rc < 0){
           ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-          return false;
+          pthread_exit(NULL);
      }
      // no need to run our cleanup a second time
      pthread_cleanup_pop(0);
