@@ -388,8 +388,6 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                     if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = *cursor;
                }
 
-               vim->last_insert_rune_head = NULL;
-
                vim->mode = CE_VIM_MODE_NORMAL;
                vim->chain_undo = false;
           }
@@ -453,10 +451,12 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
                if(track){
                     vim->current_command[0] = 0;
 
-                    if(!vim->verb_last_action && action.repeatable && vim->mode == CE_VIM_MODE_NORMAL && action.verb.function != ce_vim_verb_last_action){
+                    if(!vim->verb_last_action && action.repeatable){
                          vim->last_action = action;
-                         if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
-                         vim->last_insert_rune_head = vim->insert_rune_head;
+                         if(vim->last_insert_rune_head){
+                              free(vim->last_insert_rune_head);
+                              vim->last_insert_rune_head = NULL;
+                         }
                          vim->insert_rune_head = NULL;
                     }
                }
@@ -1511,6 +1511,7 @@ CeVimParseResult_t ce_vim_parse_verb_replace_mode(CeVimAction_t* action, const C
      if(action->verb.function) return CE_VIM_PARSE_KEY_NOT_HANDLED;
 
      action->verb.function = &ce_vim_verb_replace_mode;
+     action->repeatable = true;
      return CE_VIM_PARSE_COMPLETE;
 }
 
@@ -3288,7 +3289,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
           CeRune_t* itr = rune_string;
 
           while(*itr){
-               insert_mode_handle_key(vim, view, cursor, visual, *itr, config_options, true);
+               ce_vim_handle_key(vim, view, cursor, visual, *itr, buffer_data, config_options, true);
                itr++;
           }
 
