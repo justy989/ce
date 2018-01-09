@@ -1888,6 +1888,7 @@ int main(int argc, char** argv){
                                    buf_itr = buf_itr->next;
                                    free(tmp);
                               }else{
+                                   buf_prev = buf_itr;
                                    buf_itr = buf_itr->next;
                               }
                          }
@@ -1899,6 +1900,7 @@ int main(int argc, char** argv){
                     itr = itr->next;
                     free(tmp);
                }else{
+                    prev = itr;
                     itr = itr->next;
                }
           }
