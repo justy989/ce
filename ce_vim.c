@@ -333,6 +333,8 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
           break;
      case 27: // escape
      {
+          if(!track) break;
+
           if(!vim->insert_rune_head &&
              (vim->current_action.verb.function == ce_vim_verb_insert_mode ||
               vim->current_action.verb.function == ce_vim_verb_append ||
@@ -342,7 +344,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                vim->last_action = vim->current_action;
                if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
                vim->last_insert_rune_head = vim->insert_rune_head;
-               if(track) vim->insert_rune_head = NULL;
+               vim->insert_rune_head = NULL;
           }
 
           // check if previous line was all whitespace, if so, remove it
@@ -387,7 +389,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = *cursor;
           }
 
-          if(!track) vim->last_insert_rune_head = NULL;
+          vim->last_insert_rune_head = NULL;
 
           vim->mode = CE_VIM_MODE_NORMAL;
           vim->chain_undo = false;
