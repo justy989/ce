@@ -419,7 +419,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
      default:
           return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
-          if(!vim->verb_last_action && key != 27 && track) ce_rune_node_insert(&vim->insert_rune_head, key);
+          if(!vim->verb_last_action && track) ce_rune_node_insert(&vim->insert_rune_head, key);
           return insert_mode_handle_key(vim, view, cursor, visual, key, config_options, track);
      case CE_VIM_MODE_REPLACE:
           if(key != CE_NEWLINE && key != 27){ // escape
@@ -431,6 +431,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
               }
           }
 
+          if(!vim->verb_last_action && track) ce_rune_node_insert(&vim->insert_rune_head, key);
           return insert_mode_handle_key(vim, view, cursor, visual, key, config_options, track);
      case CE_VIM_MODE_NORMAL:
      case CE_VIM_MODE_VISUAL:
@@ -3277,7 +3278,6 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
      CeBufferChangeNode_t* change_node = view->buffer->change_node;
 
      vim->verb_last_action = true;
-     CeVimMode_t save_mode = vim->mode;
      assert(vim->last_action.verb.function != ce_vim_verb_last_action);
      if(!ce_vim_apply_action(vim, &vim->last_action, view, cursor, visual, buffer_data, config_options)){
           vim->verb_last_action = false;
@@ -3298,7 +3298,6 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
 
      if(change_node && change_node->next) change_node->next->change.chain = false;
 
-     vim->mode = save_mode;
      vim->verb_last_action = false;
      return true;
 }
