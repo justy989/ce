@@ -1553,7 +1553,8 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
      terminal->start_line = terminal->line_count - height;
 
      // clamp cursor onto terminal
-     if(terminal->cursor.y >= height){
+     if((terminal->cursor.y >= height) ||
+        (terminal->buffer == terminal->lines_buffer && height > old_height)){ // if the terminal got bigger, move the cursor to the bottom
           terminal->cursor.y = height - 1;
      }
 
