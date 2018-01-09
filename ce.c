@@ -1129,9 +1129,9 @@ static CePoint_t move_point_based_on_buffer_change(CeBuffer_t* buffer, CeBufferC
 
           if(change->change.insertion){
                return ce_buffer_advance_point(buffer, point, change_len);
-          }else{
-               return ce_buffer_advance_point(buffer, point, -change_len);
           }
+
+          return ce_buffer_advance_point(buffer, point, -change_len);
      }else if(change_line_count > 1){
           if(point.y < change->change.location.y + change_line_count){
                point = change->change.location;

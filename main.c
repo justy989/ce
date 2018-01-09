@@ -1280,7 +1280,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          app->vim.mode = save_vim_mode;
 
                          for(int64_t j = 0; j < app->multiple_cursors.count; j++){
-                              if(i == j) break;
+                              if(i == j) continue;
                               app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer,
                                                                                                        before_change_node,
                                                                                                        app->multiple_cursors.cursors[j]);
