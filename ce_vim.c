@@ -339,7 +339,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                    vim->current_action.verb.function == ce_vim_verb_append ||
                    vim->current_action.verb.function == ce_vim_verb_append_at_end_of_line)){
                     // pass
-               }else{
+               }else if(!vim->verb_last_action){
                     vim->last_action = vim->current_action;
                     if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
                     vim->last_insert_rune_head = vim->insert_rune_head;
