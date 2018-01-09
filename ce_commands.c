@@ -252,12 +252,27 @@ CeCommandStatus_t command_show_jumps(CeCommand_t* command, void* user_data){
      return command_show_info_buffer(command, user_data, app->jump_list_buffer);
 }
 
+CeLayout_t* split_layout(CeApp_t* app, bool vertical){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical);
+
+     if(new_layout){
+          ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+          ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
+                                app->config_options.vertical_scroll_off, app->config_options.tab_width);
+          tab_layout->tab.current = new_layout;
+
+          ce_app_resize_terminals(app);
+     }
+
+     return new_layout;
+}
+
 CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
      bool vertical = false;
 
      if(strcmp(command->args[0].string, "vertical") == 0){
@@ -268,11 +283,7 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
           return CE_COMMAND_PRINT_HELP;
      }
 
-     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical);
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
-                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
-     tab_layout->tab.current = new_layout;
+     split_layout(app, vertical);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -337,6 +348,7 @@ static bool delete_layout(CeApp_t* app){
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
+     ce_app_resize_terminals(app);
 
      return true;
 }
@@ -1229,14 +1241,8 @@ CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
      if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     CeLayout_t* new_layout = ce_layout_split(tab_layout, true);
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-
-     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
-                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
-     tab_layout->tab.current = new_layout;
+     split_layout(app, true);
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
@@ -1254,14 +1260,8 @@ CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
      if(command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = user_data;
-     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
 
-     CeLayout_t* new_layout = ce_layout_split(tab_layout, false);
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
-
-     ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
-                           app->config_options.vertical_scroll_off, app->config_options.tab_width);
-     tab_layout->tab.current = new_layout;
+     split_layout(app, false);
 
      if(command->arg_count == 1){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;

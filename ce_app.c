@@ -1564,3 +1564,33 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
 
      return true;
 }
+
+void app_resize_terminals_impl(CeApp_t* app, CeLayout_t* layout){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               app_resize_terminals_impl(app, layout->list.layouts[i]);
+          }
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+     {
+          CeTerminal_t* terminal = ce_buffer_in_terminal_list(layout->view.buffer, &app->terminal_list);
+          if(terminal){
+               int64_t width = ce_view_width(&layout->view);
+               int64_t height = ce_view_height(&layout->view);
+               if(terminal->columns != width || terminal->rows != height){
+                    ce_terminal_resize(terminal, width, height);
+               }
+          }
+     } break;
+     case CE_LAYOUT_TYPE_TAB:
+          app_resize_terminals_impl(app, layout->tab.root);
+          break;
+     }
+}
+
+void ce_app_resize_terminals(CeApp_t* app){
+     app_resize_terminals_impl(app, app->tab_list_layout->tab_list.current);
+}
