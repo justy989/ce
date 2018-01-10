@@ -1547,7 +1547,7 @@ void ce_terminal_resize(CeTerminal_t* terminal, int64_t width, int64_t height){
           }
      }
 
-     int64_t old_height = height;
+     int64_t old_height = terminal->rows;
 
      terminal->columns = width;
      terminal->rows = height;
