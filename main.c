@@ -1263,7 +1263,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
 
                          CeVimMode_t save_vim_mode = app->vim.mode;
-                         CePoint_t save_cursor = app->multiple_cursors.cursors[i];
 
                          buffer_data->vim.motion_column = app->multiple_cursors.motion_columns[i];
 
@@ -1272,10 +1271,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                            &app->config_options, false);
 
                          app->multiple_cursors.motion_columns[i] = buffer_data->vim.motion_column;
-
-                         if(vim_mode_is_visual(app->vim.mode) && !vim_mode_is_visual(save_vim_mode)){
-                              app->multiple_cursors.visuals[i].point = save_cursor;
-                         }
 
                          app->vim.mode = save_vim_mode;
 
