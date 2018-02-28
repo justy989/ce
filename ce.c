@@ -508,6 +508,8 @@ int64_t ce_buffer_line_len(CeBuffer_t* buffer, int64_t line){
 
 CePoint_t ce_buffer_move_point(CeBuffer_t* buffer, CePoint_t point, CePoint_t delta, int64_t tab_width, CeClampX_t clamp_x){
      if(delta.y){
+          CE_CLAMP(point.y, 0, (buffer->line_count - 1));
+
           // figure out where we are visibly (due to tabs being variable length)
           int64_t cur_visible_index = ce_util_string_index_to_visible_index(buffer->lines[point.y], point.x, tab_width);
 

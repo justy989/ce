@@ -1430,22 +1430,28 @@ typedef struct{
      volatile bool* ready_to_draw;
 }ShellCommandData_t;
 
-void run_shell_command_cleanup(void* data){
-     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
-     free(shell_command_data->command);
-     free(shell_command_data);
-}
+typedef struct{
+     ShellCommandData_t* shell_command_data;
+     CeSubprocess_t* subprocess;
+}RunShellCommandCleanup_t;
 
-void cleanup_subprocess(void* data){
-     CeSubprocess_t* subprocess = (CeSubprocess_t*)(data);
-     // kill the subprocess and wait for it to be cleaned up
-     ce_subprocess_kill(subprocess, -9);
-     ce_subprocess_close(subprocess);
+void run_shell_command_cleanup(void* data){
+     RunShellCommandCleanup_t* cleanup = (RunShellCommandCleanup_t*)(data);
+
+     if(cleanup->shell_command_data){
+          free(cleanup->shell_command_data->command);
+          free(cleanup->shell_command_data);
+     }
+
+     if(cleanup->subprocess){
+          // kill the subprocess and wait for it to be cleaned up
+          ce_subprocess_kill(cleanup->subprocess, -9);
+          ce_subprocess_close(cleanup->subprocess);
+     }
 }
 
 static void* run_shell_command_and_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
-     pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
 
      // guarantee we get to register our cleanup handler before the thread is canceled
      int old;
@@ -1463,7 +1469,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      // in filter applications
      ce_subprocess_close_stdin(&subprocess);
 
-     pthread_cleanup_push(cleanup_subprocess, &subprocess);
+     RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
+     pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
      rc = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old);
      assert(rc == 0);
 
@@ -1499,19 +1506,19 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           snprintf(bytes, BUFSIZ, "\npid %d stopped with unexpected status %d", subprocess.pid, status);
      }
 
-
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
      do{
           rc = write(g_shell_command_ready_fds[1], "1", 2);
      }while(rc == -1 && errno == EINTR);
+
      if(rc < 0){
           ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
           pthread_exit(NULL);
      }
-     // no need to run our cleanup a second time
+
+     cleanup.subprocess = NULL;
      pthread_cleanup_pop(0);
-     pthread_cleanup_pop(1);
      return NULL;
 }
 
