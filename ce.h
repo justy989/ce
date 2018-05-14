@@ -103,6 +103,8 @@ typedef struct{
      void* app_data; // TODO: this doesn't need to be a void*
      void* syntax_data;
 
+     time_t file_modified_time;
+
      // NOTE: if we decide to do a buffer init hook, add config_data for user configs
 }CeBuffer_t;
 

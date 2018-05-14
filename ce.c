@@ -146,6 +146,8 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
           return false;
      }
 
+     buffer->file_modified_time = statbuf.st_mtime;
+
      // read the entire file
      size_t content_size;
      char* contents = NULL;
@@ -285,6 +287,12 @@ bool ce_buffer_save(CeBuffer_t* buffer){
      fclose(file);
      if(buffer->status == CE_BUFFER_STATUS_MODIFIED) buffer->status = CE_BUFFER_STATUS_NONE;
      buffer->save_at_change_node = buffer->change_node;
+
+     struct stat statbuf;
+     if(stat(buffer->name, &statbuf) == 0){
+          buffer->file_modified_time = statbuf.st_mtime;
+     }
+
      return true;
 }
 

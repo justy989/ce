@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <locale.h>
-#include <sys/time.h>
+#iclude <sys/time.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <ncurses.h>
@@ -25,6 +25,33 @@ int g_last_key = 0;
 void handle_sigint(int signal){
      // pass
 }
+
+typedef struct{
+     char* start;
+     char* newline;
+}FindTrailingResult_t;
+
+static FindTrailingResult_t find_trailing_whitespace(char* str){
+     FindTrailingResult_t res = {};
+
+     while(*str){
+          if(*str == ' '){
+               if(res.start == 0){
+                    res.start = str;
+               }
+          }else if(*str == CE_NEWLINE){
+               res.newline = str;
+               break;
+          }else{
+               res.start = 0;
+          }
+
+          str++;
+     }
+
+     return res;
+}
+
 
 const char* buffer_status_get_str(CeBufferStatus_t status){
      if(status == CE_BUFFER_STATUS_READONLY){
@@ -1318,13 +1345,29 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                        app->vim.current_action.motion.function == ce_vim_motion_search_prev){
                          app->highlight_search = true;
                     }
+               }else if(app->vim.current_action.verb.function == ce_vim_verb_yank){
+                    CeTerminal_t* terminal = ce_buffer_in_terminal_list(view->buffer, &app->terminal_list);
+                    if(terminal){
+                         CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index(app->vim.current_action.verb.integer);
+                         char* text = yank->text;
+                         while(*text){
+                              FindTrailingResult_t result = find_trailing_whitespace(text);
+                              if(result.start){
+                                   memmove(result.start, result.newline, strlen(result.newline) + 1);
+                                   text = result.start + 1;
+                              }else if(result.newline){
+                                   text = result.newline + 1;
+                              }else{
+                                   break;
+                              }
+                         }
+                    }
                }
 
                if(app->last_vim_handle_result == CE_VIM_PARSE_COMPLETE &&
                   app->vim.current_action.repeatable){
                     app->last_macro_register = 0;
                }
-
           }
      }else{
           if(key == KEY_ESCAPE){

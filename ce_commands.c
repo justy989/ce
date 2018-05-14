@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 typedef struct{
      CeLayout_t* tab_layout;
@@ -22,6 +23,19 @@ static bool get_command_context(CeApp_t* app, CommandContext_t* command_context)
           return true;
      }
 
+     return true;
+}
+
+static bool try_save_buffer(CeApp_t* app, CeBuffer_t* buffer){
+     struct stat statbuf;
+     if(stat(buffer->name, &statbuf) == 0){
+          if(statbuf.st_mtime > buffer->file_modified_time){
+               ce_app_input(app, BUFFER_MODIFIED_OUTSIDE_EDITOR, buffer_modified_outside_editor_complete_func);
+               return false;
+          }
+     }
+
+     ce_buffer_save(buffer);
      return true;
 }
 
@@ -196,7 +210,7 @@ CeCommandStatus_t command_save_buffer(CeCommand_t* command, void* user_data){
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     ce_buffer_save(command_context.view->buffer);
+     try_save_buffer(app, command_context.view->buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -209,7 +223,9 @@ CeCommandStatus_t command_save_all_and_quit(CeCommand_t* command, void* user_dat
      CeBufferNode_t* itr = app->buffer_node_head;
      while(itr){
           if(itr->buffer->status == CE_BUFFER_STATUS_MODIFIED){
-               ce_buffer_save(itr->buffer);
+               if(!try_save_buffer(app, itr->buffer)){
+                    return CE_COMMAND_SUCCESS;
+               }
           }
           itr = itr->next;
      }
@@ -1226,7 +1242,7 @@ CeCommandStatus_t command_vim_wq(CeCommand_t* command, void* user_data){
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     ce_buffer_save(command_context.view->buffer);
+     try_save_buffer(app, command_context.view->buffer);
 
      if(app->tab_list_layout->tab_list.tab_count == 1 &&
         ce_layout_tab_get_layout_count(app->tab_list_layout->tab_list.current) == 1){

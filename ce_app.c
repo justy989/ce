@@ -1247,6 +1247,24 @@ bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer)
      return true;
 }
 
+bool buffer_modified_outside_editor_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     if(strcmp(app->input_view.buffer->lines[0], "y") == 0 ||
+        strcmp(app->input_view.buffer->lines[0], "Y") == 0){
+          CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+          CeView_t* view = NULL;
+
+          if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+               view = &tab_layout->tab.current->view;
+          }else{
+               return false;
+          }
+
+          ce_buffer_save(view->buffer);
+     }
+
+     return true;
+}
+
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
      if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;

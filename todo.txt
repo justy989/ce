@@ -1,5 +1,4 @@
 todo:
-- check if file has been modified since we last loaded it
 - add config option for log destination (we want to init the log before the user config, so can we even do this?)
 - dired mode
 - undo in macros actually removing some actions
@@ -10,7 +9,6 @@ todo:
   - status bar
 - backup files, and session info in ~/.ce
 - vim :sort
-- trim extra whitespace when yanking from terminal
 - log file of multiple ce's at once will have problems
 
 bug:

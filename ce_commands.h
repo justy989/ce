@@ -4,6 +4,7 @@
 
 #define UNSAVED_BUFFERS_DIALOGUE "Unsaved buffers, quit? [y/n]"
 #define TERMINALS_STILL_RUNNING_DIALOGUE "Terminals still running, quit? [y/n]"
+#define BUFFER_MODIFIED_OUTSIDE_EDITOR "Buffer modified outside editor, save anyway? [y/n]"
 
 CeCommandStatus_t command_add_cursor(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clear_cursors(CeCommand_t* command, void* user_data);
