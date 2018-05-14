@@ -165,7 +165,7 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      contents[content_size] = 0;
 
      if(strlen(contents) != content_size){
-          ce_log("%s() file '%s' has early null terminator\n", filename);
+          ce_log("%s() file '%s' has early null terminator\n", __FUNCTION__, filename);
           errno = ENOPROTOOPT;
           return false;
      }
