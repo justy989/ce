@@ -1317,6 +1317,7 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
           if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                   &app->multiple_cursors, &app->terminal_list, &app->last_terminal, true, filepath)){
                ce_app_message(app, "failed to load file '%s': '%s'", filepath, strerror(errno));
+               errno = 0;
                return false;
           }
      }

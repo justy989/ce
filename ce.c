@@ -164,6 +164,12 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      fread(contents, content_size, 1, file);
      contents[content_size] = 0;
 
+     if(strlen(contents) != content_size){
+          ce_log("%s() file '%s' has early null terminator\n", filename);
+          errno = ENOPROTOOPT;
+          return false;
+     }
+
      // strip the ending '\n'
      if(contents[content_size - 1] == CE_NEWLINE) contents[content_size - 1] = 0;
 
@@ -184,13 +190,44 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      return true;
 }
 
+typedef enum{
+     FNS_OK,
+     FNS_EOF,
+     FNS_INVALID,
+}FindNewlineStatus_t;
+
+typedef struct{
+     const char* str;
+     FindNewlineStatus_t status;
+}FindNewlineResult_t;
+
+static FindNewlineResult_t find_next_newline(const char* str){
+     int64_t rune_len = 0;
+     FindNewlineResult_t status = {};
+     while(*str){
+          CeRune_t rune = ce_utf8_decode(str, &rune_len);
+          if(rune == CE_NEWLINE){
+               status.str = str;
+               status.status = FNS_OK;
+               return status;
+          }else if(rune == CE_UTF8_INVALID){
+               status.status = FNS_INVALID;
+               return status;
+          }
+          str += rune_len;
+     }
+
+     status.status = FNS_EOF;
+     return status;
+}
+
 bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* name){
      if(buffer->lines) ce_buffer_free(buffer);
 
      int64_t line_count = ce_util_count_string_lines(string);
 
      // allocate for the number of lines contained in the string
-     buffer->lines = (char**)malloc(line_count * sizeof(*buffer->lines));
+     buffer->lines = (char**)calloc(line_count, sizeof(*buffer->lines));
      if(!buffer->lines){
           ce_log("%s() failed to allocate %ld lines\n", __FUNCTION__, line_count);
           return false;
@@ -203,6 +240,13 @@ bool ce_buffer_load_string(CeBuffer_t* buffer, const char* string, const char* n
      const char* newline = NULL;
      size_t line_len = 0;
      for(int64_t i = 0; i < line_count; i++){
+          FindNewlineResult_t res = find_next_newline(string);
+          if(res.status == FNS_INVALID){
+               ce_log("%s() saw invalid utf-8 bytes\n");
+               ce_buffer_free(buffer);
+               return false;
+          }
+
           // look for the newline
           newline = strchr(string, CE_NEWLINE);
 
