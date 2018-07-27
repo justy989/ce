@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-#define CE_COMMAND_NAME_MAX_LEN 128
+#define CE_COMMAND_NAME_MAX_LEN 512
 
 typedef enum{
      CE_COMMAND_SUCCESS,

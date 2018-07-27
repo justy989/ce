@@ -197,6 +197,7 @@ static int64_t match_c_type(const char* str, const char* beginning_of_line, bool
      if(len > 1){
           if(strncmp((itr - 2), "_t", 2) == 0) return len;
           if(strncmp((itr - 2), "_h", 2) == 0) return len;
+          if(cpp && isupper(*str)) return len;
      }
 
      static const char* keywords[] = {

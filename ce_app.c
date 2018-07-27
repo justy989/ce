@@ -1065,6 +1065,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_load_file, "load_file", "load a file (optionally specified)"},
+          {command_load_project_file, "load_project_file", "search backward in the tree for a .git folder, then find all files in the project and autocomplete on them. Optionally specify directories to ignore in the arguments."},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_new_tab, "new_tab", "create a new tab"},
@@ -1343,6 +1344,25 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      }
 
      free(base_directory);
+     return true;
+}
+
+bool load_project_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
+     // TODO: compress with code above
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) return false;
+     CeView_t* view = &tab_layout->tab.current->view;
+
+     for(int64_t i = 0; i < input_buffer->line_count; i++){
+          if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                  &app->multiple_cursors, &app->terminal_list, &app->last_terminal, true,
+                                  input_buffer->lines[i])){
+               ce_app_message(app, "failed to load file '%s': '%s'", input_buffer->lines[i], strerror(errno));
+               errno = 0;
+               return false;
+          }
+     }
+
      return true;
 }
 

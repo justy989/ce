@@ -244,6 +244,7 @@ bool ce_app_apply_completion(CeApp_t* app);
 
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
+bool load_project_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool search_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool switch_buffer_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool replace_all_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
