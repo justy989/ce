@@ -184,7 +184,7 @@ static int64_t match_words(const char* str, const char* beginning_of_line, const
      return 0;
 }
 
-static int64_t match_c_type(const char* str, const char* beginning_of_line){
+static int64_t match_c_type(const char* str, const char* beginning_of_line, bool cpp){
      if(!isalpha(*str)) return false;
 
      const char* itr = str;
@@ -607,7 +607,7 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                                                         (CePoint_t){0, match_point.y + 1});
                          }
                     }else{
-                         if((match_len = match_c_type(str, line))){
+                         if((match_len = match_c_type(str, line, false))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
                          }else if((match_len = match_c_keyword(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
@@ -659,6 +659,7 @@ static int64_t match_cpp_keyword(const char* str, const char* beginning_of_line)
           "char",
           "class",
           "const_cast",
+          "constexpr",
           "default",
           "delete",
           "do",
@@ -719,6 +720,7 @@ static int64_t match_cpp_control(const char* str, const char* beginning_of_line)
           "break",
           "catch",
           "const",
+          "constexpr",
           "continue",
           "goto",
           "return",
@@ -729,6 +731,32 @@ static int64_t match_cpp_control(const char* str, const char* beginning_of_line)
      static const int64_t keyword_count = sizeof(keywords) / sizeof(keywords[0]);
 
      return match_words(str, beginning_of_line, keywords, keyword_count);
+}
+
+
+static int64_t match_cpp_namespace(const char* str, const char* beginning_of_line){
+     bool saw_colon = false;
+     bool saw_alpha = false;
+     const char* itr = str;
+     while(*itr){
+          if(isalpha(*itr) || *itr == '_'){
+               if(saw_colon) break;
+               saw_alpha = true;
+          }else if(*itr == ':'){
+               if(!saw_alpha) break;
+
+               if(!saw_colon){
+                    saw_colon = true;
+               }else{
+                    return (itr - str) - 1;
+               }
+          }else{
+               break;
+          }
+          itr++;
+     }
+
+     return 0;
 }
 
 void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list, CeDrawColorList_t* draw_color_list,
@@ -803,7 +831,7 @@ void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list
                                                         (CePoint_t){0, match_point.y + 1});
                          }
                     }else{
-                         if((match_len = match_c_type(str, line))){
+                         if((match_len = match_c_type(str, line, true))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
                          }else if((match_len = match_cpp_keyword(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
@@ -821,6 +849,8 @@ void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NUMBER_LITERAL, match_point);
                          }else if((match_len = match_c_preproc(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_PREPROCESSOR, match_point);
+                         }else if((match_len = match_cpp_namespace(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
                          }else if((match_len = match_c_multiline_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
                               multiline_comment = true;
@@ -1038,7 +1068,6 @@ static int64_t match_python_keyword(const char* str, const char* beginning_of_li
           "class",
           "exec",
           "in",
-          "finally",
           "is",
           "def",
           "for",
@@ -1196,7 +1225,7 @@ void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_l
                               match_len = 3;
                          }
                     }else{
-                         if((match_len = match_c_type(str, line))){
+                         if((match_len = match_c_type(str, line, false))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
                          }else if((match_len = match_python_keyword(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);

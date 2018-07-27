@@ -612,7 +612,9 @@ void determine_buffer_syntax(CeBuffer_t* buffer){
         string_ends_with(buffer->name, ".h")){
           buffer_data->syntax_function = ce_syntax_highlight_c;
      }else if(string_ends_with(buffer->name, ".cpp") ||
-              string_ends_with(buffer->name, ".hpp")){
+              string_ends_with(buffer->name, ".hpp") ||
+              string_ends_with(buffer->name, ".hh") ||
+              string_ends_with(buffer->name, ".cc")){
           buffer_data->syntax_function = ce_syntax_highlight_cpp;
      }else if(string_ends_with(buffer->name, ".py")){
           buffer_data->syntax_function = ce_syntax_highlight_python;
