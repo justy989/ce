@@ -17,3 +17,4 @@ bug:
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
 - crash where assertion fails when vim last action is verb_last_action
 - highlighting trailing whitespace doesn't work in multiline strings in python
+- logging from different threads creates problems

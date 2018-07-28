@@ -1829,6 +1829,7 @@ int main(int argc, char** argv){
                }while(rc == -1 && errno == EINTR);
                if(rc < 0){
                     ce_log("failed to read from terminal ready fd: '%s'\n", strerror(errno));
+                    errno = 0;
                     continue;
                }
           }
@@ -1841,6 +1842,7 @@ int main(int argc, char** argv){
                }while(rc == -1 && errno == EINTR);
                if(rc < 0){
                     ce_log("failed to read from shell command ready fd: '%s'\n", strerror(errno));
+                    errno = 0;
                     continue;
                }
           }
