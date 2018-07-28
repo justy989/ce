@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <locale.h>
-#iclude <sys/time.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <ncurses.h>

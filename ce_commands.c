@@ -402,6 +402,149 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+typedef struct CeStrNode_t{
+    char* string;
+    struct CeStrNode_t* next;
+}CeStrNode_t;
+
+CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNode_t* node, char** ignore_dirs,
+                                                 int* ignore_dir_lens, uint64_t ignore_dir_count){
+     char full_path[PATH_MAX];
+     struct stat info;
+     struct dirent *dir_node;
+
+     DIR* os_dir = opendir(directory);
+     if(!os_dir) return node;
+
+     while((dir_node = readdir(os_dir)) != NULL){
+          if(strcmp(dir_node->d_name, ".") == 0 || strcmp(dir_node->d_name, "..") == 0) continue;
+          int full_path_len = snprintf(full_path, PATH_MAX, "%s/%s", directory, dir_node->d_name);
+          stat(full_path, &info);
+          if(S_ISDIR(info.st_mode) && access(full_path, W_OK) == 0){
+               bool ignore_dir = false;
+               for(uint64_t i = 0; i < ignore_dir_count; i++){
+                    if(full_path_len >= ignore_dir_lens[i] && strcmp(full_path + full_path_len - ignore_dir_lens[i], ignore_dirs[i]) == 0){
+                        ignore_dir = true;
+                        break;
+                    }
+               }
+               if(ignore_dir) continue;
+
+               node = find_files_in_directory_recursively(full_path, node, ignore_dirs, ignore_dir_lens, ignore_dir_count);
+          }else{
+               CeStrNode_t* new_node = malloc(sizeof(*new_node));
+               new_node->string = strdup(full_path);
+               new_node->next = NULL;
+               node->next = new_node;
+               node = new_node;
+          }
+     }
+
+     closedir(os_dir);
+     return node;
+}
+
+CeCommandStatus_t command_load_project_file(CeCommand_t* command, void* user_data){
+    CeApp_t* app = user_data;
+    CommandContext_t command_context = {};
+
+    if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+    char* base_directory = buffer_base_directory(command_context.view->buffer, &app->terminal_list);
+    if(!base_directory){
+         // if the base_directory is NULL, it's the directory where ce was opened, so fill it out with CWD
+         base_directory = malloc(PATH_MAX);
+         getcwd(base_directory, PATH_MAX);
+    }
+
+    // search up the tree for a .git folder
+    char project_marker_path[PATH_MAX + 1];
+    while(strlen(base_directory) > 0){
+         // TODO: support other version control besides git
+         snprintf(project_marker_path, PATH_MAX, "%s/.git", base_directory);
+
+         struct stat statbuf;
+         if(stat(project_marker_path, &statbuf) == 0){
+              break;
+         }
+
+         char* last_slash = strrchr(base_directory, '/');
+         if(last_slash){
+              // truncate directory
+              *last_slash = 0;
+         }else{
+              free(base_directory);
+              return CE_COMMAND_NO_ACTION;
+         }
+    }
+
+    // setup our ignore dirs
+    char** ignore_dirs = malloc(sizeof(*ignore_dirs) * command->arg_count);
+    for(int64_t i = 0; i < command->arg_count; i++){
+        // TODO: this imposes a restriction that folders cannot be named numbers like 5
+        if(command->args[i].type != CE_COMMAND_ARG_STRING){
+            free(base_directory);
+            return CE_COMMAND_PRINT_HELP;
+        }
+        ignore_dirs[i] = strdup(command->args[i].string);
+    }
+
+    int* ignore_dir_lens = malloc(sizeof(*ignore_dir_lens) * command->arg_count);
+    for(int64_t i = 0; i < command->arg_count; i++){
+        ignore_dir_lens[i] = strlen(ignore_dirs[i]);
+    }
+
+    // head is a dummy node that doesn't contain any info, just makes the find_files_in_directory_recursively()
+    // interface better
+    CeStrNode_t* head = calloc(sizeof(*head), 1);
+    find_files_in_directory_recursively(base_directory, head, ignore_dirs, ignore_dir_lens, command->arg_count);
+    free(base_directory);
+
+    // cleanup our ignore dirs
+    for(int64_t i = 0; i < command->arg_count; i++){
+        free(ignore_dirs[i]);
+    }
+    free(ignore_dirs);
+    free(ignore_dir_lens);
+
+    // convert linked list of strings to array of strings
+    CeStrNode_t* save_head = head;
+
+    uint64_t file_count = 0;
+    while(head){
+        if(head->string) file_count++;
+        head = head->next;
+    }
+
+    char** files = malloc(sizeof(*files) * file_count);
+
+    head = save_head;
+
+    uint64_t file_index = 0;
+    while(head){
+        if(head->string){
+            files[file_index] = strdup(head->string);
+            file_index++;
+        }
+        CeStrNode_t* node = head;
+        head = head->next;
+        free(node->string);
+        free(node);
+    }
+
+    // setup input and completion
+    ce_app_input(app, "Load Project File", load_project_file_input_complete_func);
+    ce_complete_init(&app->input_complete, (const char**)(files), NULL, file_count);
+    build_complete_list(app->complete_list_buffer, &app->input_complete);
+
+    for(uint64_t i = 0; i < file_count; i++){
+        free(files[i]);
+    }
+    free(files);
+
+    return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
