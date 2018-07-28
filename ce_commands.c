@@ -440,6 +440,7 @@ CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNod
           }
      }
 
+     closedir(os_dir);
      return node;
 }
 
