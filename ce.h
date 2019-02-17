@@ -130,7 +130,6 @@ typedef struct{
      int64_t tab_width;
      int64_t horizontal_scroll_off;
      int64_t vertical_scroll_off;
-     int64_t terminal_scroll_back;
      bool insert_spaces_on_tab;
      CeVisualLineDisplayType_t visual_line_display_type;
      int ui_fg_color;

@@ -3,7 +3,6 @@
 #include "ce_app.h"
 
 #define UNSAVED_BUFFERS_DIALOGUE "Unsaved buffers, quit? [y/n]"
-#define TERMINALS_STILL_RUNNING_DIALOGUE "Terminals still running, quit? [y/n]"
 #define BUFFER_MODIFIED_OUTSIDE_EDITOR "Buffer modified outside editor, save anyway? [y/n]"
 
 CeCommandStatus_t command_add_cursor(CeCommand_t* command, void* user_data);
@@ -32,8 +31,6 @@ CeCommandStatus_t command_setpaste(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_setnopaste(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_command(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_switch_to_terminal(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_new_terminal(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data);
@@ -48,7 +45,6 @@ CeCommandStatus_t command_new_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_rename_buffer(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_terminal_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data);
 
