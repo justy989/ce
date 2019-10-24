@@ -1173,6 +1173,7 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
      bool chain_undo = false;
      int64_t match_len = 0;
      regex_t regex = {};
+
      if(regex_search){
           int rc = regcomp(&regex, match, REG_EXTENDED);
           if(rc != 0){
@@ -1184,6 +1185,7 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
      }else{
            match_len = strlen(match);
      }
+
      while(true){
           CePoint_t match_point;
 
@@ -1203,6 +1205,8 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
           chain_undo = true;
 
           ce_buffer_insert_string_change(buffer, strdup(replacement), match_point, &cursor, cursor, chain_undo);
+
+          start = ce_buffer_advance_point(buffer, match_point, ce_utf8_strlen(replacement));
      }
 }
 

@@ -19,6 +19,5 @@ bug:
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
 - highlighting trailing whitespace doesn't work in multiline strings in python
 - logging from different threads creates problems
-- infinite search and replace for certain patterns
 - load project file doesn't work when editor starts in top level repo directory?
 - cache project files, and have separate command to load cached project file
