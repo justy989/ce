@@ -2023,11 +2023,12 @@ CeVimParseResult_t ce_vim_parse_verb_g_command(CeVimAction_t* action, const CeVi
 }
 
 CeVimParseResult_t ce_vim_parse_verb_indent(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
-     action->repeatable = true;
      if(action->verb.function == NULL){
+          action->repeatable = true;
           action->verb.function = ce_vim_verb_indent;
           return CE_VIM_PARSE_IN_PROGRESS;
      }else if(action->verb.function == ce_vim_verb_indent){
+          action->repeatable = true;
           return CE_VIM_PARSE_COMPLETE;
      }
 

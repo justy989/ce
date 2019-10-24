@@ -519,7 +519,8 @@ void determine_buffer_syntax(CeBuffer_t* buffer){
      CeAppBufferData_t* buffer_data = buffer->app_data;
 
      if(string_ends_with(buffer->name, ".c") ||
-        string_ends_with(buffer->name, ".h")){
+        string_ends_with(buffer->name, ".h") ||
+        string_ends_with(buffer->name, ".js")){
           buffer_data->syntax_function = ce_syntax_highlight_c;
      }else if(string_ends_with(buffer->name, ".cpp") ||
               string_ends_with(buffer->name, ".hpp") ||

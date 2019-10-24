@@ -10,11 +10,15 @@ todo:
 - backup files, and session info in ~/.ce
 - vim :sort
 - log file of multiple ce's at once will have problems
+- request from anthony: character to show when text goes off the view, because he likes word wrap and is wrong about that
+- adjust width/height of split windows, keep their proportions as we resize
 
 bug:
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - TERM=xterm-256color needs to be set to view ce correctly
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
-- crash where assertion fails when vim last action is verb_last_action
 - highlighting trailing whitespace doesn't work in multiline strings in python
 - logging from different threads creates problems
+- infinite search and replace for certain patterns
+- load project file doesn't work when editor starts in top level repo directory?
+- cache project files, and have separate command to load cached project file

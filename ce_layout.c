@@ -57,7 +57,9 @@ void ce_layout_free(CeLayout_t** root){
           break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               ce_layout_free(&layout->list.layouts[i]);
+               if(layout->list.layouts[i] != NULL){
+                    ce_layout_free(&layout->list.layouts[i]);
+               }
           }
           free(layout->list.layouts);
           layout->list.layout_count = 0;
@@ -187,6 +189,7 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
           int64_t separator_lines = layout->list.layout_count - 1;
 
           if(layout->list.vertical){
+               assert(layout->list.layout_count != 0);
                int64_t rect_height = rect.bottom - rect.top;
                int64_t slice_height = (rect_height - separator_lines) / layout->list.layout_count;
                int64_t leftover_lines = (rect_height - separator_lines) % layout->list.layout_count;
@@ -204,6 +207,7 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect){
                     sliced_rect.bottom = sliced_rect.top + slice_height;
                }
           }else{
+               assert(layout->list.layout_count != 0);
                int64_t rect_width = rect.right - rect.left;
                int64_t slice_width = (rect_width - separator_lines) / layout->list.layout_count;
                int64_t leftover_lines = (rect_width - separator_lines) % layout->list.layout_count;
@@ -313,8 +317,38 @@ bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node){
                parent->list.layouts[i] = parent->list.layouts[i + 1];
           }
           parent->list.layout_count = new_count;
+          assert(!(parent->list.layout_count == 0 && parent == root));
 
-          if(new_count == 0) return ce_layout_delete(root, parent);
+          if(new_count == 0){
+              return ce_layout_delete(root, parent);
+          }else if(new_count == 1){
+               // reduce back to a single layout
+               CeLayout_t* grandparent = ce_layout_find_parent(root, parent);
+               if(!grandparent) return true;
+
+               switch(grandparent->type){
+               default:
+                    return false;
+               case CE_LAYOUT_TYPE_LIST:
+                    // replace the parent at that element
+                    for(int64_t i = 0; i < grandparent->list.layout_count; i++){
+                         if(grandparent->list.layouts[i] == parent){
+                              grandparent->list.layouts[i] = parent->list.layouts[0];
+                              parent->list.layouts[0] = NULL;
+                              break;
+                         }
+                    }
+                    break;
+               case CE_LAYOUT_TYPE_TAB:
+                    grandparent->tab.root = parent->list.layouts[0];
+                    parent->list.layouts[0] = NULL;
+                    break;
+               case CE_LAYOUT_TYPE_TAB_LIST:
+                    return false;
+               }
+
+               ce_layout_free(&parent);
+          }
      } break;
      case CE_LAYOUT_TYPE_TAB:
           break;

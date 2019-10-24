@@ -318,11 +318,17 @@ static bool delete_layout(CeApp_t* app){
           }
      }
 
+     CeLayout_t* parent_of_current = ce_layout_find_parent(tab_layout->tab.root, tab_layout->tab.current);
+
+     ce_log("tab count: %ld, current layout type: %d, current layout count: %ld, current layout: %p, parent: %p, root: %p\n",
+            app->tab_list_layout->tab_list.tab_count, tab_layout->tab.root->type, tab_layout->tab.root->list.layout_count,
+            tab_layout->tab.current, parent_of_current, tab_layout->tab.root);
+
      // check if this is the only view, and ignore the delete request
      if(app->tab_list_layout->tab_list.tab_count == 1 &&
         tab_layout->tab.root->type == CE_LAYOUT_TYPE_LIST &&
         tab_layout->tab.root->list.layout_count == 1 &&
-        tab_layout->tab.current == tab_layout->tab.root->list.layouts[0]){
+        parent_of_current == tab_layout->tab.root){
           return false;
      }
 

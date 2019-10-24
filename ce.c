@@ -1776,6 +1776,7 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
      while(*char_itr){
           if(!isprint(*char_itr)){
                free(int_str);
+               ce_log("found unprintable char at position %d %d\n", char_itr - char_str, *char_itr);
                return NULL;
           }
 
@@ -1783,6 +1784,7 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
                char_itr++;
                switch(*char_itr){
                default:
+                    ce_log("unrecognized escape char %c\n", *char_itr);
                     free(int_str);
                     return NULL;
                case 'b':

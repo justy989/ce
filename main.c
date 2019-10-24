@@ -1036,7 +1036,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                                    case CE_COMMAND_NO_ACTION:
                                         break;
                                    case CE_COMMAND_FAILURE:
-                                        ce_log("'%s' failed", entry->name);
+                                        ce_log("'%s' failed\n", entry->name);
                                         break;
                                    case CE_COMMAND_PRINT_HELP:
                                         ce_app_message(app, "%s: %s\n", entry->name, entry->description);
@@ -1865,12 +1865,12 @@ int main(int argc, char** argv){
 
      free(app.command_entries);
 
-     ce_buffer_node_free(&app.buffer_node_head);
-
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
      ce_history_free(&app.command_history);
      ce_history_free(&app.search_history);
+
+     ce_buffer_node_free(&app.buffer_node_head);
 
      endwin();
      return 0;

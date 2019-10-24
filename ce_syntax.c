@@ -832,14 +832,14 @@ void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list
                                                         (CePoint_t){0, match_point.y + 1});
                          }
                     }else{
-                         if((match_len = match_c_type(str, line, true))){
+                         if((match_len = match_caps_var(str, line))){
+                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
+                         }else if((match_len = match_c_type(str, line, true))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TYPE, match_point);
                          }else if((match_len = match_cpp_keyword(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_KEYWORD, match_point);
                          }else if((match_len = match_cpp_control(str, line))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CONTROL, match_point);
-                         }else if((match_len = match_caps_var(str, line))){
-                              change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_CAPS_VAR, match_point);
                          }else if((match_len = match_c_comment(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_COMMENT, match_point);
                          }else if((match_len = match_c_string(str))){
