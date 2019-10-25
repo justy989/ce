@@ -372,6 +372,13 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeM
      ce_multiple_cursors_clear(multiple_cursors);
 }
 
+void ce_app_clear_filepath_cache(CeApp_t* app){
+     for(int64_t i = 0; i < app->cached_filepath_count; i++){
+         free(app->cached_filepaths[i]);
+     }
+     free(app->cached_filepaths);
+}
+
 void ce_app_update_terminal_view(CeApp_t* app){
      getmaxyx(stdscr, app->terminal_height, app->terminal_width);
      app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
@@ -879,7 +886,9 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_load_file, "load_file", "load a file (optionally specified)"},
-          {command_load_project_file, "load_project_file", "search backward in the tree for a .git folder, then find all files in the project and autocomplete on them. Optionally specify directories to ignore in the arguments."},
+          {command_load_project, "load_project", "search backward in the tree for a .git folder, then find all files in the project and autocomplete on them. Optionally specify directories to ignore in the arguments."},
+          {command_load_directory_files, "load_directory_files", "find all files recursively in the specified directory and autocomplete on them."},
+          {command_load_cached_files, "load_cached_files", "autocomplete based on last cached recursive file search."},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_new_tab, "new_tab", "create a new tab"},

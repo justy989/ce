@@ -1553,6 +1553,8 @@ int main(int argc, char** argv){
                CeBuffer_t* buffer = new_buffer();
                ce_buffer_alloc(buffer, 1, "unnamed");
           }
+
+         app.cached_filepath_count = 0;
      }
 
      // init ncurses
@@ -1869,6 +1871,8 @@ int main(int argc, char** argv){
      ce_vim_free(&app.vim);
      ce_history_free(&app.command_history);
      ce_history_free(&app.search_history);
+
+     ce_app_clear_filepath_cache(&app);
 
      ce_buffer_node_free(&app.buffer_node_head);
 

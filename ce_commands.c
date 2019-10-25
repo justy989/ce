@@ -433,7 +433,7 @@ CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNod
      return node;
 }
 
-CeCommandStatus_t command_load_project_file(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_load_project(CeCommand_t* command, void* user_data){
     CeApp_t* app = user_data;
     CommandContext_t command_context = {};
 
@@ -499,20 +499,22 @@ CeCommandStatus_t command_load_project_file(CeCommand_t* command, void* user_dat
     // convert linked list of strings to array of strings
     CeStrNode_t* save_head = head;
 
-    uint64_t file_count = 0;
+    ce_app_clear_filepath_cache(app);
+
+    app->cached_filepath_count = 0;
     while(head){
-        if(head->string) file_count++;
+        if(head->string) app->cached_filepath_count++;
         head = head->next;
     }
 
-    char** files = malloc(sizeof(*files) * file_count);
+    app->cached_filepaths = malloc(sizeof(*app->cached_filepaths) * app->cached_filepath_count);
 
     head = save_head;
 
     uint64_t file_index = 0;
     while(head){
         if(head->string){
-            files[file_index] = strdup(head->string);
+            app->cached_filepaths[file_index] = strdup(head->string);
             file_index++;
         }
         CeStrNode_t* node = head;
@@ -523,13 +525,102 @@ CeCommandStatus_t command_load_project_file(CeCommand_t* command, void* user_dat
 
     // setup input and completion
     ce_app_input(app, "Load Project File", load_project_file_input_complete_func);
-    ce_complete_init(&app->input_complete, (const char**)(files), NULL, file_count);
+    ce_complete_init(&app->input_complete, (const char**)(app->cached_filepaths), NULL, app->cached_filepath_count);
     build_complete_list(app->complete_list_buffer, &app->input_complete);
 
-    for(uint64_t i = 0; i < file_count; i++){
-        free(files[i]);
+    return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_load_directory_files(CeCommand_t* command, void* user_data){
+    CeApp_t* app = user_data;
+    CommandContext_t command_context = {};
+
+    if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+    if(command->arg_count <= 0 ||
+       command->args[0].type != CE_COMMAND_ARG_STRING){
+        return CE_COMMAND_PRINT_HELP;
     }
-    free(files);
+
+    char* base_directory = strdup(command->args[0].string);
+
+    // setup our ignore dirs
+    int ignore_dir_count = (command->arg_count - 1);
+    char** ignore_dirs = malloc(sizeof(*ignore_dirs) * ignore_dir_count);
+    for(int64_t i = 1; i < command->arg_count; i++){
+        // TODO: this imposes a restriction that folders cannot be named numbers like 5
+        if(command->args[i].type != CE_COMMAND_ARG_STRING){
+            free(base_directory);
+            return CE_COMMAND_PRINT_HELP;
+        }
+        ignore_dirs[i - 1] = strdup(command->args[i].string);
+    }
+
+    int* ignore_dir_lens = malloc(sizeof(*ignore_dir_lens) * ignore_dir_count);
+    for(int64_t i = 0; i < ignore_dir_count; i++){
+        ignore_dir_lens[i] = strlen(ignore_dirs[i]);
+    }
+
+    // head is a dummy node that doesn't contain any info, just makes the find_files_in_directory_recursively()
+    // interface better
+    CeStrNode_t* head = calloc(sizeof(*head), 1);
+    find_files_in_directory_recursively(base_directory, head, ignore_dirs, ignore_dir_lens, ignore_dir_count);
+    free(base_directory);
+
+    // cleanup our ignore dirs
+    for(int64_t i = 0; i < ignore_dir_count; i++){
+        free(ignore_dirs[i]);
+    }
+    free(ignore_dirs);
+    free(ignore_dir_lens);
+
+    // convert linked list of strings to array of strings
+    CeStrNode_t* save_head = head;
+
+    ce_app_clear_filepath_cache(app);
+
+    app->cached_filepath_count = 0;
+    while(head){
+        if(head->string) app->cached_filepath_count++;
+        head = head->next;
+    }
+
+    app->cached_filepaths = malloc(sizeof(*app->cached_filepaths) * app->cached_filepath_count);
+
+    head = save_head;
+
+    uint64_t file_index = 0;
+    while(head){
+        if(head->string){
+            app->cached_filepaths[file_index] = strdup(head->string);
+            file_index++;
+        }
+        CeStrNode_t* node = head;
+        head = head->next;
+        free(node->string);
+        free(node);
+    }
+
+    // setup input and completion
+    ce_app_input(app, "Load Directory File", load_project_file_input_complete_func);
+    ce_complete_init(&app->input_complete, (const char**)(app->cached_filepaths), NULL, app->cached_filepath_count);
+    build_complete_list(app->complete_list_buffer, &app->input_complete);
+
+    return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_load_cached_files(CeCommand_t* command, void* user_data){
+    CeApp_t* app = user_data;
+    CommandContext_t command_context = {};
+
+    if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+    if(app->cached_filepath_count <= 0) return CE_COMMAND_NO_ACTION;
+
+    // setup input and completion
+    ce_app_input(app, "Load Directory File", load_project_file_input_complete_func);
+    ce_complete_init(&app->input_complete, (const char**)(app->cached_filepaths), NULL, app->cached_filepath_count);
+    build_complete_list(app->complete_list_buffer, &app->input_complete);
 
     return CE_COMMAND_SUCCESS;
 }
