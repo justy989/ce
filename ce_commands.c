@@ -264,6 +264,16 @@ CeLayout_t* split_layout(CeApp_t* app, bool vertical){
           ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
                                 app->config_options.vertical_scroll_off, app->config_options.tab_width);
           tab_layout->tab.current = new_layout;
+
+          CeLayout_t* parent = ce_layout_find_parent(tab_layout, new_layout);
+          if(parent && parent->type == CE_LAYOUT_TYPE_LIST){
+               for(int64_t i = 0; i < parent->list.layout_count; i++){
+                    CeLayout_t* layout = parent->list.layouts[i];
+                    ce_view_follow_cursor(&layout->view, app->config_options.horizontal_scroll_off,
+                                          app->config_options.vertical_scroll_off, app->config_options.tab_width);
+
+               }
+          }
      }
 
      return new_layout;
