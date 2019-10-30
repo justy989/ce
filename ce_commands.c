@@ -299,6 +299,45 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_resize_layout(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 3) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     if(command->args[1].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     if(command->args[2].type != CE_COMMAND_ARG_INTEGER) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     CeLayout_t* current_layout = tab_layout->tab.current;
+     bool expand = false;
+     CeDirection_t direction;
+
+     if(strcmp(command->args[0].string, "expand") == 0){
+         expand = true;
+     }else if(strcmp(command->args[0].string, "shrink") == 0){
+          // pass
+     }else{
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     if(strcmp(command->args[1].string, "left") == 0){
+          direction = CE_LEFT;
+     }else if(strcmp(command->args[1].string, "right") == 0){
+          direction = CE_RIGHT;
+     }else if(strcmp(command->args[1].string, "up") == 0){
+          direction = CE_UP;
+     }else if(strcmp(command->args[1].string, "down") == 0){
+          direction = CE_DOWN;
+     }else{
+          return CE_COMMAND_PRINT_HELP;
+     }
+
+     if(ce_layout_resize_rect(app->tab_list_layout, current_layout, app->terminal_rect, direction, expand, command->args[2].integer)){
+          return CE_COMMAND_SUCCESS;
+     }
+
+     return CE_COMMAND_FAILURE;
+}
+
 CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
@@ -329,10 +368,6 @@ static bool delete_layout(CeApp_t* app){
      }
 
      CeLayout_t* parent_of_current = ce_layout_find_parent(tab_layout->tab.root, tab_layout->tab.current);
-
-     ce_log("tab count: %ld, current layout type: %d, current layout count: %ld, current layout: %p, parent: %p, root: %p\n",
-            app->tab_list_layout->tab_list.tab_count, tab_layout->tab.root->type, tab_layout->tab.root->list.layout_count,
-            tab_layout->tab.current, parent_of_current, tab_layout->tab.root);
 
      // check if this is the only view, and ignore the delete request
      if(app->tab_list_layout->tab_list.tab_count == 1 &&

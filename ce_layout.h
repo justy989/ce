@@ -58,6 +58,7 @@ int64_t ce_layout_tab_get_layout_count(CeLayout_t* layout);
 void ce_layout_free(CeLayout_t** layout);
 CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical);
 void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect);
+bool ce_layout_resize_rect(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, CeDirection_t direction, bool expand, int64_t amount);
 CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point);
 CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node);
 bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node);

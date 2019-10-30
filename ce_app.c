@@ -900,6 +900,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search if 1 argument is given, if 2 are given replaces the first argument with the second argument"},
+          {command_resize_layout, "resize_layout", "resize the current view. specify 'expand' or 'shrink', direction 'left', 'right', 'up', 'down' and an amount"},
           {command_save_all_and_quit, "save_all_and_quit", "save all modified buffers and quit the editor"},
           {command_save_buffer, "save_buffer", "save the currently selected view's buffer"},
           {command_search, "search", "interactive search 'forward' or 'backward'"},

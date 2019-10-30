@@ -31,8 +31,10 @@
 typedef int32_t CeRune_t;
 
 typedef enum{
-     CE_UP = -1,
-     CE_DOWN = 1
+     CE_LEFT,
+     CE_UP,
+     CE_RIGHT,
+     CE_DOWN
 }CeDirection_t;
 
 typedef enum{
