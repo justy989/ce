@@ -18,6 +18,7 @@ CeCommandStatus_t command_show_yanks(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_show_macros(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_show_marks(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_show_jumps(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_balance_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_resize_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_data);

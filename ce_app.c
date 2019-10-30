@@ -875,6 +875,7 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
 void ce_app_init_default_commands(CeApp_t* app){
      CeCommandEntry_t command_entries[] = {
           {command_add_cursor, "add_cursor", "add cursor so you have multiple cursors to edit the buffer with"},
+          {command_balance_layout, "balance_layout", "rebalance layout based on the node tree"},
           {command_blank, "blank", "empty command"},
           {command_clear_cursors, "clear_cursors", "clear multiple cursors so you go back to having one cursor"},
           {command_command, "command", "interactively send a commmand"},

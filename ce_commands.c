@@ -279,6 +279,12 @@ CeLayout_t* split_layout(CeApp_t* app, bool vertical){
      return new_layout;
 }
 
+CeCommandStatus_t command_balance_layout(CeCommand_t* command, void* user_data){
+     CeApp_t* app = user_data;
+     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;

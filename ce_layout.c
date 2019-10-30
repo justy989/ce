@@ -337,18 +337,21 @@ static ResizeRectResult_t resize_rect(CeRect_t* rect, CeRect_t bounds, CeDirecti
 }
 
 static void resize_opposites_left(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, ResizeRectResult_t* result){
+    int64_t bottom_start = layout->view.rect.top;
+
     for(int64_t i = layout->view.rect.top - 1; i >= rect.top; i--){
          CePoint_t point = {result->adjacent_old_value, i};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.right == result->adjacent_old_value){
               adjacent_layout->view.rect.right = result->adjacent_new_value;
               i = adjacent_layout->view.rect.top;
+              if((adjacent_layout->view.rect.bottom + 1) > bottom_start) bottom_start = adjacent_layout->view.rect.bottom + 1;
          }else{
               break;
          }
     }
 
-    for(int64_t i = layout->view.rect.top; i <= rect.bottom; i++){
+    for(int64_t i = bottom_start; i <= rect.bottom; i++){
          CePoint_t point = {result->adjacent_old_value, i};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.right == result->adjacent_old_value){
@@ -385,18 +388,20 @@ static void resize_shareds_left(CeLayout_t* root, CeLayout_t* layout, CeRect_t r
 }
 
 static void resize_opposites_right(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, ResizeRectResult_t* result){
+    int64_t bottom_start = layout->view.rect.top;
     for(int64_t i = layout->view.rect.top - 1; i >= rect.top; i--){
          CePoint_t point = {result->adjacent_old_value, i};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.left == result->adjacent_old_value){
               adjacent_layout->view.rect.left = result->adjacent_new_value;
               i = adjacent_layout->view.rect.top;
+              if((adjacent_layout->view.rect.bottom + 1) > bottom_start) bottom_start = adjacent_layout->view.rect.bottom + 1;
          }else{
               break;
          }
     }
 
-    for(int64_t i = layout->view.rect.top; i <= rect.bottom; i++){
+    for(int64_t i = bottom_start; i <= rect.bottom; i++){
          CePoint_t point = {result->adjacent_old_value, i};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.left == result->adjacent_old_value){
@@ -433,18 +438,21 @@ static void resize_shareds_right(CeLayout_t* root, CeLayout_t* layout, CeRect_t 
 }
 
 static void resize_opposites_up(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, ResizeRectResult_t* result){
+    int64_t right_start = layout->view.rect.left;
+
     for(int64_t i = layout->view.rect.left - 1; i >= rect.left; i--){
          CePoint_t point = {i, result->adjacent_old_value};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.bottom == result->adjacent_old_value){
               adjacent_layout->view.rect.bottom = result->adjacent_new_value;
               i = adjacent_layout->view.rect.left;
+              if((adjacent_layout->view.rect.right + 1) > right_start) right_start = adjacent_layout->view.rect.right + 1;
          }else{
               break;
          }
     }
 
-    for(int64_t i = layout->view.rect.left; i <= rect.right; i++){
+    for(int64_t i = right_start; i <= rect.right; i++){
          CePoint_t point = {i, result->adjacent_old_value};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.bottom == result->adjacent_old_value){
@@ -481,18 +489,21 @@ static void resize_shareds_up(CeLayout_t* root, CeLayout_t* layout, CeRect_t rec
 }
 
 static void resize_opposites_down(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, ResizeRectResult_t* result){
+    int64_t right_start = layout->view.rect.left;
+
     for(int64_t i = layout->view.rect.left - 1; i >= rect.left; i--){
          CePoint_t point = {i, result->adjacent_old_value};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.top == result->adjacent_old_value){
               adjacent_layout->view.rect.top = result->adjacent_new_value;
               i = adjacent_layout->view.rect.left;
+              if((adjacent_layout->view.rect.right + 1) > right_start) right_start = adjacent_layout->view.rect.right + 1;
          }else{
               break;
          }
     }
 
-    for(int64_t i = layout->view.rect.left; i <= rect.right; i++){
+    for(int64_t i = right_start; i <= rect.right; i++){
          CePoint_t point = {i, result->adjacent_old_value};
          CeLayout_t* adjacent_layout = ce_layout_find_at(root, point);
          if(adjacent_layout && adjacent_layout->view.rect.top == result->adjacent_old_value){
