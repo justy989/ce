@@ -260,7 +260,6 @@ CeLayout_t* split_layout(CeApp_t* app, bool vertical){
      CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical);
 
      if(new_layout){
-          ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
           ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
                                 app->config_options.vertical_scroll_off, app->config_options.tab_width);
           tab_layout->tab.current = new_layout;
@@ -403,7 +402,6 @@ static bool delete_layout(CeApp_t* app){
           ce_layout_delete(tab_layout, tab_layout->tab.current);
      }
 
-     ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
      CeLayout_t* layout = ce_layout_find_at(tab_layout, cursor);
      if(layout) tab_layout->tab.current = layout;
 

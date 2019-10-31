@@ -140,15 +140,16 @@ typedef struct CeApp_t{
      CeUserConfig_t user_config;
 
      pthread_t shell_command_thread;
-     volatile bool shell_command_ready_to_draw;
 
      CeMultipleCursors_t multiple_cursors;
 
-     // debug
-     bool log_key_presses;
-
      int64_t cached_filepath_count;
      char** cached_filepaths;
+
+     bool shell_command_buffer_should_scroll;
+
+     // debug
+     bool log_key_presses;
 }CeApp_t;
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer);

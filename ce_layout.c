@@ -106,6 +106,32 @@ static CeBuffer_t* ce_layout_find_buffer(CeLayout_t* layout){
      return NULL;
 }
 
+static CeRect_t ce_layout_rect(CeLayout_t* layout){
+     if(layout->type == CE_LAYOUT_TYPE_VIEW) return layout->view.rect;
+
+     CeRect_t result = {};
+
+     if(layout->type == CE_LAYOUT_TYPE_LIST){
+          if(layout->list.layout_count <= 0) return result;
+          result = ce_layout_rect(layout->list.layouts[0]);
+          ce_log("first child rect: %ld, %ld, %ld, %ld\n", result.left, result.top, result.right, result.bottom);
+
+          for(int64_t i = 1; i < layout->list.layout_count; i++){
+               CeRect_t rect = ce_layout_rect(layout->list.layouts[i]);
+               ce_log("child rect: %ld, %ld, %ld, %ld\n", rect.left, rect.top, rect.right, rect.bottom);
+               if(rect.left < result.left) result.left = rect.left;
+               if(rect.right > result.right) result.right = rect.right;
+               if(rect.top < result.top) result.top = rect.top;
+               if(rect.bottom > result.bottom) result.bottom = rect.bottom;
+          }
+
+          ce_log("calculated parent rect: %ld, %ld, %ld, %ld\n", result.left, result.top, result.right, result.bottom);
+          return result;
+     }
+
+     return result;
+}
+
 CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
      assert(layout->type == CE_LAYOUT_TYPE_TAB);
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
@@ -117,6 +143,7 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
                break;
           case CE_LAYOUT_TYPE_LIST:
                if(parent_of_current->list.vertical == vertical){
+                    CeRect_t parent_layout_rect = ce_layout_rect(parent_of_current);
                     CeLayout_t* new_layout = ce_layout_view_init(buffer);
                     if(!new_layout) return NULL;
                     new_layout->view.scroll = layout->tab.current->view.scroll;
@@ -131,6 +158,7 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
                          parent_of_current->list.layouts[i] = parent_of_current->list.layouts[i - 1];
                     }
                     parent_of_current->list.layouts[0] = new_layout;
+                    ce_layout_distribute_rect(parent_of_current, parent_layout_rect);
                     return new_layout;
                }else{
                     CeLayout_t* new_list_layout = calloc(1, sizeof(*new_list_layout));
@@ -669,6 +697,8 @@ bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node){
           return false;
      case CE_LAYOUT_TYPE_LIST:
      {
+          CeRect_t parent_rect = ce_layout_rect(parent);
+
           // find index of matching node
           int64_t index = -1;
           for(int64_t i = 0; i < parent->list.layout_count; i++){
@@ -688,6 +718,7 @@ bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node){
                parent->list.layouts[i] = parent->list.layouts[i + 1];
           }
           parent->list.layout_count = new_count;
+          ce_layout_distribute_rect(parent, parent_rect);
           assert(!(parent->list.layout_count == 0 && parent == root));
 
           if(new_count == 0){

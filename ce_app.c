@@ -1288,7 +1288,7 @@ bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
 typedef struct{
      CeBuffer_t* buffer;
      char* command;
-     volatile bool* ready_to_draw;
+     volatile bool* should_scroll;
 }ShellCommandData_t;
 
 typedef struct{
@@ -1324,6 +1324,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
           pthread_exit(NULL);
      }
+
+     *shell_command_data->should_scroll = true;
 
      // we aren't using stdin here, so we should close it in case the
      // subprocess waits for stdin to close before it completes which is common
@@ -1378,6 +1380,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           pthread_exit(NULL);
      }
 
+     *shell_command_data->should_scroll = false;
+
      cleanup.subprocess = NULL;
      pthread_cleanup_pop(0);
      return NULL;
@@ -1422,7 +1426,7 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
      shell_command_data->buffer = app->shell_command_buffer;
      shell_command_data->command = strdup(updated_command);
-     shell_command_data->ready_to_draw = &app->shell_command_ready_to_draw;
+     shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
 
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){

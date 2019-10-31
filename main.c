@@ -1028,19 +1028,20 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               if(command_func){
                                    CeCommandStatus_t cs = command_func(command, app);
 
+                                   app->key_count = 0;
+                                   app->vim.current_command[0] = 0;
+
                                    switch(cs){
                                    default:
-                                        app->key_count = 0;
-                                        app->vim.current_command[0] = 0;
                                         return;
                                    case CE_COMMAND_NO_ACTION:
                                         break;
                                    case CE_COMMAND_FAILURE:
                                         ce_log("'%s' failed\n", entry->name);
-                                        break;
+                                        return;
                                    case CE_COMMAND_PRINT_HELP:
                                         ce_app_message(app, "%s: %s\n", entry->name, entry->description);
-                                        break;
+                                        return;
                                    }
                               }else{
                                    ce_app_message(app, "unknown command: '%s'", command->name);
@@ -1402,11 +1403,6 @@ void print_help(char* program){
      printf("usage  : %s [options] [file]\n", program);
      printf("options:\n");
      printf("  -c <config file> path to shared object configuration\n");
-}
-
-void done_drawing(CeApp_t* app, struct timeval* previous_draw_time){
-     gettimeofday(previous_draw_time, NULL);
-     app->shell_command_ready_to_draw = false;
 }
 
 int main(int argc, char** argv){
@@ -1811,8 +1807,12 @@ int main(int argc, char** argv){
           }
 
           if(view){
-               ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
-                                     app.config_options.tab_width);
+               if(view->buffer == app.shell_command_buffer){
+                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, 1, app.config_options.tab_width);
+               }else{
+                    ce_view_follow_cursor(view, app.config_options.horizontal_scroll_off, app.config_options.vertical_scroll_off,
+                                          app.config_options.tab_width);
+               }
 
                // setup input view overlay if we are
                if(app.input_complete_func) input_view_overlay(&app.input_view, view);
@@ -1843,6 +1843,22 @@ int main(int argc, char** argv){
           if(view && ce_layout_buffer_in_view(tab_layout, app.jump_list_buffer)){
                CeAppViewData_t* view_data = view->user_data;
                build_jump_list(app.jump_list_buffer, &view_data->jump_list);
+          }
+
+          if(view){
+               CeLayout_t* shell_command_layout = ce_layout_buffer_in_view(tab_layout, app.shell_command_buffer);
+               if(shell_command_layout){
+                    CePoint_t end_of_buffer = ce_buffer_end_point(app.shell_command_buffer);
+                    if(&shell_command_layout->view == view){
+                         app.shell_command_buffer_should_scroll = (view->cursor.y == end_of_buffer.y);
+                    }
+
+                    if(app.shell_command_buffer_should_scroll){
+                         shell_command_layout->view.cursor = end_of_buffer;
+                         shell_command_layout->view.cursor.x = 0;
+                         ce_view_follow_cursor(&shell_command_layout->view, 1, 1, app.config_options.tab_width);
+                    }
+               }
           }
 
           draw(&app);
