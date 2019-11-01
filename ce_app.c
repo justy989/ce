@@ -921,10 +921,12 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_toggle_log_keys_pressed, "toggle_log_keys_pressed", "debug command to log key presses"},
           {command_toggle_cursors_active, "toggle_cursors_active", "toggle whether the multiple cursors are active or not"},
           {command_shell_command, "shell_command", "run a shell command"},
+          {command_shell_command_relative, "shell_command_relative", "run a shell command relative to the current buffer"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
           {command_vim_cp, "cp", "vim's cn command to select the goto the previous build error"},
           {command_vim_e, "e", "vim's e command to load a file specified"},
           {command_vim_find, "find", "vim's find command to search for files recursively"},
+          {command_vim_make, "make", "vim's make command"},
           {command_vim_q, "q", "vim's q command to close the current window"},
           {command_vim_sp, "sp", "vim's sp command to split the window vertically. It optionally takes a file to open"},
           {command_vim_tabnew, "tabnew", "vim's tabnew command to create a new tab"},
@@ -1387,7 +1389,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      return NULL;
 }
 
-bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view){
+bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
      if(app->shell_command_thread){
           pthread_cancel(app->shell_command_thread);
           pthread_join(app->shell_command_thread, NULL);
@@ -1399,7 +1401,7 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      buffer_data->last_goto_destination = 0;
      app->last_goto_buffer = app->shell_command_buffer;
 
-     char* base_directory = buffer_base_directory(view->buffer);
+     char* base_directory = relative ? buffer_base_directory(view->buffer) : NULL;
      CeLayout_t* view_layout = ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer);
      if(view_layout){
           view_layout->view.cursor = (CePoint_t){0, 0};

@@ -235,6 +235,6 @@ bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer)
 bool buffer_modified_outside_editor_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 
 bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);
-bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view);
+bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative);
 
 extern int g_shell_command_ready_fds[2];

@@ -1287,24 +1287,85 @@ CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, vo
      char cmd[128];
      snprintf(cmd, 128, "man %s", word);
      free(word);
-     ce_app_run_shell_command(app, cmd, command_context.tab_layout, command_context.view);
+     ce_app_run_shell_command(app, cmd, command_context.tab_layout, command_context.view, false);
 
      return CE_COMMAND_SUCCESS;
 }
 
+static char* build_string_from_command_args(CeCommand_t* command){
+     char buffer[256];
+     int64_t buffer_consumed = 0;
+
+     char* result = NULL;
+     for(int64_t i = 0; i < command->arg_count; i++){
+          int rc = 0;
+
+          switch(command->args[i].type){
+          default:
+              return result;
+          case CE_COMMAND_ARG_INTEGER:
+               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%ld ", command->args[i].integer);
+               break;
+          case CE_COMMAND_ARG_DECIMAL:
+               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%f ", command->args[i].decimal);
+               break;
+          case CE_COMMAND_ARG_STRING:
+               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%s ", command->args[i].string);
+               break;
+          }
+
+          if(rc < 0){
+               ce_log("snprintf() failed: %s\n", strerror(errno));
+               return result;
+          }
+
+          buffer_consumed += rc;
+     }
+
+     result = strdup(buffer);
+
+     // strip off extra space at the end
+     size_t len = strlen(result);
+     if(len >= 1) result[len - 1] = 0;
+
+     return result;
+}
+
 CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 1) return CE_COMMAND_PRINT_HELP;
-     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     if(command->arg_count < 1) return CE_COMMAND_PRINT_HELP;
 
      CeApp_t* app = (CeApp_t*)(user_data);
      CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(!ce_app_run_shell_command(app, command->args[0].string, command_context.tab_layout, command_context.view)){
+     char* command_args = build_string_from_command_args(command);
+
+     if(!ce_app_run_shell_command(app, command_args, command_context.tab_layout, command_context.view, false)){
+          free(command_args);
           return CE_COMMAND_FAILURE;
      }
 
+     free(command_args);
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* user_data){
+     if(command->arg_count < 1) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     char* command_args = build_string_from_command_args(command);
+
+     if(!ce_app_run_shell_command(app, command->args[0].string, command_context.tab_layout, command_context.view, true)){
+          free(command_args);
+          return CE_COMMAND_FAILURE;
+     }
+
+     free(command_args);
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1525,14 +1586,14 @@ CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data){
      if(command->arg_count == 0){
           CommandContext_t command_context = {};
           if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
-          ce_app_run_shell_command(app, "make", command_context.tab_layout, command_context.view);
+          ce_app_run_shell_command(app, "make", command_context.tab_layout, command_context.view, false);
      }else if(command->arg_count == 1 &&
               command->args[0].type == CE_COMMAND_ARG_STRING){
           CommandContext_t command_context = {};
           if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
           char command_string[256];
           snprintf(command_string, 256, "make %s", command->args[0].string);
-          ce_app_run_shell_command(app, command_string, command_context.tab_layout, command_context.view);
+          ce_app_run_shell_command(app, command_string, command_context.tab_layout, command_context.view, false);
      }else{
           return CE_COMMAND_PRINT_HELP;
      }
