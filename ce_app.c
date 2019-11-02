@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <ncurses.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -1291,6 +1292,7 @@ typedef struct{
      CeBuffer_t* buffer;
      char* command;
      volatile bool* should_scroll;
+     volatile bool* should_die;
 }ShellCommandData_t;
 
 typedef struct{
@@ -1300,6 +1302,8 @@ typedef struct{
 
 void run_shell_command_cleanup(void* data){
      RunShellCommandCleanup_t* cleanup = (RunShellCommandCleanup_t*)(data);
+
+     cleanup->shell_command_data->should_scroll = false;
 
      if(cleanup->shell_command_data){
           free(cleanup->shell_command_data->command);
@@ -1313,13 +1317,13 @@ void run_shell_command_cleanup(void* data){
      }
 }
 
+static int fd_is_valid(int fd)
+{
+     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
+}
+
 static void* run_shell_command_and_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
-
-     // guarantee we get to register our cleanup handler before the thread is canceled
-     int old;
-     int rc = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
-     assert(rc == 0);
 
      CeSubprocess_t subprocess;
      if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
@@ -1335,28 +1339,54 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      ce_subprocess_close_stdin(&subprocess);
 
      RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
-     pthread_cleanup_push(run_shell_command_cleanup, shell_command_data);
-     rc = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old);
-     assert(rc == 0);
+     int rc = 0;
 
      char bytes[BUFSIZ];
      snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.pid, shell_command_data->command);
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
 
-     while(fgets(bytes, BUFSIZ, subprocess.stdout) != NULL){
-          ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-          do{
-               rc = write(g_shell_command_ready_fds[1], "1", 2);
-          }while(rc == -1 && errno == EINTR);
-          if(rc < 0){
-               ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-               pthread_exit(NULL);
+     int stdout_fd = fileno(subprocess.stdout);
+
+     while(true){
+          if(*shell_command_data->should_die){
+               run_shell_command_cleanup(&cleanup);
+               return NULL;
+          }
+
+          rc = read(stdout_fd, bytes, BUFSIZ);
+          if(rc > 0){
+               bytes[rc] = 0;
+
+               // sanitize bytes for non-printable characters
+               for(int i = 0; i < rc; i++){
+                   if(bytes[i] < 32 && bytes[i] != '\n') bytes[i] = '?';
+               }
+
+               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+               do{
+                    rc = write(g_shell_command_ready_fds[1], "1", 2);
+               }while(rc == -1 && errno == EINTR);
+
+               if(rc < 0){
+                    ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+                    run_shell_command_cleanup(&cleanup);
+                    return NULL;
+               }
+          }
+
+          if(rc < BUFSIZ){
+               if(errno == EAGAIN){
+                    usleep(1000);
+               }else if(!fd_is_valid(stdout_fd) || (rc == 0 && errno == 0)){
+                    break;
+               }
           }
      }
 
      if(ferror(subprocess.stdout)){
           ce_log("shell command: fgets() from pid %d failed\n", subprocess.pid);
-          pthread_exit(NULL);
+          run_shell_command_cleanup(&cleanup);
+          return NULL;
      }
 
      int status = ce_subprocess_close(&subprocess);
@@ -1379,20 +1409,19 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 
      if(rc < 0){
           ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-          pthread_exit(NULL);
+          run_shell_command_cleanup(&cleanup);
+          return NULL;
      }
 
-     *shell_command_data->should_scroll = false;
-
-     cleanup.subprocess = NULL;
-     pthread_cleanup_pop(0);
+     run_shell_command_cleanup(&cleanup);
      return NULL;
 }
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
      if(app->shell_command_thread){
-          pthread_cancel(app->shell_command_thread);
+          app->shell_command_thread_should_die = true;
           pthread_join(app->shell_command_thread, NULL);
+          app->shell_command_thread_should_die = false;
      }
 
      ce_buffer_empty(app->shell_command_buffer);
@@ -1429,6 +1458,7 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      shell_command_data->buffer = app->shell_command_buffer;
      shell_command_data->command = strdup(updated_command);
      shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
+     shell_command_data->should_die = &app->shell_command_thread_should_die;
 
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){

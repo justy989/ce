@@ -1551,6 +1551,8 @@ int main(int argc, char** argv){
           }
 
          app.cached_filepath_count = 0;
+         app.shell_command_buffer_should_scroll = false;
+         app.shell_command_thread_should_die = false;
      }
 
      // init ncurses

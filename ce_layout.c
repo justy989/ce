@@ -114,18 +114,15 @@ static CeRect_t ce_layout_rect(CeLayout_t* layout){
      if(layout->type == CE_LAYOUT_TYPE_LIST){
           if(layout->list.layout_count <= 0) return result;
           result = ce_layout_rect(layout->list.layouts[0]);
-          ce_log("first child rect: %ld, %ld, %ld, %ld\n", result.left, result.top, result.right, result.bottom);
 
           for(int64_t i = 1; i < layout->list.layout_count; i++){
                CeRect_t rect = ce_layout_rect(layout->list.layouts[i]);
-               ce_log("child rect: %ld, %ld, %ld, %ld\n", rect.left, rect.top, rect.right, rect.bottom);
                if(rect.left < result.left) result.left = rect.left;
                if(rect.right > result.right) result.right = rect.right;
                if(rect.top < result.top) result.top = rect.top;
                if(rect.bottom > result.bottom) result.bottom = rect.bottom;
           }
 
-          ce_log("calculated parent rect: %ld, %ld, %ld, %ld\n", result.left, result.top, result.right, result.bottom);
           return result;
      }
 

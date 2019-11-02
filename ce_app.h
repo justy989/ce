@@ -147,6 +147,7 @@ typedef struct CeApp_t{
      char** cached_filepaths;
 
      bool shell_command_buffer_should_scroll;
+     bool shell_command_thread_should_die;
 
      // debug
      bool log_key_presses;
