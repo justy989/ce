@@ -10,8 +10,7 @@ todo:
 - backup files, and session info in ~/.ce
 - vim :sort
 - log file of multiple ce's at once will have problems
-- request from anthony: character to show when text goes off the view, because he likes word wrap and is wrong about that
-- adjust width/height of split windows, keep their proportions as we resize
+- keep their view proportions as we resize
 
 bug:
 - sometimes chain undo will undo 2 actions, not sure how to reproduce yet

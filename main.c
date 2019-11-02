@@ -242,7 +242,8 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
 }
 
 void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, CeVisualLineDisplayType_t visual_line_display_type,
-               CeMultipleCursors_t* multiple_cursors, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs){
+               CeMultipleCursors_t* multiple_cursors, CeDrawColorList_t* draw_color_list, CeColorDefs_t* color_defs, CeSyntaxDef_t* syntax_defs,
+               int64_t terminal_right, CeRune_t show_line_extends_passed_view_as){
      int64_t view_width = ce_view_width(view);
      int64_t view_height = ce_view_height(view);
      int64_t row_min = view->scroll.y;
@@ -327,9 +328,26 @@ void draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number, Ce
                               draw_color_node = draw_color_node->next;
                          }
 
-                         if(x >= col_min &&
-                            x <= col_max &&
-                            rune > 0){
+                         const char* look_ahead = line + rune_len;
+                         int64_t next_rune_len = 0;
+                         CeRune_t next_rune = 1;
+
+                         next_rune = ce_utf8_decode(look_ahead, &next_rune_len);
+
+                         if(x > col_max){
+                              x++;
+                         }else if(show_line_extends_passed_view_as &&
+                                  ((view->rect.right >= terminal_right && x == col_max) ||
+                                   (view->rect.right < terminal_right && x == (col_max - 1))) &&
+                                  next_rune != 0){
+                              int new_bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW, COLOR_DEFAULT);
+                              int new_fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW, COLOR_DEFAULT);
+                              int change_color_pair = ce_color_def_get(color_defs, new_fg, new_bg);
+                              attron(COLOR_PAIR(change_color_pair));
+                              addch(show_line_extends_passed_view_as);
+                              standend();
+                              x++;
+                         }else if(x >= col_min && rune > 0){
                               bool showed_one_of_the_multiple_cursors = false;
 
                               if(multiple_cursors){
@@ -502,7 +520,7 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, Ce
                  CeBuffer_t* input_buffer, CeColorDefs_t* color_defs, int64_t tab_width, CeLineNumber_t line_number,
                  CeVisualLineDisplayType_t visual_line_display_type, CeMultipleCursors_t* multiple_cursors,
                  CeLayout_t* current, CeSyntaxDef_t* syntax_defs, int64_t terminal_width, bool highlight_search,
-                 int ui_fg_color, int ui_bg_color){
+                 int ui_fg_color, int ui_bg_color, CeRune_t show_line_extends_passed_view_as){
      switch(layout->type){
      default:
           break;
@@ -668,7 +686,8 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, Ce
                ce_range_list_free(&range_list);
           }
 
-          draw_view(&layout->view, tab_width, line_number, visual_line_display_type, multiple_cursors, &draw_color_list, color_defs, syntax_defs);
+          draw_view(&layout->view, tab_width, line_number, visual_line_display_type, multiple_cursors, &draw_color_list, color_defs, syntax_defs,
+                    terminal_width, show_line_extends_passed_view_as);
           ce_draw_color_list_free(&draw_color_list);
           draw_view_status(&layout->view, layout == current ? vim : NULL, macros, multiple_cursors, color_defs, 0,
                            ui_fg_color, ui_bg_color);
@@ -685,12 +704,13 @@ void draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* visual, Ce
           for(int64_t i = 0; i < layout->list.layout_count; i++){
                draw_layout(layout->list.layouts[i], vim, visual, macros, input_buffer, color_defs, tab_width,
                            line_number, visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search,
-                           ui_fg_color, ui_bg_color);
+                           ui_fg_color, ui_bg_color, show_line_extends_passed_view_as);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
           draw_layout(layout->tab.root, vim, visual, macros, input_buffer, color_defs, tab_width, line_number,
-                      visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color);
+                      visual_line_display_type, multiple_cursors, current, syntax_defs, terminal_width, highlight_search, ui_fg_color, ui_bg_color,
+                      show_line_extends_passed_view_as);
           break;
      }
 }
@@ -742,12 +762,14 @@ void draw(CeApp_t* app){
      draw_layout(tab_layout, &app->vim, &app->visual, &app->macros, app->input_view.buffer, &color_defs,
                  app->config_options.tab_width, app->config_options.line_number, app->config_options.visual_line_display_type,
                  &app->multiple_cursors, tab_layout->tab.current, app->syntax_defs, tab_list_layout->tab_list.rect.right,
-                 app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color);
+                 app->highlight_search, app->config_options.ui_fg_color, app->config_options.ui_bg_color,
+                 app->config_options.show_line_extends_passed_view_as);
 
      if(app->input_complete_func){
           CeDrawColorList_t draw_color_list = {};
           draw_view(&app->input_view, app->config_options.tab_width, app->config_options.line_number,
-                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
+                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs,
+                    app->terminal_rect.right, app->config_options.show_line_extends_passed_view_as);
           ce_draw_color_list_free(&draw_color_list);
           int64_t new_status_bar_offset = (app->input_view.rect.bottom - app->input_view.rect.top) + 1;
           draw_view_status(&app->input_view, &app->vim, &app->macros, &app->multiple_cursors, &color_defs, 0,
@@ -788,7 +810,8 @@ void draw(CeApp_t* app){
                                        app->complete_view.buffer->syntax_data);
           ce_range_list_free(&range_list);
           draw_view(&app->complete_view, app->config_options.tab_width, app->config_options.line_number,
-                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
+                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs,
+                    app->terminal_rect.right, app->config_options.show_line_extends_passed_view_as);
           ce_draw_color_list_free(&draw_color_list);
           if(app->input_complete_func){
                int64_t new_status_bar_offset = (app->complete_view.rect.bottom - app->complete_view.rect.top) + 1 + app->input_view.buffer->line_count;
@@ -807,7 +830,8 @@ void draw(CeApp_t* app){
           ce_range_list_free(&range_list);
 
           draw_view(&app->message_view, app->config_options.tab_width, app->config_options.line_number,
-                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs);
+                    app->config_options.visual_line_display_type, NULL, &draw_color_list, &color_defs, app->syntax_defs,
+                    app->terminal_rect.right, app->config_options.show_line_extends_passed_view_as);
           ce_draw_color_list_free(&draw_color_list);
 
           // set the specified background
@@ -1627,6 +1651,7 @@ int main(int argc, char** argv){
           config_options->apply_completion_key = CE_TAB;
           config_options->cycle_next_completion_key = ce_ctrl_key('n');
           config_options->cycle_prev_completion_key = ce_ctrl_key('p');
+          config_options->show_line_extends_passed_view_as = '>';
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
@@ -1703,6 +1728,8 @@ int main(int argc, char** argv){
                syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].bg = COLOR_RED;
                syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].fg = COLOR_DEFAULT;
                syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].bg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].fg = COLOR_YELLOW;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].bg = CE_SYNTAX_USE_CURRENT_COLOR;
 
                app.config_options.ui_fg_color = COLOR_BLACK;
                app.config_options.ui_bg_color = COLOR_WHITE;

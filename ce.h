@@ -143,6 +143,7 @@ typedef struct{
      int apply_completion_key;
      int cycle_next_completion_key;
      int cycle_prev_completion_key;
+     CeRune_t show_line_extends_passed_view_as;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
