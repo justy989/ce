@@ -19,6 +19,7 @@
 #include <sys/wait.h>
 
 int g_shell_command_ready_fds[2];
+bool g_shell_command_should_die = false;
 
 bool ce_buffer_node_insert(CeBufferNode_t** head, CeBuffer_t* buffer){
      CeBufferNode_t* node = malloc(sizeof(*node));
@@ -1291,8 +1292,7 @@ bool edit_yank_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
 typedef struct{
      CeBuffer_t* buffer;
      char* command;
-     volatile bool* should_scroll;
-     volatile bool* should_die;
+     volatile bool* volatile should_scroll;
 }ShellCommandData_t;
 
 typedef struct{
@@ -1303,7 +1303,7 @@ typedef struct{
 void run_shell_command_cleanup(void* data){
      RunShellCommandCleanup_t* cleanup = (RunShellCommandCleanup_t*)(data);
 
-     cleanup->shell_command_data->should_scroll = false;
+     *cleanup->shell_command_data->should_scroll = false;
 
      if(cleanup->shell_command_data){
           free(cleanup->shell_command_data->command);
@@ -1312,14 +1312,10 @@ void run_shell_command_cleanup(void* data){
 
      if(cleanup->subprocess){
           // kill the subprocess and wait for it to be cleaned up
-          ce_subprocess_kill(cleanup->subprocess, -9);
+          ce_subprocess_kill(cleanup->subprocess, SIGKILL);
           ce_subprocess_close(cleanup->subprocess);
+     }else{
      }
-}
-
-static int fd_is_valid(int fd)
-{
-     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
 static void* run_shell_command_and_output_to_buffer(void* data){
@@ -1346,9 +1342,11 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
 
      int stdout_fd = fileno(subprocess.stdout);
+     int flags = fcntl(stdout_fd, F_GETFL, 0);
+     fcntl(stdout_fd, F_SETFL, flags | O_NONBLOCK);
 
      while(true){
-          if(*shell_command_data->should_die){
+          if(g_shell_command_should_die){
                run_shell_command_cleanup(&cleanup);
                return NULL;
           }
@@ -1372,14 +1370,14 @@ static void* run_shell_command_and_output_to_buffer(void* data){
                     run_shell_command_cleanup(&cleanup);
                     return NULL;
                }
-          }
-
-          if(rc < BUFSIZ){
-               if(errno == EAGAIN){
+          }else if(rc < 0){
+               if(errno == EAGAIN || errno == EWOULDBLOCK){
                     usleep(1000);
-               }else if(!fd_is_valid(stdout_fd) || (rc == 0 && errno == 0)){
+               }else if(errno == EBADF){
                     break;
                }
+          }else{
+               break;
           }
      }
 
@@ -1419,9 +1417,9 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
      if(app->shell_command_thread){
-          app->shell_command_thread_should_die = true;
+          g_shell_command_should_die = true;
           pthread_join(app->shell_command_thread, NULL);
-          app->shell_command_thread_should_die = false;
+          g_shell_command_should_die = false;
      }
 
      ce_buffer_empty(app->shell_command_buffer);
@@ -1458,7 +1456,6 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      shell_command_data->buffer = app->shell_command_buffer;
      shell_command_data->command = strdup(updated_command);
      shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
-     shell_command_data->should_die = &app->shell_command_thread_should_die;
 
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){
