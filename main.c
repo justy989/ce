@@ -726,6 +726,8 @@ void draw(CeApp_t* app){
      CeLayout_t* tab_list_layout = app->tab_list_layout;
      CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
 
+     CeView_t* view = &tab_layout->tab.current->view;
+
      // draw a tab bar if there is more than 1 tab
      if(tab_list_layout->tab_list.tab_count > 1){
           move(0, 0);
@@ -755,8 +757,6 @@ void draw(CeApp_t* app){
                }
           }
      }
-
-     CeView_t* view = &tab_layout->tab.current->view;
 
      standend();
      draw_layout(tab_layout, &app->vim, &app->visual, &app->macros, app->input_view.buffer, &color_defs,
@@ -1609,7 +1609,8 @@ int main(int argc, char** argv){
 
      // init layout
      {
-          CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer);
+          CeRect_t rect = {};
+          CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer, rect);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
           ce_app_update_terminal_view(&app);
      }

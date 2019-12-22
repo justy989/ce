@@ -15,14 +15,54 @@ CeLayout_t* ce_layout_tab_list_init(CeLayout_t* tab_layout){
      return tab_list_layout;
 }
 
+static void ce_layout_resize_for_tabline(CeLayout_t* layout){
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          if(layout->view.rect.top == 0){
+               layout->view.rect.top = 1;
+          }
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+     {
+          if(layout->list.rect.top == 0){
+               layout->list.rect.top = 1;
+          }
+
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+              ce_layout_resize_for_tabline(layout->list.layouts[i]);
+          }
+     } break;
+     case CE_LAYOUT_TYPE_TAB:
+          if(layout->tab.rect.top == 0){
+               layout->tab.rect.top = 1;
+          }
+          ce_layout_resize_for_tabline(layout->tab.root);
+          break;
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          if(layout->tab_list.rect.top == 0){
+               layout->tab_list.rect.top = 1;
+          }
+          for(int64_t i = 0; i < layout->tab_list.tab_count; i++){
+               ce_layout_resize_for_tabline(layout->tab_list.tabs[i]);
+          }
+          break;
+     }
+}
+
 CeLayout_t* ce_layout_tab_list_add(CeLayout_t* tab_list_layout){
      assert(tab_list_layout->type == CE_LAYOUT_TYPE_TAB_LIST);
+     CeRect_t rect = tab_list_layout->tab_list.rect;
      int64_t new_tab_count = tab_list_layout->tab_list.tab_count + 1;
      CeLayout_t** new_tabs = realloc(tab_list_layout->tab_list.tabs, new_tab_count * sizeof(*tab_list_layout->tab_list.tabs));
      if(!new_tabs) return false;
      tab_list_layout->tab_list.tabs = new_tabs;
-     new_tabs[tab_list_layout->tab_list.tab_count] = ce_layout_tab_init(tab_list_layout->tab_list.current->tab.current->view.buffer);
+     new_tabs[tab_list_layout->tab_list.tab_count] = ce_layout_tab_init(tab_list_layout->tab_list.current->tab.current->view.buffer, rect);
      tab_list_layout->tab_list.tab_count = new_tab_count;
+     for(int64_t i = 0; i < new_tab_count; i++){
+         ce_layout_resize_for_tabline(new_tabs[i]);
+     }
      return new_tabs[tab_list_layout->tab_list.tab_count - 1];
 }
 
@@ -35,11 +75,15 @@ CeLayout_t* ce_layout_view_init(CeBuffer_t* buffer){
      return view_layout;
 }
 
-CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer){
+CeLayout_t* ce_layout_tab_init(CeBuffer_t* buffer, CeRect_t rect){
      CeLayout_t* view_layout = ce_layout_view_init(buffer);
+     view_layout->view.rect = rect;
 
      CeLayout_t* tab_layout = calloc(1, sizeof(*tab_layout));
-     if(!tab_layout) return NULL; // LEAK: leak view_layout
+     if(!tab_layout){
+         free(view_layout);
+         return NULL;
+     }
      tab_layout->type = CE_LAYOUT_TYPE_TAB;
      tab_layout->tab.root = view_layout;
      tab_layout->tab.current = view_layout;
@@ -146,16 +190,32 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
                     new_layout->view.scroll = layout->tab.current->view.scroll;
                     new_layout->view.cursor = layout->tab.current->view.cursor;
 
+                    int64_t split_layout_index = 0;
+                    for(int64_t i = 0; i < parent_of_current->list.layout_count; i++){
+                         if(parent_of_current->list.layouts[i] == layout->tab.current){
+                              split_layout_index = i;
+                              break;
+                         }
+                    }
+
+                    ce_log("split layout index: %d\n", split_layout_index);
+
                     int64_t new_layout_count = parent_of_current->list.layout_count + 1;
                     parent_of_current->list.layouts = realloc(parent_of_current->list.layouts,
                                                               new_layout_count * sizeof(*parent_of_current->list.layouts));
-                    if(parent_of_current->list.layouts) parent_of_current->list.layout_count = new_layout_count;
-                    else return NULL;
-                    for(int64_t i = parent_of_current->list.layout_count - 1; i > 0; i--){
+                    if(parent_of_current->list.layouts){
+                         parent_of_current->list.layout_count = new_layout_count;
+                    }else{
+                         return NULL;
+                    }
+
+                    // shift down the rest of the layouts first
+                    for(int64_t i = parent_of_current->list.layout_count - 1; i > split_layout_index; i--){
                          parent_of_current->list.layouts[i] = parent_of_current->list.layouts[i - 1];
                     }
-                    parent_of_current->list.layouts[0] = new_layout;
+                    parent_of_current->list.layouts[split_layout_index] = new_layout;
                     ce_layout_distribute_rect(parent_of_current, parent_layout_rect);
+                    layout->tab.current = new_layout;
                     return new_layout;
                }else{
                     CeLayout_t* new_list_layout = calloc(1, sizeof(*new_list_layout));

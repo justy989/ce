@@ -3114,13 +3114,23 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
 bool ce_vim_verb_paste_before(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                               CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                               const CeConfigOptions_t* config_options){
-     return paste_text(vim, action, motion_range, view, cursor, config_options, false);
+     if(paste_text(vim, action, motion_range, view, cursor, config_options, false)){
+          buffer_data->motion_column = cursor->x;
+          return true;
+     }
+
+     return false;
 }
 
 bool ce_vim_verb_paste_after(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                              CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                              const CeConfigOptions_t* config_options){
-     return paste_text(vim, action, motion_range, view, cursor, config_options, true);
+     if(paste_text(vim, action, motion_range, view, cursor, config_options, true)){
+          buffer_data->motion_column = cursor->x;
+          return true;
+     }
+
+     return false;
 }
 
 bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
