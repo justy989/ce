@@ -1,6 +1,8 @@
 #include "ce_draw_term.h"
 #include "ce_app.h"
 
+#if defined(DISPLAY_TERMINAL)
+
 #include <stdlib.h>
 #include <string.h>
 #include <ncurses.h>
@@ -575,3 +577,7 @@ void ce_draw_term(CeApp_t* app){
 
      refresh();
 }
+
+#else
+void ce_draw_term(CeApp_t* app){ }
+#endif

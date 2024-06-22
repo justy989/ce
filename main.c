@@ -4,15 +4,28 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
-#include <ncurses.h>
 #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
 #include <errno.h>
 
+#if defined(DISPLAY_TERMINAL)
+  #include <ncurses.h>
+#endif
+
 #include "ce_app.h"
-#include "ce_draw_term.h"
 #include "ce_commands.h"
+
+#if defined(DISPLAY_TERMINAL)
+  #include "ce_draw_term.h"
+  #define KEY_UP_ARROW KEY_UP
+  #define KEY_DOWN_ARROW KEY_DOWN
+  #define KEY_LEFT_ARROW KEY_LEFT
+  #define KEY_RIGHT_ARROW KEY_RIGHT
+  #define KEY_RESIZE_EVENT KEY_RESIZE
+  #define KEY_CARRIAGE_RETURN KEY_ENTER
+  #define KEY_INVALID ERR
+#endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
 int g_last_key = 0;
@@ -29,6 +42,13 @@ typedef struct{
      char* start;
      char* newline;
 }FindTrailingResult_t;
+
+static const char* keyname_str(int key) {
+#if defined(DISPLAY_TERMINAL)
+    return keyname(key);
+#endif
+    return "UNKNOWN";
+}
 
 static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      char buffer_info[BUFSIZ];
@@ -123,7 +143,7 @@ static void build_bind_list(CeBuffer_t* buffer, CeKeyBinds_t* key_binds){
           // print keys
           for(int64_t k = 0; k < bind->key_count; k++){
                int key = bind->keys[k];
-               printed += snprintf(line + printed, 256 - printed, "%s", keyname(key));
+               printed += snprintf(line + printed, 256 - printed, "%s", keyname_str(key));
           }
 
           // print command with arguments
@@ -255,7 +275,7 @@ void scroll_to_and_center_if_offscreen(CeView_t* view, CePoint_t point, CeConfig
 }
 
 bool handle_input_history_key(int key, CeHistory_t* history, CeBuffer_t* input_buffer, CePoint_t* cursor){
-     if(key == KEY_UP){
+     if(key == KEY_UP_ARROW){
           char* prev = ce_history_previous(history);
           if(prev){
                ce_buffer_remove_string(input_buffer, (CePoint_t){0, 0}, ce_utf8_strlen(input_buffer->lines[0]));
@@ -265,7 +285,7 @@ bool handle_input_history_key(int key, CeHistory_t* history, CeBuffer_t* input_b
           return true;
      }
 
-     if(key == KEY_DOWN){
+     if(key == KEY_DOWN_ARROW){
           char* next = ce_history_next(history);
           ce_buffer_remove_string(input_buffer, (CePoint_t){0, 0}, ce_utf8_strlen(input_buffer->lines[0]));
           if(next){
@@ -279,9 +299,9 @@ bool handle_input_history_key(int key, CeHistory_t* history, CeBuffer_t* input_b
 }
 
 void app_handle_key(CeApp_t* app, CeView_t* view, int key){
-     if(key == ERR) return;
+     if(key == KEY_INVALID) return;
 
-     if(key == KEY_RESIZE){
+     if(key == KEY_RESIZE_EVENT){
           ce_app_update_terminal_view(app);
           return;
      }
@@ -429,7 +449,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      }
 
      if(view){
-          if(key == KEY_ENTER) key = CE_NEWLINE;
+          if(key == KEY_CARRIAGE_RETURN) key = CE_NEWLINE;
           if(key == CE_NEWLINE && !app->input_complete_func && view->buffer == app->buffer_list_buffer){
                CeBufferNode_t* itr = app->buffer_node_head;
                int64_t index = 0;
@@ -880,6 +900,7 @@ int main(int argc, char** argv){
          app.shell_command_thread_should_die = false;
      }
 
+ #if defined(DISPLAY_TERMINAL)
      // init ncurses
      {
           initscr();
@@ -904,6 +925,7 @@ int main(int argc, char** argv){
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
           define_key("\x7F", KEY_BACKSPACE); // Backspace  (127) (0x7F) ASCII "DEL" Delete
      }
+#endif
 
      ce_app_init_default_commands(&app);
      ce_vim_init(&app.vim);
@@ -1114,17 +1136,21 @@ int main(int argc, char** argv){
                break;
           }
 
-          int key = ERR;
+          int key = KEY_INVALID;
 
-          if(check_stdin) key = getch();
+ #if defined(DISPLAY_TERMINAL)
+          if(check_stdin) { key = getch(); }
+ #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
           if(check_stdin) g_last_key = key;
-          if(app.log_key_presses) ce_log("key: %s %d\n", keyname(key), key);
+          if(app.log_key_presses) ce_log("key: %s %d\n", keyname_str(key), key);
 #endif
 
-          // handle input from the user
-          app_handle_key(&app, view, key);
+          if (key != KEY_INVALID) {
+              // handle input from the user
+              app_handle_key(&app, view, key);
+          }
 
           // update refs to view and tab_layout
           tab_layout = app.tab_list_layout->tab_list.current;
@@ -1192,7 +1218,9 @@ int main(int argc, char** argv){
                }
           }
 
+ #if defined(DISPLAY_TERMINAL)
           ce_draw_term(&app);
+ #endif
      }
 
      // cleanup

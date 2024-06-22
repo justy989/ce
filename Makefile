@@ -1,42 +1,41 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
 LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+TERM_DEFINES := -DDISPLAY_TERMINAL
+# LDFLAGS := -rdynamic -lncursesw -lutil -ldl
 
-OBJDIR ?= build
-DESTDIR ?= /usr/local/bin
+BUILD_DIR ?= build
+TERM_OBJDIR ?= $(BUILD_DIR)/term
 
-.PHONY: all clean install
+.PHONY: term clean install
 
-EXE := ce
+TERM_EXE := ce_term
 
-all: $(EXE)
+term: $(TERM_EXE)
 
 TEST_CSRCS := $(wildcard test_*.c)
 TESTS := $(patsubst %.c,%,$(TEST_CSRCS))
 
 CSRCS := $(filter-out $(TEST_CSRCS), $(wildcard *.c))
 # put our .o files in $(OBJDIR)
-COBJS := $(patsubst %.c,$(OBJDIR)/%.o,$(CSRCS))
+TERM_COBJS := $(patsubst %.c,$(TERM_OBJDIR)/%.o,$(CSRCS))
 CHDRS := $(wildcard *.h)
 
-$(OBJDIR):
-	mkdir $@
+$(TERM_OBJDIR):
+	mkdir -p $@
 
-$(OBJDIR)/%.o: %.c $(CHDRS) | $(OBJDIR)
-	$(CC) $(CFLAGS) -c  -o $@ $<
+$(TERM_OBJDIR)/%.o: %.c $(CHDRS) | $(TERM_OBJDIR)
+	$(CC) $(TERM_DEFINES) $(CFLAGS) -c -o $@ $<
 
-$(EXE): $(COBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+$(TERM_EXE): $(TERM_COBJS)
+	$(CC) $(TERM_DEFINES) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 test: $(TESTS)
 
-test_%: test_%.c $(OBJDIR)/%.o
+test_%: test_%.c $(TERM_OBJDIR)/%.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 	./$@
 
 clean:
-	rm -f $(EXE) $(TESTS) ce_test.log valgrind.out
-	rm -rf $(OBJDIR)
-
-install:
-	install -D $(EXE) $(DESTDIR)/$(EXE)
+	rm -f $(TERM_EXE) $(TESTS) ce_test.log valgrind.out
+	rm -rf $(BUILD_DIR)
