@@ -2,7 +2,68 @@
 #include "ce_app.h"
 
 #if defined(DISPLAY_GUI)
-static void _draw_view(CeView_t* view, CeGui_t* gui) {
+
+#define STATUS_LINE_LEN 128
+
+static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
+     char line_buffer[STATUS_LINE_LEN];
+
+     const char* vim_mode_string = NULL;
+     if(vim){
+          switch(vim->mode){
+          default:
+               vim_mode_string = "";
+               break;
+          case CE_VIM_MODE_NORMAL:
+               vim_mode_string = "NORMAL ";
+               break;
+          case CE_VIM_MODE_INSERT:
+               vim_mode_string = "INSERT ";
+               break;
+          case CE_VIM_MODE_VISUAL:
+               vim_mode_string = "VISUAL ";
+               break;
+          case CE_VIM_MODE_VISUAL_LINE:
+               vim_mode_string = "VISUAL LINE ";
+               break;
+          case CE_VIM_MODE_VISUAL_BLOCK:
+               vim_mode_string = "VISUAL BLOCK ";
+               break;
+          case CE_VIM_MODE_REPLACE:
+               vim_mode_string = "REPLACE ";
+               break;
+          }
+     }
+
+     const char* status_str = ce_buffer_status_get_str(view->buffer->status);
+     if (status_str) {
+         if(ce_macros_is_recording(macros)){
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s RECORDING %c", vim_mode_string, status_str, view->buffer->name, macros->recording);
+         } else {
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s", vim_mode_string, status_str, view->buffer->name);
+         }
+     } else {
+         snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", vim_mode_string, view->buffer->name);
+     }
+
+     SDL_Color text_color;
+     text_color.r = 255;
+     text_color.g = 255;
+     text_color.b = 255;
+     text_color.a = 255;
+
+     SDL_Rect text_rect;
+     text_rect.x = view->rect.left * (gui->font_point_size / 2);
+     text_rect.y = view->rect.bottom * (gui->font_point_size + gui->font_line_separation);
+     SDL_Surface* line_surface = TTF_RenderText_Blended(gui->font, line_buffer, text_color);
+     text_rect.w = line_surface->w;
+     text_rect.h = line_surface->h;
+
+     SDL_BlitSurface(line_surface, NULL, gui->window_surface, &text_rect);
+     SDL_FreeSurface(line_surface);
+}
+
+static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
      if(view->buffer->line_count == 0){
          return;
      }
@@ -68,23 +129,25 @@ static void _draw_view(CeView_t* view, CeGui_t* gui) {
      }
 
      free(line_buffer);
+
+     _draw_view_status(view, gui, vim, macros);
 }
 
-static void _draw_layout(CeLayout_t* layout, CeGui_t* gui) {
+static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
      switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
      {
-         _draw_view(&layout->view, gui);
+         _draw_view(&layout->view, gui, vim, macros);
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               _draw_layout(layout->list.layouts[i], gui);
+               _draw_layout(layout->list.layouts[i], gui, vim, macros);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          _draw_layout(layout->tab.root, gui);
+          _draw_layout(layout->tab.root, gui, vim, macros);
           break;
      }
 }
@@ -111,7 +174,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
         SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0xFF, 0xFF, 0xFF));
     }
 
-    _draw_layout(tab_layout, gui);
+    _draw_layout(tab_layout, gui, &app->vim, &app->macros);
 
     SDL_UpdateWindowSurface(gui->window);
 }
