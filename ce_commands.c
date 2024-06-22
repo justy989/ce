@@ -850,7 +850,9 @@ CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data){
 }
 
 CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
+#if defined(DISPLAY_TERMINAL)
      clear();
+#endif
      return CE_COMMAND_SUCCESS;
 }
 

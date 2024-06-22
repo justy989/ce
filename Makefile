@@ -1,17 +1,24 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
-LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
-# LDFLAGS := -rdynamic -lncursesw -lutil -ldl
+GUI_DEFINES := -DDISPLAY_GUI
+#TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
+#GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
+GUI_INCFLAGS := -I/usr/include/SDL2
 
 BUILD_DIR ?= build
 TERM_OBJDIR ?= $(BUILD_DIR)/term
+GUI_OBJDIR ?= $(BUILD_DIR)/gui
 
-.PHONY: term clean install
+.PHONY: term gui clean install
 
 TERM_EXE := ce_term
+GUI_EXE := ce_gui
 
 term: $(TERM_EXE)
+gui: $(GUI_EXE)
 
 TEST_CSRCS := $(wildcard test_*.c)
 TESTS := $(patsubst %.c,%,$(TEST_CSRCS))
@@ -19,6 +26,7 @@ TESTS := $(patsubst %.c,%,$(TEST_CSRCS))
 CSRCS := $(filter-out $(TEST_CSRCS), $(wildcard *.c))
 # put our .o files in $(OBJDIR)
 TERM_COBJS := $(patsubst %.c,$(TERM_OBJDIR)/%.o,$(CSRCS))
+GUI_COBJS := $(patsubst %.c,$(GUI_OBJDIR)/%.o,$(CSRCS))
 CHDRS := $(wildcard *.h)
 
 $(TERM_OBJDIR):
@@ -28,7 +36,16 @@ $(TERM_OBJDIR)/%.o: %.c $(CHDRS) | $(TERM_OBJDIR)
 	$(CC) $(TERM_DEFINES) $(CFLAGS) -c -o $@ $<
 
 $(TERM_EXE): $(TERM_COBJS)
-	$(CC) $(TERM_DEFINES) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CC) $(TERM_DEFINES) $(CFLAGS) $^ -o $@ $(TERM_LDFLAGS)
+
+$(GUI_OBJDIR):
+	mkdir -p $@
+
+$(GUI_OBJDIR)/%.o: %.c $(CHDRS) | $(GUI_OBJDIR)
+	$(CC) $(GUI_DEFINES) $(CFLAGS) $(GUI_INCFLAGS) -c -o $@ $<
+
+$(GUI_EXE): $(GUI_COBJS)
+	$(CC) $(GUI_DEFINES) $(CFLAGS) $^ -o $@ $(GUI_LDFLAGS)
 
 test: $(TESTS)
 
@@ -37,5 +54,5 @@ test_%: test_%.c $(TERM_OBJDIR)/%.o
 	./$@
 
 clean:
-	rm -f $(TERM_EXE) $(TESTS) ce_test.log valgrind.out
+	rm -f $(TERM_EXE) $(GUI_EXE) $(TESTS) ce_test.log valgrind.out
 	rm -rf $(BUILD_DIR)

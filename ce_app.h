@@ -210,7 +210,7 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
 
 void ce_app_clear_filepath_cache(CeApp_t* app);
 
-void ce_app_update_terminal_view(CeApp_t* app);
+void ce_app_update_terminal_view(CeApp_t* app, int width, int height);
 
 void ce_app_init_default_commands(CeApp_t* app);
 void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete);

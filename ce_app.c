@@ -379,9 +379,15 @@ void ce_app_clear_filepath_cache(CeApp_t* app){
      free(app->cached_filepaths);
 }
 
-void ce_app_update_terminal_view(CeApp_t* app){
-     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
+void ce_app_update_terminal_view(CeApp_t* app, int width, int height) {
+     app->terminal_width = width;
+     app->terminal_height = height;
      app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
+     printf("app->terminal_rect: %ld, %ld, %ld, %ld\n",
+            app->terminal_rect.left,
+            app->terminal_rect.right,
+            app->terminal_rect.top,
+            app->terminal_rect.bottom);
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 }
 

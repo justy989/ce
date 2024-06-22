@@ -11,6 +11,11 @@
 
 #if defined(DISPLAY_TERMINAL)
   #include <ncurses.h>
+#elif defined(DISPLAY_GUI)
+  #include <SDL.h>
+  #include <SDL_ttf.h>
+#else
+#error "No display mode specified"
 #endif
 
 #include "ce_app.h"
@@ -25,6 +30,25 @@
   #define KEY_RESIZE_EVENT KEY_RESIZE
   #define KEY_CARRIAGE_RETURN KEY_ENTER
   #define KEY_INVALID ERR
+#elif defined(DISPLAY_GUI)
+  #include "ce_draw_gui.h"
+  // TODO: figure out the real values here.
+  #define KEY_UP_ARROW -2
+  #define KEY_DOWN_ARROW -3
+  #define KEY_LEFT_ARROW -4
+  #define KEY_RIGHT_ARROW -5
+  #define KEY_RESIZE_EVENT -6
+  #define KEY_CARRIAGE_RETURN -7
+  #define KEY_INVALID -8
+
+  #define COLOR_BLACK 1
+  #define COLOR_RED 2
+  #define COLOR_GREEN 3
+  #define COLOR_YELLOW 4
+  #define COLOR_BLUE 5
+  #define COLOR_MAGENTA 5
+  #define COLOR_CYAN 6
+  #define COLOR_WHITE 7
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -302,7 +326,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
      if(key == KEY_INVALID) return;
 
      if(key == KEY_RESIZE_EVENT){
-          ce_app_update_terminal_view(app);
+#if defined(DISPLAY_TERMINAL)
+          int terminal_width = 0;
+          int terminal_height = 0;
+          getmaxyx(stdscr, terminal_height, terminal_width);
+          ce_app_update_terminal_view(app, terminal_width, terminal_height);
+#endif
           return;
      }
 
@@ -925,6 +954,53 @@ int main(int argc, char** argv){
           define_key("\x0D", KEY_ENTER);     // Enter       (13) (0x0D) ASCII "CR"  NL Carriage Return
           define_key("\x7F", KEY_BACKSPACE); // Backspace  (127) (0x7F) ASCII "DEL" Delete
      }
+#elif defined(DISPLAY_GUI)
+     CeGui_t gui;
+     memset(&gui, 0, sizeof(gui));
+
+     {
+          int rc = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+          if(rc < 0){
+              printf("SDL_Init() failed: %s\n", SDL_GetError());
+              return 1;
+          }
+
+          SDL_StartTextInput();
+
+          gui.application_name = "ce";
+          gui.window_width = 1280;
+          gui.window_height = 1024;
+          printf("Create window: %s %d, %d\n", gui.application_name, gui.window_width, gui.window_height);
+
+          gui.window = SDL_CreateWindow(gui.application_name,
+                                        SDL_WINDOWPOS_CENTERED,
+                                        SDL_WINDOWPOS_CENTERED,
+                                        gui.window_width,
+                                        gui.window_height,
+                                        0);
+          if(gui.window == NULL){
+              printf("SDL_CreateWindow() failed: %s\n", SDL_GetError());
+              return 1;
+          }
+
+          gui.window_surface = SDL_GetWindowSurface(gui.window);
+
+          rc = TTF_Init();
+          if (rc < 0) {
+              printf("TTF_Init() failed: %s\n", TTF_GetError());
+              return 1;
+          }
+
+          gui.font_point_size = 24;
+          gui.font_line_separation = 2;
+          gui.font = TTF_OpenFont("Inconsolata-SemiBold.ttf", gui.font_point_size);
+          if (gui.font == NULL) {
+              printf("TTF_OpenFont() failed: %s\n", TTF_GetError());
+              return 1;
+          }
+
+          TTF_SetFontHinting(gui.font, TTF_HINTING_MONO);
+     }
 #endif
 
      ce_app_init_default_commands(&app);
@@ -935,7 +1011,16 @@ int main(int argc, char** argv){
           CeRect_t rect = {};
           CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer, rect);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
-          ce_app_update_terminal_view(&app);
+#if defined(DISPLAY_TERMINAL)
+          int terminal_width = 0;
+          int terminal_height = 0;
+          getmaxyx(stdscr, terminal_height, terminal_width);
+          ce_app_update_terminal_view(&app, terminal_width, terminal_height);
+#elif defined(DISPLAY_GUI)
+          int calculated_terminal_width = gui.window_width / (gui.font_point_size / 2);
+          int calculated_terminal_height = gui.window_height / (gui.font_point_size + gui.font_line_separation);
+          ce_app_update_terminal_view(&app, calculated_terminal_width, calculated_terminal_height);
+#endif
      }
 
      // setup input buffer
@@ -1066,7 +1151,11 @@ int main(int argc, char** argv){
 
      pipe(g_shell_command_ready_fds);
 
+ #if defined(DISPLAY_TERMINAL)
      ce_draw_term(&app);
+ #elif defined(DISPLAY_GUI)
+     ce_draw_gui(&app, &gui);
+ #endif
 
      // init draw thread
      struct timeval current_draw_time = {};
@@ -1074,6 +1163,7 @@ int main(int argc, char** argv){
 
      // main loop
      while(!app.quit){
+ #if defined(DISPLAY_TERMINAL)
           // TODO: add shell command buffer
           int input_fd_count = 2; // stdin and terminal_ready_fd
           struct pollfd input_fds[input_fd_count];
@@ -1116,6 +1206,7 @@ int main(int argc, char** argv){
                     continue;
                }
           }
+#endif
 
           if(app.message_mode){
                time_since_last_message = time_between(app.message_time, current_draw_time);
@@ -1136,11 +1227,45 @@ int main(int argc, char** argv){
                break;
           }
 
+#if defined(DISPLAY_TERMINAL)
           int key = KEY_INVALID;
-
- #if defined(DISPLAY_TERMINAL)
           if(check_stdin) { key = getch(); }
- #endif
+#elif defined(DISPLAY_GUI)
+          bool check_stdin = false;
+          int64_t key_len = 0;
+          int key = KEY_INVALID;
+          int keydown_key = KEY_INVALID;
+          SDL_Event event;
+          memset(&event, 0, sizeof(event));
+          while(SDL_PollEvent(&event)){
+               switch(event.type){
+               case SDL_QUIT:
+                    app.quit = true;
+                    break;
+               case SDL_KEYDOWN:
+                    if (isascii(event.key.keysym.sym)) {
+                        keydown_key = event.key.keysym.sym;
+                        if (event.key.keysym.mod & KMOD_LCTRL ||
+                            event.key.keysym.mod & KMOD_RCTRL) {
+                            keydown_key = ce_ctrl_key(keydown_key);
+                        }
+                    }
+                    break;
+               case SDL_TEXTINPUT:
+                    {
+                        int decoded_key = ce_utf8_decode(event.text.text, &key_len);
+                        if (isascii(decoded_key)) {
+                            key = decoded_key;
+                        }
+                    }
+                    break;
+
+               }
+          }
+          if (key == KEY_INVALID && keydown_key != KEY_INVALID) {
+              key = keydown_key;
+          }
+#endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
           if(check_stdin) g_last_key = key;
@@ -1220,6 +1345,9 @@ int main(int argc, char** argv){
 
  #if defined(DISPLAY_TERMINAL)
           ce_draw_term(&app);
+ #elif defined(DISPLAY_GUI)
+          ce_draw_gui(&app, &gui);
+          SDL_Delay(0);
  #endif
      }
 
@@ -1251,6 +1379,13 @@ int main(int argc, char** argv){
 
      ce_buffer_node_free(&app.buffer_node_head);
 
+#if defined(DISPLAY_TERMINAL)
      endwin();
+#elif defined(DISPLAY_GUI)
+    TTF_CloseFont(gui.font);
+    TTF_Quit();
+    SDL_DestroyWindow(gui.window);
+    SDL_Quit();
+#endif
      return 0;
 }
