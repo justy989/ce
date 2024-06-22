@@ -435,7 +435,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                int64_t index = 0;
                while(itr){
                     if(index == view->cursor.y){
-                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->multiple_cursors, &app->config_options, true);
+                         ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options, true);
                          break;
                     }
                     itr = itr->next;
@@ -600,45 +600,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                // TODO: how are we going to let this be supported through customization
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
 
-               if(app->multiple_cursors.active){
-                    int64_t save_motion_column = buffer_data->vim.motion_column;
-
-                    for(int64_t i = 0; i < app->multiple_cursors.count; i++){
-                         CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
-
-                         CeVimMode_t save_vim_mode = app->vim.mode;
-
-                         buffer_data->vim.motion_column = app->multiple_cursors.motion_columns[i];
-
-                         ce_vim_handle_key(&app->vim, view, app->multiple_cursors.cursors + i,
-                                           app->multiple_cursors.visuals + i, key, &buffer_data->vim,
-                                           &app->config_options, false);
-
-                         app->multiple_cursors.motion_columns[i] = buffer_data->vim.motion_column;
-
-                         app->vim.mode = save_vim_mode;
-
-                         for(int64_t j = 0; j < app->multiple_cursors.count; j++){
-                              if(i == j) continue;
-                              app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer,
-                                                                                                       before_change_node,
-                                                                                                       app->multiple_cursors.cursors[j]);
-                         }
-
-                         view->cursor = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, view->cursor);
-                    }
-
-                    buffer_data->vim.motion_column = save_motion_column;
-               }
-
-               CeBufferChangeNode_t* before_change_node = view->buffer->change_node;
-
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, &view->cursor, &app->visual,
                                                                key, &buffer_data->vim, &app->config_options, true);
-
-               for(int64_t j = 0; j < app->multiple_cursors.count; j++){
-                    app->multiple_cursors.cursors[j] = ce_move_point_based_on_buffer_changes(view->buffer, before_change_node, app->multiple_cursors.cursors[j]);
-               }
 
                // A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
                // "N", "%", "(", ")", "[[", "]]", "{", "}", ":s", ":tag", "L", "M", "H" and
