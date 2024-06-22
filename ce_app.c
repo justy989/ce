@@ -1341,7 +1341,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.pid, shell_command_data->command);
      ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
 
-     int stdout_fd = fileno(subprocess.stdout);
+     int stdout_fd = fileno(subprocess.stdout_file);
      int flags = fcntl(stdout_fd, F_GETFL, 0);
      fcntl(stdout_fd, F_SETFL, flags | O_NONBLOCK);
 
@@ -1381,7 +1381,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           }
      }
 
-     if(ferror(subprocess.stdout)){
+     if(ferror(subprocess.stdout_file)){
           ce_log("shell command: fgets() from pid %d failed\n", subprocess.pid);
           run_shell_command_cleanup(&cleanup);
           return NULL;

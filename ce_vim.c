@@ -12,7 +12,7 @@ static bool string_is_whitespace(const char* string){
 
      bool all_whitespace = true;
      while(*string){
-          if(!isspace(*string)){
+          if(!isspace((int)(*string))){
                all_whitespace = false;
                break;
           }
@@ -1468,7 +1468,7 @@ int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_
                bool blank = true;
 
                while(*itr){
-                    if(!isblank(*itr)){
+                    if(!isblank((int)(*itr))){
                          blank = false;
                          break;
                     }
@@ -2624,7 +2624,7 @@ CeVimMotionResult_t ce_vim_motion_bottom_of_view(CeVim_t* vim, CeVimAction_t* ac
 
 static bool string_is_blank(const char* string){
      while(*string){
-          if(!isblank(*string)) return false;
+          if(!isblank((int)(*string))) return false;
           string++;
      }
      return true;
@@ -2680,7 +2680,7 @@ CeVimMotionResult_t ce_vim_motion_next_zero_indentation_line(CeVim_t* vim, CeVim
                }
           }
 
-          if(isprint(view->buffer->lines[y][0]) && !isspace(view->buffer->lines[y][0]) && strchr(view->buffer->lines[y], '(')){
+          if(isprint((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
                motion_range->end = (CePoint_t){0, y};
                return CE_VIM_MOTION_RESULT_SUCCESS;
           }
@@ -2702,7 +2702,7 @@ CeVimMotionResult_t ce_vim_motion_previous_zero_indentation_line(CeVim_t* vim, C
                }
           }
 
-          if(isprint(view->buffer->lines[y][0]) && !isspace(view->buffer->lines[y][0]) && strchr(view->buffer->lines[y], '(')){
+          if(isprint((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
                motion_range->end = (CePoint_t){0, y};
                return CE_VIM_MOTION_RESULT_SUCCESS;
           }
@@ -3423,7 +3423,7 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeRange_t m
 
           // figure out how much we can unindent
           for(int64_t s = 0; s < config_options->tab_width; s++){
-               if(isblank(view->buffer->lines[i][s])){
+               if(isblank((int)(view->buffer->lines[i][s]))){
                     tab_width++;
                }else{
                     break;
@@ -3518,7 +3518,7 @@ bool ce_vim_verb_set_mark(CeVim_t* vim, const CeVimAction_t* action, CeRange_t m
 static bool change_number(CeView_t* view, CePoint_t* cursor, CePoint_t point, int64_t delta){
      char* start = ce_utf8_iterate_to(view->buffer->lines[point.y], point.x);
      char* itr = start;
-     while(*itr && !isdigit(*itr)){
+     while(*itr && !isdigit((int)(*itr))){
           itr++;
      }
 
@@ -3527,7 +3527,7 @@ static bool change_number(CeView_t* view, CePoint_t* cursor, CePoint_t point, in
      // loop backward if we are inside a number, checking for the beginning or for the negative sign
      while(itr > view->buffer->lines[point.y]){
           itr--;
-          if(!isdigit(*itr)){
+          if(!isdigit((int)(*itr))){
                if(*itr == '-') break;
                itr++;
                break;

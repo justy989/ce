@@ -9,8 +9,8 @@ typedef struct{
      // do not mix and match
      int stdin_fd;
      int stdout_fd;
-     FILE *stdin;
-     FILE *stdout;
+     FILE *stdin_file;
+     FILE *stdout_file;
 }CeSubprocess_t;
 
 // run the provided shell command as a subprocess

@@ -7,7 +7,7 @@
 
 static const char* eat_blanks(const char* string){
      while(*string){
-          if(!isblank(*string)) break;
+          if(!isblank((int)(*string))) break;
           string++;
      }
 
@@ -43,7 +43,7 @@ static bool parse_arg(CeCommandArg_t* arg, const char* string){
      const char* itr = string;
 
      while(*itr){
-          if(!isdigit(*itr)){
+          if(!isdigit((int)(*itr))){
                if(*itr == '.'){
                     if(decimal) return false;
                     decimal = true;

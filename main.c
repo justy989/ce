@@ -13,8 +13,6 @@
 #include "ce_app.h"
 #include "ce_commands.h"
 
-FILE* g_ce_log = NULL;
-CeBuffer_t* g_ce_log_buffer = NULL;
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
 int g_last_key = 0;
 #endif
@@ -488,7 +486,7 @@ void draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros, CeMultip
      }
 
      const char* status_str = buffer_status_get_str(view->buffer->status);
-     if(status_str) printw(status_str);
+     if(status_str) printw("%s", status_str);
 
      if(vim_mode_string && ce_macros_is_recording(macros)){
           printw(" RECORDING %c", macros->recording);

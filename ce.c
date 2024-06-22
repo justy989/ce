@@ -12,6 +12,9 @@
 #include <ncurses.h>
 #include <sys/stat.h>
 
+FILE* g_ce_log = NULL;
+CeBuffer_t* g_ce_log_buffer = NULL;
+
 static void ce_buffer_change_node_free(CeBufferChangeNode_t** head){
      CeBufferChangeNode_t* itr = *head;
      while(itr){
@@ -1774,7 +1777,7 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
      int* int_itr = int_str;
      const char* char_itr = char_str;
      while(*char_itr){
-          if(!isprint(*char_itr)){
+          if(!isprint((int)(*char_itr))){
                free(int_str);
                ce_log("found unprintable char at position %d %d\n", char_itr - char_str, *char_itr);
                return NULL;
@@ -1894,6 +1897,6 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
 }
 
 CeRune_t ce_ctrl_key(char ch){
-     if(isalpha(ch)) return (ch - 'a') + 1;
+     if(isalpha((int)(ch))) return (ch - 'a') + 1;
      return CE_UTF8_INVALID;
 }

@@ -185,7 +185,7 @@ static int64_t match_words(const char* str, const char* beginning_of_line, const
 }
 
 static int64_t match_c_type(const char* str, const char* beginning_of_line, bool cpp){
-     if(!isalpha(*str)) return false;
+     if(!isalpha((int)(*str))) return false;
 
      const char* itr = str;
      while(*itr){
@@ -197,7 +197,7 @@ static int64_t match_c_type(const char* str, const char* beginning_of_line, bool
      if(len > 1){
           if(strncmp((itr - 2), "_t", 2) == 0) return len;
           if(strncmp((itr - 2), "_h", 2) == 0) return len;
-          if(cpp && isupper(*str)) return len;
+          if(cpp && isupper((int)(*str))) return len;
      }
 
      static const char* keywords[] = {
@@ -306,7 +306,7 @@ static int64_t match_c_preproc(const char* str){
      if(*str == '#'){
           const char* itr = str + 1;
           while(*itr){
-               if(!isalpha(*itr)) break;
+               if(!isalpha((int)(*itr))) break;
                itr++;
           }
 
@@ -320,7 +320,7 @@ static int64_t utf8_strlen_until_trailing_whitespace(const char* str){
      const char* itr = str;
      while(*itr) itr++;
      itr--;
-     while(itr > str && *itr && isblank(*itr)) itr--;
+     while(itr > str && *itr && isblank((int)(*itr))) itr--;
      return ce_utf8_strlen_between(str, itr);
 }
 
@@ -391,7 +391,7 @@ static int64_t match_c_literal(const char* str, const char* beginning_of_line){
      int seen_l = 0;
 
      while(ch != 0){
-          if(isdigit(ch)){
+          if(isdigit((int)(ch))){
                if(seen_u || seen_l) break;
                seen_digit = true;
                count++;
@@ -454,7 +454,7 @@ static int64_t match_c_literal(const char* str, const char* beginning_of_line){
      // check if the previous character is not a delimiter
      if(str > beginning_of_line){
           const char* prev = str - 1;
-          if(is_caps_var_char(*prev) || isalpha(*prev)) return 0;
+          if(is_caps_var_char(*prev) || isalpha((int)(*prev))) return 0;
      }
 
      return count;
@@ -463,7 +463,7 @@ static int64_t match_c_literal(const char* str, const char* beginning_of_line){
 static int64_t match_trailing_whitespace(const char* str){
      const char* itr = str;
      while(*itr){
-          if(!isspace(*itr)) return 0;
+          if(!isspace((int)(*itr))) return 0;
           itr++;
      }
 
@@ -740,7 +740,7 @@ static int64_t match_cpp_namespace(const char* str, const char* beginning_of_lin
      bool saw_alpha = false;
      const char* itr = str;
      while(*itr){
-          if(isalpha(*itr) || *itr == '_'){
+          if(isalpha((int)(*itr)) || *itr == '_'){
                if(saw_colon) break;
                saw_alpha = true;
           }else if(*itr == ':'){
