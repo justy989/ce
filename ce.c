@@ -1213,6 +1213,19 @@ CePoint_t ce_move_point_based_on_buffer_changes(CeBuffer_t* buffer, CeBufferChan
      return point;
 }
 
+const char* ce_buffer_status_get_str(CeBufferStatus_t status){
+     if(status == CE_BUFFER_STATUS_READONLY){
+          return "[RO]";
+     }
+
+     if(status == CE_BUFFER_STATUS_MODIFIED ||
+        status == CE_BUFFER_STATUS_NEW_FILE){
+          return "*";
+     }
+
+     return "";
+}
+
 void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
      if(!view->buffer) return;
 
