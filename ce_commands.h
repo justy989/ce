@@ -49,6 +49,7 @@ CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data);
 
 // NOTE: these are to make vim users feel at home
 CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);

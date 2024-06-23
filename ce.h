@@ -152,6 +152,11 @@ typedef struct{
      int cycle_prev_completion_key;
      CeRune_t show_line_extends_passed_view_as;
      CeColorDef_t color_defs[COLOR_COUNT];
+     int gui_window_width;
+     int gui_window_height;
+     int gui_font_size;
+     int gui_font_line_separation;
+     char gui_font_path[PATH_MAX];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{

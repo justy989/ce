@@ -853,6 +853,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_blank, "blank", "empty command"},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
+          {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
           {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},

@@ -24,6 +24,9 @@ typedef struct{
     int font_point_size;
     int font_line_separation;
 }CeGui_t;
+
+int gui_load_font(CeGui_t* gui, const char* font_filepath, int font_point_size, int font_line_separation);
+
 #else
 typedef struct{
     int dummy;

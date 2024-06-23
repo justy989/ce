@@ -64,14 +64,14 @@ static void _draw_cursor(CePoint_t* cursor, CeConfigOptions_t* config_options, C
      left_wall.x = _text_pixel_x(cursor->x, gui) - 1;
      left_wall.y = _text_pixel_y(cursor->y, gui) - 1;
      left_wall.w = 1;
-     left_wall.h = _text_pixel_y(1, gui) + 1;
+     left_wall.h = _text_pixel_y(1, gui) + 2;
      SDL_FillRect(gui->window_surface, &left_wall, color_packed);
 
      SDL_Rect right_wall;
      right_wall.x = _text_pixel_x(cursor->x + 1, gui) + 1;
      right_wall.y = _text_pixel_y(cursor->y, gui) - 1;
      right_wall.w = 1;
-     right_wall.h = _text_pixel_y(1, gui) + 1;
+     right_wall.h = _text_pixel_y(1, gui) + 2;
      SDL_FillRect(gui->window_surface, &right_wall, color_packed);
 
      SDL_Rect top_wall;
@@ -608,6 +608,25 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
 
      SDL_UpdateWindowSurface(gui->window);
 }
+
+int gui_load_font(CeGui_t* gui, const char* font_filepath, int font_point_size, int font_line_separation) {
+     if (gui->font == NULL) {
+          TTF_CloseFont(gui->font);
+     }
+
+     printf("loading font: %s at size: %d\n", font_filepath, font_point_size);
+
+     gui->font_point_size = font_point_size;
+     gui->font_line_separation = font_line_separation;
+     gui->font = TTF_OpenFont(font_filepath, gui->font_point_size);
+     if (gui->font == NULL) {
+         printf("TTF_OpenFont() failed: %s\n", TTF_GetError());
+         return 1;
+     }
+
+     return 0;
+}
+
 #else
 void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
 }

@@ -147,6 +147,8 @@ typedef struct CeApp_t{
      bool shell_command_buffer_should_scroll;
      bool shell_command_thread_should_die;
 
+     void* gui;
+
      // debug
      bool log_key_presses;
 }CeApp_t;

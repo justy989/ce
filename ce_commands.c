@@ -1,4 +1,5 @@
 #include "ce_commands.h"
+#include "ce_draw_gui.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -1325,6 +1326,35 @@ CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* use
 
      free(command_args);
      return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data) {
+     if(command->arg_count < 1) return CE_COMMAND_PRINT_HELP;
+     if(command->args[0].type != CE_COMMAND_ARG_INTEGER) return CE_COMMAND_PRINT_HELP;
+
+#if defined(DISPLAY_TERMINAL)
+     return CE_COMMAND_SUCCESS;
+#elif defined(DISPLAY_GUI)
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CeGui_t* gui = app->gui;
+     int new_font_size = gui->font_point_size + command->args[0].integer;
+     if (new_font_size % 2 != 0) {
+         ce_log("requested font size %d, but only even font sizes are supported", new_font_size);
+         return CE_COMMAND_FAILURE;
+     }
+     if (gui_load_font(gui,
+                       app->config_options.gui_font_path,
+                       gui->font_point_size + command->args[0].integer,
+                       gui->font_line_separation) != 0) {
+         return CE_COMMAND_FAILURE;
+     }
+
+     int calculated_terminal_width = gui->window_width / (gui->font_point_size / 2);
+     int calculated_terminal_height = gui->window_height / (gui->font_point_size + gui->font_line_separation);
+     ce_app_update_terminal_view(app, calculated_terminal_width, calculated_terminal_height);
+
+     return CE_COMMAND_SUCCESS;
+#endif
 }
 
 void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match, const char* replacement, CePoint_t start, CePoint_t end,
