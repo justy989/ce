@@ -7,8 +7,11 @@
 
 static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index) {
     SDL_Color result;
-    if (index == -1) { index = COLOR_FOREGROUND; }
-    else if (index == -2) { index = COLOR_BACKGROUND; }
+    if(index == -1){
+        index = COLOR_FOREGROUND;
+    }else if(index == -2){
+        index = COLOR_BACKGROUND;
+    }
     result.r = config_options->color_defs[index].red;
     result.g = config_options->color_defs[index].green;
     result.b = config_options->color_defs[index].blue;
@@ -87,15 +90,15 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
      }
 
      const char* status_str = ce_buffer_status_get_str(view->buffer->status);
-     if (status_str) {
+     if(status_str){
          if(ce_macros_is_recording(macros)){
              snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s RECORDING %c", vim_mode_string,
                       status_str, view->buffer->name, macros->recording);
-         } else {
+         }else{
              snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s", vim_mode_string, status_str,
                       view->buffer->name);
          }
-     } else {
+     }else{
          snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", vim_mode_string, view->buffer->name);
      }
 
@@ -132,9 +135,10 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
 }
 
 static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
-                       CeConfigOptions_t* config_options, int terminal_right) {
+                       CeDrawColorList_t* syntax_color_list, CeConfigOptions_t* config_options,
+                       int terminal_right) {
      if(view->buffer->line_count == 0){
-         return;
+          return;
      }
 
      int64_t view_width = ce_view_width(view);
@@ -148,7 +152,8 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      int64_t line_buffer_len = (col_max - col_min) + 1;
      char* line_buffer = malloc(line_buffer_len);
 
-     if (view->rect.right < terminal_right) {
+     // If this view doesn't extend to the right side of the window, draw a ui border.
+     if(view->rect.right < terminal_right){
          SDL_Color border_color = color_from_index(config_options, config_options->ui_bg_color);
          uint32_t background_color_packed = SDL_MapRGB(gui->window_surface->format,
                                                        border_color.r,
@@ -162,77 +167,167 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
          SDL_FillRect(gui->window_surface, &border_rect, background_color_packed);
      }
 
+     CeDrawColorNode_t* current_syntax_color_node = NULL;
+     CeDrawColorNode_t* next_syntax_color_node = NULL;
+
+     if(syntax_color_list){
+          current_syntax_color_node = syntax_color_list->head;
+          next_syntax_color_node = current_syntax_color_node->next;
+     }
+
      SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color);
 
-     SDL_Rect text_rect;
-     text_rect.x = _text_pixel_x(view->rect.left, gui);
-     text_rect.y = _text_pixel_y(view->rect.top, gui);
+     int64_t text_pixel_y = _text_pixel_y(view->rect.top, gui);
 
-     for(int64_t y = 0; y < view_height; y++){
-         CeRune_t rune = 1;
-         int64_t x = 0;
-         int64_t line_index = y + row_min;
-         if (line_index >= view->buffer->line_count) {
-             break;
-         }
-         const char* line = view->buffer->lines[y + row_min];
+     for(int64_t draw_y = 0; draw_y < view_height; draw_y++){
+          int64_t text_pixel_x = _text_pixel_x(view->rect.left, gui);
 
-         while(rune > 0 && x < col_max){
-              rune = ce_utf8_decode(line, &rune_len);
-              if (x >= col_min) {
-                  if (isprint((int)(rune))) {
-                      line_buffer[x - col_min] = (char)(rune);
-                  } else {
-                      line_buffer[x - col_min] = ' ';
-                  }
-              }
-              line += rune_len;
-              x++;
-         }
+          CeRune_t rune = 1;
+          int64_t buffer_x = 0;
+          int64_t line_index = draw_y + row_min;
+          if (line_index >= view->buffer->line_count) {
+               break;
+          }
 
-         if (x >= col_min) {
-             line_buffer[x - col_min] = 0;
-         } else {
-             line_buffer[0] = 0;
-         }
+          CePoint_t buffer_point = {buffer_x, line_index};
+          CeDrawColorNode_t* original_next_syntax_color_node = next_syntax_color_node;
+          while (next_syntax_color_node && !ce_point_after(next_syntax_color_node->point, buffer_point)) {
+               original_next_syntax_color_node = next_syntax_color_node;
+               next_syntax_color_node = next_syntax_color_node->next;
+          }
 
-         if (strlen(line_buffer) > 0) {
-             SDL_Surface* line_surface = TTF_RenderText_Blended(gui->font, line_buffer, text_color);
-             text_rect.w = line_surface->w;
-             text_rect.h = line_surface->h;
-             SDL_BlitSurface(line_surface, NULL, gui->window_surface, &text_rect);
+          if (next_syntax_color_node != original_next_syntax_color_node) {
+              current_syntax_color_node = original_next_syntax_color_node;
+          }
 
-             SDL_FreeSurface(line_surface);
-         }
+          const char* line = view->buffer->lines[draw_y + row_min];
+          size_t line_buffer_index = 0;
 
-         text_rect.y += (gui->font_point_size + gui->font_line_separation);
+          while(rune > 0 && buffer_x < col_max){
+               rune = ce_utf8_decode(line, &rune_len);
+               if (buffer_x >= col_min) {
+                    if (isprint((int)(rune))) {
+                         line_buffer[line_buffer_index] = (char)(rune);
+                    } else {
+                         line_buffer[line_buffer_index] = ' ';
+                    }
+                    line_buffer_index++;
+               }
+
+               line += rune_len;
+               buffer_x++;
+
+               if (current_syntax_color_node) {
+                   buffer_point = (CePoint_t){buffer_x, line_index};
+                   original_next_syntax_color_node = next_syntax_color_node;
+                   while (next_syntax_color_node && !ce_point_after(next_syntax_color_node->point, buffer_point)) {
+                        original_next_syntax_color_node = next_syntax_color_node;
+                        next_syntax_color_node = next_syntax_color_node->next;
+                   }
+                   if (next_syntax_color_node != original_next_syntax_color_node) {
+                        line_buffer[line_buffer_index] = 0;
+                        text_color = color_from_index(config_options, current_syntax_color_node->fg);
+                        if (line_buffer_index > 0) {
+                            _draw_text_line(line_buffer, text_pixel_x, text_pixel_y, &text_color, gui);
+                            text_pixel_x += _text_pixel_x(strlen(line_buffer), gui);
+                        }
+                        line_buffer_index = 0;
+                        current_syntax_color_node = original_next_syntax_color_node;
+                   }
+               }
+          }
+
+          // Null terminate the string and draw any leftover characters.
+          line_buffer[line_buffer_index] = 0;
+          if(line_buffer_index > 0){
+               buffer_point = (CePoint_t){buffer_x, line_index};
+               if (current_syntax_color_node &&
+                   (next_syntax_color_node == NULL || ce_point_after(next_syntax_color_node->point, buffer_point))) {
+                   text_color = color_from_index(config_options, current_syntax_color_node->fg);
+               }
+               _draw_text_line(line_buffer, text_pixel_x, text_pixel_y, &text_color, gui);
+          }
+
+          text_pixel_y += (gui->font_point_size + gui->font_line_separation);
      }
 
      free(line_buffer);
 }
 
-static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
+static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVisualData_t* vim_visual,
+                         CeMacros_t* macros, CeSyntaxDef_t* syntax_defs,
                          CeConfigOptions_t* config_options, int terminal_right,
                          CeLayout_t* current_layout) {
      switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
-         _draw_view(&layout->view, gui, vim, macros, config_options, terminal_right);
-         _draw_view_status(&layout->view,
-                           gui,
-                           (layout == current_layout) ? vim : NULL,
-                           macros,
-                           config_options);
-         break;
+          {
+               CeAppBufferData_t* buffer_data = layout->view.buffer->app_data;
+               CeDrawColorList_t syntax_color_list = {};
+               if(buffer_data->syntax_function){
+                    CeRangeList_t highlight_ranges = {};
+                    if(layout == current_layout){
+                         switch(vim->mode){
+                         default:
+                              break;
+                         case CE_VIM_MODE_VISUAL:
+                         {
+                              CeRange_t range = {vim_visual->point, layout->view.cursor};
+                              ce_range_sort(&range);
+                              ce_range_list_insert(&highlight_ranges, range.start, range.end);
+                         } break;
+                         case CE_VIM_MODE_VISUAL_LINE:
+                         {
+                              CeRange_t range = {vim_visual->point, layout->view.cursor};
+                              ce_range_sort(&range);
+                              range.start.x = 0;
+                              range.end.x = ce_utf8_last_index(layout->view.buffer->lines[range.end.y]) + 1;
+                              ce_range_list_insert(&highlight_ranges, range.start, range.end);
+                         } break;
+                         case CE_VIM_MODE_VISUAL_BLOCK:
+                         {
+                              CeRange_t range = {vim_visual->point, layout->view.cursor};
+                              if(range.start.x > range.end.x){
+                                   int64_t tmp = range.start.x;
+                                   range.start.x = range.end.x;
+                                   range.end.x = tmp;
+                              }
+                              if(range.start.y > range.end.y){
+                                   int64_t tmp = range.start.y;
+                                   range.start.y = range.end.y;
+                                   range.end.y = tmp;
+                              }
+                              for(int64_t i = range.start.y; i <= range.end.y; i++){
+                                   CePoint_t start = {range.start.x, i};
+                                   CePoint_t end = {range.end.x, i};
+                                   ce_range_list_insert(&highlight_ranges, start, end);
+                              }
+                         } break;
+                         }
+                    }
+                    buffer_data->syntax_function(&layout->view, &highlight_ranges, &syntax_color_list, syntax_defs,
+                                                 layout->view.buffer->syntax_data);
+                    ce_range_list_free(&highlight_ranges);
+               }
+
+               _draw_view(&layout->view, gui, vim, macros, &syntax_color_list, config_options, terminal_right);
+               ce_draw_color_list_free(&syntax_color_list);
+               _draw_view_status(&layout->view,
+                                 gui,
+                                 (layout == current_layout) ? vim : NULL,
+                                 macros,
+                                 config_options);
+          }
+          break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               _draw_layout(layout->list.layouts[i], gui, vim, macros, config_options,
+               _draw_layout(layout->list.layouts[i], gui, vim, vim_visual, macros, syntax_defs, config_options,
                             terminal_right, current_layout);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          _draw_layout(layout->tab.root, gui, vim, macros, config_options, terminal_right,
+          _draw_layout(layout->tab.root, gui, vim, vim_visual, macros, syntax_defs, config_options, terminal_right,
                        current_layout);
           break;
      }
@@ -309,14 +404,14 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0xFF));
      }
 
-     _draw_layout(tab_layout, gui, &app->vim, &app->macros, &app->config_options, app->terminal_rect.right,
+     _draw_layout(tab_layout, gui, &app->vim, &app->visual, &app->macros, app->syntax_defs, &app->config_options, app->terminal_rect.right,
                   tab_layout->tab.current);
 
      if(app->input_complete_func){
           SDL_Rect view_rect = rect_from_view(&app->input_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
-          _draw_view(&app->input_view, gui, NULL, &app->macros, &app->config_options, app->terminal_rect.right);
+          _draw_view(&app->input_view, gui, NULL, &app->macros, NULL, &app->config_options, app->terminal_rect.right);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -348,7 +443,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           SDL_Rect view_rect = rect_from_view(&app->complete_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
-          _draw_view(&app->complete_view, gui, NULL, &app->macros, &app->config_options, app->terminal_rect.right);
+          _draw_view(&app->complete_view, gui, NULL, &app->macros, NULL, &app->config_options, app->terminal_rect.right);
      }
 
      SDL_UpdateWindowSurface(gui->window);
