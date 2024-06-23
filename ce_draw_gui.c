@@ -61,48 +61,7 @@ static void _draw_text_line(const char* line, int64_t pixel_x, int64_t pixel_y,
 
 static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
                               CeConfigOptions_t* config_options) {
-     char line_buffer[STATUS_LINE_LEN];
-
-     const char* vim_mode_string = "";
-     if(vim){
-          switch(vim->mode){
-          default:
-               break;
-          case CE_VIM_MODE_NORMAL:
-               vim_mode_string = "NORMAL ";
-               break;
-          case CE_VIM_MODE_INSERT:
-               vim_mode_string = "INSERT ";
-               break;
-          case CE_VIM_MODE_VISUAL:
-               vim_mode_string = "VISUAL ";
-               break;
-          case CE_VIM_MODE_VISUAL_LINE:
-               vim_mode_string = "VISUAL LINE ";
-               break;
-          case CE_VIM_MODE_VISUAL_BLOCK:
-               vim_mode_string = "VISUAL BLOCK ";
-               break;
-          case CE_VIM_MODE_REPLACE:
-               vim_mode_string = "REPLACE ";
-               break;
-          }
-     }
-
-     const char* status_str = ce_buffer_status_get_str(view->buffer->status);
-     if(status_str){
-         if(ce_macros_is_recording(macros)){
-             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s RECORDING %c", vim_mode_string,
-                      status_str, view->buffer->name, macros->recording);
-         }else{
-             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s", vim_mode_string, status_str,
-                      view->buffer->name);
-         }
-     }else{
-         snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", vim_mode_string, view->buffer->name);
-     }
-
-
+     // Draw the status bar.
      SDL_Color ui_bg_color = color_from_index(config_options, config_options->ui_bg_color);
      uint32_t background_color_packed = SDL_MapRGB(gui->window_surface->format,
                                                    ui_bg_color.r,
@@ -115,10 +74,65 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
      status_rect.h = _text_pixel_y(1, gui);
      SDL_FillRect(gui->window_surface, &status_rect, background_color_packed);
 
+
+     // Draw the vim mode if there is one.
+     const char* vim_mode_string = "";
+     if(vim){
+          SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color);
+          switch(vim->mode){
+          default:
+               break;
+          case CE_VIM_MODE_NORMAL:
+               vim_mode_string = "NORMAL ";
+               text_color = color_from_index(config_options, COLOR_BLUE);
+               break;
+          case CE_VIM_MODE_INSERT:
+               vim_mode_string = "INSERT ";
+               text_color = color_from_index(config_options, COLOR_GREEN);
+               break;
+          case CE_VIM_MODE_VISUAL:
+               vim_mode_string = "VISUAL ";
+               text_color = color_from_index(config_options, COLOR_YELLOW);
+               break;
+          case CE_VIM_MODE_VISUAL_LINE:
+               vim_mode_string = "VISUAL LINE ";
+               text_color = color_from_index(config_options, COLOR_BRIGHT_YELLOW);
+               break;
+          case CE_VIM_MODE_VISUAL_BLOCK:
+               vim_mode_string = "VISUAL BLOCK ";
+               text_color = color_from_index(config_options, COLOR_BRIGHT_YELLOW);
+               break;
+          case CE_VIM_MODE_REPLACE:
+               vim_mode_string = "REPLACE ";
+               text_color = color_from_index(config_options, COLOR_RED);
+               break;
+          }
+
+          _draw_text_line(vim_mode_string,
+                          _text_pixel_x(view->rect.left + 1, gui),
+                          _text_pixel_y(view->rect.bottom, gui),
+                          &text_color,
+                          gui);
+     }
+
+     char line_buffer[STATUS_LINE_LEN];
+     const char* status_str = ce_buffer_status_get_str(view->buffer->status);
+     if(status_str){
+         if(ce_macros_is_recording(macros)){
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s RECORDING %c",
+                      status_str, view->buffer->name, macros->recording);
+         }else{
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", status_str, view->buffer->name);
+         }
+     }else{
+         snprintf(line_buffer, STATUS_LINE_LEN, "%s", view->buffer->name);
+     }
+
+
      SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color);
 
     _draw_text_line(line_buffer,
-                    _text_pixel_x(view->rect.left, gui),
+                    _text_pixel_x(view->rect.left + strlen(vim_mode_string) + 1, gui),
                     _text_pixel_y(view->rect.bottom, gui),
                     &text_color,
                     gui);
@@ -412,6 +426,11 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
           _draw_view(&app->input_view, gui, NULL, &app->macros, NULL, &app->config_options, app->terminal_rect.right);
+          _draw_view_status(&app->input_view,
+                            gui,
+                            &app->vim,
+                            &app->macros,
+                            &app->config_options);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -442,6 +461,21 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
 
           SDL_Rect view_rect = rect_from_view(&app->complete_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
+
+          // Draw top border
+          view_rect.x = _text_pixel_x(app->complete_view.rect.left, gui);
+          view_rect.y = _text_pixel_y(app->complete_view.rect.top - 1, gui);
+          view_rect.w = _text_pixel_x((app->complete_view.rect.right - app->complete_view.rect.left) + 1, gui);
+          view_rect.h = _text_pixel_y(1, gui);
+          if (view_rect.y >= 0) {
+               SDL_Color border_color = color_from_index(&app->config_options,
+                                                        app->config_options.ui_bg_color);
+               uint32_t border_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                         border_color.r,
+                                                         border_color.g,
+                                                         border_color.b);
+               SDL_FillRect(gui->window_surface, &view_rect, border_color_packed);
+          }
 
           _draw_view(&app->complete_view, gui, NULL, &app->macros, NULL, &app->config_options, app->terminal_rect.right);
      }

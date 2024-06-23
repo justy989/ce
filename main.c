@@ -26,15 +26,6 @@
   #include "ce_draw_term.h"
 #elif defined(DISPLAY_GUI)
   #include "ce_draw_gui.h"
-
-  #define COLOR_BLACK 1
-  #define COLOR_RED 2
-  #define COLOR_GREEN 3
-  #define COLOR_YELLOW 4
-  #define COLOR_BLUE 5
-  #define COLOR_MAGENTA 5
-  #define COLOR_CYAN 6
-  #define COLOR_WHITE 7
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
