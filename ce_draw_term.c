@@ -527,7 +527,6 @@ void ce_draw_term(CeApp_t* app){
           for(int i = message_len; i < view_width; i++){
                addch(' ');
           }
-
      }
 
      // show border when non view is selected

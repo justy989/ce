@@ -546,7 +546,16 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
                SDL_FillRect(gui->window_surface, &view_rect, border_color_packed);
           }
 
-          _draw_view(&app->complete_view, gui, NULL, &app->macros, NULL, &app->config_options, app->terminal_rect.right);
+          CeDrawColorList_t draw_color_list = {};
+          CeRangeList_t highlight_ranges = {};
+          CeAppBufferData_t* buffer_data = app->complete_view.buffer->app_data;
+          if (buffer_data->syntax_function) {
+               buffer_data->syntax_function(&app->complete_view, &highlight_ranges, &draw_color_list, app->syntax_defs,
+                                            app->complete_view.buffer->syntax_data);
+               ce_range_list_free(&highlight_ranges);
+          }
+
+          _draw_view(&app->complete_view, gui, NULL, &app->macros, &draw_color_list, &app->config_options, app->terminal_rect.right);
      }
 
      if (tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) {
