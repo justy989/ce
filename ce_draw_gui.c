@@ -22,11 +22,11 @@ static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index, 
 }
 
 static int64_t _text_pixel_x(int64_t char_pos, CeGui_t* gui) {
-    return char_pos * (gui->font_point_size / 2);
+    return (char_pos * (gui->font_point_size / 2));
 }
 
 static int64_t _text_pixel_y(int64_t char_pos, CeGui_t* gui) {
-    return char_pos * (gui->font_point_size + gui->font_line_separation);
+    return (char_pos * (gui->font_point_size + gui->font_line_separation));
 }
 
 static SDL_Rect rect_from_view(CeView_t* view, CeGui_t* gui) {
@@ -35,15 +35,6 @@ static SDL_Rect rect_from_view(CeView_t* view, CeGui_t* gui) {
      result.y = _text_pixel_y(view->rect.top, gui);
      result.w = _text_pixel_x(view->rect.right - view->rect.left, gui);
      result.h = _text_pixel_y(view->rect.bottom - view->rect.top, gui);
-     return result;
-}
-
-static SDL_Rect rect_from_cursor(CePoint_t* cursor, CeGui_t* gui) {
-     SDL_Rect result;
-     result.x = _text_pixel_x(cursor->x, gui);
-     result.y = _text_pixel_y(cursor->y, gui);
-     result.w = (gui->font_point_size / 2);
-     result.h = gui->font_point_size;
      return result;
 }
 
@@ -61,6 +52,43 @@ static void _draw_text_line(const char* line, int64_t pixel_x, int64_t pixel_y,
      SDL_FreeSurface(surface);
 }
 
+static void _draw_cursor(CePoint_t* cursor, CeConfigOptions_t* config_options, CeGui_t* gui) {
+     SDL_Color color = color_from_index(config_options,
+                                        COLOR_FOREGROUND,
+                                        false);
+     uint32_t color_packed = SDL_MapRGB(gui->window_surface->format,
+                                        color.r,
+                                        color.g,
+                                        color.b);
+     SDL_Rect left_wall;
+     left_wall.x = _text_pixel_x(cursor->x, gui) - 1;
+     left_wall.y = _text_pixel_y(cursor->y, gui) - 1;
+     left_wall.w = 1;
+     left_wall.h = _text_pixel_y(1, gui) + 1;
+     SDL_FillRect(gui->window_surface, &left_wall, color_packed);
+
+     SDL_Rect right_wall;
+     right_wall.x = _text_pixel_x(cursor->x + 1, gui) + 1;
+     right_wall.y = _text_pixel_y(cursor->y, gui) - 1;
+     right_wall.w = 1;
+     right_wall.h = _text_pixel_y(1, gui) + 1;
+     SDL_FillRect(gui->window_surface, &right_wall, color_packed);
+
+     SDL_Rect top_wall;
+     top_wall.x = _text_pixel_x(cursor->x, gui);
+     top_wall.y = _text_pixel_y(cursor->y, gui) - 1;
+     top_wall.w = _text_pixel_x(1, gui) + 1;
+     top_wall.h = 1;
+     SDL_FillRect(gui->window_surface, &top_wall, color_packed);
+
+     SDL_Rect bottom_wall;
+     bottom_wall.x = _text_pixel_x(cursor->x, gui);
+     bottom_wall.y = _text_pixel_y(cursor->y + 1, gui) + 1;
+     bottom_wall.w = _text_pixel_x(1, gui) + 1;
+     bottom_wall.h = 1;
+     SDL_FillRect(gui->window_surface, &bottom_wall, color_packed);
+}
+
 static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
                               CeConfigOptions_t* config_options) {
      // Draw the status bar.
@@ -75,7 +103,6 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
      status_rect.w = _text_pixel_x((view->rect.right - view->rect.left) + 1, gui);
      status_rect.h = _text_pixel_y(1, gui);
      SDL_FillRect(gui->window_surface, &status_rect, background_color_packed);
-
 
      // Draw the vim mode if there is one.
      const char* vim_mode_string = "";
@@ -201,6 +228,24 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
           CeRune_t rune = 1;
           int64_t buffer_x = 0;
           int64_t line_index = draw_y + row_min;
+
+          if (!view->buffer->no_highlight_current_line &&
+              line_index == view->cursor.y) {
+               SDL_Color color = color_from_index(config_options,
+                                                  COLOR_BLACK,
+                                                  false);
+               uint32_t color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                  color.r,
+                                                  color.g,
+                                                  color.b);
+               SDL_Rect rect;
+               rect.x = _text_pixel_x(view->rect.left, gui);
+               rect.y = _text_pixel_y(view->rect.top + draw_y, gui);
+               rect.w = _text_pixel_x(view->rect.right - view->rect.left, gui);
+               rect.h = _text_pixel_y(1, gui);
+               SDL_FillRect(gui->window_surface, &rect, color_packed);
+          }
+
           if (line_index >= view->buffer->line_count) {
                break;
           }
@@ -244,7 +289,9 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                         line_buffer[line_buffer_index] = 0;
                         text_color = color_from_index(config_options, current_syntax_color_node->fg, true);
                         if (line_buffer_index > 0) {
-                            if (current_syntax_color_node->bg != COLOR_BACKGROUND) {
+                            if (current_syntax_color_node->bg != COLOR_BACKGROUND &&
+                                current_syntax_color_node->bg != COLOR_DEFAULT &&
+                                current_syntax_color_node->bg != CE_SYNTAX_USE_CURRENT_COLOR) {
                                  SDL_Color bg_color = color_from_index(config_options,
                                                                        current_syntax_color_node->bg,
                                                                        false);
@@ -274,23 +321,25 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                buffer_point = (CePoint_t){buffer_x, line_index};
                if (current_syntax_color_node &&
                    (next_syntax_color_node == NULL || ce_point_after(next_syntax_color_node->point, buffer_point))) {
-                   text_color = color_from_index(config_options, current_syntax_color_node->fg, true);
+                    text_color = color_from_index(config_options, current_syntax_color_node->fg, true);
 
-                   if (current_syntax_color_node->bg != COLOR_BACKGROUND) {
-                        SDL_Color bg_color = color_from_index(config_options,
-                                                              current_syntax_color_node->bg,
-                                                              false);
-                        uint32_t bg_color_packed = SDL_MapRGB(gui->window_surface->format,
-                                                              bg_color.r,
-                                                              bg_color.g,
-                                                              bg_color.b);
-                        SDL_Rect bg_rect;
-                        bg_rect.x = text_pixel_x;
-                        bg_rect.y = text_pixel_y;
-                        bg_rect.w = _text_pixel_x(strlen(line_buffer), gui);
-                        bg_rect.h = _text_pixel_y(1, gui);
-                        SDL_FillRect(gui->window_surface, &bg_rect, bg_color_packed);
-                   }
+                    if (current_syntax_color_node->bg != COLOR_BACKGROUND &&
+                        current_syntax_color_node->bg != COLOR_DEFAULT &&
+                        current_syntax_color_node->bg != CE_SYNTAX_USE_CURRENT_COLOR) {
+                         SDL_Color bg_color = color_from_index(config_options,
+                                                               current_syntax_color_node->bg,
+                                                               false);
+                         uint32_t bg_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                               bg_color.r,
+                                                               bg_color.g,
+                                                               bg_color.b);
+                         SDL_Rect bg_rect;
+                         bg_rect.x = text_pixel_x;
+                         bg_rect.y = text_pixel_y;
+                         bg_rect.w = _text_pixel_x(strlen(line_buffer), gui);
+                         bg_rect.h = _text_pixel_y(1, gui);
+                         SDL_FillRect(gui->window_surface, &bg_rect, bg_color_packed);
+                    }
                }
                _draw_text_line(line_buffer, text_pixel_x, text_pixel_y, &text_color, gui);
           }
@@ -504,53 +553,13 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           CePoint_t cursor = view_cursor_on_screen(&app->input_view,
                                                    app->config_options.tab_width,
                                                    app->config_options.line_number);
-
-          // TODO: Consolidate with the code below.
-          SDL_Rect cursor_rect = rect_from_cursor(&cursor, gui);
-          SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0xFF));
+          _draw_cursor(&cursor, &app->config_options, gui);
      } else {
           CeView_t* view = &tab_layout->tab.current->view;
-
           CePoint_t cursor = view_cursor_on_screen(view,
                                                    app->config_options.tab_width,
                                                    app->config_options.line_number);
-          SDL_Color cursor_color = color_from_index(&app->config_options,
-                                                        COLOR_FOREGROUND,
-                                                        false);
-          uint32_t cursor_color_packed = SDL_MapRGB(gui->window_surface->format,
-                                                    cursor_color.r,
-                                                    cursor_color.g,
-                                                    cursor_color.b);
-          SDL_Rect left_wall;
-          left_wall.x = _text_pixel_x(cursor.x, gui) - 1;
-          left_wall.y = _text_pixel_y(cursor.y, gui) - 1;
-          left_wall.w = 1;
-          left_wall.h = _text_pixel_y(1, gui) + 1;
-          SDL_FillRect(gui->window_surface, &left_wall, cursor_color_packed);
-
-          SDL_Rect right_wall;
-          right_wall.x = _text_pixel_x(cursor.x + 1, gui) + 1;
-          right_wall.y = _text_pixel_y(cursor.y, gui) - 1;
-          right_wall.w = 1;
-          right_wall.h = _text_pixel_y(1, gui) + 1;
-          SDL_FillRect(gui->window_surface, &right_wall, cursor_color_packed);
-
-          SDL_Rect top_wall;
-          top_wall.x = _text_pixel_x(cursor.x, gui);
-          top_wall.y = _text_pixel_y(cursor.y, gui) - 1;
-          top_wall.w = _text_pixel_x(1, gui) + 1;
-          top_wall.h = 1;
-          SDL_FillRect(gui->window_surface, &top_wall, cursor_color_packed);
-
-          SDL_Rect bottom_wall;
-          bottom_wall.x = _text_pixel_x(cursor.x, gui);
-          bottom_wall.y = _text_pixel_y(cursor.y + 1, gui) - 1;
-          bottom_wall.w = _text_pixel_x(1, gui) + 1;
-          bottom_wall.h = 1;
-          SDL_FillRect(gui->window_surface, &bottom_wall, cursor_color_packed);
-
-          // SDL_Rect cursor_rect = rect_from_cursor(&cursor, gui);
-          // SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0xFF));
+          _draw_cursor(&cursor, &app->config_options, gui);
      }
 
      SDL_UpdateWindowSurface(gui->window);
