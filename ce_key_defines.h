@@ -23,6 +23,7 @@
   #define KEY_PPAGE -8
   #define KEY_NPAGE -9
   #define KEY_HOME -10
+  #define KEY_CLOSE -11
   #define KEY_INVALID -11
 
   #define KEY_ONLY_BACKSPACE 8

@@ -1048,6 +1048,78 @@ int main(int argc, char** argv){
           config_options->cycle_prev_completion_key = ce_ctrl_key('p');
           config_options->show_line_extends_passed_view_as = '>';
 
+          config_options->color_defs[COLOR_BLACK].red = 32;
+          config_options->color_defs[COLOR_BLACK].green = 32;
+          config_options->color_defs[COLOR_BLACK].blue = 32;
+
+          config_options->color_defs[COLOR_RED].red = 137;
+          config_options->color_defs[COLOR_RED].green = 56;
+          config_options->color_defs[COLOR_RED].blue = 56;
+
+          config_options->color_defs[COLOR_GREEN].red = 69;
+          config_options->color_defs[COLOR_GREEN].green = 123;
+          config_options->color_defs[COLOR_GREEN].blue = 77;
+
+          config_options->color_defs[COLOR_YELLOW].red = 150;
+          config_options->color_defs[COLOR_YELLOW].green = 111;
+          config_options->color_defs[COLOR_YELLOW].blue = 78;
+
+          config_options->color_defs[COLOR_BLUE].red = 70;
+          config_options->color_defs[COLOR_BLUE].green = 107;
+          config_options->color_defs[COLOR_BLUE].blue = 138;
+
+          config_options->color_defs[COLOR_MAGENTA].red = 116;
+          config_options->color_defs[COLOR_MAGENTA].green = 90;
+          config_options->color_defs[COLOR_MAGENTA].blue = 160;
+
+          config_options->color_defs[COLOR_CYAN].red = 55;
+          config_options->color_defs[COLOR_CYAN].green = 125;
+          config_options->color_defs[COLOR_CYAN].blue = 108;
+
+          config_options->color_defs[COLOR_WHITE].red = 42;
+          config_options->color_defs[COLOR_WHITE].green = 42;
+          config_options->color_defs[COLOR_WHITE].blue = 42;
+
+          config_options->color_defs[COLOR_BRIGHT_BLACK].red = 36;
+          config_options->color_defs[COLOR_BRIGHT_BLACK].green = 36;
+          config_options->color_defs[COLOR_BRIGHT_BLACK].blue = 36;
+
+          config_options->color_defs[COLOR_BRIGHT_RED].red = 157;
+          config_options->color_defs[COLOR_BRIGHT_RED].green = 110;
+          config_options->color_defs[COLOR_BRIGHT_RED].blue = 127;
+
+          config_options->color_defs[COLOR_BRIGHT_GREEN].red = 110;
+          config_options->color_defs[COLOR_BRIGHT_GREEN].green = 137;
+          config_options->color_defs[COLOR_BRIGHT_GREEN].blue = 106;
+
+          config_options->color_defs[COLOR_BRIGHT_YELLOW].red = 156;
+          config_options->color_defs[COLOR_BRIGHT_YELLOW].green = 148;
+          config_options->color_defs[COLOR_BRIGHT_YELLOW].blue = 95;
+
+          config_options->color_defs[COLOR_BRIGHT_BLUE].red = 114;
+          config_options->color_defs[COLOR_BRIGHT_BLUE].green = 151;
+          config_options->color_defs[COLOR_BRIGHT_BLUE].blue = 179;
+
+          config_options->color_defs[COLOR_BRIGHT_MAGENTA].red = 147;
+          config_options->color_defs[COLOR_BRIGHT_MAGENTA].green = 108;
+          config_options->color_defs[COLOR_BRIGHT_MAGENTA].blue = 151;
+
+          config_options->color_defs[COLOR_BRIGHT_CYAN].red = 124;
+          config_options->color_defs[COLOR_BRIGHT_CYAN].green = 166;
+          config_options->color_defs[COLOR_BRIGHT_CYAN].blue = 145;
+
+          config_options->color_defs[COLOR_BRIGHT_WHITE].red = 255;
+          config_options->color_defs[COLOR_BRIGHT_WHITE].green = 255;
+          config_options->color_defs[COLOR_BRIGHT_WHITE].blue = 255;
+
+          config_options->color_defs[COLOR_FOREGROUND].red = 218;
+          config_options->color_defs[COLOR_FOREGROUND].green = 218;
+          config_options->color_defs[COLOR_FOREGROUND].blue = 218;
+
+          config_options->color_defs[COLOR_BACKGROUND].red = 25;
+          config_options->color_defs[COLOR_BACKGROUND].green = 25;
+          config_options->color_defs[COLOR_BACKGROUND].blue = 25;
+
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
                {{'\\', 'q'},             "quit"},
