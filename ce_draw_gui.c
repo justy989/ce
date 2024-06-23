@@ -5,9 +5,21 @@
 
 #define STATUS_LINE_LEN 128
 
+static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index) {
+    SDL_Color result;
+    if (index == -1) { index = COLOR_FOREGROUND; }
+    else if (index == -2) { index = COLOR_BACKGROUND; }
+    result.r = config_options->color_defs[index].red;
+    result.g = config_options->color_defs[index].green;
+    result.b = config_options->color_defs[index].blue;
+    result.a = 255;
+    return result;
+}
+
 static int64_t _text_pixel_x(int64_t char_pos, CeGui_t* gui) {
     return char_pos * (gui->font_point_size / 2);
 }
+
 static int64_t _text_pixel_y(int64_t char_pos, CeGui_t* gui) {
     return char_pos * (gui->font_point_size + gui->font_line_separation);
 }
@@ -44,7 +56,8 @@ static void _draw_text_line(const char* line, int64_t pixel_x, int64_t pixel_y,
      SDL_FreeSurface(surface);
 }
 
-static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
+static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
+                              CeConfigOptions_t* config_options) {
      char line_buffer[STATUS_LINE_LEN];
 
      const char* vim_mode_string = "";
@@ -86,11 +99,20 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
          snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", vim_mode_string, view->buffer->name);
      }
 
-     SDL_Color text_color;
-     text_color.r = 255;
-     text_color.g = 255;
-     text_color.b = 255;
-     text_color.a = 255;
+
+     SDL_Color ui_bg_color = color_from_index(config_options, config_options->ui_bg_color);
+     uint32_t background_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                   ui_bg_color.r,
+                                                   ui_bg_color.g,
+                                                   ui_bg_color.b);
+     SDL_Rect status_rect;
+     status_rect.x = _text_pixel_x(view->rect.left, gui);
+     status_rect.y = _text_pixel_y(view->rect.bottom, gui);
+     status_rect.w = _text_pixel_x((view->rect.right - view->rect.left) + 1, gui);
+     status_rect.h = _text_pixel_y(1, gui);
+     SDL_FillRect(gui->window_surface, &status_rect, background_color_packed);
+
+     SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color);
 
     _draw_text_line(line_buffer,
                     _text_pixel_x(view->rect.left, gui),
@@ -109,7 +131,8 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
                     gui);
 }
 
-static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
+static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
+                       CeConfigOptions_t* config_options, int terminal_right) {
      if(view->buffer->line_count == 0){
          return;
      }
@@ -125,12 +148,22 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      int64_t line_buffer_len = (col_max - col_min) + 1;
      char* line_buffer = malloc(line_buffer_len);
 
-     // TODO: Encode these and the font point size and window dimentions in CeGui_t.
-     SDL_Color text_color;
-     text_color.r = 255;
-     text_color.g = 255;
-     text_color.b = 255;
-     text_color.a = 255;
+     if (view->rect.right < terminal_right) {
+         SDL_Color border_color = color_from_index(config_options, config_options->ui_bg_color);
+         uint32_t background_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                       border_color.r,
+                                                       border_color.g,
+                                                       border_color.b);
+         SDL_Rect border_rect;
+         border_rect.x = _text_pixel_x(view->rect.right, gui);
+         border_rect.y = _text_pixel_y(view->rect.top, gui);
+         border_rect.w = _text_pixel_x(1, gui);
+         border_rect.h = _text_pixel_y(view_height, gui);
+         SDL_FillRect(gui->window_surface, &border_rect, background_color_packed);
+     }
+
+     SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color);
+
      SDL_Rect text_rect;
      text_rect.x = _text_pixel_x(view->rect.left, gui);
      text_rect.y = _text_pixel_y(view->rect.top, gui);
@@ -178,25 +211,29 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      free(line_buffer);
 }
 
-static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros, CeLayout_t* current_layout) {
+static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
+                         CeConfigOptions_t* config_options, int terminal_right,
+                         CeLayout_t* current_layout) {
      switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
-     {
-         _draw_view(&layout->view, gui, vim, macros);
+         _draw_view(&layout->view, gui, vim, macros, config_options, terminal_right);
          _draw_view_status(&layout->view,
                            gui,
                            (layout == current_layout) ? vim : NULL,
-                           macros);
-     } break;
+                           macros,
+                           config_options);
+         break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               _draw_layout(layout->list.layouts[i], gui, vim, macros, current_layout);
+               _draw_layout(layout->list.layouts[i], gui, vim, macros, config_options,
+                            terminal_right, current_layout);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          _draw_layout(layout->tab.root, gui, vim, macros, current_layout);
+          _draw_layout(layout->tab.root, gui, vim, macros, config_options, terminal_right,
+                       current_layout);
           break;
      }
 }
@@ -205,33 +242,51 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
      CeLayout_t* tab_list_layout = app->tab_list_layout;
      CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
 
-     SDL_FillRect(gui->window_surface, NULL, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0x00));
+     SDL_Color background_color = color_from_index(&app->config_options,
+                                                   app->syntax_defs[CE_SYNTAX_COLOR_NORMAL].bg);
+     uint32_t background_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                   background_color.r,
+                                                   background_color.g,
+                                                   background_color.b);
+     SDL_FillRect(gui->window_surface, NULL, background_color_packed);
 
      if(tab_list_layout->tab_list.tab_count > 1){
-          SDL_Color active_text_color;
-          active_text_color.r = 255;
-          active_text_color.g = 255;
-          active_text_color.b = 255;
-          active_text_color.a = 255;
+          // Draw the tab line ui background.
+          SDL_Color border_color = color_from_index(&app->config_options,
+                                                   app->config_options.ui_bg_color);
+          uint32_t border_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                    border_color.r,
+                                                    border_color.g,
+                                                    border_color.b);
 
-          SDL_Color inactive_text_color;
-          inactive_text_color.r = 128;
-          inactive_text_color.g = 128;
-          inactive_text_color.b = 128;
-          inactive_text_color.a = 128;
+          SDL_Rect border_rect;
+          border_rect.x = 0;
+          border_rect.y = 0;
+          border_rect.w = _text_pixel_x(app->terminal_rect.right, gui);
+          border_rect.h = _text_pixel_y(1, gui);
+
+          SDL_FillRect(gui->window_surface, &border_rect, border_color_packed);
+
+          SDL_Color text_color = color_from_index(&app->config_options,
+                                                  app->config_options.ui_fg_color);
 
           int64_t text_pixel_x = _text_pixel_x(1, gui);
 
           for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
                const char* buffer_name = tab_list_layout->tab_list.tabs[i]->tab.current->view.buffer->name;
 
-               SDL_Color* text_color =
-                  (tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current) ?
-                  (&active_text_color) : (&inactive_text_color);
+               if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
+                  SDL_Rect selected_border_rect;
+                  selected_border_rect.x = text_pixel_x - _text_pixel_x(1, gui);
+                  selected_border_rect.y = 0;
+                  selected_border_rect.w = _text_pixel_x(strlen(buffer_name) + 2, gui);
+                  selected_border_rect.h = _text_pixel_y(1, gui);
 
-               _draw_text_line(buffer_name, text_pixel_x, 0, text_color, gui);
+                  SDL_FillRect(gui->window_surface, &selected_border_rect, background_color_packed);
+               }
 
-               text_pixel_x += _text_pixel_x((strlen(buffer_name) + 1), gui);
+               _draw_text_line(buffer_name, text_pixel_x, 0, &text_color, gui);
+               text_pixel_x += _text_pixel_x((strlen(buffer_name) + 2), gui);
           }
      }
 
@@ -254,13 +309,14 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0xFF));
      }
 
-     _draw_layout(tab_layout, gui, &app->vim, &app->macros, tab_layout->tab.current);
+     _draw_layout(tab_layout, gui, &app->vim, &app->macros, &app->config_options, app->terminal_rect.right,
+                  tab_layout->tab.current);
 
      if(app->input_complete_func){
           SDL_Rect view_rect = rect_from_view(&app->input_view, gui);
-          SDL_FillRect(gui->window_surface, &view_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0x00));
+          SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
-          _draw_view(&app->input_view, gui, NULL, &app->macros);
+          _draw_view(&app->input_view, gui, NULL, &app->macros, &app->config_options, app->terminal_rect.right);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -290,9 +346,9 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           ce_view_follow_cursor(&app->complete_view, 0, 0, 0); // NOTE: I don't think anyone wants their settings applied here
 
           SDL_Rect view_rect = rect_from_view(&app->complete_view, gui);
-          SDL_FillRect(gui->window_surface, &view_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0x00));
+          SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
-          _draw_view(&app->complete_view, gui, NULL, &app->macros);
+          _draw_view(&app->complete_view, gui, NULL, &app->macros, &app->config_options, app->terminal_rect.right);
      }
 
      SDL_UpdateWindowSurface(gui->window);

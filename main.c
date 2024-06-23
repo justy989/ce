@@ -978,7 +978,7 @@ int main(int argc, char** argv){
           }
 
           gui.font_point_size = 24;
-          gui.font_line_separation = 2;
+          gui.font_line_separation = 1;
           gui.font = TTF_OpenFont("Inconsolata-SemiBold.ttf", gui.font_point_size);
           if (gui.font == NULL) {
               printf("TTF_OpenFont() failed: %s\n", TTF_GetError());
