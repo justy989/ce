@@ -963,7 +963,7 @@ int main(int argc, char** argv){
                                         SDL_WINDOWPOS_CENTERED,
                                         gui.window_width,
                                         gui.window_height,
-                                        0);
+                                        SDL_WINDOW_RESIZABLE);
           if(gui.window == NULL){
               printf("SDL_CreateWindow() failed: %s\n", SDL_GetError());
               return 1;
@@ -1290,6 +1290,7 @@ int main(int argc, char** argv){
           if(check_stdin) { key = getch(); }
 #elif defined(DISPLAY_GUI)
           bool check_stdin = false;
+          bool window_resized = false;
           int64_t key_len = 0;
           int key = KEY_INVALID;
           int keydown_key = KEY_INVALID;
@@ -1334,9 +1335,23 @@ int main(int argc, char** argv){
                         }
                     }
                     break;
-
+               case SDL_WINDOWEVENT:
+                    if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                         window_resized = true;
+                    }
+                    break;
                }
           }
+
+          if(window_resized){
+              SDL_GetWindowSize(gui.window, &gui.window_width, &gui.window_height);
+              printf("window resized to: %d, %d\n", gui.window_width, gui.window_height);
+              gui.window_surface = SDL_GetWindowSurface(gui.window);
+              int calculated_terminal_width = gui.window_width / (gui.font_point_size / 2);
+              int calculated_terminal_height = gui.window_height / (gui.font_point_size + gui.font_line_separation);
+              ce_app_update_terminal_view(&app, calculated_terminal_width, calculated_terminal_height);
+          }
+
           if (key == KEY_INVALID && keydown_key != KEY_INVALID) {
               key = keydown_key;
           }
