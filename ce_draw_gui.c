@@ -213,12 +213,14 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      CeDrawColorNode_t* current_syntax_color_node = NULL;
      CeDrawColorNode_t* next_syntax_color_node = NULL;
 
+     SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color, true);
+
      if(syntax_color_list){
           current_syntax_color_node = syntax_color_list->head;
-          next_syntax_color_node = current_syntax_color_node->next;
+          if (current_syntax_color_node) {
+               next_syntax_color_node = current_syntax_color_node->next;
+          }
      }
-
-     SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color, true);
 
      int64_t text_pixel_y = _text_pixel_y(view->rect.top, gui);
 
