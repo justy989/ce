@@ -1,10 +1,10 @@
 #include "ce_vim.h"
 #include "ce_app.h"
+#include "ce_key_defines.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <ncurses.h>
 #include <assert.h>
 
 static bool string_is_whitespace(const char* string){
@@ -51,11 +51,11 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'l', &ce_vim_parse_motion_right);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'k', &ce_vim_parse_motion_up);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'j', &ce_vim_parse_motion_down);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_LEFT, &ce_vim_parse_motion_left);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_BACKSPACE, &ce_vim_parse_motion_left);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_RIGHT, &ce_vim_parse_motion_right);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_UP, &ce_vim_parse_motion_up);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_DOWN, &ce_vim_parse_motion_down);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_LEFT_ARROW, &ce_vim_parse_motion_left);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_ONLY_BACKSPACE, &ce_vim_parse_motion_left);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_RIGHT_ARROW, &ce_vim_parse_motion_right);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_UP_ARROW, &ce_vim_parse_motion_up);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_DOWN_ARROW, &ce_vim_parse_motion_down);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '^', &ce_vim_parse_motion_soft_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '0', &ce_vim_parse_motion_hard_begin_line);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_HOME, &ce_vim_parse_motion_hard_begin_line);
@@ -286,7 +286,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
           vim->chain_undo = true;
 
      } break;
-     case KEY_BACKSPACE:
+     case KEY_ONLY_BACKSPACE:
           if(!ce_points_equal(*cursor, (CePoint_t){0, 0})){
                CePoint_t remove_point;
                CePoint_t end_cursor;
@@ -307,32 +307,32 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                vim->chain_undo = true;
           }
           break;
-     case KEY_DC:
+     case KEY_DELETE:
           ce_buffer_remove_string_change(view->buffer, *cursor, 1, cursor,
                                          *cursor, vim->chain_undo);
           vim->chain_undo = true;
           break;
-     case KEY_LEFT:
+     case KEY_LEFT_ARROW:
           *cursor = ce_buffer_move_point(view->buffer, *cursor, (CePoint_t){-1, 0},
                                          config_options->tab_width, CE_CLAMP_X_ON);
           vim->chain_undo = false;
           break;
-     case KEY_DOWN:
+     case KEY_DOWN_ARROW:
           *cursor = ce_buffer_move_point(view->buffer, *cursor, (CePoint_t){0, 1},
                                          config_options->tab_width, CE_CLAMP_X_ON);
           vim->chain_undo = false;
           break;
-     case KEY_UP:
+     case KEY_UP_ARROW:
           *cursor = ce_buffer_move_point(view->buffer, *cursor, (CePoint_t){0, -1},
                                         config_options->tab_width, CE_CLAMP_X_ON);
           vim->chain_undo = false;
           break;
-     case KEY_RIGHT:
+     case KEY_RIGHT_ARROW:
           *cursor = ce_buffer_move_point(view->buffer, *cursor, (CePoint_t){1, 0},
                                          config_options->tab_width, CE_CLAMP_X_ON);
           vim->chain_undo = false;
           break;
-     case 27: // escape
+     case KEY_ESCAPE: // escape
      {
           if(track){
                if(!vim->insert_rune_head &&

@@ -26,8 +26,6 @@
 #define COLOR_BRIGHT_CYAN 14
 #define COLOR_BRIGHT_WHITE 15
 
-#define KEY_ESCAPE 27
-
 typedef int32_t CeRune_t;
 
 typedef enum{

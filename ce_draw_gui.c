@@ -38,9 +38,11 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
      const char* status_str = ce_buffer_status_get_str(view->buffer->status);
      if (status_str) {
          if(ce_macros_is_recording(macros)){
-             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s RECORDING %c", vim_mode_string, status_str, view->buffer->name, macros->recording);
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s RECORDING %c", vim_mode_string,
+                      status_str, view->buffer->name, macros->recording);
          } else {
-             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s", vim_mode_string, status_str, view->buffer->name);
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s%s", vim_mode_string, status_str,
+                      view->buffer->name);
          }
      } else {
          snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", vim_mode_string, view->buffer->name);
@@ -89,11 +91,15 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      text_rect.x = (view->rect.left * (gui->font_point_size / 2));
      text_rect.y = view->rect.top * (gui->font_point_size + gui->font_line_separation);
      text_rect.w = 0;
-     text_rect.y = 0;
+     text_rect.h = 0;
 
      for(int64_t y = 0; y < view_height; y++){
          CeRune_t rune = 1;
          int64_t x = 0;
+         int64_t line_index = y + row_min;
+         if (line_index >= view->buffer->line_count) {
+             break;
+         }
          const char* line = view->buffer->lines[y + row_min];
 
          while(rune > 0 && x < col_max){
@@ -159,7 +165,18 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
     SDL_FillRect(gui->window_surface, NULL, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0x00));
 
     if (tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) {
+
     } else if (app->input_complete_func) {
+        CePoint_t cursor = view_cursor_on_screen(&app->input_view,
+                                                 app->config_options.tab_width,
+                                                 app->config_options.line_number);
+        // TODO: Consolidate with the code below.
+        SDL_Rect cursor_rect;
+        cursor_rect.x = (gui->font_point_size / 2) * cursor.x;
+        cursor_rect.y = (gui->font_point_size + gui->font_line_separation) * cursor.y;
+        cursor_rect.w = (gui->font_point_size / 2);
+        cursor_rect.h = gui->font_point_size;
+        SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0xFF, 0xFF, 0xFF));
     } else {
         CeView_t* view = &tab_layout->tab.current->view;
 
@@ -172,6 +189,11 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
         cursor_rect.w = (gui->font_point_size / 2);
         cursor_rect.h = gui->font_point_size;
         SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0xFF, 0xFF, 0xFF));
+    }
+
+
+    if(app->input_complete_func){
+        _draw_view(&app->input_view, gui, &app->vim, &app->macros);
     }
 
     _draw_layout(tab_layout, gui, &app->vim, &app->macros);

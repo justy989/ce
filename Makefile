@@ -1,11 +1,11 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
-TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
-GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
+#TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+#GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
-#TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
-#GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
+TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
+GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
 GUI_INCFLAGS := -I/usr/include/SDL2
 
 BUILD_DIR ?= build

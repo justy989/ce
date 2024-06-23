@@ -20,26 +20,12 @@
 
 #include "ce_app.h"
 #include "ce_commands.h"
+#include "ce_key_defines.h"
 
 #if defined(DISPLAY_TERMINAL)
   #include "ce_draw_term.h"
-  #define KEY_UP_ARROW KEY_UP
-  #define KEY_DOWN_ARROW KEY_DOWN
-  #define KEY_LEFT_ARROW KEY_LEFT
-  #define KEY_RIGHT_ARROW KEY_RIGHT
-  #define KEY_RESIZE_EVENT KEY_RESIZE
-  #define KEY_CARRIAGE_RETURN KEY_ENTER
-  #define KEY_INVALID ERR
 #elif defined(DISPLAY_GUI)
   #include "ce_draw_gui.h"
-  // TODO: figure out the real values here.
-  #define KEY_UP_ARROW -2
-  #define KEY_DOWN_ARROW -3
-  #define KEY_LEFT_ARROW -4
-  #define KEY_RIGHT_ARROW -5
-  #define KEY_RESIZE_EVENT -6
-  #define KEY_CARRIAGE_RETURN -7
-  #define KEY_INVALID -8
 
   #define COLOR_BLACK 1
   #define COLOR_RED 2
@@ -1249,6 +1235,7 @@ int main(int argc, char** argv){
                             event.key.keysym.mod & KMOD_RCTRL) {
                             keydown_key = ce_ctrl_key(keydown_key);
                         }
+                        printf("keydown: %c %d\n", keydown_key, keydown_key);
                     }
                     break;
                case SDL_TEXTINPUT:
@@ -1256,6 +1243,7 @@ int main(int argc, char** argv){
                         int decoded_key = ce_utf8_decode(event.text.text, &key_len);
                         if (isascii(decoded_key)) {
                             key = decoded_key;
+                            printf("textinput: %c %d\n", key, key);
                         }
                     }
                     break;
