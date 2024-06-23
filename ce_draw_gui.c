@@ -5,14 +5,52 @@
 
 #define STATUS_LINE_LEN 128
 
+static int64_t _text_pixel_x(int64_t char_pos, CeGui_t* gui) {
+    return char_pos * (gui->font_point_size / 2);
+}
+static int64_t _text_pixel_y(int64_t char_pos, CeGui_t* gui) {
+    return char_pos * (gui->font_point_size + gui->font_line_separation);
+}
+
+static SDL_Rect rect_from_view(CeView_t* view, CeGui_t* gui) {
+     SDL_Rect result;
+     result.x = _text_pixel_x(view->rect.left, gui);
+     result.y = _text_pixel_y(view->rect.top, gui);
+     result.w = _text_pixel_x(view->rect.right - view->rect.left, gui);
+     result.h = _text_pixel_y(view->rect.bottom - view->rect.top, gui);
+     return result;
+}
+
+static SDL_Rect rect_from_cursor(CePoint_t* cursor, CeGui_t* gui) {
+     SDL_Rect result;
+     result.x = _text_pixel_x(cursor->x, gui);
+     result.y = _text_pixel_y(cursor->y, gui);
+     result.w = (gui->font_point_size / 2);
+     result.h = gui->font_point_size;
+     return result;
+}
+
+static void _draw_text_line(const char* line, int64_t pixel_x, int64_t pixel_y,
+                            SDL_Color* text_color, CeGui_t* gui) {
+     SDL_Surface* surface = TTF_RenderText_Blended(gui->font, line, *text_color);
+
+     SDL_Rect rect;
+     rect.x = pixel_x;
+     rect.y = pixel_y;
+     rect.w = surface->w;
+     rect.h = surface->h;
+
+     SDL_BlitSurface(surface, NULL, gui->window_surface, &rect);
+     SDL_FreeSurface(surface);
+}
+
 static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
      char line_buffer[STATUS_LINE_LEN];
 
-     const char* vim_mode_string = NULL;
+     const char* vim_mode_string = "";
      if(vim){
           switch(vim->mode){
           default:
-               vim_mode_string = "";
                break;
           case CE_VIM_MODE_NORMAL:
                vim_mode_string = "NORMAL ";
@@ -54,28 +92,21 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
      text_color.b = 255;
      text_color.a = 255;
 
-     SDL_Rect text_rect;
-     text_rect.x = view->rect.left * (gui->font_point_size / 2);
-     text_rect.y = view->rect.bottom * (gui->font_point_size + gui->font_line_separation);
-     SDL_Surface* line_surface = TTF_RenderText_Blended(gui->font, line_buffer, text_color);
-     text_rect.w = line_surface->w;
-     text_rect.h = line_surface->h;
-
-     SDL_BlitSurface(line_surface, NULL, gui->window_surface, &text_rect);
-     SDL_FreeSurface(line_surface);
+    _draw_text_line(line_buffer,
+                    _text_pixel_x(view->rect.left, gui),
+                    _text_pixel_y(view->rect.bottom, gui),
+                    &text_color,
+                    gui);
 
      // Draw the cursor pos in the bottom right.
      int64_t cursor_pose_string_len = snprintf(line_buffer, STATUS_LINE_LEN, "%ld, %ld",
                                                view->cursor.x + 1, view->cursor.y + 1);
 
-     text_rect.x = view->rect.right * (gui->font_point_size / 2) - (cursor_pose_string_len * (gui->font_point_size / 2));
-     text_rect.y = view->rect.bottom * (gui->font_point_size + gui->font_line_separation);
-     line_surface = TTF_RenderText_Blended(gui->font, line_buffer, text_color);
-     text_rect.w = line_surface->w;
-     text_rect.h = line_surface->h;
-
-     SDL_BlitSurface(line_surface, NULL, gui->window_surface, &text_rect);
-     SDL_FreeSurface(line_surface);
+    _draw_text_line(line_buffer,
+                    _text_pixel_x(view->rect.right, gui) - _text_pixel_x(cursor_pose_string_len, gui),
+                    _text_pixel_y(view->rect.bottom, gui),
+                    &text_color,
+                    gui);
 }
 
 static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
@@ -101,10 +132,8 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      text_color.b = 255;
      text_color.a = 255;
      SDL_Rect text_rect;
-     text_rect.x = (view->rect.left * (gui->font_point_size / 2));
-     text_rect.y = view->rect.top * (gui->font_point_size + gui->font_line_separation);
-     text_rect.w = 0;
-     text_rect.h = 0;
+     text_rect.x = _text_pixel_x(view->rect.left, gui);
+     text_rect.y = _text_pixel_y(view->rect.top, gui);
 
      for(int64_t y = 0; y < view_height; y++){
          CeRune_t rune = 1;
@@ -136,7 +165,6 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
 
          if (strlen(line_buffer) > 0) {
              SDL_Surface* line_surface = TTF_RenderText_Blended(gui->font, line_buffer, text_color);
-
              text_rect.w = line_surface->w;
              text_rect.h = line_surface->h;
              SDL_BlitSurface(line_surface, NULL, gui->window_surface, &text_rect);
@@ -148,25 +176,27 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      }
 
      free(line_buffer);
-
-     _draw_view_status(view, gui, vim, macros);
 }
 
-static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros) {
+static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros, CeLayout_t* current_layout) {
      switch(layout->type){
      default:
           break;
      case CE_LAYOUT_TYPE_VIEW:
      {
          _draw_view(&layout->view, gui, vim, macros);
+         _draw_view_status(&layout->view,
+                           gui,
+                           (layout == current_layout) ? vim : NULL,
+                           macros);
      } break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               _draw_layout(layout->list.layouts[i], gui, vim, macros);
+               _draw_layout(layout->list.layouts[i], gui, vim, macros, current_layout);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          _draw_layout(layout->tab.root, gui, vim, macros);
+          _draw_layout(layout->tab.root, gui, vim, macros, current_layout);
           break;
      }
 }
@@ -190,27 +220,18 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           inactive_text_color.b = 128;
           inactive_text_color.a = 128;
 
-          SDL_Rect text_rect;
-          text_rect.x = gui->font_point_size / 2;
-          text_rect.y = 0;
+          int64_t text_pixel_x = _text_pixel_x(1, gui);
 
-          SDL_Surface* line_surface = NULL;
           for(int64_t i = 0; i < tab_list_layout->tab_list.tab_count; i++){
                const char* buffer_name = tab_list_layout->tab_list.tabs[i]->tab.current->view.buffer->name;
 
-               if(tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current){
-                   line_surface = TTF_RenderText_Blended(gui->font, buffer_name, active_text_color);
-               } else {
-                   line_surface = TTF_RenderText_Blended(gui->font, buffer_name, inactive_text_color);
-               }
+               SDL_Color* text_color =
+                  (tab_list_layout->tab_list.tabs[i] == tab_list_layout->tab_list.current) ?
+                  (&active_text_color) : (&inactive_text_color);
 
-               text_rect.w = line_surface->w;
-               text_rect.h = line_surface->h;
+               _draw_text_line(buffer_name, text_pixel_x, 0, text_color, gui);
 
-               SDL_BlitSurface(line_surface, NULL, gui->window_surface, &text_rect);
-               SDL_FreeSurface(line_surface);
-
-               text_rect.x += ((strlen(buffer_name) + 1) * (gui->font_point_size / 2));
+               text_pixel_x += _text_pixel_x((strlen(buffer_name) + 1), gui);
           }
      }
 
@@ -221,11 +242,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
                                                    app->config_options.tab_width,
                                                    app->config_options.line_number);
           // TODO: Consolidate with the code below.
-          SDL_Rect cursor_rect;
-          cursor_rect.x = (gui->font_point_size / 2) * cursor.x;
-          cursor_rect.y = (gui->font_point_size + gui->font_line_separation) * cursor.y;
-          cursor_rect.w = (gui->font_point_size / 2);
-          cursor_rect.h = gui->font_point_size;
+          SDL_Rect cursor_rect = rect_from_cursor(&cursor, gui);
           SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0xFF));
      } else {
           CeView_t* view = &tab_layout->tab.current->view;
@@ -233,25 +250,17 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           CePoint_t cursor = view_cursor_on_screen(view,
                                                    app->config_options.tab_width,
                                                    app->config_options.line_number);
-          SDL_Rect cursor_rect;
-          cursor_rect.x = (gui->font_point_size / 2) * cursor.x;
-          cursor_rect.y = (gui->font_point_size + gui->font_line_separation) * cursor.y;
-          cursor_rect.w = (gui->font_point_size / 2);
-          cursor_rect.h = gui->font_point_size;
+          SDL_Rect cursor_rect = rect_from_cursor(&cursor, gui);
           SDL_FillRect(gui->window_surface, &cursor_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0xFF));
      }
 
-     _draw_layout(tab_layout, gui, &app->vim, &app->macros);
+     _draw_layout(tab_layout, gui, &app->vim, &app->macros, tab_layout->tab.current);
 
      if(app->input_complete_func){
-          SDL_Rect view_rect;
-          view_rect.x = app->input_view.rect.left * (gui->font_point_size / 2);
-          view_rect.y = app->input_view.rect.top * (gui->font_point_size + gui->font_line_separation);
-          view_rect.w = app->input_view.rect.right * (gui->font_point_size / 2);
-          view_rect.h = app->input_view.rect.bottom * (gui->font_point_size + gui->font_line_separation);
+          SDL_Rect view_rect = rect_from_view(&app->input_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0x00));
 
-          _draw_view(&app->input_view, gui, &app->vim, &app->macros);
+          _draw_view(&app->input_view, gui, NULL, &app->macros);
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
@@ -280,14 +289,10 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           app->complete_view.scroll.x = 0;
           ce_view_follow_cursor(&app->complete_view, 0, 0, 0); // NOTE: I don't think anyone wants their settings applied here
 
-          SDL_Rect view_rect;
-          view_rect.x = app->complete_view.rect.left * (gui->font_point_size / 2);
-          view_rect.y = app->complete_view.rect.top * (gui->font_point_size + gui->font_line_separation);
-          view_rect.w = app->complete_view.rect.right * (gui->font_point_size / 2);
-          view_rect.h = app->complete_view.rect.bottom * (gui->font_point_size + gui->font_line_separation);
+          SDL_Rect view_rect = rect_from_view(&app->complete_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, SDL_MapRGB(gui->window_surface->format, 0x00, 0x00, 0x00));
 
-          _draw_view(&app->complete_view, gui, &app->vim, &app->macros);
+          _draw_view(&app->complete_view, gui, NULL, &app->macros);
      }
 
      SDL_UpdateWindowSurface(gui->window);
