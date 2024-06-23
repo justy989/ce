@@ -954,8 +954,8 @@ int main(int argc, char** argv){
           SDL_StartTextInput();
 
           gui.application_name = "ce";
-          gui.window_width = 1280;
-          gui.window_height = 1024;
+          gui.window_width = 1920;
+          gui.window_height = 1080;
           printf("Create window: %s %d, %d\n", gui.application_name, gui.window_width, gui.window_height);
 
           gui.window = SDL_CreateWindow(gui.application_name,
@@ -1235,7 +1235,23 @@ int main(int argc, char** argv){
                             event.key.keysym.mod & KMOD_RCTRL) {
                             keydown_key = ce_ctrl_key(keydown_key);
                         }
-                        printf("keydown: %c %d\n", keydown_key, keydown_key);
+                    } else {
+                        switch (event.key.keysym.scancode) {
+                        default:
+                            break;
+                        case SDL_SCANCODE_LEFT:
+                            keydown_key = KEY_LEFT_ARROW;
+                            break;
+                        case SDL_SCANCODE_RIGHT:
+                            keydown_key = KEY_RIGHT_ARROW;
+                            break;
+                        case SDL_SCANCODE_UP:
+                            keydown_key = KEY_UP_ARROW;
+                            break;
+                        case SDL_SCANCODE_DOWN:
+                            keydown_key = KEY_DOWN_ARROW;
+                            break;
+                        }
                     }
                     break;
                case SDL_TEXTINPUT:
@@ -1243,7 +1259,6 @@ int main(int argc, char** argv){
                         int decoded_key = ce_utf8_decode(event.text.text, &key_len);
                         if (isascii(decoded_key)) {
                             key = decoded_key;
-                            printf("textinput: %c %d\n", key, key);
                         }
                     }
                     break;
