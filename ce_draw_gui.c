@@ -178,8 +178,8 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
 }
 
 static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
-                       CeDrawColorList_t* syntax_color_list, CeConfigOptions_t* config_options,
-                       int terminal_right) {
+                       CeDrawColorList_t* syntax_color_list, CeSyntaxDef_t* syntax_defs,
+                       CeConfigOptions_t* config_options, int terminal_right) {
      if(view->buffer->line_count == 0){
           return;
      }
@@ -210,6 +210,19 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
          SDL_FillRect(gui->window_surface, &border_rect, background_color_packed);
      }
 
+     // figure out how wide the line number margin needs to be
+     int line_number_size = 0;
+     if(!view->buffer->no_line_numbers){
+          line_number_size = ce_line_number_column_width(config_options->line_number,
+                                                         view->buffer->line_count,
+                                                         view->rect.top,
+                                                         view->rect.bottom);
+          if(line_number_size){
+               col_max -= line_number_size;
+               line_number_size--;
+          }
+     }
+
      CeDrawColorNode_t* current_syntax_color_node = NULL;
      CeDrawColorNode_t* next_syntax_color_node = NULL;
 
@@ -234,7 +247,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
           if (!view->buffer->no_highlight_current_line &&
               line_index == view->cursor.y) {
                SDL_Color color = color_from_index(config_options,
-                                                  COLOR_BLACK,
+                                                  ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_BLACK),
                                                   false);
                uint32_t color_packed = SDL_MapRGB(gui->window_surface->format,
                                                   color.r,
@@ -243,13 +256,28 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                SDL_Rect rect;
                rect.x = _text_pixel_x(view->rect.left, gui);
                rect.y = _text_pixel_y(view->rect.top + draw_y, gui);
-               rect.w = _text_pixel_x(view->rect.right - view->rect.left, gui);
+               rect.w = _text_pixel_x((view->rect.right - view->rect.left) + 1, gui);
                rect.h = _text_pixel_y(1, gui);
                SDL_FillRect(gui->window_surface, &rect, color_packed);
           }
 
           if (line_index >= view->buffer->line_count) {
                break;
+          }
+
+          if(!view->buffer->no_line_numbers && config_options->line_number > 0){
+               SDL_Color color = color_from_index(config_options,
+                                                  ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_LINE_NUMBER, COLOR_BLACK),
+                                                  true);
+               // TODO: Respect background color.
+               int current_line_number = line_index + 1;
+               if(config_options->line_number == CE_LINE_NUMBER_RELATIVE ||
+                  (config_options->line_number == CE_LINE_NUMBER_ABSOLUTE_AND_RELATIVE && view->cursor.y != line_index)){
+                    current_line_number = abs((int)(view->cursor.y - line_index));
+               }
+               snprintf(line_buffer, line_buffer_len, "%*d ", line_number_size, current_line_number);
+               _draw_text_line(line_buffer, text_pixel_x, text_pixel_y, &color, gui);
+               text_pixel_x += _text_pixel_x(strlen(line_buffer), gui);
           }
 
           CePoint_t buffer_point = {buffer_x, line_index};
@@ -409,7 +437,8 @@ static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVi
                     ce_range_list_free(&highlight_ranges);
                }
 
-               _draw_view(&layout->view, gui, vim, macros, &syntax_color_list, config_options, terminal_right);
+               _draw_view(&layout->view, gui, vim, macros, &syntax_color_list, syntax_defs,
+                          config_options, terminal_right);
                ce_draw_color_list_free(&syntax_color_list);
                _draw_view_status(&layout->view,
                                  gui,
@@ -420,13 +449,13 @@ static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVi
           break;
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
-               _draw_layout(layout->list.layouts[i], gui, vim, vim_visual, macros, syntax_defs, config_options,
-                            terminal_right, current_layout);
+               _draw_layout(layout->list.layouts[i], gui, vim, vim_visual, macros, syntax_defs,
+                            config_options, terminal_right, current_layout);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
-          _draw_layout(layout->tab.root, gui, vim, vim_visual, macros, syntax_defs, config_options, terminal_right,
-                       current_layout);
+          _draw_layout(layout->tab.root, gui, vim, vim_visual, macros, syntax_defs, config_options,
+                       terminal_right, current_layout);
           break;
      }
 }
@@ -493,7 +522,8 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           SDL_Rect view_rect = rect_from_view(&app->input_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
-          _draw_view(&app->input_view, gui, NULL, &app->macros, NULL, &app->config_options, app->terminal_rect.right);
+          _draw_view(&app->input_view, gui, NULL, &app->macros, NULL, app->syntax_defs,
+                     &app->config_options, app->terminal_rect.right);
           _draw_view_status(&app->input_view,
                             gui,
                             &app->vim,
@@ -555,7 +585,8 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
                ce_range_list_free(&highlight_ranges);
           }
 
-          _draw_view(&app->complete_view, gui, NULL, &app->macros, &draw_color_list, &app->config_options, app->terminal_rect.right);
+          _draw_view(&app->complete_view, gui, NULL, &app->macros, &draw_color_list,
+                     app->syntax_defs, &app->config_options, app->terminal_rect.right);
      }
 
      if (tab_layout->tab.current->type != CE_LAYOUT_TYPE_VIEW) {
@@ -572,6 +603,8 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
                                                    app->config_options.line_number);
           _draw_cursor(&cursor, &app->config_options, gui);
      }
+
+     // TODO: draw alert message
 
      SDL_UpdateWindowSurface(gui->window);
 }
