@@ -19,15 +19,15 @@
   #define KEY_LEFT_ARROW -4
   #define KEY_RIGHT_ARROW -5
   #define KEY_RESIZE_EVENT -6
-  #define KEY_REDO -7
   #define KEY_PPAGE -8
   #define KEY_NPAGE -9
   #define KEY_HOME -10
   #define KEY_CLOSE -11
-  #define KEY_INVALID -11
+  #define KEY_INVALID -12
 
   #define KEY_ONLY_BACKSPACE 8
   #define KEY_CARRIAGE_RETURN 13
+  #define KEY_REDO 18
   #define KEY_DELETE 127
 #endif
 
