@@ -226,7 +226,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      CeDrawColorNode_t* current_syntax_color_node = NULL;
      CeDrawColorNode_t* next_syntax_color_node = NULL;
 
-     SDL_Color text_color = color_from_index(config_options, config_options->ui_fg_color, true);
+     SDL_Color text_color = color_from_index(config_options, COLOR_FOREGROUND, true);
 
      if(syntax_color_list){
           current_syntax_color_node = syntax_color_list->head;
