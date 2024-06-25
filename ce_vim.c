@@ -3556,7 +3556,7 @@ static bool change_number(CeView_t* view, CePoint_t* cursor, CePoint_t point, in
      int64_t digits = ce_count_digits(value);
      if(value < 0) digits++; // account for negative sign
      char* new_number_string = malloc(digits + 1);
-     snprintf(new_number_string, digits + 1, "%ld", value);
+     snprintf(new_number_string, digits + 1, "%"PRId64"", value);
      new_number_string[digits] = 0;
 
      ce_buffer_remove_string_change(view->buffer, change_point, number_len, &change_point_save,

@@ -1268,7 +1268,7 @@ static char* build_string_from_command_args(CeCommand_t* command){
           default:
               return result;
           case CE_COMMAND_ARG_INTEGER:
-               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%ld ", command->args[i].integer);
+               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%"PRId64" ", command->args[i].integer);
                break;
           case CE_COMMAND_ARG_DECIMAL:
                rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%f ", command->args[i].decimal);

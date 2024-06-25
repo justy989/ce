@@ -58,13 +58,13 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      // calc maxes of things we care about for formatting
      int64_t max_buffer_lines = 0;
      int64_t max_name_len = 0;
-     int64_t buffer_count = 0;
+//     int64_t buffer_count = 0; // FIXME: this is unused?
      const CeBufferNode_t* itr = head;
      while(itr){
           if(max_buffer_lines < itr->buffer->line_count) max_buffer_lines = itr->buffer->line_count;
           int64_t name_len = strlen(itr->buffer->name);
           if(max_name_len < name_len) max_buffer_lines = name_len;
-          buffer_count++;
+//          buffer_count++; // FIXME: see above
           itr = itr->next;
      }
 
@@ -155,7 +155,7 @@ static void build_bind_list(CeBuffer_t* buffer, CeKeyBinds_t* key_binds){
                default:
                     break;
                case CE_COMMAND_ARG_INTEGER:
-                    printed += snprintf(line + printed, 256 - printed, " %ld", bind->command.args[c].integer);
+                    printed += snprintf(line + printed, 256 - printed, " %"PRId64"", bind->command.args[c].integer);
                     break;
                case CE_COMMAND_ARG_DECIMAL:
                     printed += snprintf(line + printed, 256 - printed, " %f", bind->command.args[c].decimal);
@@ -212,7 +212,7 @@ static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
           CePoint_t* point = buffer_data->marks + i;
           if(point->x == 0 && point->y == 0) continue;
           char reg = i + '!';
-          snprintf(line, 256, "'%c' %ld, %ld\n", reg, point->x, point->y);
+          snprintf(line, 256, "'%c' %"PRId64", %"PRId64"\n", reg, point->x, point->y);
           buffer_append_on_new_line(buffer, line);
      }
 

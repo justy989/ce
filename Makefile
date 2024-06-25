@@ -6,7 +6,18 @@ TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
 TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
 GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
-GUI_INCFLAGS := -I/usr/include/SDL2
+
+ifeq ($(OS),Windows_NT)
+
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Linux)
+        GUI_INCFLAGS := -I/usr/include/SDL2
+    endif
+    ifeq ($(UNAME_S),Darwin)
+        GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
+    endif
+endif
 
 BUILD_DIR ?= build
 TERM_OBJDIR ?= $(BUILD_DIR)/term

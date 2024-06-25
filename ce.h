@@ -8,6 +8,15 @@
 #include <regex.h>
 #include <dirent.h>
 
+#ifdef __APPLE__
+    #include <time.h> // time_t
+    #include <sys/time.h> // struct timeval
+    #include <pthread.h> // pthread_t
+    #ifndef PATH_MAX
+        #define PATH_MAX 1024
+    #endif
+#endif
+
 #define CE_NEWLINE '\n'
 #define CE_TAB '\t'
 #define CE_UTF8_INVALID -1
