@@ -5,9 +5,14 @@
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
-#include <ncurses.h>
 #include <errno.h>
 #include <sys/stat.h>
+
+#if defined(DISPLAY_TERMINAL)
+    #include <ncurses.h>
+#elif defined(DISPLAY_GUI)
+    #include <SDL_clipboard.h>
+#endif
 
 typedef struct{
      CeLayout_t* tab_layout;
@@ -1344,7 +1349,7 @@ CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data
      }
      if (gui_load_font(gui,
                        app->config_options.gui_font_path,
-                       gui->font_point_size + command->args[0].integer,
+                       new_font_size,
                        gui->font_line_separation) != 0) {
          return CE_COMMAND_FAILURE;
      }
@@ -1353,6 +1358,41 @@ CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data
      int calculated_terminal_height = gui->window_height / (gui->font_point_size + gui->font_line_separation);
      ce_app_update_terminal_view(app, calculated_terminal_width, calculated_terminal_height);
 
+     return CE_COMMAND_SUCCESS;
+#endif
+}
+
+CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data) {
+     if(command->arg_count >= 1) return CE_COMMAND_PRINT_HELP;
+#if defined(DISPLAY_TERMINAL)
+     return CE_COMMAND_SUCCESS;
+#elif defined(DISPLAY_GUI)
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if (!SDL_HasClipboardText()) {
+         return CE_COMMAND_SUCCESS;
+     }
+     char* clipboard_text = SDL_GetClipboardText();
+     if (clipboard_text && *clipboard_text != 0) {
+         ce_buffer_insert_string(command_context.view->buffer, clipboard_text, command_context.view->cursor);
+         int64_t text_len = ce_utf8_strlen(clipboard_text);
+
+         CePoint_t final_cursor = ce_buffer_advance_point(command_context.view->buffer, command_context.view->cursor, text_len);
+
+         CeBufferChange_t change = {};
+         change.chain = false;
+         change.insertion = true;
+         change.string = strdup(clipboard_text);
+         change.location = command_context.view->cursor;
+         change.cursor_before = command_context.view->cursor;
+         change.cursor_after = final_cursor;
+         ce_buffer_change(command_context.view->buffer, &change);
+
+         command_context.view->cursor = final_cursor;
+         free(clipboard_text);
+     }
      return CE_COMMAND_SUCCESS;
 #endif
 }

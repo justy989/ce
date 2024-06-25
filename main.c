@@ -10,10 +10,10 @@
 #include <errno.h>
 
 #if defined(DISPLAY_TERMINAL)
-  #include <ncurses.h>
+    #include <ncurses.h>
 #elif defined(DISPLAY_GUI)
-  #include <SDL.h>
-  #include <SDL_ttf.h>
+    #include <SDL.h>
+    #include <SDL_ttf.h>
 #else
 #error "No display mode specified"
 #endif

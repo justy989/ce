@@ -869,6 +869,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_new_tab, "new_tab", "create a new tab"},
           {command_noh, "noh", "turn off search highlighting"},
           {command_quit, "quit", "quit ce"},
+          {command_paste_clipboard, "paste_clipboard", "Grabs the user's clipboard and inserts into the current buffer"},
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_reload_config, "reload_config", "reload the config shared object"},
