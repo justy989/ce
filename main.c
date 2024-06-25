@@ -992,8 +992,8 @@ int main(int argc, char** argv){
                syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].fg = COLOR_YELLOW;
                syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].bg = CE_SYNTAX_USE_CURRENT_COLOR;
 
-               app.config_options.ui_fg_color = COLOR_BLACK;
-               app.config_options.ui_bg_color = COLOR_WHITE;
+               app.config_options.ui_fg_color = COLOR_BRIGHT_WHITE;
+               app.config_options.ui_bg_color = COLOR_BLACK;
                app.config_options.message_fg_color = COLOR_BLUE;
                app.config_options.message_bg_color = COLOR_WHITE;
 
