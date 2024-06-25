@@ -1302,8 +1302,10 @@ int main(int argc, char** argv){
                case SDL_KEYDOWN:
                     if (isascii(event.key.keysym.sym)) {
                         keydown_key = event.key.keysym.sym;
-                        if (event.key.keysym.mod & KMOD_LCTRL ||
-                            event.key.keysym.mod & KMOD_RCTRL) {
+                        if (event.key.keysym.mod & KMOD_SHIFT) {
+                            keydown_key = toupper(keydown_key);
+                        }
+                        if (event.key.keysym.mod & KMOD_CTRL) {
                             keydown_key = ce_ctrl_key(keydown_key);
                         }
                     } else {
