@@ -4,17 +4,18 @@ CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
 #GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
-TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
+TERM_LDFLAGS := -rdynamic -lutil -ldl
 GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
 
 ifeq ($(OS),Windows_NT)
-
+	TERM_LDFLAGS += -lncursesw
 else
     UNAME_S := $(shell uname -s)
     ifeq ($(UNAME_S),Linux)
         GUI_INCFLAGS := -I/usr/include/SDL2
     endif
     ifeq ($(UNAME_S),Darwin)
+    TERM_LDFLAGS += -lncurses
         GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
     endif
 endif
