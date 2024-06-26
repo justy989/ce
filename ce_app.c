@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <ncurses.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -17,6 +16,10 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+
+#if defined(DISPLAY_TERMINAL)
+    #include <ncurses.h>
+#endif
 
 int g_shell_command_ready_fds[2];
 bool g_shell_command_should_die = false;
@@ -322,7 +325,7 @@ CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list){
      return jump_list->destinations + jump_list->current;
 }
 
-void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeMultipleCursors_t* multiple_cursors,
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim,
                            CeConfigOptions_t* config_options, bool insert_into_jump_list){
      CeAppViewData_t* view_data = view->user_data;
      CeJumpList_t* jump_list = &view_data->jump_list;
@@ -370,8 +373,6 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeM
      }
 
      vim->mode = CE_VIM_MODE_NORMAL;
-
-     ce_multiple_cursors_clear(multiple_cursors);
 }
 
 void ce_app_clear_filepath_cache(CeApp_t* app){
@@ -381,8 +382,9 @@ void ce_app_clear_filepath_cache(CeApp_t* app){
      free(app->cached_filepaths);
 }
 
-void ce_app_update_terminal_view(CeApp_t* app){
-     getmaxyx(stdscr, app->terminal_height, app->terminal_width);
+void ce_app_update_terminal_view(CeApp_t* app, int width, int height) {
+     app->terminal_width = width;
+     app->terminal_height = height;
      app->terminal_rect = (CeRect_t){0, app->terminal_width - 1, 0, app->terminal_height - 1};
      ce_layout_distribute_rect(app->tab_list_layout, app->terminal_rect);
 }
@@ -410,7 +412,7 @@ bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool swi
           }
      }
 
-     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->multiple_cursors, &app->config_options, true);
+     ce_view_switch_buffer(view, view_data->prev_buffer, &app->vim, &app->config_options, true);
      return true;
 }
 
@@ -432,7 +434,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
-     input_view->rect.right = view->rect.right - 1;
+     input_view->rect.right = view->rect.right;
      input_view->rect.bottom = view->rect.bottom;
      int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
      int64_t height = input_view->buffer->line_count;
@@ -460,7 +462,7 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
 
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
-                                CeMultipleCursors_t* multiple_cursors, bool insert_into_jump_list, const char* filepath){
+                                bool insert_into_jump_list, const char* filepath){
      // adjust the filepath if it doesn't match our pwd
      char real_path[PATH_MAX + 1];
      char load_path[PATH_MAX + 1];
@@ -489,7 +491,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBufferNode_t* itr = *buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, load_path) == 0){
-               ce_view_switch_buffer(view, itr->buffer, vim, multiple_cursors, config_options, insert_into_jump_list);
+               ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
                return itr->buffer;
           }
           itr = itr->next;
@@ -499,7 +501,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
      CeBuffer_t* buffer = new_buffer();
      if(ce_buffer_load_file(buffer, load_path)){
           ce_buffer_node_insert(buffer_node_head, buffer);
-          ce_view_switch_buffer(view, buffer, vim, multiple_cursors, config_options, insert_into_jump_list);
+          ce_view_switch_buffer(view, buffer, vim, config_options, insert_into_jump_list);
           determine_buffer_syntax(buffer);
      }else{
           free(buffer);
@@ -810,32 +812,6 @@ void user_config_free(CeUserConfig_t* user_config){
      memset(user_config, 0, sizeof(*user_config));
 }
 
-void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t point){
-     int64_t new_count = multiple_cursors->count + 1;
-     multiple_cursors->cursors = realloc(multiple_cursors->cursors, new_count * sizeof(multiple_cursors->cursors[0]));
-     multiple_cursors->visuals = realloc(multiple_cursors->visuals, new_count * sizeof(multiple_cursors->visuals[0]));
-     multiple_cursors->motion_columns = realloc(multiple_cursors->motion_columns, new_count * sizeof(multiple_cursors->motion_columns[0]));
-     multiple_cursors->cursors[multiple_cursors->count] = point;
-     multiple_cursors->visuals[multiple_cursors->count].point = point;
-     multiple_cursors->motion_columns[multiple_cursors->count] = point.x;
-     multiple_cursors->count = new_count;
-}
-
-void ce_multiple_cursors_clear(CeMultipleCursors_t* multiple_cursors){
-     free(multiple_cursors->cursors);
-     multiple_cursors->cursors = NULL;
-     free(multiple_cursors->visuals);
-     multiple_cursors->visuals = NULL;
-     free(multiple_cursors->motion_columns);
-     multiple_cursors->motion_columns = NULL;
-     multiple_cursors->count = 0;
-     multiple_cursors->active = false;
-}
-
-void ce_multiple_cursors_toggle_active(CeMultipleCursors_t* multiple_cursors){
-     multiple_cursors->active = !multiple_cursors->active;
-}
-
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers){
      int64_t value = 0;
      const CeRune_t* itr = istr;
@@ -876,12 +852,11 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view){
 
 void ce_app_init_default_commands(CeApp_t* app){
      CeCommandEntry_t command_entries[] = {
-          {command_add_cursor, "add_cursor", "add cursor so you have multiple cursors to edit the buffer with"},
           {command_balance_layout, "balance_layout", "rebalance layout based on the node tree"},
           {command_blank, "blank", "empty command"},
-          {command_clear_cursors, "clear_cursors", "clear multiple cursors so you go back to having one cursor"},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
+          {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
           {command_goto_next_destination, "goto_next_destination", "find the next line in the buffer that contains a destination to goto"},
           {command_goto_prev_destination, "goto_prev_destination", "find the previous line in the buffer that contains a destination to goto"},
@@ -897,6 +872,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_new_tab, "new_tab", "create a new tab"},
           {command_noh, "noh", "turn off search highlighting"},
           {command_quit, "quit", "quit ce"},
+          {command_paste_clipboard, "paste_clipboard", "Grabs the user's clipboard and inserts into the current buffer"},
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_reload_config, "reload_config", "reload the config shared object"},
@@ -921,7 +897,6 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_switch_buffer, "switch_buffer", "open dialogue to switch buffer by name"},
           {command_syntax, "syntax", "set the current buffer's type: 'c', 'cpp', 'python', 'java', 'bash', 'config', 'diff', 'plain'"},
           {command_toggle_log_keys_pressed, "toggle_log_keys_pressed", "debug command to log key presses"},
-          {command_toggle_cursors_active, "toggle_cursors_active", "toggle whether the multiple cursors are active or not"},
           {command_shell_command, "shell_command", "run a shell command"},
           {command_shell_command_relative, "shell_command_relative", "run a shell command relative to the current buffer"},
           {command_vim_cn, "cn", "vim's cn command to select the goto the next build error"},
@@ -1025,8 +1000,6 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
 
      app->input_complete_func = input_complete_func;
      ce_complete_free(&app->input_complete);
-
-     ce_multiple_cursors_clear(&app->multiple_cursors);
 }
 
 bool ce_app_apply_completion(CeApp_t* app){
@@ -1161,7 +1134,7 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
                strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
           }
           if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                  &app->multiple_cursors, true, filepath)){
+                                  true, filepath)){
                ce_app_message(app, "failed to load file '%s': '%s'", filepath, strerror(errno));
                errno = 0;
                return false;
@@ -1180,7 +1153,7 @@ bool load_project_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffe
 
      for(int64_t i = 0; i < input_buffer->line_count; i++){
           if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                  &app->multiple_cursors, true, input_buffer->lines[i])){
+                                  true, input_buffer->lines[i])){
                ce_app_message(app, "failed to load file '%s': '%s'", input_buffer->lines[i], strerror(errno));
                errno = 0;
                return false;
@@ -1228,7 +1201,7 @@ bool switch_buffer_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      CeBufferNode_t* itr = app->buffer_node_head;
      while(itr){
           if(strcmp(itr->buffer->name, app->input_view.buffer->lines[0]) == 0){
-               ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->multiple_cursors, &app->config_options,
+               ce_view_switch_buffer(view, itr->buffer, &app->vim, &app->config_options,
                                      jump_list);
                break;
           }
@@ -1434,7 +1407,7 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
           view_layout->view.cursor = (CePoint_t){0, 0};
           view_layout->view.scroll = (CePoint_t){0, 0};
      }else{
-          ce_view_switch_buffer(view, app->shell_command_buffer, &app->vim, &app->multiple_cursors,
+          ce_view_switch_buffer(view, app->shell_command_buffer, &app->vim,
                                 &app->config_options, true);
           view->cursor = (CePoint_t){0, 0};
           view->scroll = (CePoint_t){0, 0};

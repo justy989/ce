@@ -5,9 +5,6 @@
 #define UNSAVED_BUFFERS_DIALOGUE "Unsaved buffers, quit? [y/n]"
 #define BUFFER_MODIFIED_OUTSIDE_EDITOR "Buffer modified outside editor, save anyway? [y/n]"
 
-CeCommandStatus_t command_add_cursor(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_clear_cursors(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_toggle_cursors_active(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_blank(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_quit(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_adjacent_layout(CeCommand_t* command, void* user_data);
@@ -52,6 +49,8 @@ CeCommandStatus_t command_line_number(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_man_page_on_word_under_cursor(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data);
 
 // NOTE: these are to make vim users feel at home
 CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);

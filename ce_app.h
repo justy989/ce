@@ -141,13 +141,13 @@ typedef struct CeApp_t{
 
      pthread_t shell_command_thread;
 
-     CeMultipleCursors_t multiple_cursors;
-
      int64_t cached_filepath_count;
      char** cached_filepaths;
 
      bool shell_command_buffer_should_scroll;
      bool shell_command_thread_should_die;
+
+     void* gui;
 
      // debug
      bool log_key_presses;
@@ -184,7 +184,7 @@ CeDestination_t* ce_jump_list_previous(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_next(CeJumpList_t* jump_list);
 CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list);
 
-void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim, CeMultipleCursors_t* multiple_cursors,
+void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim,
                            CeConfigOptions_t* config_options, bool insert_into_jump_list);
 
 bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue);
@@ -192,7 +192,7 @@ void input_view_overlay(CeView_t* input_view, CeView_t* view);
 CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number);
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
-                                CeMultipleCursors_t* multiple_cursors, bool insert_into_jump_list, const char* filepath);
+                                bool insert_into_jump_list, const char* filepath);
 CeBuffer_t* new_buffer();
 void determine_buffer_syntax(CeBuffer_t* buffer);
 char* buffer_base_directory(CeBuffer_t* buffer);
@@ -205,10 +205,6 @@ void replace_all(CeView_t* view, CeVimVisualSave_t* vim_visual_save, const char*
 bool user_config_init(CeUserConfig_t* user_config, const char* filepath);
 void user_config_free(CeUserConfig_t* user_config);
 
-void ce_multiple_cursors_add(CeMultipleCursors_t* multiple_cursors, CePoint_t point);
-void ce_multiple_cursors_clear(CeMultipleCursors_t* multiple_cursors);
-void ce_multiple_cursors_toggle_active(CeMultipleCursors_t* multiple_cursors);
-
 int64_t istrtol(const CeRune_t* istr, const CeRune_t** end_of_numbers);
 int64_t istrlen(const CeRune_t* istr);
 
@@ -216,7 +212,7 @@ bool ce_destination_in_view(CeDestination_t* destination, CeView_t* view);
 
 void ce_app_clear_filepath_cache(CeApp_t* app);
 
-void ce_app_update_terminal_view(CeApp_t* app);
+void ce_app_update_terminal_view(CeApp_t* app, int width, int height);
 
 void ce_app_init_default_commands(CeApp_t* app);
 void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete);

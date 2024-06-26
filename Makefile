@@ -1,42 +1,57 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
-LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
+TERM_DEFINES := -DDISPLAY_TERMINAL
+GUI_DEFINES := -DDISPLAY_GUI
+TERM_INCFLAGS := -I/usr/include/ncursesw
+GUI_INCFLAGS := -I/usr/include/SDL2
 
-OBJDIR ?= build
-DESTDIR ?= /usr/local/bin
+BUILD_DIR ?= build
+TERM_OBJDIR ?= $(BUILD_DIR)/term
+GUI_OBJDIR ?= $(BUILD_DIR)/gui
 
-.PHONY: all clean install
+.PHONY: term gui clean install
 
-EXE := ce
+TERM_EXE := ce_term
+GUI_EXE := ce_gui
 
-all: $(EXE)
+term: $(TERM_EXE)
+gui: $(GUI_EXE)
 
 TEST_CSRCS := $(wildcard test_*.c)
 TESTS := $(patsubst %.c,%,$(TEST_CSRCS))
 
 CSRCS := $(filter-out $(TEST_CSRCS), $(wildcard *.c))
 # put our .o files in $(OBJDIR)
-COBJS := $(patsubst %.c,$(OBJDIR)/%.o,$(CSRCS))
+TERM_COBJS := $(patsubst %.c,$(TERM_OBJDIR)/%.o,$(CSRCS))
+GUI_COBJS := $(patsubst %.c,$(GUI_OBJDIR)/%.o,$(CSRCS))
 CHDRS := $(wildcard *.h)
 
-$(OBJDIR):
-	mkdir $@
+$(TERM_OBJDIR):
+	mkdir -p $@
 
-$(OBJDIR)/%.o: %.c $(CHDRS) | $(OBJDIR)
-	$(CC) $(CFLAGS) -c  -o $@ $<
+$(TERM_OBJDIR)/%.o: %.c $(CHDRS) | $(TERM_OBJDIR)
+	$(CC) $(TERM_DEFINES) $(CFLAGS) $(TERM_INCFLAGS) -c -o $@ $<
 
-$(EXE): $(COBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+$(TERM_EXE): $(TERM_COBJS)
+	$(CC) $(TERM_DEFINES) $(CFLAGS) $^ -o $@ $(TERM_LDFLAGS)
+
+$(GUI_OBJDIR):
+	mkdir -p $@
+
+$(GUI_OBJDIR)/%.o: %.c $(CHDRS) | $(GUI_OBJDIR)
+	$(CC) $(GUI_DEFINES) $(CFLAGS) $(GUI_INCFLAGS) -c -o $@ $<
+
+$(GUI_EXE): $(GUI_COBJS)
+	$(CC) $(GUI_DEFINES) $(CFLAGS) $^ -o $@ $(GUI_LDFLAGS)
 
 test: $(TESTS)
 
-test_%: test_%.c $(OBJDIR)/%.o
+test_%: test_%.c $(TERM_OBJDIR)/%.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 	./$@
 
 clean:
-	rm -f $(EXE) $(TESTS) ce_test.log valgrind.out
-	rm -rf $(OBJDIR)
-
-install:
-	install -D $(EXE) $(DESTDIR)/$(EXE)
+	rm -f $(TERM_EXE) $(GUI_EXE) $(TESTS) ce_test.log valgrind.out
+	rm -rf $(BUILD_DIR)

@@ -45,8 +45,10 @@ static bool parse_arg(CeCommandArg_t* arg, const char* string){
      while(*itr){
           if(!isdigit((int)(*itr))){
                if(*itr == '.'){
-                    if(decimal) return false;
                     decimal = true;
+               }else if(*itr == '-' ||
+                        *itr == '+'){
+                    // ignore
                }else{
                     digits_only = false;
                }

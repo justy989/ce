@@ -25,8 +25,9 @@
 #define COLOR_BRIGHT_MAGENTA 13
 #define COLOR_BRIGHT_CYAN 14
 #define COLOR_BRIGHT_WHITE 15
-
-#define KEY_ESCAPE 27
+#define COLOR_FOREGROUND 16
+#define COLOR_BACKGROUND 17
+#define COLOR_COUNT 18
 
 typedef int32_t CeRune_t;
 
@@ -128,6 +129,12 @@ typedef enum{
 }CeVisualLineDisplayType_t;
 
 typedef struct{
+     uint8_t red;
+     uint8_t green;
+     uint8_t blue;
+}CeColorDef_t;
+
+typedef struct{
      CeLineNumber_t line_number;
      int64_t tab_width;
      int64_t horizontal_scroll_off;
@@ -144,6 +151,12 @@ typedef struct{
      int cycle_next_completion_key;
      int cycle_prev_completion_key;
      CeRune_t show_line_extends_passed_view_as;
+     CeColorDef_t color_defs[COLOR_COUNT];
+     int gui_window_width;
+     int gui_window_height;
+     int gui_font_size;
+     int gui_font_line_separation;
+     char gui_font_path[PATH_MAX];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
@@ -212,6 +225,8 @@ bool ce_buffer_redo(CeBuffer_t* buffer, CePoint_t* cursor); // TODO: unittest
 
 CePoint_t ce_move_point_based_on_buffer_changes(CeBuffer_t* buffer, CeBufferChangeNode_t* before, CePoint_t before_point);
 
+const char* ce_buffer_status_get_str(CeBufferStatus_t status);
+
 void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width);
 void ce_view_scroll_to(CeView_t* view, CePoint_t point);
 void ce_view_center(CeView_t* view);
@@ -252,3 +267,4 @@ CeRune_t ce_ctrl_key(char ch);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;
+extern int g_last_key;

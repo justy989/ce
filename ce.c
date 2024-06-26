@@ -1,4 +1,5 @@
 #include "ce.h"
+#include "ce_key_defines.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +10,6 @@
 #include <time.h>
 #include <assert.h>
 #include <ctype.h>
-#include <ncurses.h>
 #include <sys/stat.h>
 
 FILE* g_ce_log = NULL;
@@ -1213,6 +1213,19 @@ CePoint_t ce_move_point_based_on_buffer_changes(CeBuffer_t* buffer, CeBufferChan
      return point;
 }
 
+const char* ce_buffer_status_get_str(CeBufferStatus_t status){
+     if(status == CE_BUFFER_STATUS_READONLY){
+          return "[RO]";
+     }
+
+     if(status == CE_BUFFER_STATUS_MODIFIED ||
+        status == CE_BUFFER_STATUS_NEW_FILE){
+          return "*";
+     }
+
+     return "";
+}
+
 void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_t vertical_scroll_off, int64_t tab_width){
      if(!view->buffer) return;
 
@@ -1653,14 +1666,14 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
                          len++; // going to fill in with '~' for now
                     }
                     break;
-               case KEY_BACKSPACE:
+               case KEY_ONLY_BACKSPACE:
                case KEY_ESCAPE:
-               case KEY_ENTER:
+               case KEY_CARRIAGE_RETURN:
                case CE_TAB:
-               case KEY_UP:
-               case KEY_DOWN:
-               case KEY_LEFT:
-               case KEY_RIGHT:
+               case KEY_UP_ARROW:
+               case KEY_DOWN_ARROW:
+               case KEY_LEFT_ARROW:
+               case KEY_RIGHT_ARROW:
                case '\\':
                     len += 2;
                     break;
@@ -1714,7 +1727,7 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
                          char_itr++;
                     }
                     break;
-               case KEY_BACKSPACE:
+               case KEY_ONLY_BACKSPACE:
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'b'; char_itr++;
                     break;
@@ -1722,7 +1735,7 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'e'; char_itr++;
                     break;
-               case KEY_ENTER:
+               case KEY_CARRIAGE_RETURN:
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'r'; char_itr++;
                     break;
@@ -1730,19 +1743,19 @@ char* ce_rune_string_to_char_string(const CeRune_t* int_str){
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 't'; char_itr++;
                     break;
-               case KEY_UP:
+               case KEY_UP_ARROW:
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'u'; char_itr++;
                     break;
-               case KEY_DOWN:
+               case KEY_DOWN_ARROW:
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'd'; char_itr++;
                     break;
-               case KEY_LEFT:
+               case KEY_LEFT_ARROW:
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'l'; char_itr++;
                     break;
-               case KEY_RIGHT:
+               case KEY_RIGHT_ARROW:
                     *char_itr = '\\'; char_itr++;
                     *char_itr = 'i'; char_itr++; // NOTE: not happy with 'i'
                     break;
@@ -1791,28 +1804,28 @@ CeRune_t* ce_char_string_to_rune_string(const char* char_str){
                     free(int_str);
                     return NULL;
                case 'b':
-                    *int_itr = KEY_BACKSPACE;
+                    *int_itr = KEY_ONLY_BACKSPACE;
                     break;
                case 'e':
                     *int_itr = KEY_ESCAPE;
                     break;
                case 'r':
-                    *int_itr = KEY_ENTER;
+                    *int_itr = KEY_CARRIAGE_RETURN;
                     break;
                case 't':
                     *int_itr = CE_TAB;
                     break;
                case 'u':
-                    *int_itr = KEY_UP;
+                    *int_itr = KEY_UP_ARROW;
                     break;
                case 'd':
-                    *int_itr = KEY_DOWN;
+                    *int_itr = KEY_DOWN_ARROW;
                     break;
                case 'l':
-                    *int_itr = KEY_LEFT;
+                    *int_itr = KEY_LEFT_ARROW;
                     break;
                case 'i':
-                    *int_itr = KEY_RIGHT;
+                    *int_itr = KEY_RIGHT_ARROW;
                     break;
                case '\\':
                     *int_itr = '\\';

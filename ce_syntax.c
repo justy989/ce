@@ -1,9 +1,12 @@
 #include "ce_syntax.h"
 
 #include <stdlib.h>
-#include <ncurses.h>
 #include <string.h>
 #include <ctype.h>
+
+#if defined(DISPLAY_TERMINAL)
+    #include <ncurses.h>
+#endif
 
 #define SEARCH_BACK_LINES 1024
 
@@ -147,8 +150,10 @@ int ce_color_def_get(CeColorDefs_t* color_defs, int fg, int bg){
      color_defs->current %= 256;
      if(color_defs->current <= 0) color_defs->current = 1; // when we wrap around, start at 1, because curses doesn't like 0 index color pairs
 
+#if defined(DISPLAY_TERMINAL)
      // create the pair definition
      init_pair(color_defs->current, fg, bg);
+#endif
 
      // set our internal definition
      color_defs->pairs[color_defs->current].fg = fg;
