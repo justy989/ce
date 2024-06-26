@@ -12,10 +12,11 @@ ifeq ($(OS),Windows_NT)
 else
     UNAME_S := $(shell uname -s)
     ifeq ($(UNAME_S),Linux)
+        TERM_LDFLAGS += -lncursesw
         GUI_INCFLAGS := -I/usr/include/SDL2
     endif
     ifeq ($(UNAME_S),Darwin)
-    TERM_LDFLAGS += -lncurses
+        TERM_LDFLAGS += -lncurses
         GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
     endif
 endif
