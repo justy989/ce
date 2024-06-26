@@ -1,11 +1,10 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
-#TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
-#GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
+TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
+GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
-TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
-GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
+TERM_INCFLAGS := -I/usr/include/ncursesw
 GUI_INCFLAGS := -I/usr/include/SDL2
 
 BUILD_DIR ?= build
@@ -33,7 +32,7 @@ $(TERM_OBJDIR):
 	mkdir -p $@
 
 $(TERM_OBJDIR)/%.o: %.c $(CHDRS) | $(TERM_OBJDIR)
-	$(CC) $(TERM_DEFINES) $(CFLAGS) -c -o $@ $<
+	$(CC) $(TERM_DEFINES) $(CFLAGS) $(TERM_INCFLAGS) -c -o $@ $<
 
 $(TERM_EXE): $(TERM_COBJS)
 	$(CC) $(TERM_DEFINES) $(CFLAGS) $^ -o $@ $(TERM_LDFLAGS)

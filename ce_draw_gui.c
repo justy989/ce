@@ -337,10 +337,16 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                if (buffer_x >= col_min) {
                     if (isprint((int)(rune))) {
                          line_buffer[line_buffer_index] = (char)(rune);
+                         line_buffer_index++;
+                    } else if (rune == CE_TAB) {
+                         for (int64_t t = 0; t < config_options->tab_width; t++) {
+                              line_buffer[line_buffer_index] = ' ';
+                              line_buffer_index++;
+                         }
                     } else {
                          line_buffer[line_buffer_index] = ' ';
+                         line_buffer_index++;
                     }
-                    line_buffer_index++;
                }
 
                line += rune_len;
