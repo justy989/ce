@@ -89,6 +89,29 @@ static void _draw_cursor(CePoint_t* cursor, CeConfigOptions_t* config_options, C
      SDL_FillRect(gui->window_surface, &bottom_wall, color_packed);
 }
 
+static void _append_search_highlight_ranges(const char* pattern, CeLayout_t* layout, CeVim_t* vim, CeRangeList_t* range_list) {
+     int64_t pattern_len = ce_utf8_strlen(pattern);
+     int64_t min = layout->view.scroll.y;
+     int64_t max = min + (layout->view.rect.bottom - layout->view.rect.top);
+     int64_t clamp_max = (layout->view.buffer->line_count - 1);
+     CE_CLAMP(min, 0, clamp_max);
+     CE_CLAMP(max, 0, clamp_max);
+
+     if(vim->search_mode == CE_VIM_SEARCH_MODE_FORWARD ||
+        vim->search_mode == CE_VIM_SEARCH_MODE_BACKWARD){
+          for(int64_t i = min; i <= max; i++){
+               char* match = NULL;
+               char* itr = layout->view.buffer->lines[i];
+               while((match = strstr(itr, pattern))){
+                    CePoint_t start = {ce_utf8_strlen_between(layout->view.buffer->lines[i], match) - 1, i};
+                    CePoint_t end = {start.x + (pattern_len - 1), i};
+                    ce_range_list_insert(range_list, start, end);
+                    itr = match + pattern_len;
+               }
+          }
+     }
+}
+
 static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
                               CeConfigOptions_t* config_options) {
      // Draw the status bar.
@@ -383,7 +406,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
 static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVisualData_t* vim_visual,
                          CeMacros_t* macros, CeSyntaxDef_t* syntax_defs,
                          CeConfigOptions_t* config_options, int terminal_right,
-                         CeLayout_t* current_layout) {
+                         const char* highlight_pattern, CeLayout_t* current_layout) {
      switch(layout->type){
      default:
           break;
@@ -432,6 +455,9 @@ static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVi
                          } break;
                          }
                     }
+                    if (highlight_pattern) {
+                        _append_search_highlight_ranges(highlight_pattern, layout, vim, &highlight_ranges);
+                    }
                     buffer_data->syntax_function(&layout->view, &highlight_ranges, &syntax_color_list, syntax_defs,
                                                  layout->view.buffer->syntax_data);
                     ce_range_list_free(&highlight_ranges);
@@ -450,12 +476,12 @@ static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVi
      case CE_LAYOUT_TYPE_LIST:
           for(int64_t i = 0; i < layout->list.layout_count; i++){
                _draw_layout(layout->list.layouts[i], gui, vim, vim_visual, macros, syntax_defs,
-                            config_options, terminal_right, current_layout);
+                            config_options, terminal_right, highlight_pattern, current_layout);
           }
           break;
      case CE_LAYOUT_TYPE_TAB:
           _draw_layout(layout->tab.root, gui, vim, vim_visual, macros, syntax_defs, config_options,
-                       terminal_right, current_layout);
+                       terminal_right, highlight_pattern, current_layout);
           break;
      }
 }
@@ -515,10 +541,26 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           }
      }
 
+     // Pass down a highlight if one is present.
+     const char* highlight_pattern = NULL;
+     if(app->highlight_search) {
+          if(app->input_complete_func == search_input_complete_func &&
+             app->input_view.buffer->line_count > 0 &&
+             app->input_view.buffer->lines[0][0] > 0){
+               highlight_pattern = app->input_view.buffer->lines[0];
+          }else{
+               const CeVimYank_t* yank = app->vim.yanks + ce_vim_register_index('/');
+               if(yank->text){
+                   highlight_pattern = yank->text;
+               }
+          }
+     }
+
      _draw_layout(tab_layout, gui, &app->vim, &app->visual, &app->macros, app->syntax_defs, &app->config_options, app->terminal_rect.right,
-                  tab_layout->tab.current);
+                  highlight_pattern, tab_layout->tab.current);
 
      if(app->input_complete_func){
+          ce_view_follow_cursor(&app->input_view, 0, 0, 0); // NOTE: I don't think anyone wants their settings applied here
           SDL_Rect view_rect = rect_from_view(&app->input_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
@@ -529,6 +571,22 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
                             &app->vim,
                             &app->macros,
                             &app->config_options);
+
+          // Draw a top border over the input view.
+          view_rect.x = _text_pixel_x(app->input_view.rect.left, gui);
+          view_rect.y = _text_pixel_y(app->input_view.rect.top - 1, gui);
+          view_rect.w = _text_pixel_x((app->input_view.rect.right - app->input_view.rect.left) + 1, gui);
+          view_rect.h = _text_pixel_y(1, gui);
+          if (view_rect.y >= 0) {
+               SDL_Color border_color = color_from_index(&app->config_options,
+                                                         app->config_options.ui_bg_color,
+                                                         false);
+               uint32_t border_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                         border_color.r,
+                                                         border_color.g,
+                                                         border_color.b);
+               SDL_FillRect(gui->window_surface, &view_rect, border_color_packed);
+          }
      }
 
      CeComplete_t* complete = ce_app_is_completing(app);
