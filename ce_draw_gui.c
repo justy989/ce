@@ -33,7 +33,7 @@ static SDL_Rect rect_from_view(CeView_t* view, CeGui_t* gui) {
      SDL_Rect result;
      result.x = _text_pixel_x(view->rect.left, gui);
      result.y = _text_pixel_y(view->rect.top, gui);
-     result.w = _text_pixel_x(view->rect.right - view->rect.left, gui);
+     result.w = _text_pixel_x((view->rect.right - view->rect.left) + 1, gui);
      result.h = _text_pixel_y(view->rect.bottom - view->rect.top, gui);
      return result;
 }
@@ -251,10 +251,25 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
 
      SDL_Color text_color = color_from_index(config_options, COLOR_FOREGROUND, true);
 
+     CeDrawColorNode_t default_node;
+
      if(syntax_color_list){
           current_syntax_color_node = syntax_color_list->head;
           if (current_syntax_color_node) {
                next_syntax_color_node = current_syntax_color_node->next;
+               if (current_syntax_color_node->point.x != 0 ||
+                   current_syntax_color_node->point.y != 0) {
+                    // If the first point in the buffer doesn't have a syntax node, then
+                    // create a default and set it to the head of the list. This fixes buffers
+                    // with no syntax highlighting until later in the buffer.
+                    default_node.fg = COLOR_FOREGROUND;
+                    default_node.bg = COLOR_BACKGROUND;
+                    default_node.point.x = 0;
+                    default_node.point.y = 0;
+                    default_node.next = current_syntax_color_node;
+                    next_syntax_color_node = current_syntax_color_node;
+                    current_syntax_color_node = &default_node;
+               }
           }
      }
 
@@ -334,7 +349,8 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                if (current_syntax_color_node) {
                    buffer_point = (CePoint_t){buffer_x, line_index};
                    original_next_syntax_color_node = next_syntax_color_node;
-                   while (next_syntax_color_node && !ce_point_after(next_syntax_color_node->point, buffer_point)) {
+                   while (next_syntax_color_node &&
+                          !ce_point_after(next_syntax_color_node->point, buffer_point)) {
                         original_next_syntax_color_node = next_syntax_color_node;
                         next_syntax_color_node = next_syntax_color_node->next;
                    }
@@ -373,6 +389,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
           if(line_buffer_index > 0){
                buffer_point = (CePoint_t){buffer_x, line_index};
                if (current_syntax_color_node &&
+                   !ce_point_after(current_syntax_color_node->point, buffer_point) &&
                    (next_syntax_color_node == NULL || ce_point_after(next_syntax_color_node->point, buffer_point))) {
                     text_color = color_from_index(config_options, current_syntax_color_node->fg, true);
 
@@ -594,7 +611,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
         strlen(app->complete_list_buffer->lines[0])){
           CeLayout_t* view_layout = tab_layout->tab.current;
           app->complete_view.rect.left = view_layout->view.rect.left;
-          app->complete_view.rect.right = view_layout->view.rect.right - 1;
+          app->complete_view.rect.right = view_layout->view.rect.right;
           if(app->input_complete_func){
                app->complete_view.rect.bottom = app->input_view.rect.top;
           }else{

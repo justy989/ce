@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <ncurses.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -17,6 +16,10 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+
+#if defined(DISPLAY_TERMINAL)
+    #include <ncurses.h>
+#endif
 
 int g_shell_command_ready_fds[2];
 bool g_shell_command_should_die = false;
@@ -431,7 +434,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
-     input_view->rect.right = view->rect.right - 1;
+     input_view->rect.right = view->rect.right;
      input_view->rect.bottom = view->rect.bottom;
      int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
      int64_t height = input_view->buffer->line_count;

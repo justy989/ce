@@ -1,9 +1,12 @@
 #include "ce_syntax.h"
 
 #include <stdlib.h>
-#include <ncurses.h>
 #include <string.h>
 #include <ctype.h>
+
+#if defined(DISPLAY_TERMINAL)
+    #include <ncurses.h>
+#endif
 
 #define SEARCH_BACK_LINES 1024
 

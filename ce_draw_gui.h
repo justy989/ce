@@ -1,5 +1,11 @@
 #pragma once
 
+// TODO:
+// - display message
+// - select parent layout, I don't remember what you do with that though.
+// - regex search highlight
+// - Display when line extends passed the view
+
 #if defined(DISPLAY_GUI)
   #include <SDL.h>
   #include <SDL_ttf.h>
