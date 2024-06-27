@@ -1,10 +1,12 @@
 #pragma once
 #include <stdio.h>
 #include <stdbool.h>
-#include <sys/wait.h>
+// WINDOWS: process
+// #include <sys/wait.h>
 
 typedef struct{
-     pid_t pid;
+     // WINDOWS: process
+     // pid_t pid;
      // you should either use the file descriptor, or the FILE pointer.
      // do not mix and match
      int stdin_fd;

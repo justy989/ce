@@ -1,13 +1,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <locale.h>
-#include <sys/time.h>
+// WINDOWS: time
+// #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/poll.h>
-#include <unistd.h>
+// WINDOWS: poll
+// #include <sys/poll.h>
+// WINDOWS: unistd
+// #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
 #include <errno.h>
+#include <ctype.h>
 
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
@@ -155,7 +159,7 @@ static void build_bind_list(CeBuffer_t* buffer, CeKeyBinds_t* key_binds){
                default:
                     break;
                case CE_COMMAND_ARG_INTEGER:
-                    printed += snprintf(line + printed, 256 - printed, " %ld", bind->command.args[c].integer);
+                    printed += snprintf(line + printed, 256 - printed, " %" PRId64, bind->command.args[c].integer);
                     break;
                case CE_COMMAND_ARG_DECIMAL:
                     printed += snprintf(line + printed, 256 - printed, " %f", bind->command.args[c].decimal);
@@ -212,7 +216,7 @@ static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
           CePoint_t* point = buffer_data->marks + i;
           if(point->x == 0 && point->y == 0) continue;
           char reg = i + '!';
-          snprintf(line, 256, "'%c' %ld, %ld\n", reg, point->x, point->y);
+          snprintf(line, 256, "'%c' %" PRId64 ", %" PRId64 "\n", reg, point->x, point->y);
           buffer_append_on_new_line(buffer, line);
      }
 
@@ -247,10 +251,11 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-uint64_t time_between(struct timeval previous, struct timeval current){
-     return (current.tv_sec - previous.tv_sec) * 1000000LL +
-            (current.tv_usec - previous.tv_usec);
-}
+// WINDOWS: time
+// uint64_t time_between(struct timeval previous, struct timeval current){
+//      return (current.tv_sec - previous.tv_sec) * 1000000LL +
+//             (current.tv_usec - previous.tv_usec);
+// }
 
 
 static int int_strneq(int* a, int* b, size_t len){
@@ -641,7 +646,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          CeJumpList_t* jump_list = &view_data->jump_list;
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
-                         strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+                         strncpy(destination.filepath, view->buffer->name, MAX_PATH_LEN);
                          ce_jump_list_insert(jump_list, destination);
                     }
 
@@ -708,44 +713,45 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
-          }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
-               if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                    regex_t regex = {};
-                    int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
-                    if(rc != 0){
-                         char error_buffer[BUFSIZ];
-                         regerror(rc, &regex, error_buffer, BUFSIZ);
-                         ce_log("regcomp() failed: '%s'", error_buffer);
-                    }else{
-                         CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
-                         if(result.point.x >= 0){
-                              scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
-                         }else{
-                              view->cursor = app->search_start;
-                         }
-                    }
-               }else{
-                    view->cursor = app->search_start;
-               }
-          }else if(strcmp(app->input_view.buffer->name, "Regex Reverse Search") == 0){
-               if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                    regex_t regex = {};
-                    int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
-                    if(rc != 0){
-                         char error_buffer[BUFSIZ];
-                         regerror(rc, &regex, error_buffer, BUFSIZ);
-                         ce_log("regcomp() failed: '%s'", error_buffer);
-                    }else{
-                         CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
-                         if(result.point.x >= 0){
-                              scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
-                         }else{
-                              view->cursor = app->search_start;
-                         }
-                    }
-               }else{
-                    view->cursor = app->search_start;
-               }
+          // WINDOWS: regex
+          // }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
+          //      if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+          //           regex_t regex = {};
+          //           int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
+          //           if(rc != 0){
+          //                char error_buffer[BUFSIZ];
+          //                regerror(rc, &regex, error_buffer, BUFSIZ);
+          //                ce_log("regcomp() failed: '%s'", error_buffer);
+          //           }else{
+          //                CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
+          //                if(result.point.x >= 0){
+          //                     scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
+          //                }else{
+          //                     view->cursor = app->search_start;
+          //                }
+          //           }
+          //      }else{
+          //           view->cursor = app->search_start;
+          //      }
+          // }else if(strcmp(app->input_view.buffer->name, "Regex Reverse Search") == 0){
+          //      if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+          //           regex_t regex = {};
+          //           int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
+          //           if(rc != 0){
+          //                char error_buffer[BUFSIZ];
+          //                regerror(rc, &regex, error_buffer, BUFSIZ);
+          //                ce_log("regcomp() failed: '%s'", error_buffer);
+          //           }else{
+          //                CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
+          //                if(result.point.x >= 0){
+          //                     scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
+          //                }else{
+          //                     view->cursor = app->search_start;
+          //                }
+          //           }
+          //      }else{
+          //           view->cursor = app->search_start;
+          //      }
           }
      }
 }
@@ -764,21 +770,23 @@ int main(int argc, char** argv){
      signal(SIGINT, handle_sigint);
 
      // parse args
-     {
-          char c;
-          while((c = getopt(argc, argv, "c:h")) != -1){
-               switch(c){
-               case 'c':
-                    config_filepath = optarg;
-                    break;
-               case 'h':
-               default:
-                    print_help(argv[0]);
-                    return 1;
-               }
-          }
-
-          last_arg_index = optind;
+     for(int i = 0; i < argc; i++){
+         char* arg = argv[i];
+         if (arg[0] == '-') {
+             if (strcmp(arg, "-c") == 0) {
+                 if ((i + 1) >= argc) {
+                     printf("error: missing config argument. See help.\n");
+                     return 1;
+                 }
+                 config_filepath = argv[i + 1];
+             } else if (strcmp(arg, "-h") == 0) {
+                 print_help(argv[0]);
+                 return 1;
+             }
+         } else {
+             last_arg_index = i;
+             break;
+         }
      }
 
      setlocale(LC_ALL, "");
@@ -795,24 +803,25 @@ int main(int argc, char** argv){
           g_ce_log_buffer->no_line_numbers = true;
      }
 
-     char ce_dir[PATH_MAX];
-     snprintf(ce_dir, PATH_MAX, "%s/.ce", getenv("HOME"));
+     // WINDOWS: log
+     // char ce_dir[MAX_PATH_LEN];
+     // snprintf(ce_dir, MAX_PATH_LEN, "%s/.ce", getenv("HOME"));
 
-     struct stat st = {};
-     if(stat(ce_dir, &st) == -1){
-          mode_t permissions = S_IRWXU | S_IRWXG;
-          int rc = mkdir(ce_dir, permissions);
-          if(rc != 0){
-               fprintf(stderr, "mkdir('%s', %d) failed: '%s'\n", ce_dir, permissions, strerror(errno));
-               return 1;
-          }
-     }
+     // struct stat st = {};
+     // if(stat(ce_dir, &st) == -1){
+     //      mode_t permissions = S_IRWXU | S_IRWXG;
+     //      int rc = mkdir(ce_dir, permissions);
+     //      if(rc != 0){
+     //           fprintf(stderr, "mkdir('%s', %d) failed: '%s'\n", ce_dir, permissions, strerror(errno));
+     //           return 1;
+     //      }
+     // }
 
-     char log_filepath[PATH_MAX];
-     snprintf(log_filepath, PATH_MAX, "%s/ce.log", ce_dir);
-     if(!ce_log_init(log_filepath)){
-          return 1;
-     }
+     // char log_filepath[MAX_PATH_LEN];
+     // snprintf(log_filepath, MAX_PATH_LEN, "%s/ce.log", ce_dir);
+     // if(!ce_log_init(log_filepath)){
+     //      return 1;
+     // }
 
      // init user config
      if(config_filepath){
@@ -912,7 +921,7 @@ int main(int argc, char** argv){
           config_options->gui_window_height = 768;
           config_options->gui_font_size = 16;
           config_options->gui_font_line_separation = 1;
-          strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", PATH_MAX);
+          strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", MAX_PATH_LEN);
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
@@ -1205,7 +1214,8 @@ int main(int argc, char** argv){
           app.message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
      }
 
-     pipe(g_shell_command_ready_fds);
+     // WINDOWS: pipe
+     // pipe(g_shell_command_ready_fds);
 
  #if defined(DISPLAY_TERMINAL)
      ce_draw_term(&app);
@@ -1214,7 +1224,8 @@ int main(int argc, char** argv){
  #endif
 
      // init draw thread
-     struct timeval current_draw_time = {};
+     // WINDOWS: time
+     // struct timeval current_draw_time = {};
      uint64_t time_since_last_message = 0;
 
      // main loop
@@ -1265,10 +1276,11 @@ int main(int argc, char** argv){
 #endif
 
           if(app.message_mode){
-               time_since_last_message = time_between(app.message_time, current_draw_time);
-               if(time_since_last_message > app.config_options.message_display_time_usec){
-                    app.message_mode = false;
-               }
+               // WINDOWS: time
+               // time_since_last_message = time_between(app.message_time, current_draw_time);
+               // if(time_since_last_message > app.config_options.message_display_time_usec){
+               //      app.message_mode = false;
+               // }
           }
 
           // figure out our current view rect
@@ -1300,7 +1312,11 @@ int main(int argc, char** argv){
                     app.quit = true;
                     break;
                case SDL_KEYDOWN:
+#if defined(PLATFORM_WINDOWS)
+                    if (__isascii(event.key.keysym.sym)) {
+#else
                     if (isascii(event.key.keysym.sym)) {
+#endif
                         keydown_key = event.key.keysym.sym;
                         if (event.key.keysym.mod & KMOD_SHIFT) {
                             keydown_key = toupper(keydown_key);

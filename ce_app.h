@@ -104,7 +104,8 @@ typedef struct CeApp_t{
      CeView_t complete_view;
      CeInputCompleteFunc* input_complete_func;
      bool message_mode;
-     struct timeval message_time;
+     // WINDOWS: time
+     // struct timeval message_time;
      CeLayout_t* tab_list_layout;
      CeSyntaxDef_t* syntax_defs;
      CeBufferNode_t* buffer_node_head;
@@ -139,7 +140,8 @@ typedef struct CeApp_t{
      bool highlight_search;
      CeUserConfig_t user_config;
 
-     pthread_t shell_command_thread;
+     // WINDOWS: thread
+     // pthread_t shell_command_thread;
 
      int64_t cached_filepath_count;
      char** cached_filepaths;

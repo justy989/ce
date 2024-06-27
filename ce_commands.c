@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <unistd.h>
+// WINDOWS: unistd
+// #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
 
@@ -420,38 +421,39 @@ typedef struct CeStrNode_t{
 
 CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNode_t* node, char** ignore_dirs,
                                                  int* ignore_dir_lens, uint64_t ignore_dir_count){
-     char full_path[PATH_MAX];
+     char full_path[MAX_PATH_LEN];
      struct stat info;
-     struct dirent *dir_node;
+     // WINDOWS: list dir
+     // struct dirent *dir_node;
 
-     DIR* os_dir = opendir(directory);
-     if(!os_dir) return node;
+     // DIR* os_dir = opendir(directory);
+     // if(!os_dir) return node;
 
-     while((dir_node = readdir(os_dir)) != NULL){
-          if(strcmp(dir_node->d_name, ".") == 0 || strcmp(dir_node->d_name, "..") == 0) continue;
-          int full_path_len = snprintf(full_path, PATH_MAX, "%s/%s", directory, dir_node->d_name);
-          stat(full_path, &info);
-          if(S_ISDIR(info.st_mode) && access(full_path, W_OK) == 0){
-               bool ignore_dir = false;
-               for(uint64_t i = 0; i < ignore_dir_count; i++){
-                    if(full_path_len >= ignore_dir_lens[i] && strcmp(full_path + full_path_len - ignore_dir_lens[i], ignore_dirs[i]) == 0){
-                        ignore_dir = true;
-                        break;
-                    }
-               }
-               if(ignore_dir) continue;
+     // while((dir_node = readdir(os_dir)) != NULL){
+     //      if(strcmp(dir_node->d_name, ".") == 0 || strcmp(dir_node->d_name, "..") == 0) continue;
+     //      int full_path_len = snprintf(full_path, MAX_PATH_LEN, "%s/%s", directory, dir_node->d_name);
+     //      stat(full_path, &info);
+     //      if(S_ISDIR(info.st_mode) && access(full_path, W_OK) == 0){
+     //           bool ignore_dir = false;
+     //           for(uint64_t i = 0; i < ignore_dir_count; i++){
+     //                if(full_path_len >= ignore_dir_lens[i] && strcmp(full_path + full_path_len - ignore_dir_lens[i], ignore_dirs[i]) == 0){
+     //                    ignore_dir = true;
+     //                    break;
+     //                }
+     //           }
+     //           if(ignore_dir) continue;
 
-               node = find_files_in_directory_recursively(full_path, node, ignore_dirs, ignore_dir_lens, ignore_dir_count);
-          }else{
-               CeStrNode_t* new_node = malloc(sizeof(*new_node));
-               new_node->string = strdup(full_path);
-               new_node->next = NULL;
-               node->next = new_node;
-               node = new_node;
-          }
-     }
+     //           node = find_files_in_directory_recursively(full_path, node, ignore_dirs, ignore_dir_lens, ignore_dir_count);
+     //      }else{
+     //           CeStrNode_t* new_node = malloc(sizeof(*new_node));
+     //           new_node->string = strdup(full_path);
+     //           new_node->next = NULL;
+     //           node->next = new_node;
+     //           node = new_node;
+     //      }
+     // }
 
-     closedir(os_dir);
+     // closedir(os_dir);
      return node;
 }
 
@@ -464,15 +466,15 @@ CeCommandStatus_t command_load_project(CeCommand_t* command, void* user_data){
     char* base_directory = buffer_base_directory(command_context.view->buffer);
     if(!base_directory){
          // if the base_directory is NULL, it's the directory where ce was opened, so fill it out with CWD
-         base_directory = malloc(PATH_MAX);
-         getcwd(base_directory, PATH_MAX);
+         base_directory = malloc(MAX_PATH_LEN);
+         getcwd(base_directory, MAX_PATH_LEN);
     }
 
     // search up the tree for a .git folder
-    char project_marker_path[PATH_MAX + 1];
+    char project_marker_path[MAX_PATH_LEN + 1];
     while(strlen(base_directory) > 0){
          // TODO: support other version control besides git
-         snprintf(project_marker_path, PATH_MAX, "%s/.git", base_directory);
+         snprintf(project_marker_path, MAX_PATH_LEN, "%s/.git", base_directory);
 
          struct stat statbuf;
          if(stat(project_marker_path, &statbuf) == 0){
@@ -865,12 +867,12 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
                                        CeVim_t* vim, bool insert_into_jump_list,
                                        const char* base_directory, CeDestination_t* destination){
-     char full_path[PATH_MAX];
+     char full_path[MAX_PATH_LEN];
      if(!base_directory && destination->filepath[0] != '/') base_directory = ".";
      if(base_directory){
-          snprintf(full_path, PATH_MAX, "%s/%s", base_directory, destination->filepath);
+          snprintf(full_path, MAX_PATH_LEN, "%s/%s", base_directory, destination->filepath);
      }else{
-          strncpy(full_path, destination->filepath, PATH_MAX);
+          strncpy(full_path, destination->filepath, MAX_PATH_LEN);
      }
      CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim,
                                                    insert_into_jump_list, full_path);
@@ -1061,10 +1063,11 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(access(command_context.view->buffer->name, F_OK) == -1){
-          ce_app_message(app, "buffer '%s' is not file backed, unable to reload\n", command_context.view->buffer->name);
-          return CE_COMMAND_NO_ACTION;
-     }
+     // WINDOWS: files
+     // if(access(command_context.view->buffer->name, F_OK) == -1){
+     //      ce_app_message(app, "buffer '%s' is not file backed, unable to reload\n", command_context.view->buffer->name);
+     //      return CE_COMMAND_NO_ACTION;
+     // }
 
      char* filename = strdup(command_context.view->buffer->name);
      CeAppBufferData_t* buffer_data = command_context.view->buffer->app_data;
@@ -1268,7 +1271,7 @@ static char* build_string_from_command_args(CeCommand_t* command){
           default:
               return result;
           case CE_COMMAND_ARG_INTEGER:
-               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%ld ", command->args[i].integer);
+               rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%" PRId64 " ", command->args[i].integer);
                break;
           case CE_COMMAND_ARG_DECIMAL:
                rc = snprintf(buffer + buffer_consumed, 256 - buffer_consumed, "%f ", command->args[i].decimal);
@@ -1401,16 +1404,18 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
                         bool regex_search){
      bool chain_undo = false;
      int64_t match_len = 0;
-     regex_t regex = {};
+     // regex_t regex = {};
 
      if(regex_search){
-          int rc = regcomp(&regex, match, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
-               return;
-          }
+          // WINDOWS: regex
+          // int rc = regcomp(&regex, match, REG_EXTENDED);
+          // if(rc != 0){
+          //      char error_buffer[BUFSIZ];
+          //      regerror(rc, &regex, error_buffer, BUFSIZ);
+          //      ce_log("regcomp() failed: '%s'", error_buffer);
+          //      return;
+          // }
+          return;
      }else{
            match_len = strlen(match);
      }
@@ -1420,9 +1425,11 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
 
           // find the match
           if(regex_search){
-               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, &regex);
-               match_point = result.point;
-               match_len = result.length;
+               // WINDOWS: regex
+               // CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, &regex);
+               // match_point = result.point;
+               // match_len = result.length;
+               break;
           }else{
                match_point = ce_buffer_search_forward(buffer, start, match);
           }
@@ -1630,23 +1637,24 @@ CeCommandStatus_t command_vim_make(CeCommand_t* command, void* user_data){
 }
 
 static void open_file_in_dir_recursively(char* path, char* match, CeApp_t* app, CeView_t* view){
-     DIR* dir;
-     struct dirent *ent;
-     if((dir = opendir(path)) != NULL){
-          while((ent = readdir(dir)) != NULL){
-               if(ent->d_type == DT_DIR && strcmp(ent->d_name, ".") != 0  && strcmp(ent->d_name, "..") != 0){
-                    char new_path[PATH_MAX];
-                    snprintf(new_path, PATH_MAX, "%s/%s", path, ent->d_name);
-                    open_file_in_dir_recursively(new_path, match, app, view);
-               }else if(strcmp(ent->d_name, match) == 0){
-                    char full_path[PATH_MAX];
-                    snprintf(full_path, PATH_MAX, "%s/%s", path, ent->d_name);
-                    load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                        true, full_path);
-               }
-          }
-          closedir(dir);
-     }
+     // WINDOWS: list dir
+     // DIR* dir;
+     // struct dirent *ent;
+     // if((dir = opendir(path)) != NULL){
+     //      while((ent = readdir(dir)) != NULL){
+     //           if(ent->d_type == DT_DIR && strcmp(ent->d_name, ".") != 0  && strcmp(ent->d_name, "..") != 0){
+     //                char new_path[MAX_PATH_LEN];
+     //                snprintf(new_path, MAX_PATH_LEN, "%s/%s", path, ent->d_name);
+     //                open_file_in_dir_recursively(new_path, match, app, view);
+     //           }else if(strcmp(ent->d_name, match) == 0){
+     //                char full_path[MAX_PATH_LEN];
+     //                snprintf(full_path, MAX_PATH_LEN, "%s/%s", path, ent->d_name);
+     //                load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+     //                                    true, full_path);
+     //           }
+     //      }
+     //      closedir(dir);
+     // }
 }
 
 CeCommandStatus_t command_vim_find(CeCommand_t* command, void* user_data){

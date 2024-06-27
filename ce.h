@@ -5,8 +5,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <regex.h>
-#include <dirent.h>
+// WINDOWS: regex
+// #include <regex.h>
+// WINDOWS: list dir
+// #include <dirent.h>
+
+#define MAX_PATH_LEN 1024
 
 #define CE_NEWLINE '\n'
 #define CE_TAB '\t'
@@ -156,7 +160,7 @@ typedef struct{
      int gui_window_height;
      int gui_font_size;
      int gui_font_line_separation;
-     char gui_font_path[PATH_MAX];
+     char gui_font_path[MAX_PATH_LEN];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
@@ -171,7 +175,7 @@ typedef struct{
 
 typedef struct{
      CePoint_t point;
-     char filepath[PATH_MAX];
+     char filepath[MAX_PATH_LEN];
 }CeDestination_t;
 
 typedef struct{
@@ -201,8 +205,9 @@ bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid // TODO: unittest
 CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
 CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
-CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
-CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
+// WINDOWS: regex
+// CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
+// CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
 char* ce_buffer_dupe(CeBuffer_t* buffer);
@@ -264,6 +269,8 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
 int64_t ce_count_digits(int64_t n);
 
 CeRune_t ce_ctrl_key(char ch);
+
+char* ce_strndup(char* str, size_t n);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;
