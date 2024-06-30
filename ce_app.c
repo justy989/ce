@@ -16,8 +16,6 @@
 // WINDOWS: shared object
 // #include <dlfcn.h>
 #include <errno.h>
-// WINDOWS: time
-// #include <sys/time.h>
 // WINDOWS: waitpid
 // #include <sys/wait.h>
 
@@ -967,8 +965,7 @@ void ce_app_message(CeApp_t* app, const char* fmt, ...){
      app->message_view.rect.bottom = view->rect.bottom + 1;
      app->message_view.rect.top = view->rect.bottom;
 
-     // WINDOWS: time
-     // gettimeofday(&app->message_time, NULL);
+     timespec_get(&app->message_time, TIME_UTC);
      app->message_mode = true;
 
      free(app->message_view.buffer->app_data);

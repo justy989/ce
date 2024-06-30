@@ -8,6 +8,8 @@
 #include "ce_complete.h"
 #include "ce_macros.h"
 
+#include <time.h>
+
 #define ENABLE_DEBUG_KEY_PRESS_INFO
 
 #define APP_MAX_KEY_COUNT 16
@@ -104,8 +106,7 @@ typedef struct CeApp_t{
      CeView_t complete_view;
      CeInputCompleteFunc* input_complete_func;
      bool message_mode;
-     // WINDOWS: time
-     // struct timeval message_time;
+     struct timespec message_time;
      CeLayout_t* tab_list_layout;
      CeSyntaxDef_t* syntax_defs;
      CeBufferNode_t* buffer_node_head;

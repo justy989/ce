@@ -1,15 +1,14 @@
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <locale.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <locale.h>
-// WINDOWS: time
-// #include <sys/time.h>
-#include <sys/stat.h>
 // WINDOWS: poll
 // #include <sys/poll.h>
-#include <assert.h>
-#include <signal.h>
-#include <errno.h>
-#include <ctype.h>
+#include <sys/stat.h>
+#include <time.h>
 
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
@@ -253,12 +252,10 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-// WINDOWS: time
-// uint64_t time_between(struct timeval previous, struct timeval current){
-//      return (current.tv_sec - previous.tv_sec) * 1000000LL +
-//             (current.tv_usec - previous.tv_usec);
-// }
-
+static uint64_t time_between_usec(struct timespec previous, struct timespec current){
+     return (current.tv_sec - previous.tv_sec) * 1000000LL +
+            ((current.tv_nsec - previous.tv_nsec)) / 1000;
+}
 
 static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
@@ -1226,10 +1223,8 @@ int main(int argc, char* argv[]){
      ce_draw_gui(&app, &gui);
  #endif
 
-     // init draw thread
-     // WINDOWS: time
-     // struct timeval current_draw_time = {};
-     uint64_t time_since_last_message = 0;
+     struct timespec current_draw_time = {};
+     uint64_t time_since_last_message_usec = 0;
 
      // main loop
      while(!app.quit){
@@ -1279,12 +1274,11 @@ int main(int argc, char* argv[]){
 #endif
 
           if(app.message_mode){
-               // WINDOWS: time
-               // gettimeofday(&current_draw_time, NULL);
-               // time_since_last_message = time_between(app.message_time, current_draw_time);
-               // if(time_since_last_message > app.config_options.message_display_time_usec){
-               //      app.message_mode = false;
-               // }
+               timespec_get(&current_draw_time, TIME_UTC);
+               time_since_last_message_usec = time_between_usec(app.message_time, current_draw_time);
+               if(time_since_last_message_usec > app.config_options.message_display_time_usec){
+                    app.message_mode = false;
+               }
           }
 
           // figure out our current view rect
