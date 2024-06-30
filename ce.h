@@ -7,7 +7,6 @@
 #include <stdbool.h>
 // WINDOWS: regex
 // #include <regex.h>
-// WINDOWS: list dir
 #if !defined(PLATFORM_WINDOWS)
     #include <dirent.h>
 #endif

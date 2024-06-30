@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-// WINDOWS: unistd
-// #include <unistd.h>
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
@@ -17,6 +15,8 @@
     #include <fileapi.h>
     #include <handleapi.h>
     #include <inttypes.h>
+#else
+    #include <unistd.h>
 #endif
 
 FILE* g_ce_log = NULL;

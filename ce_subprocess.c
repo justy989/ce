@@ -2,8 +2,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
-// WINDOWS: unistd
-// #include <unistd.h>
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <unistd.h>
+#endif
 
 // WINDOWS: process
 // NOTE: stderr is redirected to stdout

@@ -6,8 +6,6 @@
 #include <sys/stat.h>
 // WINDOWS: poll
 // #include <sys/poll.h>
-// WINDOWS: unistd
-// #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
 #include <errno.h>
@@ -30,6 +28,10 @@
   #include "ce_draw_term.h"
 #elif defined(DISPLAY_GUI)
   #include "ce_draw_gui.h"
+#endif
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <unistd.h>
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -1214,8 +1216,9 @@ int main(int argc, char* argv[]){
           app.message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
      }
 
-     // WINDOWS: pipe
-     // pipe(g_shell_command_ready_fds);
+#if !defined(PLATFORM_WINDOWS)
+     pipe(g_shell_command_ready_fds);
+#endif
 
  #if defined(DISPLAY_TERMINAL)
      ce_draw_term(&app);

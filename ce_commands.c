@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-// WINDOWS: unistd
-// #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
 
@@ -13,6 +11,10 @@
     #include <ncurses.h>
 #elif defined(DISPLAY_GUI)
     #include <SDL_clipboard.h>
+#endif
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <unistd.h>
 #endif
 
 typedef struct{

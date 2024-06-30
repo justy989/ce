@@ -12,8 +12,6 @@
 #include <fcntl.h>
 // WINDOWS: thread
 // #include <pthread.h>
-// WINDOWS: unistd
-// #include <unistd.h>
 #include <sys/stat.h>
 // WINDOWS: shared object
 // #include <dlfcn.h>
@@ -25,8 +23,9 @@
 
 #if defined(PLATFORM_WINDOWS)
     #include <direct.h>
+#else
+    #include <unistd.h>
 #endif
-
 
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
