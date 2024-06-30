@@ -13,6 +13,12 @@
 #include <ctype.h>
 #include <sys/stat.h>
 
+#if defined(PLATFORM_WINDOWS)
+    #include <fileapi.h>
+    #include <handleapi.h>
+    #include <inttypes.h>
+#endif
+
 FILE* g_ce_log = NULL;
 CeBuffer_t* g_ce_log_buffer = NULL;
 
@@ -75,7 +81,8 @@ void ce_log(const char* fmt, ...){
      size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
      va_end(args);
 
-     fwrite(g_log_string, string_len, 1, g_ce_log);
+     // WINDOWS: log
+     // fwrite(g_log_string, string_len, 1, g_ce_log);
      CePoint_t end = ce_buffer_end_point(g_ce_log_buffer);
      g_ce_log_buffer->status = CE_BUFFER_STATUS_NONE;
      ce_buffer_insert_string(g_ce_log_buffer, g_log_string, end);
@@ -145,14 +152,37 @@ void ce_buffer_free(CeBuffer_t* buffer){
 bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      struct stat statbuf;
      if(stat(filename, &statbuf) != 0) return false;
+     bool is_dir = false;
+
 #if defined(PLATFORM_WINDOWS)
-     if(statbuf.st_mode & _S_IFDIR){
+     is_dir = (statbuf.st_mode & _S_IFDIR);
 #else
-     if(S_ISDIR(statbuf.st_mode)){
+     is_dir = S_ISDIR(statbuf.st_mode);
 #endif
+     if(is_dir){
           errno = EPERM;
           return false;
      }
+
+#if defined(PLATFORM_WINDOWS)
+     bool writeable = (_access(filename, 2) == 0);
+     bool readable = (_access(filename, 4) == 0);
+
+     if (!writeable && readable) {
+          buffer->status = CE_BUFFER_STATUS_READONLY;
+     }else if(writeable && readable){
+          buffer->status = CE_BUFFER_STATUS_NONE;
+     }else{
+          ce_log("File %s not read-able or write-able %d", filename, errno);
+          return false;
+     }
+#else
+     if(access(filename, W_OK) != 0){
+          buffer->status = CE_BUFFER_STATUS_READONLY;
+     }else{
+          buffer->status = CE_BUFFER_STATUS_NONE;
+     }
+#endif
 
      buffer->file_modified_time = statbuf.st_mtime;
 
@@ -188,13 +218,6 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      }
 
      fclose(file);
-
-     // WINDOWS: file
-     // if(access(filename, W_OK) != 0){
-     //      buffer->status = CE_BUFFER_STATUS_READONLY;
-     // }else{
-     //      buffer->status = CE_BUFFER_STATUS_NONE;
-     // }
 
      free(contents);
      ce_log("%s() loaded '%s'\n", __FUNCTION__, filename);
@@ -1934,4 +1957,69 @@ char* ce_strndup(char* str, size_t n) {
 #else
     return strndup(str, n);
 #endif
+}
+
+static void insert_list_dir_result_filename(CeListDirResult_t* list_dir_result,
+                                            const char* filename,
+                                            bool is_directory) {
+      int64_t new_count = list_dir_result->count + 1;
+
+      list_dir_result->filenames = realloc(list_dir_result->filenames,
+                                           new_count * sizeof(*list_dir_result->filenames));
+      list_dir_result->filenames[list_dir_result->count] = strdup(filename);
+
+      list_dir_result->is_directories = realloc(list_dir_result->is_directories,
+                                                new_count * sizeof(*list_dir_result->is_directories));
+      list_dir_result->is_directories[list_dir_result->count] = is_directory;
+
+      list_dir_result->count = new_count;
+}
+
+CeListDirResult_t ce_list_dir(const char* directory) {
+     CeListDirResult_t result;
+     memset(&result, 0, sizeof(result));
+
+#if defined(PLATFORM_WINDOWS)
+     WIN32_FIND_DATA find_files_result;
+     memset(&find_files_result, 0, sizeof(find_files_result));
+
+     HANDLE find_files_handle = FindFirstFileA(directory,
+                                               &find_files_result);
+     if (find_files_handle == INVALID_HANDLE_VALUE) {
+          return result;
+     }
+
+     do{
+         insert_list_dir_result_filename(&result,
+                                         find_files_result.cFileName,
+                                         find_files_result.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+     }while(FindNextFileA(find_files_handle, &find_files_result));
+
+     FindClose(find_files_handle);
+#else
+     DIR* os_dir = opendir(directory);
+     if(!os_dir){
+          free(directory);
+          return result;
+     }
+
+     while((node = readdir(os_dir)) != NULL){
+          insert_list_dir_result_filename(&result,
+                                          node->d_name,
+                                          node->d_type == DT_DIR);
+     }
+
+     closedir(os_dir);
+#endif
+
+     return result;
+}
+
+void ce_free_list_dir_result(CeListDirResult_t* list_dir_result) {
+     for(int64_t i = 0; i < list_dir_result->count; i++){
+          free(list_dir_result->filenames[i]);
+     }
+     free(list_dir_result->filenames);
+     free(list_dir_result->is_directories);
+     memset(list_dir_result, 0, sizeof(*list_dir_result));
 }

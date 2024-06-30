@@ -8,7 +8,9 @@
 // WINDOWS: regex
 // #include <regex.h>
 // WINDOWS: list dir
-// #include <dirent.h>
+#if !defined(PLATFORM_WINDOWS)
+    #include <dirent.h>
+#endif
 
 #define MAX_PATH_LEN 1024
 
@@ -17,6 +19,16 @@
 #define CE_UTF8_INVALID -1
 #define CE_UTF8_SIZE 4
 #define CE_ASCII_PRINTABLE_CHARACTERS (127 - 32)
+
+#if defined(PLATFORM_WINDOWS)
+    #define CE_PATH_SEPARATOR '\\'
+    #define CE_CURRENT_DIR_SEARCH '*'
+    #define CE_CURRENT_DIR_SEARCH_STR "*"
+#else
+    #define CE_PATH_SEPARATOR '/'
+    #define CE_CURRENT_DIR_SEARCH '.'
+    #define CE_CURRENT_DIR_SEARCH_STR "."
+#endif
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
@@ -183,6 +195,12 @@ typedef struct{
      CePoint_t end;
 }CeRange_t;
 
+typedef struct{
+    int64_t count;
+    char** filenames;
+    bool* is_directories;
+}CeListDirResult_t;
+
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);
 // lol we should have a ce_log_free() but honestly, whatever
@@ -271,6 +289,9 @@ int64_t ce_count_digits(int64_t n);
 CeRune_t ce_ctrl_key(char ch);
 
 char* ce_strndup(char* str, size_t n);
+
+CeListDirResult_t ce_list_dir(const char* directory);
+void ce_free_list_dir_result(CeListDirResult_t* list_dir_result);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;

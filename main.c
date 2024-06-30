@@ -762,7 +762,7 @@ void print_help(char* program){
      printf("  -c <config file> path to shared object configuration\n");
 }
 
-int main(int argc, char** argv){
+int main(int argc, char* argv[]){
      const char* config_filepath = NULL;
      int last_arg_index = 0;
 
@@ -770,7 +770,7 @@ int main(int argc, char** argv){
      signal(SIGINT, handle_sigint);
 
      // parse args
-     for(int i = 0; i < argc; i++){
+     for(int i = 1; i < argc; i++){
          char* arg = argv[i];
          if (arg[0] == '-') {
              if (strcmp(arg, "-c") == 0) {

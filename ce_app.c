@@ -23,6 +23,11 @@
 // WINDOWS: waitpid
 // #include <sys/wait.h>
 
+#if defined(PLATFORM_WINDOWS)
+    #include <direct.h>
+#endif
+
+
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
 #endif
@@ -469,34 +474,42 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
                                 bool insert_into_jump_list, const char* filepath){
-     // adjust the filepath if it doesn't match our pwd
-     char real_path[MAX_PATH_LEN + 1];
-     char load_path[MAX_PATH_LEN + 1];
+    char load_path[MAX_PATH_LEN + 1];
 #if defined(PLATFORM_WINDOWS)
-     char* res = _fullpath(filepath, real_path, MAX_PATH_LEN);
+     char* res = _fullpath(NULL, filepath, MAX_PATH_LEN);
 #else
-     char* res = realpath(filepath, real_path);
+     char* res = realpath(filepath, NULL);
 #endif
      if(!res) return NULL;
-     // WINDOWS: current working directory (See GetCurrentDirectory)
-     // char cwd[MAX_PATH_LEN + 1];
-     // if(getcwd(cwd, sizeof(cwd)) != NULL){
-     //      size_t cwd_len = strlen(cwd);
-     //      // append a '/' so it looks like a path
-     //      if(cwd_len < MAX_PATH_LEN){
-     //           cwd[cwd_len] = '/';
-     //           cwd_len++;
-     //           cwd[cwd_len] = 0;
-     //      }
-     //      // if the file is in our current directory, only show part of the path
-     //      if(strncmp(cwd, real_path, cwd_len) == 0){
-     //           strncpy(load_path, real_path + cwd_len, MAX_PATH_LEN);
-     //      }else{
-     //           strncpy(load_path, real_path, MAX_PATH_LEN);
-     //      }
-     // }else{
-          strncpy(load_path, real_path, MAX_PATH_LEN);
-     // }
+
+     char* result = NULL;
+     char cwd[MAX_PATH_LEN + 1];
+
+#if defined(PLATFORM_WINDOWS)
+    result = _getcwd(cwd, sizeof(cwd));
+#else
+    result = getcwd(cwd, sizeof(cwd));
+#endif
+
+     if(result != NULL){
+          size_t cwd_len = strlen(cwd);
+          // append a path separator so it looks like a path
+          if(cwd_len < MAX_PATH_LEN){
+               cwd[cwd_len] = CE_PATH_SEPARATOR;
+               cwd_len++;
+               cwd[cwd_len] = 0;
+          }
+          // if the file is in our current directory, only show part of the path
+          if(strncmp(cwd, res, cwd_len) == 0){
+               strncpy(load_path, res + cwd_len, MAX_PATH_LEN);
+          }else{
+               strncpy(load_path, res, MAX_PATH_LEN);
+          }
+     }else{
+          strncpy(load_path, res, MAX_PATH_LEN);
+     }
+
+     free(res);
 
      // have we already loaded this file?
      CeBufferNode_t* itr = *buffer_node_head;
@@ -567,9 +580,9 @@ void determine_buffer_syntax(CeBuffer_t* buffer){
 }
 
 char* directory_from_filename(const char* filename){
-     const char* last_slash = strrchr(filename, '/');
+     const char* last_slash = strrchr(filename, CE_PATH_SEPARATOR);
      char* directory = NULL;
-     if(last_slash) directory = ce_strndup(filename, last_slash - filename);
+     if(last_slash) directory = ce_strndup((char*)(filename), last_slash - filename);
      return directory;
 }
 
@@ -582,58 +595,49 @@ char* buffer_base_directory(CeBuffer_t* buffer){
 
 void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
      char full_path[MAX_PATH_LEN];
-     if(base_directory && *line != '/'){
-          snprintf(full_path, MAX_PATH_LEN, "%s/%s", base_directory, line);
+     if(base_directory && *line != CE_PATH_SEPARATOR){
+          snprintf(full_path, MAX_PATH_LEN, "%s%c%s", base_directory, CE_PATH_SEPARATOR, line);
      }else{
           strncpy(full_path, line, MAX_PATH_LEN);
      }
 
      // figure out the directory to complete
-     const char* last_slash = strrchr(full_path, '/');
+     const char* last_slash = strrchr(full_path, CE_PATH_SEPARATOR);
      char* directory = NULL;
 
      if(last_slash){
-          directory = ce_strndup(full_path, (last_slash - full_path) + 1);
+          int64_t parent_path_len = (last_slash - full_path) + 1;
+          directory = malloc(parent_path_len + 2);
+          strncpy(directory, full_path, parent_path_len);
+          directory[parent_path_len] = CE_CURRENT_DIR_SEARCH;
+          directory[parent_path_len + 1] = 0;
      }else{
-          directory = strdup(".");
+          directory = strdup(CE_CURRENT_DIR_SEARCH_STR);
      }
 
-     // WINDOWS: list dir
-     // build list of files to complete
-     // struct dirent *node;
-     // DIR* os_dir = opendir(directory);
-     // if(!os_dir){
-     //      free(directory);
-     //      return;
-     // }
+     CeListDirResult_t list_dir_result = ce_list_dir(directory);
 
-     int64_t file_count = 0;
-     char** files = malloc(sizeof(*files));
-
-     // WINDOWS: list dir
-     // char tmp[MAX_PATH_LEN];
-     // struct stat info;
-     // while((node = readdir(os_dir)) != NULL){
-     //      snprintf(tmp, MAX_PATH_LEN, "%s/%s", directory, node->d_name);
-     //      stat(tmp, &info);
-     //      file_count++;
-     //      files = realloc(files, file_count * sizeof(*files));
-     //      if(S_ISDIR(info.st_mode)){
-     //           asprintf(&files[file_count - 1], "%s/", node->d_name);
-     //      }else{
-     //           files[file_count - 1] = strdup(node->d_name);
-     //      }
-     // }
-
-     // closedir(os_dir);
+     // Post process to add a slash to the end of directories.
+     for(int64_t i = 0; i < list_dir_result.count; i++){
+          if(!list_dir_result.is_directories[i]){
+               continue;
+          }
+          int64_t name_len = strnlen(list_dir_result.filenames[i], MAX_PATH_LEN);
+          if (name_len >= MAX_PATH_LEN) {
+               continue;
+          }
+          list_dir_result.filenames[i] = realloc(list_dir_result.filenames[i], name_len + 2);
+          list_dir_result.filenames[i][name_len] = CE_PATH_SEPARATOR;
+          list_dir_result.filenames[i][name_len + 1] = 0;
+     }
 
      // check for exact match
      bool exact_match = true;
-     if(complete->count != file_count){
+     if(complete->count != list_dir_result.count){
           exact_match = false;
      }else{
-          for(int64_t i = 0; i < file_count; i++){
-               if(strcmp(files[i], complete->elements[i].string) != 0){
+          for(int64_t i = 0; i < list_dir_result.count; i++){
+               if(strcmp(list_dir_result.filenames[i], complete->elements[i].string) != 0){
                     exact_match = false;
                     break;
                }
@@ -641,13 +645,10 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      }
 
      if(!exact_match){
-          ce_complete_init(complete, (const char**)(files), NULL, file_count);
+          ce_complete_init(complete, (const char**)(list_dir_result.filenames), NULL, list_dir_result.count);
      }
 
-     for(int64_t i = 0; i < file_count; i++){
-          free(files[i]);
-     }
-     free(files);
+     ce_free_list_dir_result(&list_dir_result);
 
      if(last_slash){
           ce_complete_match(complete, last_slash + 1);
@@ -1144,8 +1145,8 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      char* base_directory = buffer_base_directory(view->buffer);
      char filepath[MAX_PATH_LEN];
      for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-          if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
-               snprintf(filepath, MAX_PATH_LEN, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
+          if(base_directory && app->input_view.buffer->lines[i][0] != CE_PATH_SEPARATOR){
+               snprintf(filepath, MAX_PATH_LEN, "%s%c%s", base_directory, CE_PATH_SEPARATOR, app->input_view.buffer->lines[i]);
           }else{
                strncpy(filepath, app->input_view.buffer->lines[i], MAX_PATH_LEN);
           }
