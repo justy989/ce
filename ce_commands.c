@@ -10,7 +10,7 @@
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
 #elif defined(DISPLAY_GUI)
-    #include <SDL_clipboard.h>
+    #include <SDL2/SDL_clipboard.h>
 #endif
 
 #if !defined(PLATFORM_WINDOWS)
