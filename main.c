@@ -1265,6 +1265,7 @@ int main(int argc, char** argv){
 #endif
 
           if(app.message_mode){
+               gettimeofday(&current_draw_time, NULL);
                time_since_last_message = time_between(app.message_time, current_draw_time);
                if(time_since_last_message > app.config_options.message_display_time_usec){
                     app.message_mode = false;
@@ -1363,6 +1364,7 @@ int main(int argc, char** argv){
 #endif
 
           if (key != KEY_INVALID) {
+              app.message_mode = false;
               // handle input from the user
               app_handle_key(&app, view, key);
           }
