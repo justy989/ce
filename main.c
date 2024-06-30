@@ -5,8 +5,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-// WINDOWS: poll
-// #include <sys/poll.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -31,6 +29,8 @@
 
 #if !defined(PLATFORM_WINDOWS)
     #include <unistd.h>
+    // WINDOWS: poll
+    #include <sys/poll.h>
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -771,13 +771,14 @@ int main(int argc, char* argv[]){
      // parse args
      for(int i = 1; i < argc; i++){
          char* arg = argv[i];
-         if (arg[0] == '-') {
+         if (arg[i] == '-') {
              if (strcmp(arg, "-c") == 0) {
                  if ((i + 1) >= argc) {
                      printf("error: missing config argument. See help.\n");
                      return 1;
                  }
                  config_filepath = argv[i + 1];
+                 i++;
              } else if (strcmp(arg, "-h") == 0) {
                  print_help(argv[0]);
                  return 1;
@@ -1274,7 +1275,11 @@ int main(int argc, char* argv[]){
 #endif
 
           if(app.message_mode){
+#if defined(PLATFORM_WINDOWS)
                timespec_get(&current_draw_time, TIME_UTC);
+#else
+               clock_gettime(CLOCK_MONOTONIC, &current_draw_time);
+#endif
                time_since_last_message_usec = time_between_usec(app.message_time, current_draw_time);
                if(time_since_last_message_usec > app.config_options.message_display_time_usec){
                     app.message_mode = false;

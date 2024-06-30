@@ -78,7 +78,8 @@ char g_log_string[BUFSIZ];
 void ce_log(const char* fmt, ...){
      va_list args;
      va_start(args, fmt);
-     size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
+     // size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
+     vsnprintf(g_log_string, BUFSIZ, fmt, args);
      va_end(args);
 
      // WINDOWS: log
@@ -1999,10 +2000,10 @@ CeListDirResult_t ce_list_dir(const char* directory) {
 #else
      DIR* os_dir = opendir(directory);
      if(!os_dir){
-          free(directory);
           return result;
      }
 
+     struct dirent* node = NULL;
      while((node = readdir(os_dir)) != NULL){
           insert_list_dir_result_filename(&result,
                                           node->d_name,

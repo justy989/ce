@@ -446,9 +446,9 @@ CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNod
                                        CE_PATH_SEPARATOR, list_dir_result.filenames[i]);
           if(list_dir_result.is_directories[i] && full_path_len < (MAX_PATH_LEN - 3)){
                bool ignore_dir = false;
-               for(uint64_t i = 0; i < ignore_dir_count; i++){
-                    if(full_path_len >= ignore_dir_lens[i] &&
-                       strcmp(full_path + full_path_len - ignore_dir_lens[i], ignore_dirs[i]) == 0){
+               for(uint64_t j = 0; j < ignore_dir_count; j++){
+                    if(full_path_len >= ignore_dir_lens[j] &&
+                       strcmp(full_path + full_path_len - ignore_dir_lens[j], ignore_dirs[j]) == 0){
                         ignore_dir = true;
                         break;
                     }

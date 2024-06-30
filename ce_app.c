@@ -4,25 +4,25 @@
 #include "ce_syntax.h"
 
 #include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <fcntl.h>
-// WINDOWS: thread
-// #include <pthread.h>
 #include <sys/stat.h>
-// WINDOWS: shared object
-// #include <dlfcn.h>
-#include <errno.h>
-// WINDOWS: waitpid
-// #include <sys/wait.h>
 
 #if defined(PLATFORM_WINDOWS)
     #include <direct.h>
 #else
     #include <unistd.h>
+    // WINDOWS: shared object
+    #include <dlfcn.h>
+    // WINDOWS: thread
+    #include <pthread.h>
+    // WINDOWS: waitpid
+    #include <sys/wait.h>
 #endif
 
 #if defined(DISPLAY_TERMINAL)
@@ -965,7 +965,11 @@ void ce_app_message(CeApp_t* app, const char* fmt, ...){
      app->message_view.rect.bottom = view->rect.bottom + 1;
      app->message_view.rect.top = view->rect.bottom;
 
+#if defined(PLATFORM_WINDOWS)
      timespec_get(&app->message_time, TIME_UTC);
+#else
+     clock_gettime(CLOCK_MONOTONIC, &app->message_time);
+#endif
      app->message_mode = true;
 
      free(app->message_view.buffer->app_data);
@@ -1305,111 +1309,116 @@ void run_shell_command_cleanup(void* data){
      }
 }
 
+#if !defined(PLATFORM_WINDOWS)
 static void* run_shell_command_and_output_to_buffer(void* data){
      // WINDOWS: process
-     // ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
 
-     // CeSubprocess_t subprocess;
-     // if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
-     //      ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
-     //      pthread_exit(NULL);
-     // }
+     CeSubprocess_t subprocess;
+     if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
+          ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
+          pthread_exit(NULL);
+     }
 
-     // *shell_command_data->should_scroll = true;
+     *shell_command_data->should_scroll = true;
 
-     // // we aren't using stdin here, so we should close it in case the
-     // // subprocess waits for stdin to close before it completes which is common
-     // // in filter applications
-     // ce_subprocess_close_stdin(&subprocess);
+     // we aren't using stdin here, so we should close it in case the
+     // subprocess waits for stdin to close before it completes which is common
+     // in filter applications
+     ce_subprocess_close_stdin(&subprocess);
 
-     // RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
-     // int rc = 0;
+     RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
+     int rc = 0;
 
-     // char bytes[BUFSIZ];
-     // snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.pid, shell_command_data->command);
-     // ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     char bytes[BUFSIZ];
+     snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.pid, shell_command_data->command);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
 
-     // int stdout_fd = fileno(subprocess.stdout_file);
-     // int flags = fcntl(stdout_fd, F_GETFL, 0);
-     // fcntl(stdout_fd, F_SETFL, flags | O_NONBLOCK);
+     int stdout_fd = fileno(subprocess.stdout_file);
+     int flags = fcntl(stdout_fd, F_GETFL, 0);
+     fcntl(stdout_fd, F_SETFL, flags | O_NONBLOCK);
 
-     // while(true){
-     //      if(g_shell_command_should_die){
-     //           run_shell_command_cleanup(&cleanup);
-     //           return NULL;
-     //      }
+     while(true){
+          if(g_shell_command_should_die){
+               run_shell_command_cleanup(&cleanup);
+               return NULL;
+          }
 
-     //      rc = read(stdout_fd, bytes, BUFSIZ);
-     //      if(rc > 0){
-     //           bytes[rc] = 0;
+          rc = read(stdout_fd, bytes, BUFSIZ);
+          if(rc > 0){
+               bytes[rc] = 0;
 
-     //           // sanitize bytes for non-printable characters
-     //           for(int i = 0; i < rc; i++){
-     //               if(bytes[i] < 32 && bytes[i] != '\n') bytes[i] = '?';
-     //           }
+               // sanitize bytes for non-printable characters
+               for(int i = 0; i < rc; i++){
+                   if(bytes[i] < 32 && bytes[i] != '\n') bytes[i] = '?';
+               }
 
-     //           ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-     //           do{
-     //                rc = write(g_shell_command_ready_fds[1], "1", 2);
-     //           }while(rc == -1 && errno == EINTR);
+               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+               do{
+                    rc = write(g_shell_command_ready_fds[1], "1", 2);
+               }while(rc == -1 && errno == EINTR);
 
-     //           if(rc < 0){
-     //                ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-     //                run_shell_command_cleanup(&cleanup);
-     //                return NULL;
-     //           }
-     //      }else if(rc < 0){
-     //           if(errno == EAGAIN || errno == EWOULDBLOCK){
-     //                usleep(1000);
-     //           }else if(errno == EBADF){
-     //                break;
-     //           }
-     //      }else{
-     //           break;
-     //      }
-     // }
+               if(rc < 0){
+                    ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+                    run_shell_command_cleanup(&cleanup);
+                    return NULL;
+               }
+          }else if(rc < 0){
+               if(errno == EAGAIN || errno == EWOULDBLOCK){
+                    usleep(1000);
+               }else if(errno == EBADF){
+                    break;
+               }
+          }else{
+               break;
+          }
+     }
 
-     // if(ferror(subprocess.stdout_file)){
-     //      ce_log("shell command: fgets() from pid %d failed\n", subprocess.pid);
-     //      run_shell_command_cleanup(&cleanup);
-     //      return NULL;
-     // }
+     if(ferror(subprocess.stdout_file)){
+          ce_log("shell command: fgets() from pid %d failed\n", subprocess.pid);
+          run_shell_command_cleanup(&cleanup);
+          return NULL;
+     }
 
-     // int status = ce_subprocess_close(&subprocess);
+     int status = ce_subprocess_close(&subprocess);
 
-     // if(WIFEXITED(status)){
-     //      snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", subprocess.pid, WEXITSTATUS(status));
-     // }else if(WIFSIGNALED(status)){
-     //      snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", subprocess.pid, WTERMSIG(status));
-     // }else if(WIFSTOPPED(status)){
-     //      snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", subprocess.pid, WSTOPSIG(status));
-     // }else{
-     //      snprintf(bytes, BUFSIZ, "\npid %d stopped with unexpected status %d", subprocess.pid, status);
-     // }
+     if(WIFEXITED(status)){
+          snprintf(bytes, BUFSIZ, "\npid %d exited with code %d", subprocess.pid, WEXITSTATUS(status));
+     }else if(WIFSIGNALED(status)){
+          snprintf(bytes, BUFSIZ, "\npid %d killed by signal %d", subprocess.pid, WTERMSIG(status));
+     }else if(WIFSTOPPED(status)){
+          snprintf(bytes, BUFSIZ, "\npid %d stopped by signal %d", subprocess.pid, WSTOPSIG(status));
+     }else{
+          snprintf(bytes, BUFSIZ, "\npid %d stopped with unexpected status %d", subprocess.pid, status);
+     }
 
-     // ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
-     // shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
-     // do{
-     //      rc = write(g_shell_command_ready_fds[1], "1", 2);
-     // }while(rc == -1 && errno == EINTR);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
+     do{
+          rc = write(g_shell_command_ready_fds[1], "1", 2);
+     }while(rc == -1 && errno == EINTR);
 
-     // if(rc < 0){
-     //      ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
-     //      run_shell_command_cleanup(&cleanup);
-     //      return NULL;
-     // }
+     if(rc < 0){
+          ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
+          run_shell_command_cleanup(&cleanup);
+          return NULL;
+     }
 
-     // run_shell_command_cleanup(&cleanup);
+     run_shell_command_cleanup(&cleanup);
      return NULL;
 }
+#endif
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
       // WINDOWS: thread
-     // if(app->shell_command_thread){
-     //      g_shell_command_should_die = true;
-     //      pthread_join(app->shell_command_thread, NULL);
-     //      g_shell_command_should_die = false;
-     // }
+#if defined(PLATFORM_WINDOWS)
+#else
+     if(app->shell_command_thread){
+          g_shell_command_should_die = true;
+          pthread_join(app->shell_command_thread, NULL);
+          g_shell_command_should_die = false;
+     }
+#endif
 
      ce_buffer_empty(app->shell_command_buffer);
 
@@ -1447,11 +1456,14 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
 
      // WINDOWS: thread
-     // int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
-     // if(rc != 0){
-     //      ce_log("pthread_create() failed: '%s'\n", strerror(errno));
-     //      return false;
-     // }
+#if defined(PLATFORM_WINDOWS)
+#else
+     int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
+     if(rc != 0){
+          ce_log("pthread_create() failed: '%s'\n", strerror(errno));
+          return false;
+     }
+#endif
 
      // return true;
      return false;

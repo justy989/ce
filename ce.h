@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-// WINDOWS: regex
-// #include <regex.h>
 #if !defined(PLATFORM_WINDOWS)
     #include <dirent.h>
+    // WINDOWS: regex
+    #include <regex.h>
 #endif
 
 #define MAX_PATH_LEN 1024

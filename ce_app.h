@@ -141,8 +141,10 @@ typedef struct CeApp_t{
      bool highlight_search;
      CeUserConfig_t user_config;
 
+#if !defined(PLATFORM_WINDOWS)
      // WINDOWS: thread
-     // pthread_t shell_command_thread;
+     pthread_t shell_command_thread;
+#endif
 
      int64_t cached_filepath_count;
      char** cached_filepaths;
