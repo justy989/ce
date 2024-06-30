@@ -1378,7 +1378,7 @@ CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data
      CeGui_t* gui = app->gui;
      int new_font_size = gui->font_point_size + command->args[0].integer;
      if (new_font_size % 2 != 0) {
-         ce_log("requested font size %d, but only even font sizes are supported", new_font_size);
+         ce_app_message(app, "requested font size %d, but only even font sizes are supported", new_font_size);
          return CE_COMMAND_FAILURE;
      }
      if (gui_load_font(gui,
