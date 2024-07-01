@@ -1078,7 +1078,7 @@ int main(int argc, char* argv[]){
           buffer_data = app.jump_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.shell_command_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 

@@ -177,7 +177,8 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
              snprintf(line_buffer, STATUS_LINE_LEN, "%s%s RECORDING %c",
                       status_str, view->buffer->name, macros->recording);
          }else{
-             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", status_str, view->buffer->name);
+             CeRune_t rune = ce_buffer_get_rune(view->buffer, view->cursor);
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s %d", status_str, view->buffer->name, rune);
          }
      }else{
          snprintf(line_buffer, STATUS_LINE_LEN, "%s", view->buffer->name);

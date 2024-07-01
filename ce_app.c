@@ -1326,15 +1326,36 @@ static void* run_shell_command_output_to_buffer(void* data){
      DWORD bytes_read = 0;
 
      while(true){
-          bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ, &bytes_read, NULL);
+          bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ - 1, &bytes_read, NULL);
           if(!success || bytes_read == 0){
               break;
           }else{
                // Sanitize bytes for non-printable characters.
                for(DWORD i = 0; i < bytes_read; i++){
-                   if((bytes[i] < 32 || bytes[i] > 126) && bytes[i] != '\n') bytes[i] = '?';
+                   if((bytes[i] < 32 || bytes[i] > 126) && bytes[i] != '\n' && bytes[i] != '\r') bytes[i] = '?';
                }
-               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+
+               // Replace windows "\r\n" with just "\n\0" and write the line to the buffer.
+               DWORD current_line_start = 0;
+               for(DWORD i = 0; i < bytes_read; i++){
+                   if (bytes[i] == '\r' &&
+                       (i + 1) < bytes_read &&
+                       bytes[i+1] == '\n') {
+                       bytes[i] = '\n';
+                       bytes[i+1] = 0;
+                       ce_buffer_insert_string(shell_command_data->buffer,
+                                               bytes + current_line_start,
+                                               ce_buffer_end_point(shell_command_data->buffer));
+                       current_line_start = i + 2;
+                   }
+               }
+               // Write any leftover bytes
+               if(current_line_start < bytes_read){
+                   bytes[bytes_read] = 0;
+                   ce_buffer_insert_string(shell_command_data->buffer,
+                                           bytes + current_line_start,
+                                           ce_buffer_end_point(shell_command_data->buffer));
+               }
           }
      }
 
@@ -1441,7 +1462,6 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 #endif
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
-     printf("%s:%d cmd: %s\n", __FILE__, __LINE__, command);
       // WINDOWS: thread
 #if defined(PLATFORM_WINDOWS)
 #else
@@ -1480,7 +1500,6 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
           snprintf(updated_command, BUFSIZ, "cd %s && %s", base_directory, command);
      }else{
           strncpy(updated_command, command, BUFSIZ);
-          printf("upd: %s orig: %s\n", updated_command, command);
      }
 
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
