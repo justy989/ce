@@ -1100,6 +1100,11 @@ int main(int argc, char* argv[]){
          app.cached_filepath_count = 0;
          app.shell_command_buffer_should_scroll = false;
          app.shell_command_thread_should_die = false;
+#if defined(PLATFORM_WINDOWS)
+         app.shell_command_thread = INVALID_HANDLE_VALUE;
+         app.shell_command_thread_id = -1;
+#endif
+
      }
 
  #if defined(DISPLAY_TERMINAL)

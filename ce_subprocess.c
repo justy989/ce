@@ -2,9 +2,6 @@
 
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
-    // #include <handleapi.h>
-    // #include <namedpipeapi.h>
-    // #include <WinBase.h>
 
 bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command) {
      // Setup a pipe so that we'll be able to read from stdout.
@@ -69,8 +66,10 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command) {
 }
 
 void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal) {
-    TerminateProcess(subprocess->process.hProcess,
-                     0);
+    if (WaitForSingleObject(subprocess->process.hProcess, 0) == WAIT_TIMEOUT) {
+         TerminateProcess(subprocess->process.hProcess,
+                          signal);
+    }
 }
 
 int ce_subprocess_close(CeSubprocess_t* subprocess) {
@@ -98,7 +97,6 @@ int ce_subprocess_close(CeSubprocess_t* subprocess) {
 #include <signal.h>
 #include <unistd.h>
 
-// WINDOWS: process
 // NOTE: stderr is redirected to stdout
 static pid_t popen_with_stdout(const char* cmd, int* out_fd){
      int output_fds[2];
@@ -125,7 +123,6 @@ static pid_t popen_with_stdout(const char* cmd, int* out_fd){
 }
 
 bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command){
-     // WINDOWS: process
      subprocess->pid = popen_with_stdout(command, &subprocess->stdout_fd);
      if(subprocess->pid == 0) return false;
      subprocess->stdout_file = fdopen(subprocess->stdout_fd, "r");
@@ -142,14 +139,7 @@ void _close_file(FILE **file){
      fclose(to_close);
 }
 
-void ce_subprocess_close_stdin(CeSubprocess_t* subprocess){
-     if(!subprocess->stdin_file) return;
-     _close_file(&subprocess->stdin_file);
-     subprocess->stdin_fd = 0;
-}
-
 void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal){
-     // WINDOWS: process
      if(subprocess->pid <= 0){
           return;
      }
@@ -157,9 +147,6 @@ void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal){
 }
 
 int ce_subprocess_close(CeSubprocess_t* subprocess){
-     // WINDOWS: process
-     ce_subprocess_close_stdin(subprocess);
-
      // wait for the subprocess to complete
      int status;
      do{

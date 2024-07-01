@@ -6,7 +6,6 @@
 #if defined(PLATFORM_WINDOWS)
 	#include <processthreadsapi.h>
 #else
-    // WINDOWS: process
     #include <sys/wait.h>
 #endif
 
@@ -17,7 +16,6 @@ typedef struct{
      HANDLE stdout_read_pipe;
 
 #else
-     // WINDOWS: process
      pid_t pid;
      // you should either use the file descriptor, or the FILE pointer.
      // do not mix and match

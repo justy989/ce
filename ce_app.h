@@ -10,6 +10,10 @@
 
 #include <time.h>
 
+#if defined(PLATFORM_WINDOWS)
+    #include <handleapi.h>
+#endif
+
 #define ENABLE_DEBUG_KEY_PRESS_INFO
 
 #define APP_MAX_KEY_COUNT 16
@@ -141,8 +145,10 @@ typedef struct CeApp_t{
      bool highlight_search;
      CeUserConfig_t user_config;
 
-#if !defined(PLATFORM_WINDOWS)
-     // WINDOWS: thread
+#if defined(PLATFORM_WINDOWS)
+     HANDLE shell_command_thread;
+     DWORD shell_command_thread_id;
+#else
      pthread_t shell_command_thread;
 #endif
 

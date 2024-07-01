@@ -14,14 +14,13 @@
 #include <sys/stat.h>
 
 #if defined(PLATFORM_WINDOWS)
+    #include <windows.h>
     #include <direct.h>
 #else
     #include <unistd.h>
     // WINDOWS: shared object
     #include <dlfcn.h>
-    // WINDOWS: thread
     #include <pthread.h>
-    // WINDOWS: waitpid
     #include <sys/wait.h>
 #endif
 
@@ -1301,21 +1300,22 @@ void run_shell_command_cleanup(void* data){
      }
 
      if(cleanup->subprocess){
-          // WINDOWS: process
           // kill the subprocess and wait for it to be cleaned up
-          // ce_subprocess_kill(cleanup->subprocess, SIGKILL);
+#if !defined(PLATFORM_WINDOWS)
+          ce_subprocess_kill(cleanup->subprocess, SIGKILL);
+#endif
           ce_subprocess_close(cleanup->subprocess);
      }
 }
 
 #if defined(PLATFORM_WINDOWS)
-static void* run_shell_command_output_to_buffer(void* data){
+DWORD WINAPI run_shell_command_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
 
      CeSubprocess_t subprocess;
      if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
           ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
-          return NULL;
+          return -1;
      }
      *shell_command_data->should_scroll = true;
 
@@ -1323,9 +1323,12 @@ static void* run_shell_command_output_to_buffer(void* data){
 
      char bytes[BUFSIZ];
      snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.process.dwProcessId, shell_command_data->command);
+     ce_buffer_insert_string(shell_command_data->buffer,
+                             bytes,
+                             ce_buffer_end_point(shell_command_data->buffer));
      DWORD bytes_read = 0;
 
-     while(true){
+     while(WaitForSingleObject(subprocess.process.hProcess, 0) == WAIT_TIMEOUT){
           bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ - 1, &bytes_read, NULL);
           if(!success || bytes_read == 0){
               break;
@@ -1340,35 +1343,37 @@ static void* run_shell_command_output_to_buffer(void* data){
                for(DWORD i = 0; i < bytes_read; i++){
                    if (bytes[i] == '\r' &&
                        (i + 1) < bytes_read &&
-                       bytes[i+1] == '\n') {
-                       bytes[i] = '\n';
+                       bytes[i+1] == CE_NEWLINE) {
+                       bytes[i] = CE_NEWLINE;
                        bytes[i+1] = 0;
+                       CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
                        ce_buffer_insert_string(shell_command_data->buffer,
                                                bytes + current_line_start,
-                                               ce_buffer_end_point(shell_command_data->buffer));
+                                               end);
                        current_line_start = i + 2;
                    }
                }
                // Write any leftover bytes
                if(current_line_start < bytes_read){
                    bytes[bytes_read] = 0;
+                   CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
                    ce_buffer_insert_string(shell_command_data->buffer,
                                            bytes + current_line_start,
-                                           ce_buffer_end_point(shell_command_data->buffer));
+                                           end);
                }
           }
      }
 
      int exit_code = ce_subprocess_close(&subprocess);
-     snprintf(bytes, BUFSIZ, "pid %d exitted with code %d\n", subprocess.process.dwProcessId, exit_code);
-     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     snprintf(bytes, BUFSIZ, "pid %d exitted with code %d", subprocess.process.dwProcessId, exit_code);
+     CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
      run_shell_command_cleanup(&cleanup);
-     return NULL;
+     return 0;
 }
 #else
 static void* run_shell_command_and_output_to_buffer(void* data){
-     // WINDOWS: process
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
 
      CeSubprocess_t subprocess;
@@ -1405,7 +1410,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
                    if(bytes[i] < 32 && bytes[i] != '\n') bytes[i] = '?';
                }
 
-               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+               CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+               ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
                do{
                     rc = write(g_shell_command_ready_fds[1], "1", 2);
                }while(rc == -1 && errno == EINTR);
@@ -1444,7 +1450,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           snprintf(bytes, BUFSIZ, "\npid %d stopped with unexpected status %d", subprocess.pid, status);
      }
 
-     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
      do{
           rc = write(g_shell_command_ready_fds[1], "1", 2);
@@ -1462,8 +1469,15 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 #endif
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
-      // WINDOWS: thread
 #if defined(PLATFORM_WINDOWS)
+     if(app->shell_command_thread != INVALID_HANDLE_VALUE){
+          g_shell_command_should_die = true;
+          WaitForSingleObject(app->shell_command_thread,
+                              INFINITE);
+          CloseHandle(app->shell_command_thread);
+          app->shell_command_thread = INVALID_HANDLE_VALUE;
+          g_shell_command_should_die = false;
+     }
 #else
      if(app->shell_command_thread){
           g_shell_command_should_die = true;
@@ -1507,10 +1521,18 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      shell_command_data->command = ce_strndup(updated_command, BUFSIZ);
      shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
 
-     // WINDOWS: thread
 #if defined(PLATFORM_WINDOWS)
-     // TODO: Run in thread.
-     run_shell_command_output_to_buffer(shell_command_data);
+     app->shell_command_thread = CreateThread(NULL,
+                                              0,
+                                              run_shell_command_output_to_buffer,
+                                              shell_command_data,
+                                              0,
+                                              &app->shell_command_thread_id);
+     if(app->shell_command_thread == NULL){
+          ce_log("failed to create thread to run command\n");
+          return false;
+     }
+
      return true;
 #else
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
