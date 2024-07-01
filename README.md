@@ -48,11 +48,14 @@
   - c11 compiler
   - SDL2
   - SDL2_ttf
+  - Visual Studio
 
 Download SDL2 and split it up:
 - Move the headers into external\include\
 - Move the libraries into external\lib\
 - Move the dlls into build/windows/
+
+Then find Visual Studio's vcvarsall.bat, likely in C:\Program Files\Microsoft Visual Studio\... and update setup.bat to point to that.
 
 `$ setup.bat`
 `$ build.bat`

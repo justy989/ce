@@ -1305,11 +1305,47 @@ void run_shell_command_cleanup(void* data){
           // kill the subprocess and wait for it to be cleaned up
           // ce_subprocess_kill(cleanup->subprocess, SIGKILL);
           ce_subprocess_close(cleanup->subprocess);
-     }else{
      }
 }
 
-#if !defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_WINDOWS)
+static void* run_shell_command_output_to_buffer(void* data){
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+
+     CeSubprocess_t subprocess;
+     if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
+          ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
+          return NULL;
+     }
+     *shell_command_data->should_scroll = true;
+
+     RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
+
+     char bytes[BUFSIZ];
+     snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.process.dwProcessId, shell_command_data->command);
+     DWORD bytes_read = 0;
+
+     while(true){
+          bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ, &bytes_read, NULL);
+          if(!success || bytes_read == 0){
+              break;
+          }else{
+               // Sanitize bytes for non-printable characters.
+               for(DWORD i = 0; i < bytes_read; i++){
+                   if((bytes[i] < 32 || bytes[i] > 126) && bytes[i] != '\n') bytes[i] = '?';
+               }
+               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+          }
+     }
+
+     int exit_code = ce_subprocess_close(&subprocess);
+     snprintf(bytes, BUFSIZ, "pid %d exitted with code %d\n", subprocess.process.dwProcessId, exit_code);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
+     run_shell_command_cleanup(&cleanup);
+     return NULL;
+}
+#else
 static void* run_shell_command_and_output_to_buffer(void* data){
      // WINDOWS: process
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
@@ -1321,11 +1357,6 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      }
 
      *shell_command_data->should_scroll = true;
-
-     // we aren't using stdin here, so we should close it in case the
-     // subprocess waits for stdin to close before it completes which is common
-     // in filter applications
-     ce_subprocess_close_stdin(&subprocess);
 
      RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
      int rc = 0;
@@ -1410,6 +1441,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 #endif
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
+     printf("%s:%d cmd: %s\n", __FILE__, __LINE__, command);
       // WINDOWS: thread
 #if defined(PLATFORM_WINDOWS)
 #else
@@ -1448,23 +1480,26 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
           snprintf(updated_command, BUFSIZ, "cd %s && %s", base_directory, command);
      }else{
           strncpy(updated_command, command, BUFSIZ);
+          printf("upd: %s orig: %s\n", updated_command, command);
      }
 
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
      shell_command_data->buffer = app->shell_command_buffer;
-     shell_command_data->command = strdup(updated_command);
+     shell_command_data->command = ce_strndup(updated_command, BUFSIZ);
      shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
 
      // WINDOWS: thread
 #if defined(PLATFORM_WINDOWS)
+     // TODO: Run in thread.
+     run_shell_command_output_to_buffer(shell_command_data);
+     return true;
 #else
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
           return false;
      }
+     return true;
 #endif
 
-     // return true;
-     return false;
 }
