@@ -73,10 +73,18 @@ typedef struct{
 
 struct CeApp_t;
 
+#if defined(PLATFORM_WINDOWS)
+typedef bool (WINAPI CeUserConfigFunc)(struct CeApp_t*);
+#else
 typedef bool CeUserConfigFunc(struct CeApp_t*);
+#endif
 
 typedef struct{
+#if defined(PLATFORM_WINDOWS)
+     HINSTANCE library_instance;
+#else
      void* handle;
+#endif
      char* filepath;
      CeUserConfigFunc* init_func;
      CeUserConfigFunc* free_func;

@@ -771,7 +771,7 @@ int main(int argc, char* argv[]){
      // parse args
      for(int i = 1; i < argc; i++){
          char* arg = argv[i];
-         if (arg[i] == '-') {
+         if (arg[0] == '-') {
              if (strcmp(arg, "-c") == 0) {
                  if ((i + 1) >= argc) {
                      printf("error: missing config argument. See help.\n");

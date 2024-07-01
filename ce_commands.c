@@ -1113,7 +1113,11 @@ CeCommandStatus_t command_reload_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_reload_config(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
      CeApp_t* app = user_data;
+#if defined(PLATFORM_WINDOWS)
+     if(app->user_config.library_instance == NULL) return CE_COMMAND_NO_ACTION;
+#else
      if(!app->user_config.handle) return CE_COMMAND_NO_ACTION;
+#endif
 
      if(app->command_entries) free(app->command_entries);
      ce_app_init_default_commands(app);

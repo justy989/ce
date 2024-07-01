@@ -793,34 +793,60 @@ CeDestination_t scan_line_for_destination(const char* line){
 }
 
 bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
+#if defined(PLATFORM_WINDOWS)
+     user_config->library_instance = LoadLibrary(filepath);
+     if(user_config->library_instance == NULL){
+          ce_log("LoadLibrary() failed\n");
+          return false;
+     }
+
+     user_config->filepath = strdup(filepath);
+     user_config->init_func = (CeUserConfigFunc*)(GetProcAddress(user_config->library_instance,
+                                                                "ce_init"));
+     if(user_config->init_func == NULL){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+
+     user_config->free_func = (CeUserConfigFunc*)(GetProcAddress(user_config->library_instance,
+                                                                "ce_free"));
+     if(user_config->free_func == NULL){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+#else
      // WINDOWS: shared object
-     // user_config->handle = dlopen(filepath, RTLD_LAZY);
-     // if(!user_config->handle){
-     //      ce_log("dlopen() failed: '%s'\n", dlerror());
-     //      return false;
-     // }
+     user_config->handle = dlopen(filepath, RTLD_LAZY);
+     if(!user_config->handle){
+          ce_log("dlopen() failed: '%s'\n", dlerror());
+          return false;
+     }
 
-     // user_config->filepath = strdup(filepath);
-     // user_config->init_func = dlsym(user_config->handle, "ce_init");
-     // if(!user_config->init_func){
-     //      ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
-     //      return false;
-     // }
+     user_config->filepath = strdup(filepath);
+     user_config->init_func = dlsym(user_config->handle, "ce_init");
+     if(!user_config->init_func){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
 
-     // user_config->free_func = dlsym(user_config->handle, "ce_free");
-     // if(!user_config->free_func){
-     //      ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
-     //      return false;
-     // }
-
+     user_config->free_func = dlsym(user_config->handle, "ce_free");
+     if(!user_config->free_func){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+#endif
      return true;
 }
 
 void user_config_free(CeUserConfig_t* user_config){
      free(user_config->filepath);
+#if defined(PLATFORM_WINDOWS)
+
+#else
      // WINDOWS: shared object
      // NOTE: comment out dlclose() so valgrind can get a helpful stack frame
-     // dlclose(user_config->handle);
+     dlclose(user_config->handle);
+#endif
      memset(user_config, 0, sizeof(*user_config));
 }
 
