@@ -18,7 +18,6 @@
     #include <direct.h>
 #else
     #include <unistd.h>
-    // WINDOWS: shared object
     #include <dlfcn.h>
     #include <pthread.h>
     #include <sys/wait.h>
@@ -815,7 +814,6 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
           return false;
      }
 #else
-     // WINDOWS: shared object
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
           ce_log("dlopen() failed: '%s'\n", dlerror());
@@ -843,7 +841,6 @@ void user_config_free(CeUserConfig_t* user_config){
 #if defined(PLATFORM_WINDOWS)
 
 #else
-     // WINDOWS: shared object
      // NOTE: comment out dlclose() so valgrind can get a helpful stack frame
      dlclose(user_config->handle);
 #endif
@@ -1329,8 +1326,8 @@ void run_shell_command_cleanup(void* data){
           // kill the subprocess and wait for it to be cleaned up
 #if !defined(PLATFORM_WINDOWS)
           ce_subprocess_kill(cleanup->subprocess, SIGKILL);
-#endif
           ce_subprocess_close(cleanup->subprocess);
+#endif
      }
 }
 
@@ -1354,7 +1351,7 @@ DWORD WINAPI run_shell_command_output_to_buffer(void* data){
                              ce_buffer_end_point(shell_command_data->buffer));
      DWORD bytes_read = 0;
 
-     while(WaitForSingleObject(subprocess.process.hProcess, 0) == WAIT_TIMEOUT){
+     while(!g_shell_command_should_die){
           bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ - 1, &bytes_read, NULL);
           if(!success || bytes_read == 0){
               break;
@@ -1388,6 +1385,10 @@ DWORD WINAPI run_shell_command_output_to_buffer(void* data){
                                            end);
                }
           }
+     }
+     if(subprocess.process.hProcess != INVALID_HANDLE_VALUE &&
+        WaitForSingleObject(subprocess.process.hProcess, 0) == WAIT_TIMEOUT){
+          ce_subprocess_kill(&subprocess, 0);
      }
 
      int exit_code = ce_subprocess_close(&subprocess);
