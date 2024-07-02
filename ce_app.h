@@ -8,6 +8,12 @@
 #include "ce_complete.h"
 #include "ce_macros.h"
 
+#include <time.h>
+
+#if defined(PLATFORM_WINDOWS)
+    #include <handleapi.h>
+#endif
+
 #define ENABLE_DEBUG_KEY_PRESS_INFO
 
 #define APP_MAX_KEY_COUNT 16
@@ -67,10 +73,18 @@ typedef struct{
 
 struct CeApp_t;
 
+#if defined(PLATFORM_WINDOWS)
+typedef bool (WINAPI CeUserConfigFunc)(struct CeApp_t*);
+#else
 typedef bool CeUserConfigFunc(struct CeApp_t*);
+#endif
 
 typedef struct{
+#if defined(PLATFORM_WINDOWS)
+     HINSTANCE library_instance;
+#else
      void* handle;
+#endif
      char* filepath;
      CeUserConfigFunc* init_func;
      CeUserConfigFunc* free_func;
@@ -104,7 +118,7 @@ typedef struct CeApp_t{
      CeView_t complete_view;
      CeInputCompleteFunc* input_complete_func;
      bool message_mode;
-     struct timeval message_time;
+     struct timespec message_time;
      CeLayout_t* tab_list_layout;
      CeSyntaxDef_t* syntax_defs;
      CeBufferNode_t* buffer_node_head;
@@ -139,7 +153,12 @@ typedef struct CeApp_t{
      bool highlight_search;
      CeUserConfig_t user_config;
 
+#if defined(PLATFORM_WINDOWS)
+     HANDLE shell_command_thread;
+     DWORD shell_command_thread_id;
+#else
      pthread_t shell_command_thread;
+#endif
 
      int64_t cached_filepath_count;
      char** cached_filepaths;

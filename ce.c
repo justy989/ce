@@ -5,12 +5,19 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <unistd.h>
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
 #include <ctype.h>
 #include <sys/stat.h>
+
+#if defined(PLATFORM_WINDOWS)
+    #include <fileapi.h>
+    #include <handleapi.h>
+    #include <inttypes.h>
+#else
+    #include <unistd.h>
+#endif
 
 FILE* g_ce_log = NULL;
 CeBuffer_t* g_ce_log_buffer = NULL;
@@ -71,10 +78,12 @@ char g_log_string[BUFSIZ];
 void ce_log(const char* fmt, ...){
      va_list args;
      va_start(args, fmt);
-     size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
+     // size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
+     vsnprintf(g_log_string, BUFSIZ, fmt, args);
      va_end(args);
 
-     fwrite(g_log_string, string_len, 1, g_ce_log);
+     // WINDOWS: log
+     // fwrite(g_log_string, string_len, 1, g_ce_log);
      CePoint_t end = ce_buffer_end_point(g_ce_log_buffer);
      g_ce_log_buffer->status = CE_BUFFER_STATUS_NONE;
      ce_buffer_insert_string(g_ce_log_buffer, g_log_string, end);
@@ -144,10 +153,37 @@ void ce_buffer_free(CeBuffer_t* buffer){
 bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      struct stat statbuf;
      if(stat(filename, &statbuf) != 0) return false;
-     if(S_ISDIR(statbuf.st_mode)){
+     bool is_dir = false;
+
+#if defined(PLATFORM_WINDOWS)
+     is_dir = (statbuf.st_mode & _S_IFDIR);
+#else
+     is_dir = S_ISDIR(statbuf.st_mode);
+#endif
+     if(is_dir){
           errno = EPERM;
           return false;
      }
+
+#if defined(PLATFORM_WINDOWS)
+     bool writeable = (_access(filename, 2) == 0);
+     bool readable = (_access(filename, 4) == 0);
+
+     if (!writeable && readable) {
+          buffer->status = CE_BUFFER_STATUS_READONLY;
+     }else if(writeable && readable){
+          buffer->status = CE_BUFFER_STATUS_NONE;
+     }else{
+          ce_log("File %s not read-able or write-able %d", filename, errno);
+          return false;
+     }
+#else
+     if(access(filename, W_OK) != 0){
+          buffer->status = CE_BUFFER_STATUS_READONLY;
+     }else{
+          buffer->status = CE_BUFFER_STATUS_NONE;
+     }
+#endif
 
      buffer->file_modified_time = statbuf.st_mtime;
 
@@ -183,12 +219,6 @@ bool ce_buffer_load_file(CeBuffer_t* buffer, const char* filename){
      }
 
      fclose(file);
-
-     if(access(filename, W_OK) != 0){
-          buffer->status = CE_BUFFER_STATUS_READONLY;
-     }else{
-          buffer->status = CE_BUFFER_STATUS_NONE;
-     }
 
      free(contents);
      ce_log("%s() loaded '%s'\n", __FUNCTION__, filename);
@@ -430,104 +460,105 @@ CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const c
      return result;
 }
 
-CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
-     CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
-
-     if(!ce_buffer_point_is_valid(buffer, start)) return result;
-
-     const size_t match_count = 1;
-     regmatch_t matches[match_count];
-
-     while(start.y < buffer->line_count){
-          int rc = regexec(regex, buffer->lines[start.y] + start.x, match_count, matches, 0);
-          if(rc == 0){
-               result.point = start;
-               result.point.x += matches[0].rm_so;
-               result.length = matches[0].rm_eo - matches[0].rm_so;
-               break;
-          }else if(rc != REG_NOMATCH){
-               char error_buffer[128];
-               regerror(rc, regex, error_buffer, 128);
-               ce_log("regexec() failed: '%s'", error_buffer);
-               break;
-          }
-
-          start.y++;
-          start.x = 0;
-     }
-
-     return result;
-}
-
-CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
-     CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
-
-     if(!ce_buffer_point_is_valid(buffer, start)) return result;
-
-     const size_t match_count = 1;
-     regmatch_t matches[match_count];
-
-     CePoint_t location = start;
-
-     // loop over each line, backwards
-     while(true){
-          CePoint_t last_valid_match = {-1, location.y};
-          int64_t last_valid_match_len = 0;
-
-          location.x = 0;
-
-          if(buffer->lines[location.y][0]){
-               // dupe the line up to the current index
-               char* search_str = strdup(buffer->lines[location.y]);
-               int64_t search_str_len = strlen(search_str);
-
-               // start at the beginning of the line, find all matches up to the cursor and take that one
-               while(location.x < search_str_len){
-                    int rc = regexec(regex, search_str + location.x, match_count, matches, 0);
-
-                    if(rc == 0){
-                         int64_t match_x = location.x + matches[0].rm_so;
-
-                         // if the match is after the start, then stop looking in this line
-                         if(match_x >= start.x && location.y == start.y) break;
-
-                         // save the match if we find one
-                         last_valid_match.x = match_x;
-                         last_valid_match_len = matches[0].rm_eo - matches[0].rm_so;
-                         if(last_valid_match_len == 0) break;
-                    }else{
-                         // error out if regexec() fails for some reason other than no match
-                         if(rc != REG_NOMATCH){
-                              char error_buffer[128];
-                              regerror(rc, regex, error_buffer, 128);
-                              ce_log("regexec() failed: '%s'", error_buffer);
-                              return result;
-                         }
-
-                         // if there was no match, stop looking in this line
-                         break;
-                    }
-
-                    // update the next location to start after the match
-                    location.x = last_valid_match.x + last_valid_match_len;
-               }
-
-               free(search_str);
-          }
-
-          if(last_valid_match.x >= 0){
-               result.point = last_valid_match;
-               result.length = last_valid_match_len;
-               break;
-          }
-
-          location.y--;
-
-          if(location.y < 0) break;
-     }
-
-     return result;
-}
+// WINDOWS: regex
+// CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
+//      CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
+//
+//      if(!ce_buffer_point_is_valid(buffer, start)) return result;
+//
+//      const size_t match_count = 1;
+//      regmatch_t matches[match_count];
+//
+//      while(start.y < buffer->line_count){
+//           int rc = regexec(regex, buffer->lines[start.y] + start.x, match_count, matches, 0);
+//           if(rc == 0){
+//                result.point = start;
+//                result.point.x += matches[0].rm_so;
+//                result.length = matches[0].rm_eo - matches[0].rm_so;
+//                break;
+//           }else if(rc != REG_NOMATCH){
+//                char error_buffer[128];
+//                regerror(rc, regex, error_buffer, 128);
+//                ce_log("regexec() failed: '%s'", error_buffer);
+//                break;
+//           }
+//
+//           start.y++;
+//           start.x = 0;
+//      }
+//
+//      return result;
+// }
+//
+// CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
+//      CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
+//
+//      if(!ce_buffer_point_is_valid(buffer, start)) return result;
+//
+//      const size_t match_count = 1;
+//      regmatch_t matches[match_count];
+//
+//      CePoint_t location = start;
+//
+//      // loop over each line, backwards
+//      while(true){
+//           CePoint_t last_valid_match = {-1, location.y};
+//           int64_t last_valid_match_len = 0;
+//
+//           location.x = 0;
+//
+//           if(buffer->lines[location.y][0]){
+//                // dupe the line up to the current index
+//                char* search_str = strdup(buffer->lines[location.y]);
+//                int64_t search_str_len = strlen(search_str);
+//
+//                // start at the beginning of the line, find all matches up to the cursor and take that one
+//                while(location.x < search_str_len){
+//                     int rc = regexec(regex, search_str + location.x, match_count, matches, 0);
+//
+//                     if(rc == 0){
+//                          int64_t match_x = location.x + matches[0].rm_so;
+//
+//                          // if the match is after the start, then stop looking in this line
+//                          if(match_x >= start.x && location.y == start.y) break;
+//
+//                          // save the match if we find one
+//                          last_valid_match.x = match_x;
+//                          last_valid_match_len = matches[0].rm_eo - matches[0].rm_so;
+//                          if(last_valid_match_len == 0) break;
+//                     }else{
+//                          // error out if regexec() fails for some reason other than no match
+//                          if(rc != REG_NOMATCH){
+//                               char error_buffer[128];
+//                               regerror(rc, regex, error_buffer, 128);
+//                               ce_log("regexec() failed: '%s'", error_buffer);
+//                               return result;
+//                          }
+//
+//                          // if there was no match, stop looking in this line
+//                          break;
+//                     }
+//
+//                     // update the next location to start after the match
+//                     location.x = last_valid_match.x + last_valid_match_len;
+//                }
+//
+//                free(search_str);
+//           }
+//
+//           if(last_valid_match.x >= 0){
+//                result.point = last_valid_match;
+//                result.length = last_valid_match_len;
+//                break;
+//           }
+//
+//           location.y--;
+//
+//           if(location.y < 0) break;
+//      }
+//
+//      return result;
+// }
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;
@@ -960,7 +991,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length)
      // exit early if the whole string is just on this line
      if(buffer_utf8_length > length){
           char* end = ce_utf8_iterate_to(start, length);
-          return strndup(start, end - start);
+          return ce_strndup(start, end - start);
      }else if(buffer_utf8_length == length){
           char* new_string = malloc(real_length + 1);
           strncpy(new_string, start, real_length - 1);
@@ -1912,4 +1943,84 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
 CeRune_t ce_ctrl_key(char ch){
      if(isalpha((int)(ch))) return (ch - 'a') + 1;
      return CE_UTF8_INVALID;
+}
+
+char* ce_strndup(char* str, size_t n) {
+#if defined(PLATFORM_WINDOWS)
+    size_t str_len = strnlen(str, n);
+    char* result = malloc(str_len + 1);
+    if (result == NULL) {
+        return result;
+    }
+    strncpy(result, str, str_len);
+    result[str_len] = 0;
+    return result;
+#else
+    return strndup(str, n);
+#endif
+}
+
+static void insert_list_dir_result_filename(CeListDirResult_t* list_dir_result,
+                                            const char* filename,
+                                            bool is_directory) {
+      int64_t new_count = list_dir_result->count + 1;
+
+      list_dir_result->filenames = realloc(list_dir_result->filenames,
+                                           new_count * sizeof(*list_dir_result->filenames));
+      list_dir_result->filenames[list_dir_result->count] = strdup(filename);
+
+      list_dir_result->is_directories = realloc(list_dir_result->is_directories,
+                                                new_count * sizeof(*list_dir_result->is_directories));
+      list_dir_result->is_directories[list_dir_result->count] = is_directory;
+
+      list_dir_result->count = new_count;
+}
+
+CeListDirResult_t ce_list_dir(const char* directory) {
+     CeListDirResult_t result;
+     memset(&result, 0, sizeof(result));
+
+#if defined(PLATFORM_WINDOWS)
+     WIN32_FIND_DATA find_files_result;
+     memset(&find_files_result, 0, sizeof(find_files_result));
+
+     HANDLE find_files_handle = FindFirstFileA(directory,
+                                               &find_files_result);
+     if (find_files_handle == INVALID_HANDLE_VALUE) {
+          return result;
+     }
+
+     do{
+         insert_list_dir_result_filename(&result,
+                                         find_files_result.cFileName,
+                                         find_files_result.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+     }while(FindNextFileA(find_files_handle, &find_files_result));
+
+     FindClose(find_files_handle);
+#else
+     DIR* os_dir = opendir(directory);
+     if(!os_dir){
+          return result;
+     }
+
+     struct dirent* node = NULL;
+     while((node = readdir(os_dir)) != NULL){
+          insert_list_dir_result_filename(&result,
+                                          node->d_name,
+                                          node->d_type == DT_DIR);
+     }
+
+     closedir(os_dir);
+#endif
+
+     return result;
+}
+
+void ce_free_list_dir_result(CeListDirResult_t* list_dir_result) {
+     for(int64_t i = 0; i < list_dir_result->count; i++){
+          free(list_dir_result->filenames[i]);
+     }
+     free(list_dir_result->filenames);
+     free(list_dir_result->is_directories);
+     memset(list_dir_result, 0, sizeof(*list_dir_result));
 }

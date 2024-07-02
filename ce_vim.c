@@ -2435,31 +2435,33 @@ CeVimMotionResult_t ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* actio
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
      {
-          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
-          }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
-               result = regex_result.point;
-          }
+          // WINDOWS: regex
+          // CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
+          // regex_t regex = {};
+          // int rc = regcomp(&regex, yank->text, REG_EXTENDED);
+          // if(rc != 0){
+          //      char error_buffer[BUFSIZ];
+          //      regerror(rc, &regex, error_buffer, BUFSIZ);
+          //      ce_log("regcomp() failed: '%s'", error_buffer);
+          // }else{
+          //      CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
+          //      result = regex_result.point;
+          // }
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_BACKWARD:
      {
-          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
-          }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_backward(view->buffer, start, &regex);
-               result = regex_result.point;
-          }
+          // WINDOWS: regex
+          // CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
+          // regex_t regex = {};
+          // int rc = regcomp(&regex, yank->text, REG_EXTENDED);
+          // if(rc != 0){
+          //      char error_buffer[BUFSIZ];
+          //      regerror(rc, &regex, error_buffer, BUFSIZ);
+          //      ce_log("regcomp() failed: '%s'", error_buffer);
+          // }else{
+          //      CeRegexSearchResult_t regex_result = ce_buffer_regex_search_backward(view->buffer, start, &regex);
+          //      result = regex_result.point;
+          // }
      } break;
      }
      if(result.x < 0) return CE_VIM_MOTION_RESULT_FAIL;
@@ -2488,31 +2490,33 @@ CeVimMotionResult_t ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* actio
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
      {
-          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
-          }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_backward(view->buffer, start, &regex);
-               result = regex_result.point;
-          }
+          // WINDOWS: regex
+          // CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
+          // regex_t regex = {};
+          // int rc = regcomp(&regex, yank->text, REG_EXTENDED);
+          // if(rc != 0){
+          //      char error_buffer[BUFSIZ];
+          //      regerror(rc, &regex, error_buffer, BUFSIZ);
+          //      ce_log("regcomp() failed: '%s'", error_buffer);
+          // }else{
+          //      CeRegexSearchResult_t regex_result = ce_buffer_regex_search_backward(view->buffer, start, &regex);
+          //      result = regex_result.point;
+          // }
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_BACKWARD:
      {
-          CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
-          }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
-               result = regex_result.point;
-          }
+          // WINDOWS: regex
+          // CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
+          // regex_t regex = {};
+          // int rc = regcomp(&regex, yank->text, REG_EXTENDED);
+          // if(rc != 0){
+          //      char error_buffer[BUFSIZ];
+          //      regerror(rc, &regex, error_buffer, BUFSIZ);
+          //      ce_log("regcomp() failed: '%s'", error_buffer);
+          // }else{
+          //      CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
+          //      result = regex_result.point;
+          // }
      } break;
      }
      if(result.x < 0) return CE_VIM_MOTION_RESULT_FAIL;
@@ -3430,9 +3434,9 @@ bool ce_vim_verb_unindent(CeVim_t* vim, const CeVimAction_t* action, CeRange_t m
                }
           }
 
-          if(tab_width){
+          if(tab_width && tab_width < 255){
                // build indentation string
-               char remove_string[tab_width + 1];
+               char remove_string[256];
                memset(remove_string, ' ', tab_width);
                remove_string[tab_width] = 0;
 
@@ -3556,7 +3560,7 @@ static bool change_number(CeView_t* view, CePoint_t* cursor, CePoint_t point, in
      int64_t digits = ce_count_digits(value);
      if(value < 0) digits++; // account for negative sign
      char* new_number_string = malloc(digits + 1);
-     snprintf(new_number_string, digits + 1, "%ld", value);
+     snprintf(new_number_string, digits + 1, "%" PRId64, value);
      new_number_string[digits] = 0;
 
      ce_buffer_remove_string_change(view->buffer, change_point, number_len, &change_point_save,

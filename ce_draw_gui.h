@@ -7,8 +7,8 @@
 // - Display when line extends passed the view
 
 #if defined(DISPLAY_GUI)
-  #include <SDL.h>
-  #include <SDL_ttf.h>
+  #include <SDL2/SDL.h>
+  #include <SDL2/SDL_ttf.h>
 
   #define COLOR_BLACK 0
   #define COLOR_RED 1

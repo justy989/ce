@@ -143,11 +143,14 @@ bool ce_command_parse(CeCommand_t* command, const char* string){
      CeCommandArg_t* arg = command->args;
 
      // parse the individual args
+     char buffer[CE_COMMAND_ARG_MAX_LEN];
      while(*start){
           end = find_end_of_arg(start);
           if(end){
                int64_t arg_len = end - start;
-               char buffer[arg_len + 1];
+               if (arg_len >= CE_COMMAND_ARG_MAX_LEN) {
+                   return false;
+               }
                memset(buffer, 0, arg_len + 1);
                buffer[arg_len] = 0;
 
@@ -158,7 +161,9 @@ bool ce_command_parse(CeCommand_t* command, const char* string){
                }
           }else{
                int64_t arg_len = strlen(start);
-               char buffer[arg_len + 1];
+               if (arg_len >= CE_COMMAND_ARG_MAX_LEN) {
+                   return false;
+               }
                memset(buffer, 0, arg_len + 1);
                strcpy(buffer, start);
                buffer[arg_len] = 0;
