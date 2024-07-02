@@ -1439,18 +1439,22 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
                         bool regex_search){
      bool chain_undo = false;
      int64_t match_len = 0;
-     // regex_t regex = {};
+#if !defined(PLATFORM_WINDOWS)
+     regex_t regex = {};
+#endif
 
      if(regex_search){
-          // WINDOWS: regex
-          // int rc = regcomp(&regex, match, REG_EXTENDED);
-          // if(rc != 0){
-          //      char error_buffer[BUFSIZ];
-          //      regerror(rc, &regex, error_buffer, BUFSIZ);
-          //      ce_log("regcomp() failed: '%s'", error_buffer);
-          //      return;
-          // }
+#if defined(PLATFORM_WINDOWS)
           return;
+#else
+          int rc = regcomp(&regex, match, REG_EXTENDED);
+          if(rc != 0){
+               char error_buffer[BUFSIZ];
+               regerror(rc, &regex, error_buffer, BUFSIZ);
+               ce_log("regcomp() failed: '%s'", error_buffer);
+               return;
+          }
+#endif
      }else{
            match_len = strlen(match);
      }
@@ -1460,11 +1464,14 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
 
           // find the match
           if(regex_search){
-               // WINDOWS: regex
-               // CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, &regex);
-               // match_point = result.point;
-               // match_len = result.length;
+#if defined(PLATFORM_WINDOWS)
+               return;
+#else
+               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, &regex);
+               match_point = result.point;
+               match_len = result.length;
                break;
+#endif
           }else{
                match_point = ce_buffer_search_forward(buffer, start, match);
           }

@@ -22,6 +22,7 @@
 #include "ce_key_defines.h"
 
 #if defined(DISPLAY_TERMINAL)
+  #include <sys/poll.h>
   #include "ce_draw_term.h"
 #elif defined(DISPLAY_GUI)
   #include "ce_draw_gui.h"
@@ -29,8 +30,6 @@
 
 #if !defined(PLATFORM_WINDOWS)
     #include <unistd.h>
-    // WINDOWS: poll
-    #include <sys/poll.h>
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -712,45 +711,46 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
-          // WINDOWS: regex
-          // }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
-          //      if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-          //           regex_t regex = {};
-          //           int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
-          //           if(rc != 0){
-          //                char error_buffer[BUFSIZ];
-          //                regerror(rc, &regex, error_buffer, BUFSIZ);
-          //                ce_log("regcomp() failed: '%s'", error_buffer);
-          //           }else{
-          //                CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
-          //                if(result.point.x >= 0){
-          //                     scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
-          //                }else{
-          //                     view->cursor = app->search_start;
-          //                }
-          //           }
-          //      }else{
-          //           view->cursor = app->search_start;
-          //      }
-          // }else if(strcmp(app->input_view.buffer->name, "Regex Reverse Search") == 0){
-          //      if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-          //           regex_t regex = {};
-          //           int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
-          //           if(rc != 0){
-          //                char error_buffer[BUFSIZ];
-          //                regerror(rc, &regex, error_buffer, BUFSIZ);
-          //                ce_log("regcomp() failed: '%s'", error_buffer);
-          //           }else{
-          //                CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
-          //                if(result.point.x >= 0){
-          //                     scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
-          //                }else{
-          //                     view->cursor = app->search_start;
-          //                }
-          //           }
-          //      }else{
-          //           view->cursor = app->search_start;
-          //      }
+#if !defined(PLATFORM_WINDOWS)
+          }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
+               if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+                    regex_t regex = {};
+                    int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
+                    if(rc != 0){
+                         char error_buffer[BUFSIZ];
+                         regerror(rc, &regex, error_buffer, BUFSIZ);
+                         ce_log("regcomp() failed: '%s'", error_buffer);
+                    }else{
+                         CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
+                         if(result.point.x >= 0){
+                              scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
+                         }else{
+                              view->cursor = app->search_start;
+                         }
+                    }
+               }else{
+                    view->cursor = app->search_start;
+               }
+          }else if(strcmp(app->input_view.buffer->name, "Regex Reverse Search") == 0){
+               if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
+                    regex_t regex = {};
+                    int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
+                    if(rc != 0){
+                         char error_buffer[BUFSIZ];
+                         regerror(rc, &regex, error_buffer, BUFSIZ);
+                         ce_log("regcomp() failed: '%s'", error_buffer);
+                    }else{
+                         CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
+                         if(result.point.x >= 0){
+                              scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
+                         }else{
+                              view->cursor = app->search_start;
+                         }
+                    }
+               }else{
+                    view->cursor = app->search_start;
+               }
+#endif
           }
      }
 }
@@ -803,25 +803,26 @@ int main(int argc, char* argv[]){
           g_ce_log_buffer->no_line_numbers = true;
      }
 
-     // WINDOWS: log
-     // char ce_dir[MAX_PATH_LEN];
-     // snprintf(ce_dir, MAX_PATH_LEN, "%s/.ce", getenv("HOME"));
+#if !defined(PLATFORM_WINDOWS)
+     char ce_dir[MAX_PATH_LEN];
+     snprintf(ce_dir, MAX_PATH_LEN, "%s/.ce", getenv("HOME"));
 
-     // struct stat st = {};
-     // if(stat(ce_dir, &st) == -1){
-     //      mode_t permissions = S_IRWXU | S_IRWXG;
-     //      int rc = mkdir(ce_dir, permissions);
-     //      if(rc != 0){
-     //           fprintf(stderr, "mkdir('%s', %d) failed: '%s'\n", ce_dir, permissions, strerror(errno));
-     //           return 1;
-     //      }
-     // }
+     struct stat st = {};
+     if(stat(ce_dir, &st) == -1){
+          mode_t permissions = S_IRWXU | S_IRWXG;
+          int rc = mkdir(ce_dir, permissions);
+          if(rc != 0){
+               fprintf(stderr, "mkdir('%s', %d) failed: '%s'\n", ce_dir, permissions, strerror(errno));
+               return 1;
+          }
+     }
 
-     // char log_filepath[MAX_PATH_LEN];
-     // snprintf(log_filepath, MAX_PATH_LEN, "%s/ce.log", ce_dir);
-     // if(!ce_log_init(log_filepath)){
-     //      return 1;
-     // }
+     char log_filepath[MAX_PATH_LEN];
+     snprintf(log_filepath, MAX_PATH_LEN, "%s/ce.log", ce_dir);
+     if(!ce_log_init(log_filepath)){
+          return 1;
+     }
+#endif
 
      // init user config
      if(config_filepath){
