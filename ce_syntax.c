@@ -116,19 +116,19 @@ void ce_range_list_free(CeRangeList_t* list){
 }
 
 int ce_draw_color_list_last_fg_color(CeDrawColorList_t* draw_color_list){
-     int fg = COLOR_DEFAULT;
+     int fg = CE_COLOR_DEFAULT;
      if(draw_color_list->tail) fg = draw_color_list->tail->fg;
      return fg;
 }
 
 int ce_draw_color_list_last_bg_color(CeDrawColorList_t* draw_color_list){
-     int bg = COLOR_DEFAULT;
+     int bg = CE_COLOR_DEFAULT;
      if(draw_color_list->tail) bg = draw_color_list->tail->bg;
      return bg;
 }
 
 int ce_draw_color_list_next_to_last_fg_color(CeDrawColorList_t* draw_color_list){
-     int fg = COLOR_DEFAULT;
+     int fg = CE_COLOR_DEFAULT;
      if(draw_color_list->tail && (draw_color_list->head != draw_color_list->tail)){
           CeDrawColorNode_t* itr = draw_color_list->head;
           while(itr->next != draw_color_list->tail) itr = itr->next;
@@ -503,11 +503,11 @@ void ce_syntax_highlight_visual(CeRangeNode_t** range_node, bool* in_visual, CeP
                     if(syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg == CE_SYNTAX_USE_CURRENT_COLOR){
                          // if the syntax def for visual fg is use current color, then keep that one
                          ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list),
-                                                   COLOR_DEFAULT, point);
+                                                   CE_COLOR_DEFAULT, point);
                     }else{
                          // use the 2nd to last color, because we have been overriding each color with visual colors
                          ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_next_to_last_fg_color(draw_color_list),
-                                                   COLOR_DEFAULT, point);
+                                                   CE_COLOR_DEFAULT, point);
                     }
 
                     *range_node = (*range_node)->next;
@@ -534,7 +534,7 @@ void check_visual_mode_end(CeRangeNode_t* range_node, bool* in_visual, int64_t l
      if(in_visual){
           if(ce_point_after(point, range_node->range.end)){
                ce_draw_color_list_insert(draw_color_list, ce_draw_color_list_last_fg_color(draw_color_list),
-                                         COLOR_DEFAULT, point);
+                                         CE_COLOR_DEFAULT, point);
                range_node = range_node->next;
                *in_visual = false;
           }
@@ -608,8 +608,8 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                               multiline_comment = false;
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                         (CePoint_t){0, match_point.y + 1});
                          }
                     }else{
@@ -636,10 +636,10 @@ void ce_syntax_highlight_c(CeView_t* view, CeRangeList_t* highlight_range_list, 
                               multiline_comment = true;
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                         (CePoint_t){0, match_point.y + 1});
-                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != CE_COLOR_DEFAULT || draw_color_list->tail->bg != CE_COLOR_DEFAULT)){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
                          }
                     }
@@ -832,8 +832,8 @@ void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list
                               multiline_comment = false;
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                         (CePoint_t){0, match_point.y + 1});
                          }
                     }else{
@@ -862,10 +862,10 @@ void ce_syntax_highlight_cpp(CeView_t* view, CeRangeList_t* highlight_range_list
                               multiline_comment = true;
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                         (CePoint_t){0, match_point.y + 1});
-                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != CE_COLOR_DEFAULT || draw_color_list->tail->bg != CE_COLOR_DEFAULT)){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
                          }
                     }
@@ -1033,10 +1033,10 @@ void ce_syntax_highlight_java(CeView_t* view, CeRangeList_t* highlight_range_lis
                               multiline_comment = true;
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                         (CePoint_t){0, match_point.y + 1});
-                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != CE_COLOR_DEFAULT || draw_color_list->tail->bg != CE_COLOR_DEFAULT)){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
                          }
                     }
@@ -1249,10 +1249,10 @@ void ce_syntax_highlight_python(CeView_t* view, CeRangeList_t* highlight_range_l
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NUMBER_LITERAL, match_point);
                          }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                              ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                        ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                         (CePoint_t){0, match_point.y + 1});
-                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                         }else if(!draw_color_list->tail || (draw_color_list->tail->fg != CE_COLOR_DEFAULT || draw_color_list->tail->bg != CE_COLOR_DEFAULT)){
                               change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
                          }
                     }
@@ -1340,10 +1340,10 @@ void ce_syntax_highlight_bash(CeView_t* view, CeRangeList_t* highlight_range_lis
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NUMBER_LITERAL, match_point);
                     }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                         ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                   ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                         ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                   ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                    (CePoint_t){0, match_point.y + 1});
-                    }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                    }else if(!draw_color_list->tail || (draw_color_list->tail->fg != CE_COLOR_DEFAULT || draw_color_list->tail->bg != CE_COLOR_DEFAULT)){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
                     }
 
@@ -1415,10 +1415,10 @@ void ce_syntax_highlight_config(CeView_t* view, CeRangeList_t* highlight_range_l
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NUMBER_LITERAL, match_point);
                     }else if(((view->cursor.y != y) || (x > view->cursor.x)) && (match_len = match_trailing_whitespace(str))){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_TRAILING_WHITESPACE, match_point);
-                         ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
-                                                   ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, COLOR_DEFAULT),
+                         ce_draw_color_list_insert(draw_color_list, ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
+                                                   ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_NORMAL, CE_COLOR_DEFAULT),
                                                    (CePoint_t){0, match_point.y + 1});
-                    }else if(!draw_color_list->tail || (draw_color_list->tail->fg != COLOR_DEFAULT || draw_color_list->tail->bg != COLOR_DEFAULT)){
+                    }else if(!draw_color_list->tail || (draw_color_list->tail->fg != CE_COLOR_DEFAULT || draw_color_list->tail->bg != CE_COLOR_DEFAULT)){
                          change_draw_color(draw_color_list, syntax_defs, CE_SYNTAX_COLOR_NORMAL, match_point);
                     }
 

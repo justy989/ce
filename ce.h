@@ -31,18 +31,38 @@
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
-#define COLOR_DEFAULT -1
-#define COLOR_BRIGHT_BLACK 8
-#define COLOR_BRIGHT_RED 9
-#define COLOR_BRIGHT_GREEN 10
-#define COLOR_BRIGHT_YELLOW 11
-#define COLOR_BRIGHT_BLUE 12
-#define COLOR_BRIGHT_MAGENTA 13
-#define COLOR_BRIGHT_CYAN 14
-#define COLOR_BRIGHT_WHITE 15
-#define COLOR_FOREGROUND 16
-#define COLOR_BACKGROUND 17
-#define COLOR_COUNT 18
+#if defined(DISPLAY_TERM)
+  #define CE_COLOR_BLACK COLOR_BLACK
+  #define CE_COLOR_RED COLOR_RED
+  #define CE_COLOR_GREEN COLOR_GREEN
+  #define CE_COLOR_YELLOW COLOR_YELLOW
+  #define CE_COLOR_BLUE COLOR_BLUE
+  #define CE_COLOR_MAGENTA COLOR_MAGENTA
+  #define CE_COLOR_CYAN COLOR_CYAN
+  #define CE_COLOR_WHITE COLOR_WHITE
+#else
+  #define CE_COLOR_BLACK 0
+  #define CE_COLOR_RED 1
+  #define CE_COLOR_GREEN 2
+  #define CE_COLOR_YELLOW 3
+  #define CE_COLOR_BLUE 4
+  #define CE_COLOR_MAGENTA 5
+  #define CE_COLOR_CYAN 6
+  #define CE_COLOR_WHITE 7
+#endif
+
+#define CE_COLOR_DEFAULT -1
+#define CE_COLOR_BRIGHT_BLACK 8
+#define CE_COLOR_BRIGHT_RED 9
+#define CE_COLOR_BRIGHT_GREEN 10
+#define CE_COLOR_BRIGHT_YELLOW 11
+#define CE_COLOR_BRIGHT_BLUE 12
+#define CE_COLOR_BRIGHT_MAGENTA 13
+#define CE_COLOR_BRIGHT_CYAN 14
+#define CE_COLOR_BRIGHT_WHITE 15
+#define CE_COLOR_FOREGROUND 16
+#define CE_COLOR_BACKGROUND 17
+#define CE_COLOR_COUNT 18
 
 typedef int32_t CeRune_t;
 
@@ -166,7 +186,7 @@ typedef struct{
      int cycle_next_completion_key;
      int cycle_prev_completion_key;
      CeRune_t show_line_extends_passed_view_as;
-     CeColorDef_t color_defs[COLOR_COUNT];
+     CeColorDef_t color_defs[CE_COLOR_COUNT];
      int gui_window_width;
      int gui_window_height;
      int gui_font_size;

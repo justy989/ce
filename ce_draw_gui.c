@@ -9,11 +9,11 @@
 
 static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index, bool foreground) {
     SDL_Color result;
-    if(index == COLOR_DEFAULT){
+    if(index == CE_COLOR_DEFAULT){
         if (foreground) {
-            index = COLOR_FOREGROUND;
+            index = CE_COLOR_FOREGROUND;
         } else {
-            index = COLOR_BACKGROUND;
+            index = CE_COLOR_BACKGROUND;
         }
     }
     result.r = config_options->color_defs[index].red;
@@ -56,7 +56,7 @@ static void _draw_text_line(const char* line, int64_t pixel_x, int64_t pixel_y,
 
 static void _draw_cursor(CePoint_t* cursor, CeConfigOptions_t* config_options, CeGui_t* gui) {
      SDL_Color color = color_from_index(config_options,
-                                        COLOR_FOREGROUND,
+                                        CE_COLOR_FOREGROUND,
                                         false);
      uint32_t color_packed = SDL_MapRGB(gui->window_surface->format,
                                         color.r,
@@ -139,27 +139,27 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
                break;
           case CE_VIM_MODE_NORMAL:
                vim_mode_string = "NORMAL ";
-               text_color = color_from_index(config_options, COLOR_BLUE, true);
+               text_color = color_from_index(config_options, CE_COLOR_BLUE, true);
                break;
           case CE_VIM_MODE_INSERT:
                vim_mode_string = "INSERT ";
-               text_color = color_from_index(config_options, COLOR_GREEN, true);
+               text_color = color_from_index(config_options, CE_COLOR_GREEN, true);
                break;
           case CE_VIM_MODE_VISUAL:
                vim_mode_string = "VISUAL ";
-               text_color = color_from_index(config_options, COLOR_YELLOW, true);
+               text_color = color_from_index(config_options, CE_COLOR_YELLOW, true);
                break;
           case CE_VIM_MODE_VISUAL_LINE:
                vim_mode_string = "VISUAL LINE ";
-               text_color = color_from_index(config_options, COLOR_BRIGHT_YELLOW, true);
+               text_color = color_from_index(config_options, CE_COLOR_BRIGHT_YELLOW, true);
                break;
           case CE_VIM_MODE_VISUAL_BLOCK:
                vim_mode_string = "VISUAL BLOCK ";
-               text_color = color_from_index(config_options, COLOR_BRIGHT_YELLOW, true);
+               text_color = color_from_index(config_options, CE_COLOR_BRIGHT_YELLOW, true);
                break;
           case CE_VIM_MODE_REPLACE:
                vim_mode_string = "REPLACE ";
-               text_color = color_from_index(config_options, COLOR_RED, true);
+               text_color = color_from_index(config_options, CE_COLOR_RED, true);
                break;
           }
 
@@ -238,7 +238,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
      CeDrawColorNode_t* current_syntax_color_node = NULL;
      CeDrawColorNode_t* next_syntax_color_node = NULL;
 
-     SDL_Color text_color = color_from_index(config_options, COLOR_FOREGROUND, true);
+     SDL_Color text_color = color_from_index(config_options, CE_COLOR_FOREGROUND, true);
 
      CeDrawColorNode_t default_node;
 
@@ -251,8 +251,8 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                     // If the first point in the buffer doesn't have a syntax node, then
                     // create a default and set it to the head of the list. This fixes buffers
                     // with no syntax highlighting until later in the buffer.
-                    default_node.fg = COLOR_FOREGROUND;
-                    default_node.bg = COLOR_BACKGROUND;
+                    default_node.fg = CE_COLOR_FOREGROUND;
+                    default_node.bg = CE_COLOR_BACKGROUND;
                     default_node.point.x = 0;
                     default_node.point.y = 0;
                     default_node.next = current_syntax_color_node;
@@ -274,7 +274,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
           if (!view->buffer->no_highlight_current_line &&
               line_index == view->cursor.y) {
                SDL_Color color = color_from_index(config_options,
-                                                  ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, COLOR_BLACK),
+                                                  ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_CURRENT_LINE, CE_COLOR_BLACK),
                                                   false);
                uint32_t color_packed = SDL_MapRGB(gui->window_surface->format,
                                                   color.r,
@@ -294,7 +294,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
 
           if(!view->buffer->no_line_numbers && config_options->line_number > 0){
                SDL_Color color = color_from_index(config_options,
-                                                  ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_LINE_NUMBER, COLOR_BLACK),
+                                                  ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_LINE_NUMBER, CE_COLOR_BLACK),
                                                   true);
                // TODO: Respect background color.
                int current_line_number = line_index + 1;
@@ -353,8 +353,8 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                         line_buffer[line_buffer_index] = 0;
                         text_color = color_from_index(config_options, current_syntax_color_node->fg, true);
                         if(line_buffer_index > 0){
-                            if(current_syntax_color_node->bg != COLOR_BACKGROUND &&
-                                current_syntax_color_node->bg != COLOR_DEFAULT &&
+                            if(current_syntax_color_node->bg != CE_COLOR_BACKGROUND &&
+                                current_syntax_color_node->bg != CE_COLOR_DEFAULT &&
                                 current_syntax_color_node->bg != CE_SYNTAX_USE_CURRENT_COLOR){
                                  SDL_Color bg_color = color_from_index(config_options,
                                                                        current_syntax_color_node->bg,
@@ -388,8 +388,8 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                   (next_syntax_color_node == NULL || ce_point_after(next_syntax_color_node->point, buffer_point))){
                     text_color = color_from_index(config_options, current_syntax_color_node->fg, true);
 
-                    if (current_syntax_color_node->bg != COLOR_BACKGROUND &&
-                        current_syntax_color_node->bg != COLOR_DEFAULT &&
+                    if (current_syntax_color_node->bg != CE_COLOR_BACKGROUND &&
+                        current_syntax_color_node->bg != CE_COLOR_DEFAULT &&
                         current_syntax_color_node->bg != CE_SYNTAX_USE_CURRENT_COLOR) {
                          SDL_Color bg_color = color_from_index(config_options,
                                                                current_syntax_color_node->bg,
@@ -518,7 +518,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
      CeLayout_t* tab_layout = tab_list_layout->tab_list.current;
 
      SDL_Color background_color = color_from_index(&app->config_options,
-                                                   COLOR_BACKGROUND,
+                                                   CE_COLOR_BACKGROUND,
                                                    false);
      uint32_t background_color_packed = SDL_MapRGB(gui->window_surface->format,
                                                    background_color.r,
@@ -676,7 +676,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
 
      if(app->message_mode){
           CeDrawColorList_t draw_color_list = {};
-          ce_draw_color_list_insert(&draw_color_list, COLOR_RED, app->config_options.ui_bg_color, (CePoint_t){0, 0});
+          ce_draw_color_list_insert(&draw_color_list, CE_COLOR_RED, app->config_options.ui_bg_color, (CePoint_t){0, 0});
           _draw_view(&app->message_view, gui, NULL, &app->macros, &draw_color_list,
                      app->syntax_defs, &app->config_options, app->terminal_rect.right);
      }
