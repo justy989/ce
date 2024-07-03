@@ -5,14 +5,29 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <regex.h>
-#include <dirent.h>
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <dirent.h>
+    #include <regex.h>
+#endif
+
+#define MAX_PATH_LEN 1024
 
 #define CE_NEWLINE '\n'
 #define CE_TAB '\t'
 #define CE_UTF8_INVALID -1
 #define CE_UTF8_SIZE 4
 #define CE_ASCII_PRINTABLE_CHARACTERS (127 - 32)
+
+#if defined(PLATFORM_WINDOWS)
+    #define CE_PATH_SEPARATOR '\\'
+    #define CE_CURRENT_DIR_SEARCH '*'
+    #define CE_CURRENT_DIR_SEARCH_STR "*"
+#else
+    #define CE_PATH_SEPARATOR '/'
+    #define CE_CURRENT_DIR_SEARCH '.'
+    #define CE_CURRENT_DIR_SEARCH_STR "."
+#endif
 
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
@@ -156,7 +171,7 @@ typedef struct{
      int gui_window_height;
      int gui_font_size;
      int gui_font_line_separation;
-     char gui_font_path[PATH_MAX];
+     char gui_font_path[MAX_PATH_LEN];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
@@ -171,13 +186,19 @@ typedef struct{
 
 typedef struct{
      CePoint_t point;
-     char filepath[PATH_MAX];
+     char filepath[MAX_PATH_LEN];
 }CeDestination_t;
 
 typedef struct{
      CePoint_t start;
      CePoint_t end;
 }CeRange_t;
+
+typedef struct{
+    int64_t count;
+    char** filenames;
+    bool* is_directories;
+}CeListDirResult_t;
 
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);
@@ -201,8 +222,10 @@ bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid // TODO: unittest
 CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
 CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
+#if !defined(PLATFORM_WINDOWS)
 CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
 CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
+#endif
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
 char* ce_buffer_dupe(CeBuffer_t* buffer);
@@ -264,6 +287,11 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
 int64_t ce_count_digits(int64_t n);
 
 CeRune_t ce_ctrl_key(char ch);
+
+char* ce_strndup(char* str, size_t n);
+
+CeListDirResult_t ce_list_dir(const char* directory);
+void ce_free_list_dir_result(CeListDirResult_t* list_dir_result);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;

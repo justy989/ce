@@ -1,6 +1,8 @@
 #include "ce_draw_gui.h"
 #include "ce_app.h"
 
+#include <string.h>
+
 #if defined(DISPLAY_GUI)
 
 #define STATUS_LINE_LEN 128
@@ -100,13 +102,14 @@ static void _append_search_highlight_ranges(const char* pattern, CeLayout_t* lay
      if(vim->search_mode == CE_VIM_SEARCH_MODE_FORWARD ||
         vim->search_mode == CE_VIM_SEARCH_MODE_BACKWARD){
           for(int64_t i = min; i <= max; i++){
-               char* match = NULL;
-               char* itr = layout->view.buffer->lines[i];
-               while((match = strstr(itr, pattern))){
+               const char* itr = layout->view.buffer->lines[i];
+               const char* match = strstr(itr, pattern);
+               while(match){
                     CePoint_t start = {ce_utf8_strlen_between(layout->view.buffer->lines[i], match) - 1, i};
                     CePoint_t end = {start.x + (pattern_len - 1), i};
                     ce_range_list_insert(range_list, start, end);
                     itr = match + pattern_len;
+                    match = strstr(itr, pattern);
                }
           }
      }
@@ -174,7 +177,8 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
              snprintf(line_buffer, STATUS_LINE_LEN, "%s%s RECORDING %c",
                       status_str, view->buffer->name, macros->recording);
          }else{
-             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s", status_str, view->buffer->name);
+             CeRune_t rune = ce_buffer_get_rune(view->buffer, view->cursor);
+             snprintf(line_buffer, STATUS_LINE_LEN, "%s%s %d", status_str, view->buffer->name, rune);
          }
      }else{
          snprintf(line_buffer, STATUS_LINE_LEN, "%s", view->buffer->name);
@@ -190,7 +194,7 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
                     gui);
 
      // Draw the cursor pos in the bottom right.
-     int64_t cursor_pose_string_len = snprintf(line_buffer, STATUS_LINE_LEN, "%ld, %ld",
+     int64_t cursor_pose_string_len = snprintf(line_buffer, STATUS_LINE_LEN, "%" PRId64 ", %" PRId64,
                                                view->cursor.x + 1, view->cursor.y + 1);
 
     _draw_text_line(line_buffer,

@@ -28,11 +28,37 @@
 - Using something on a daily basis that we created gives us the warm and fuzzies.
 
 ### How To Build
+
+#### Terminal Linux
 - Requirements
   - c11 compiler
   - ncurses library
 
-`$ make`
+`$ make term`
+
+#### Gui Linux
+- Requirements
+  - c11 compiler
+  - SDL2
+
+`$ make gui`
+
+#### Gui Windows
+- Requirements
+  - c11 compiler
+  - SDL2
+  - SDL2_ttf
+  - Visual Studio
+
+Download SDL2 and split it up:
+- Move the headers into external\include\
+- Move the libraries into external\lib\
+- Move the dlls into build/windows/
+
+Then find Visual Studio's vcvarsall.bat, likely in C:\Program Files\Microsoft Visual Studio\... and update setup.bat to point to that.
+
+`$ setup.bat`
+`$ build.bat`
 
 ### How To Run
 `$ ce path/to/file.c`

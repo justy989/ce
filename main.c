@@ -1,19 +1,18 @@
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <locale.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <locale.h>
-#include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/poll.h>
-#include <unistd.h>
-#include <assert.h>
-#include <signal.h>
-#include <errno.h>
+#include <time.h>
 
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
 #elif defined(DISPLAY_GUI)
-    #include <SDL.h>
-    #include <SDL_ttf.h>
+    #include <SDL2/SDL.h>
+    #include <SDL2/SDL_ttf.h>
 #else
 #error "No display mode specified"
 #endif
@@ -23,9 +22,14 @@
 #include "ce_key_defines.h"
 
 #if defined(DISPLAY_TERMINAL)
+  #include <sys/poll.h>
   #include "ce_draw_term.h"
 #elif defined(DISPLAY_GUI)
   #include "ce_draw_gui.h"
+#endif
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <unistd.h>
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -155,7 +159,7 @@ static void build_bind_list(CeBuffer_t* buffer, CeKeyBinds_t* key_binds){
                default:
                     break;
                case CE_COMMAND_ARG_INTEGER:
-                    printed += snprintf(line + printed, 256 - printed, " %ld", bind->command.args[c].integer);
+                    printed += snprintf(line + printed, 256 - printed, " %" PRId64, bind->command.args[c].integer);
                     break;
                case CE_COMMAND_ARG_DECIMAL:
                     printed += snprintf(line + printed, 256 - printed, " %f", bind->command.args[c].decimal);
@@ -212,7 +216,7 @@ static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
           CePoint_t* point = buffer_data->marks + i;
           if(point->x == 0 && point->y == 0) continue;
           char reg = i + '!';
-          snprintf(line, 256, "'%c' %ld, %ld\n", reg, point->x, point->y);
+          snprintf(line, 256, "'%c' %" PRId64 ", %" PRId64 "\n", reg, point->x, point->y);
           buffer_append_on_new_line(buffer, line);
      }
 
@@ -247,11 +251,10 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-uint64_t time_between(struct timeval previous, struct timeval current){
+static uint64_t time_between_usec(struct timespec previous, struct timespec current){
      return (current.tv_sec - previous.tv_sec) * 1000000LL +
-            (current.tv_usec - previous.tv_usec);
+            ((current.tv_nsec - previous.tv_nsec)) / 1000;
 }
-
 
 static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
@@ -641,7 +644,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          CeJumpList_t* jump_list = &view_data->jump_list;
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
-                         strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+                         strncpy(destination.filepath, view->buffer->name, MAX_PATH_LEN);
                          ce_jump_list_insert(jump_list, destination);
                     }
 
@@ -708,6 +711,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
+#if !defined(PLATFORM_WINDOWS)
           }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     regex_t regex = {};
@@ -746,6 +750,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
+#endif
           }
      }
 }
@@ -756,7 +761,7 @@ void print_help(char* program){
      printf("  -c <config file> path to shared object configuration\n");
 }
 
-int main(int argc, char** argv){
+int main(int argc, char* argv[]){
      const char* config_filepath = NULL;
      int last_arg_index = 0;
 
@@ -764,21 +769,24 @@ int main(int argc, char** argv){
      signal(SIGINT, handle_sigint);
 
      // parse args
-     {
-          char c;
-          while((c = getopt(argc, argv, "c:h")) != -1){
-               switch(c){
-               case 'c':
-                    config_filepath = optarg;
-                    break;
-               case 'h':
-               default:
-                    print_help(argv[0]);
-                    return 1;
-               }
-          }
-
-          last_arg_index = optind;
+     for(int i = 1; i < argc; i++){
+         char* arg = argv[i];
+         if (arg[0] == '-') {
+             if (strcmp(arg, "-c") == 0) {
+                 if ((i + 1) >= argc) {
+                     printf("error: missing config argument. See help.\n");
+                     return 1;
+                 }
+                 config_filepath = argv[i + 1];
+                 i++;
+             } else if (strcmp(arg, "-h") == 0) {
+                 print_help(argv[0]);
+                 return 1;
+             }
+         } else {
+             last_arg_index = i;
+             break;
+         }
      }
 
      setlocale(LC_ALL, "");
@@ -795,8 +803,9 @@ int main(int argc, char** argv){
           g_ce_log_buffer->no_line_numbers = true;
      }
 
-     char ce_dir[PATH_MAX];
-     snprintf(ce_dir, PATH_MAX, "%s/.ce", getenv("HOME"));
+#if !defined(PLATFORM_WINDOWS)
+     char ce_dir[MAX_PATH_LEN];
+     snprintf(ce_dir, MAX_PATH_LEN, "%s/.ce", getenv("HOME"));
 
      struct stat st = {};
      if(stat(ce_dir, &st) == -1){
@@ -808,11 +817,12 @@ int main(int argc, char** argv){
           }
      }
 
-     char log_filepath[PATH_MAX];
-     snprintf(log_filepath, PATH_MAX, "%s/ce.log", ce_dir);
+     char log_filepath[MAX_PATH_LEN];
+     snprintf(log_filepath, MAX_PATH_LEN, "%s/ce.log", ce_dir);
      if(!ce_log_init(log_filepath)){
           return 1;
      }
+#endif
 
      // init user config
      if(config_filepath){
@@ -912,7 +922,7 @@ int main(int argc, char** argv){
           config_options->gui_window_height = 768;
           config_options->gui_font_size = 16;
           config_options->gui_font_line_separation = 1;
-          strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", PATH_MAX);
+          strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", MAX_PATH_LEN);
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
@@ -1069,7 +1079,7 @@ int main(int argc, char** argv){
           buffer_data = app.jump_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.shell_command_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 
@@ -1091,6 +1101,11 @@ int main(int argc, char** argv){
          app.cached_filepath_count = 0;
          app.shell_command_buffer_should_scroll = false;
          app.shell_command_thread_should_die = false;
+#if defined(PLATFORM_WINDOWS)
+         app.shell_command_thread = INVALID_HANDLE_VALUE;
+         app.shell_command_thread_id = -1;
+#endif
+
      }
 
  #if defined(DISPLAY_TERMINAL)
@@ -1205,7 +1220,9 @@ int main(int argc, char** argv){
           app.message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
      }
 
+#if !defined(PLATFORM_WINDOWS)
      pipe(g_shell_command_ready_fds);
+#endif
 
  #if defined(DISPLAY_TERMINAL)
      ce_draw_term(&app);
@@ -1213,9 +1230,8 @@ int main(int argc, char** argv){
      ce_draw_gui(&app, &gui);
  #endif
 
-     // init draw thread
-     struct timeval current_draw_time = {};
-     uint64_t time_since_last_message = 0;
+     struct timespec current_draw_time = {};
+     uint64_t time_since_last_message_usec = 0;
 
      // main loop
      while(!app.quit){
@@ -1265,9 +1281,13 @@ int main(int argc, char** argv){
 #endif
 
           if(app.message_mode){
-               gettimeofday(&current_draw_time, NULL);
-               time_since_last_message = time_between(app.message_time, current_draw_time);
-               if(time_since_last_message > app.config_options.message_display_time_usec){
+#if defined(PLATFORM_WINDOWS)
+               timespec_get(&current_draw_time, TIME_UTC);
+#else
+               clock_gettime(CLOCK_MONOTONIC, &current_draw_time);
+#endif
+               time_since_last_message_usec = time_between_usec(app.message_time, current_draw_time);
+               if(time_since_last_message_usec > app.config_options.message_display_time_usec){
                     app.message_mode = false;
                }
           }
@@ -1301,7 +1321,11 @@ int main(int argc, char** argv){
                     app.quit = true;
                     break;
                case SDL_KEYDOWN:
+#if defined(PLATFORM_WINDOWS)
+                    if (__isascii(event.key.keysym.sym)) {
+#else
                     if (isascii(event.key.keysym.sym)) {
+#endif
                         keydown_key = event.key.keysym.sym;
                         if (event.key.keysym.mod & KMOD_SHIFT) {
                             keydown_key = toupper(keydown_key);

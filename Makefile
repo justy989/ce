@@ -5,7 +5,6 @@ GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
 TERM_INCFLAGS := -I/usr/include/ncursesw
-GUI_INCFLAGS := -I/usr/include/SDL2
 
 BUILD_DIR ?= build
 TERM_OBJDIR ?= $(BUILD_DIR)/term
@@ -41,7 +40,7 @@ $(GUI_OBJDIR):
 	mkdir -p $@
 
 $(GUI_OBJDIR)/%.o: %.c $(CHDRS) | $(GUI_OBJDIR)
-	$(CC) $(GUI_DEFINES) $(CFLAGS) $(GUI_INCFLAGS) -c -o $@ $<
+	$(CC) $(GUI_DEFINES) $(CFLAGS) -c -o $@ $<
 
 $(GUI_EXE): $(GUI_COBJS)
 	$(CC) $(GUI_DEFINES) $(CFLAGS) $^ -o $@ $(GUI_LDFLAGS)

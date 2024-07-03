@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #define CE_COMMAND_NAME_MAX_LEN 512
+#define CE_COMMAND_ARG_MAX_LEN 1024
 
 typedef enum{
      CE_COMMAND_SUCCESS,
