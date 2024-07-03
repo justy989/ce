@@ -78,11 +78,12 @@ char g_log_string[BUFSIZ];
 void ce_log(const char* fmt, ...){
      va_list args;
      va_start(args, fmt);
-     // size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
-     vsnprintf(g_log_string, BUFSIZ, fmt, args);
+     size_t string_len = vsnprintf(g_log_string, BUFSIZ, fmt, args);
      va_end(args);
 
-#if !defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_WINDOWS)
+     (void)(string_len);
+#else
      fwrite(g_log_string, string_len, 1, g_ce_log);
 #endif
      CePoint_t end = ce_buffer_end_point(g_ce_log_buffer);
