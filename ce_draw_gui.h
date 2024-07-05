@@ -1,17 +1,14 @@
 #pragma once
 
-#if defined(DISPLAY_GUI)
-  #include <SDL.h>
-  #include <SDL_ttf.h>
+// TODO:
+// - display message
+// - select parent layout, I don't remember what you do with that though.
+// - regex search highlight
+// - Display when line extends passed the view
 
-  #define COLOR_BLACK 0
-  #define COLOR_RED 1
-  #define COLOR_GREEN 2
-  #define COLOR_YELLOW 3
-  #define COLOR_BLUE 4
-  #define COLOR_MAGENTA 5
-  #define COLOR_CYAN 6
-  #define COLOR_WHITE 7
+#if defined(DISPLAY_GUI)
+  #include <SDL2/SDL.h>
+  #include <SDL2/SDL_ttf.h>
 
 typedef struct{
     SDL_Window* window;

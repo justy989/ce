@@ -4,19 +4,28 @@
 #include "ce_syntax.h"
 
 #include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <fcntl.h>
-#include <ncurses.h>
-#include <pthread.h>
-#include <unistd.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
-#include <errno.h>
-#include <sys/time.h>
-#include <sys/wait.h>
+
+#if defined(PLATFORM_WINDOWS)
+    #include <windows.h>
+    #include <direct.h>
+#else
+    #include <unistd.h>
+    #include <dlfcn.h>
+    #include <pthread.h>
+    #include <sys/wait.h>
+#endif
+
+#if defined(DISPLAY_TERMINAL)
+    #include <ncurses.h>
+#endif
 
 int g_shell_command_ready_fds[2];
 bool g_shell_command_should_die = false;
@@ -248,7 +257,7 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
                int bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
                ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
           }else{
-               ce_draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, match_point);
+               ce_draw_color_list_insert(draw_color_list, CE_COLOR_DEFAULT, CE_COLOR_DEFAULT, match_point);
           }
 
           if(complete->current_match && strlen(complete->current_match)){
@@ -265,11 +274,11 @@ void ce_syntax_highlight_completions(CeView_t* view, CeRangeList_t* highlight_ra
                     match_point.x += match_len;
 
                     if(selected == y){
-                         fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, COLOR_DEFAULT);
+                         fg = ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, CE_COLOR_DEFAULT);
                          bg = ce_syntax_def_get_bg(syntax_defs, CE_SYNTAX_COLOR_COMPLETE_SELECTED, ce_draw_color_list_last_bg_color(draw_color_list));
                          ce_draw_color_list_insert(draw_color_list, fg, bg, match_point);
                     }else{
-                         ce_draw_color_list_insert(draw_color_list, COLOR_DEFAULT, COLOR_DEFAULT, match_point);
+                         ce_draw_color_list_insert(draw_color_list, CE_COLOR_DEFAULT, CE_COLOR_DEFAULT, match_point);
                     }
                }
           }
@@ -345,7 +354,7 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim,
 
           if(add_current){
                destination.point = view->cursor;
-               strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+               strncpy(destination.filepath, view->buffer->name, MAX_PATH_LEN);
                ce_jump_list_insert(jump_list, destination);
           }
      }
@@ -365,7 +374,7 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim,
      if(insert_into_jump_list){
           CeDestination_t destination = {};
           destination.point = view->cursor;
-          strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+          strncpy(destination.filepath, view->buffer->name, MAX_PATH_LEN);
           ce_jump_list_insert(jump_list, destination);
      }
 
@@ -431,7 +440,7 @@ bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const
 
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
-     input_view->rect.right = view->rect.right - 1;
+     input_view->rect.right = view->rect.right;
      input_view->rect.bottom = view->rect.bottom;
      int64_t max_height = (view->rect.bottom - view->rect.top) - 1;
      int64_t height = input_view->buffer->line_count;
@@ -460,29 +469,42 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
                                 bool insert_into_jump_list, const char* filepath){
-     // adjust the filepath if it doesn't match our pwd
-     char real_path[PATH_MAX + 1];
-     char load_path[PATH_MAX + 1];
-     char* res = realpath(filepath, real_path);
+    char load_path[MAX_PATH_LEN + 1];
+#if defined(PLATFORM_WINDOWS)
+     char* res = _fullpath(NULL, filepath, MAX_PATH_LEN);
+#else
+     char* res = realpath(filepath, NULL);
+#endif
      if(!res) return NULL;
-     char cwd[PATH_MAX + 1];
-     if(getcwd(cwd, sizeof(cwd)) != NULL){
+
+     char* result = NULL;
+     char cwd[MAX_PATH_LEN + 1];
+
+#if defined(PLATFORM_WINDOWS)
+    result = _getcwd(cwd, sizeof(cwd));
+#else
+    result = getcwd(cwd, sizeof(cwd));
+#endif
+
+     if(result != NULL){
           size_t cwd_len = strlen(cwd);
-          // append a '/' so it looks like a path
-          if(cwd_len < PATH_MAX){
-               cwd[cwd_len] = '/';
+          // append a path separator so it looks like a path
+          if(cwd_len < MAX_PATH_LEN){
+               cwd[cwd_len] = CE_PATH_SEPARATOR;
                cwd_len++;
                cwd[cwd_len] = 0;
           }
           // if the file is in our current directory, only show part of the path
-          if(strncmp(cwd, real_path, cwd_len) == 0){
-               strncpy(load_path, real_path + cwd_len, PATH_MAX);
+          if(strncmp(cwd, res, cwd_len) == 0){
+               strncpy(load_path, res + cwd_len, MAX_PATH_LEN);
           }else{
-               strncpy(load_path, real_path, PATH_MAX);
+               strncpy(load_path, res, MAX_PATH_LEN);
           }
      }else{
-          strncpy(load_path, real_path, PATH_MAX);
+          strncpy(load_path, res, MAX_PATH_LEN);
      }
+
+     free(res);
 
      // have we already loaded this file?
      CeBufferNode_t* itr = *buffer_node_head;
@@ -553,9 +575,9 @@ void determine_buffer_syntax(CeBuffer_t* buffer){
 }
 
 char* directory_from_filename(const char* filename){
-     const char* last_slash = strrchr(filename, '/');
+     const char* last_slash = strrchr(filename, CE_PATH_SEPARATOR);
      char* directory = NULL;
-     if(last_slash) directory = strndup(filename, last_slash - filename);
+     if(last_slash) directory = ce_strndup((char*)(filename), last_slash - filename);
      return directory;
 }
 
@@ -567,57 +589,50 @@ char* buffer_base_directory(CeBuffer_t* buffer){
 }
 
 void complete_files(CeComplete_t* complete, const char* line, const char* base_directory){
-     char full_path[PATH_MAX];
-     if(base_directory && *line != '/'){
-          snprintf(full_path, PATH_MAX, "%s/%s", base_directory, line);
+     char full_path[MAX_PATH_LEN];
+     if(base_directory && *line != CE_PATH_SEPARATOR){
+          snprintf(full_path, MAX_PATH_LEN, "%s%c%s", base_directory, CE_PATH_SEPARATOR, line);
      }else{
-          strncpy(full_path, line, PATH_MAX);
+          strncpy(full_path, line, MAX_PATH_LEN);
      }
 
      // figure out the directory to complete
-     const char* last_slash = strrchr(full_path, '/');
+     const char* last_slash = strrchr(full_path, CE_PATH_SEPARATOR);
      char* directory = NULL;
 
      if(last_slash){
-          directory = strndup(full_path, (last_slash - full_path) + 1);
+          int64_t parent_path_len = (last_slash - full_path) + 1;
+          directory = malloc(parent_path_len + 2);
+          strncpy(directory, full_path, parent_path_len);
+          directory[parent_path_len] = CE_CURRENT_DIR_SEARCH;
+          directory[parent_path_len + 1] = 0;
      }else{
-          directory = strdup(".");
+          directory = strdup(CE_CURRENT_DIR_SEARCH_STR);
      }
 
-     // build list of files to complete
-     struct dirent *node;
-     DIR* os_dir = opendir(directory);
-     if(!os_dir){
-          free(directory);
-          return;
-     }
+     CeListDirResult_t list_dir_result = ce_list_dir(directory);
 
-     int64_t file_count = 0;
-     char** files = malloc(sizeof(*files));
-
-     char tmp[PATH_MAX];
-     struct stat info;
-     while((node = readdir(os_dir)) != NULL){
-          snprintf(tmp, PATH_MAX, "%s/%s", directory, node->d_name);
-          stat(tmp, &info);
-          file_count++;
-          files = realloc(files, file_count * sizeof(*files));
-          if(S_ISDIR(info.st_mode)){
-               asprintf(&files[file_count - 1], "%s/", node->d_name);
-          }else{
-               files[file_count - 1] = strdup(node->d_name);
+     // Post process to add a slash to the end of directories.
+     for(int64_t i = 0; i < list_dir_result.count; i++){
+          if(!list_dir_result.is_directories[i]){
+               continue;
           }
+          int64_t name_len = strnlen(list_dir_result.filenames[i], MAX_PATH_LEN);
+          if (name_len >= MAX_PATH_LEN) {
+               continue;
+          }
+          list_dir_result.filenames[i] = realloc(list_dir_result.filenames[i], name_len + 2);
+          list_dir_result.filenames[i][name_len] = CE_PATH_SEPARATOR;
+          list_dir_result.filenames[i][name_len + 1] = 0;
      }
-
-     closedir(os_dir);
 
      // check for exact match
      bool exact_match = true;
-     if(complete->count != file_count){
+     if(complete->count != list_dir_result.count){
           exact_match = false;
      }else{
-          for(int64_t i = 0; i < file_count; i++){
-               if(strcmp(files[i], complete->elements[i].string) != 0){
+          for(int64_t i = 0; i < list_dir_result.count; i++){
+               if(strcmp(list_dir_result.filenames[i], complete->elements[i].string) != 0){
                     exact_match = false;
                     break;
                }
@@ -625,13 +640,10 @@ void complete_files(CeComplete_t* complete, const char* line, const char* base_d
      }
 
      if(!exact_match){
-          ce_complete_init(complete, (const char**)(files), NULL, file_count);
+          ce_complete_init(complete, (const char**)(list_dir_result.filenames), NULL, list_dir_result.count);
      }
 
-     for(int64_t i = 0; i < file_count; i++){
-          free(files[i]);
-     }
-     free(files);
+     ce_free_list_dir_result(&list_dir_result);
 
      if(last_slash){
           ce_complete_match(complete, last_slash + 1);
@@ -708,7 +720,7 @@ CeDestination_t scan_line_for_destination(const char* line){
                          destination.point.x = 0;
 
                          int64_t filepath_len = file_end - (open_paren + 1);
-                         if(filepath_len >= PATH_MAX) return destination;
+                         if(filepath_len >= MAX_PATH_LEN) return destination;
                          strncpy(destination.filepath, (open_paren + 1), filepath_len);
                          destination.filepath[filepath_len] = 0;
                          return destination;
@@ -727,7 +739,7 @@ CeDestination_t scan_line_for_destination(const char* line){
           // col_end and row_end is not always present
 
           int64_t filepath_len = file_end - line;
-          if(filepath_len >= PATH_MAX) return destination;
+          if(filepath_len >= MAX_PATH_LEN) return destination;
           strncpy(destination.filepath, line, filepath_len);
           destination.filepath[filepath_len] = 0;
           char* end = NULL;
@@ -768,7 +780,7 @@ CeDestination_t scan_line_for_destination(const char* line){
                     destination.point.x = 0;
 
                     int64_t filepath_len = file_end - line;
-                    if(filepath_len >= PATH_MAX) return destination;
+                    if(filepath_len >= MAX_PATH_LEN) return destination;
                     strncpy(destination.filepath, line, filepath_len);
                     destination.filepath[filepath_len] = 0;
                     return destination;
@@ -780,6 +792,28 @@ CeDestination_t scan_line_for_destination(const char* line){
 }
 
 bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
+#if defined(PLATFORM_WINDOWS)
+     user_config->library_instance = LoadLibrary(filepath);
+     if(user_config->library_instance == NULL){
+          ce_log("LoadLibrary() failed\n");
+          return false;
+     }
+
+     user_config->filepath = strdup(filepath);
+     user_config->init_func = (CeUserConfigFunc*)(GetProcAddress(user_config->library_instance,
+                                                                "ce_init"));
+     if(user_config->init_func == NULL){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+
+     user_config->free_func = (CeUserConfigFunc*)(GetProcAddress(user_config->library_instance,
+                                                                "ce_free"));
+     if(user_config->free_func == NULL){
+          ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
+          return false;
+     }
+#else
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
           ce_log("dlopen() failed: '%s'\n", dlerror());
@@ -798,14 +832,18 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
           ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
           return false;
      }
-
+#endif
      return true;
 }
 
 void user_config_free(CeUserConfig_t* user_config){
      free(user_config->filepath);
+#if defined(PLATFORM_WINDOWS)
+
+#else
      // NOTE: comment out dlclose() so valgrind can get a helpful stack frame
      dlclose(user_config->handle);
+#endif
      memset(user_config, 0, sizeof(*user_config));
 }
 
@@ -949,7 +987,11 @@ void ce_app_message(CeApp_t* app, const char* fmt, ...){
      app->message_view.rect.bottom = view->rect.bottom + 1;
      app->message_view.rect.top = view->rect.bottom;
 
-     gettimeofday(&app->message_time, NULL);
+#if defined(PLATFORM_WINDOWS)
+     timespec_get(&app->message_time, TIME_UTC);
+#else
+     clock_gettime(CLOCK_MONOTONIC, &app->message_time);
+#endif
      app->message_mode = true;
 
      free(app->message_view.buffer->app_data);
@@ -1123,12 +1165,12 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      CeView_t* view = &tab_layout->tab.current->view;
 
      char* base_directory = buffer_base_directory(view->buffer);
-     char filepath[PATH_MAX];
+     char filepath[MAX_PATH_LEN];
      for(int64_t i = 0; i < app->input_view.buffer->line_count; i++){
-          if(base_directory && app->input_view.buffer->lines[i][0] != '/'){
-               snprintf(filepath, PATH_MAX, "%s/%s", base_directory, app->input_view.buffer->lines[i]);
+          if(base_directory && app->input_view.buffer->lines[i][0] != CE_PATH_SEPARATOR){
+               snprintf(filepath, MAX_PATH_LEN, "%s%c%s", base_directory, CE_PATH_SEPARATOR, app->input_view.buffer->lines[i]);
           }else{
-               strncpy(filepath, app->input_view.buffer->lines[i], PATH_MAX);
+               strncpy(filepath, app->input_view.buffer->lines[i], MAX_PATH_LEN);
           }
           if(!load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
                                   true, filepath)){
@@ -1182,7 +1224,7 @@ bool search_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
      CeJumpList_t* jump_list = &view_data->jump_list;
      CeDestination_t destination = {};
      destination.point = view->cursor;
-     strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+     strncpy(destination.filepath, view->buffer->name, MAX_PATH_LEN);
      ce_jump_list_insert(jump_list, destination);
      return true;
 }
@@ -1282,12 +1324,82 @@ void run_shell_command_cleanup(void* data){
 
      if(cleanup->subprocess){
           // kill the subprocess and wait for it to be cleaned up
+#if !defined(PLATFORM_WINDOWS)
           ce_subprocess_kill(cleanup->subprocess, SIGKILL);
           ce_subprocess_close(cleanup->subprocess);
-     }else{
+#endif
      }
 }
 
+#if defined(PLATFORM_WINDOWS)
+DWORD WINAPI run_shell_command_output_to_buffer(void* data){
+     ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
+
+     CeSubprocess_t subprocess;
+     if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
+          ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
+          return -1;
+     }
+     *shell_command_data->should_scroll = true;
+
+     RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
+
+     char bytes[BUFSIZ];
+     snprintf(bytes, BUFSIZ, "pid %d started: '%s'\n\n", subprocess.process.dwProcessId, shell_command_data->command);
+     ce_buffer_insert_string(shell_command_data->buffer,
+                             bytes,
+                             ce_buffer_end_point(shell_command_data->buffer));
+     DWORD bytes_read = 0;
+
+     while(!g_shell_command_should_die){
+          bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ - 1, &bytes_read, NULL);
+          if(!success || bytes_read == 0){
+              break;
+          }else{
+               // Sanitize bytes for non-printable characters.
+               for(DWORD i = 0; i < bytes_read; i++){
+                   if((bytes[i] < 32 || bytes[i] > 126) && bytes[i] != '\n' && bytes[i] != '\r') bytes[i] = '?';
+               }
+
+               // Replace windows "\r\n" with just "\n\0" and write the line to the buffer.
+               DWORD current_line_start = 0;
+               for(DWORD i = 0; i < bytes_read; i++){
+                   if (bytes[i] == '\r' &&
+                       (i + 1) < bytes_read &&
+                       bytes[i+1] == CE_NEWLINE) {
+                       bytes[i] = CE_NEWLINE;
+                       bytes[i+1] = 0;
+                       CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+                       ce_buffer_insert_string(shell_command_data->buffer,
+                                               bytes + current_line_start,
+                                               end);
+                       current_line_start = i + 2;
+                   }
+               }
+               // Write any leftover bytes
+               if(current_line_start < bytes_read){
+                   bytes[bytes_read] = 0;
+                   CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+                   ce_buffer_insert_string(shell_command_data->buffer,
+                                           bytes + current_line_start,
+                                           end);
+               }
+          }
+     }
+     if(subprocess.process.hProcess != INVALID_HANDLE_VALUE &&
+        WaitForSingleObject(subprocess.process.hProcess, 0) == WAIT_TIMEOUT){
+          ce_subprocess_kill(&subprocess, 0);
+     }
+
+     int exit_code = ce_subprocess_close(&subprocess);
+     snprintf(bytes, BUFSIZ, "pid %d exitted with code %d", subprocess.process.dwProcessId, exit_code);
+     CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
+     shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
+     run_shell_command_cleanup(&cleanup);
+     return 0;
+}
+#else
 static void* run_shell_command_and_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
 
@@ -1298,11 +1410,6 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      }
 
      *shell_command_data->should_scroll = true;
-
-     // we aren't using stdin here, so we should close it in case the
-     // subprocess waits for stdin to close before it completes which is common
-     // in filter applications
-     ce_subprocess_close_stdin(&subprocess);
 
      RunShellCommandCleanup_t cleanup = {shell_command_data, &subprocess};
      int rc = 0;
@@ -1330,7 +1437,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
                    if(bytes[i] < 32 && bytes[i] != '\n') bytes[i] = '?';
                }
 
-               ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+               CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+               ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
                do{
                     rc = write(g_shell_command_ready_fds[1], "1", 2);
                }while(rc == -1 && errno == EINTR);
@@ -1369,7 +1477,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
           snprintf(bytes, BUFSIZ, "\npid %d stopped with unexpected status %d", subprocess.pid, status);
      }
 
-     ce_buffer_insert_string(shell_command_data->buffer, bytes, ce_buffer_end_point(shell_command_data->buffer));
+     CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
+     ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
      do{
           rc = write(g_shell_command_ready_fds[1], "1", 2);
@@ -1384,13 +1493,25 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      run_shell_command_cleanup(&cleanup);
      return NULL;
 }
+#endif
 
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative){
+#if defined(PLATFORM_WINDOWS)
+     if(app->shell_command_thread != INVALID_HANDLE_VALUE){
+          g_shell_command_should_die = true;
+          WaitForSingleObject(app->shell_command_thread,
+                              INFINITE);
+          CloseHandle(app->shell_command_thread);
+          app->shell_command_thread = INVALID_HANDLE_VALUE;
+          g_shell_command_should_die = false;
+     }
+#else
      if(app->shell_command_thread){
           g_shell_command_should_die = true;
           pthread_join(app->shell_command_thread, NULL);
           g_shell_command_should_die = false;
      }
+#endif
 
      ce_buffer_empty(app->shell_command_buffer);
 
@@ -1424,14 +1545,29 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
 
      ShellCommandData_t* shell_command_data = malloc(sizeof(*shell_command_data));
      shell_command_data->buffer = app->shell_command_buffer;
-     shell_command_data->command = strdup(updated_command);
+     shell_command_data->command = ce_strndup(updated_command, BUFSIZ);
      shell_command_data->should_scroll = &app->shell_command_buffer_should_scroll;
 
+#if defined(PLATFORM_WINDOWS)
+     app->shell_command_thread = CreateThread(NULL,
+                                              0,
+                                              run_shell_command_output_to_buffer,
+                                              shell_command_data,
+                                              0,
+                                              &app->shell_command_thread_id);
+     if(app->shell_command_thread == NULL){
+          ce_log("failed to create thread to run command\n");
+          return false;
+     }
+
+     return true;
+#else
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
           return false;
      }
-
      return true;
+#endif
+
 }

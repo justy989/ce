@@ -1,19 +1,18 @@
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <locale.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <locale.h>
-#include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/poll.h>
-#include <unistd.h>
-#include <assert.h>
-#include <signal.h>
-#include <errno.h>
+#include <time.h>
 
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
 #elif defined(DISPLAY_GUI)
-    #include <SDL.h>
-    #include <SDL_ttf.h>
+    #include <SDL2/SDL.h>
+    #include <SDL2/SDL_ttf.h>
 #else
 #error "No display mode specified"
 #endif
@@ -23,9 +22,14 @@
 #include "ce_key_defines.h"
 
 #if defined(DISPLAY_TERMINAL)
+  #include <sys/poll.h>
   #include "ce_draw_term.h"
 #elif defined(DISPLAY_GUI)
   #include "ce_draw_gui.h"
+#endif
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <unistd.h>
 #endif
 
 #ifdef ENABLE_DEBUG_KEY_PRESS_INFO
@@ -155,7 +159,7 @@ static void build_bind_list(CeBuffer_t* buffer, CeKeyBinds_t* key_binds){
                default:
                     break;
                case CE_COMMAND_ARG_INTEGER:
-                    printed += snprintf(line + printed, 256 - printed, " %"PRId64"", bind->command.args[c].integer);
+                    printed += snprintf(line + printed, 256 - printed, " %" PRId64, bind->command.args[c].integer);
                     break;
                case CE_COMMAND_ARG_DECIMAL:
                     printed += snprintf(line + printed, 256 - printed, " %f", bind->command.args[c].decimal);
@@ -212,7 +216,7 @@ static void build_mark_list(CeBuffer_t* buffer, CeVimBufferData_t* buffer_data){
           CePoint_t* point = buffer_data->marks + i;
           if(point->x == 0 && point->y == 0) continue;
           char reg = i + '!';
-          snprintf(line, 256, "'%c' %"PRId64", %"PRId64"\n", reg, point->x, point->y);
+          snprintf(line, 256, "'%c' %" PRId64 ", %" PRId64 "\n", reg, point->x, point->y);
           buffer_append_on_new_line(buffer, line);
      }
 
@@ -247,11 +251,10 @@ static void build_jump_list(CeBuffer_t* buffer, CeJumpList_t* jump_list){
      buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
-uint64_t time_between(struct timeval previous, struct timeval current){
+static uint64_t time_between_usec(struct timespec previous, struct timespec current){
      return (current.tv_sec - previous.tv_sec) * 1000000LL +
-            (current.tv_usec - previous.tv_usec);
+            ((current.tv_nsec - previous.tv_nsec)) / 1000;
 }
-
 
 static int int_strneq(int* a, int* b, size_t len){
      for(size_t i = 0; i < len; ++i){
@@ -641,7 +644,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          CeJumpList_t* jump_list = &view_data->jump_list;
                          CeDestination_t destination = {};
                          destination.point = view->cursor;
-                         strncpy(destination.filepath, view->buffer->name, PATH_MAX);
+                         strncpy(destination.filepath, view->buffer->name, MAX_PATH_LEN);
                          ce_jump_list_insert(jump_list, destination);
                     }
 
@@ -708,6 +711,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
+#if !defined(PLATFORM_WINDOWS)
           }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     regex_t regex = {};
@@ -746,6 +750,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
+#endif
           }
      }
 }
@@ -756,7 +761,7 @@ void print_help(char* program){
      printf("  -c <config file> path to shared object configuration\n");
 }
 
-int main(int argc, char** argv){
+int main(int argc, char* argv[]){
      const char* config_filepath = NULL;
      int last_arg_index = 0;
 
@@ -764,21 +769,24 @@ int main(int argc, char** argv){
      signal(SIGINT, handle_sigint);
 
      // parse args
-     {
-          char c;
-          while((c = getopt(argc, argv, "c:h")) != -1){
-               switch(c){
-               case 'c':
-                    config_filepath = optarg;
-                    break;
-               case 'h':
-               default:
-                    print_help(argv[0]);
-                    return 1;
-               }
-          }
-
-          last_arg_index = optind;
+     for(int i = 1; i < argc; i++){
+         char* arg = argv[i];
+         if (arg[0] == '-') {
+             if (strcmp(arg, "-c") == 0) {
+                 if ((i + 1) >= argc) {
+                     printf("error: missing config argument. See help.\n");
+                     return 1;
+                 }
+                 config_filepath = argv[i + 1];
+                 i++;
+             } else if (strcmp(arg, "-h") == 0) {
+                 print_help(argv[0]);
+                 return 1;
+             }
+         } else {
+             last_arg_index = i;
+             break;
+         }
      }
 
      setlocale(LC_ALL, "");
@@ -795,8 +803,9 @@ int main(int argc, char** argv){
           g_ce_log_buffer->no_line_numbers = true;
      }
 
-     char ce_dir[PATH_MAX];
-     snprintf(ce_dir, PATH_MAX, "%s/.ce", getenv("HOME"));
+#if !defined(PLATFORM_WINDOWS)
+     char ce_dir[MAX_PATH_LEN];
+     snprintf(ce_dir, MAX_PATH_LEN, "%s/.ce", getenv("HOME"));
 
      struct stat st = {};
      if(stat(ce_dir, &st) == -1){
@@ -808,11 +817,12 @@ int main(int argc, char** argv){
           }
      }
 
-     char log_filepath[PATH_MAX];
-     snprintf(log_filepath, PATH_MAX, "%s/ce.log", ce_dir);
+     char log_filepath[MAX_PATH_LEN];
+     snprintf(log_filepath, MAX_PATH_LEN, "%s/ce.log", ce_dir);
      if(!ce_log_init(log_filepath)){
           return 1;
      }
+#endif
 
      // init user config
      if(config_filepath){
@@ -835,84 +845,84 @@ int main(int argc, char** argv){
           config_options->cycle_prev_completion_key = ce_ctrl_key('p');
           config_options->show_line_extends_passed_view_as = '>';
 
-          config_options->color_defs[COLOR_BLACK].red = 32;
-          config_options->color_defs[COLOR_BLACK].green = 32;
-          config_options->color_defs[COLOR_BLACK].blue = 32;
+          config_options->color_defs[CE_COLOR_BLACK].red = 32;
+          config_options->color_defs[CE_COLOR_BLACK].green = 32;
+          config_options->color_defs[CE_COLOR_BLACK].blue = 32;
 
-          config_options->color_defs[COLOR_RED].red = 137;
-          config_options->color_defs[COLOR_RED].green = 56;
-          config_options->color_defs[COLOR_RED].blue = 56;
+          config_options->color_defs[CE_COLOR_RED].red = 137;
+          config_options->color_defs[CE_COLOR_RED].green = 56;
+          config_options->color_defs[CE_COLOR_RED].blue = 56;
 
-          config_options->color_defs[COLOR_GREEN].red = 69;
-          config_options->color_defs[COLOR_GREEN].green = 123;
-          config_options->color_defs[COLOR_GREEN].blue = 77;
+          config_options->color_defs[CE_COLOR_GREEN].red = 69;
+          config_options->color_defs[CE_COLOR_GREEN].green = 123;
+          config_options->color_defs[CE_COLOR_GREEN].blue = 77;
 
-          config_options->color_defs[COLOR_YELLOW].red = 150;
-          config_options->color_defs[COLOR_YELLOW].green = 111;
-          config_options->color_defs[COLOR_YELLOW].blue = 78;
+          config_options->color_defs[CE_COLOR_YELLOW].red = 150;
+          config_options->color_defs[CE_COLOR_YELLOW].green = 111;
+          config_options->color_defs[CE_COLOR_YELLOW].blue = 78;
 
-          config_options->color_defs[COLOR_BLUE].red = 70;
-          config_options->color_defs[COLOR_BLUE].green = 107;
-          config_options->color_defs[COLOR_BLUE].blue = 138;
+          config_options->color_defs[CE_COLOR_BLUE].red = 70;
+          config_options->color_defs[CE_COLOR_BLUE].green = 107;
+          config_options->color_defs[CE_COLOR_BLUE].blue = 138;
 
-          config_options->color_defs[COLOR_MAGENTA].red = 116;
-          config_options->color_defs[COLOR_MAGENTA].green = 90;
-          config_options->color_defs[COLOR_MAGENTA].blue = 160;
+          config_options->color_defs[CE_COLOR_MAGENTA].red = 116;
+          config_options->color_defs[CE_COLOR_MAGENTA].green = 90;
+          config_options->color_defs[CE_COLOR_MAGENTA].blue = 160;
 
-          config_options->color_defs[COLOR_CYAN].red = 55;
-          config_options->color_defs[COLOR_CYAN].green = 125;
-          config_options->color_defs[COLOR_CYAN].blue = 108;
+          config_options->color_defs[CE_COLOR_CYAN].red = 55;
+          config_options->color_defs[CE_COLOR_CYAN].green = 125;
+          config_options->color_defs[CE_COLOR_CYAN].blue = 108;
 
-          config_options->color_defs[COLOR_WHITE].red = 42;
-          config_options->color_defs[COLOR_WHITE].green = 42;
-          config_options->color_defs[COLOR_WHITE].blue = 42;
+          config_options->color_defs[CE_COLOR_WHITE].red = 42;
+          config_options->color_defs[CE_COLOR_WHITE].green = 42;
+          config_options->color_defs[CE_COLOR_WHITE].blue = 42;
 
-          config_options->color_defs[COLOR_BRIGHT_BLACK].red = 36;
-          config_options->color_defs[COLOR_BRIGHT_BLACK].green = 36;
-          config_options->color_defs[COLOR_BRIGHT_BLACK].blue = 36;
+          config_options->color_defs[CE_COLOR_BRIGHT_BLACK].red = 36;
+          config_options->color_defs[CE_COLOR_BRIGHT_BLACK].green = 36;
+          config_options->color_defs[CE_COLOR_BRIGHT_BLACK].blue = 36;
 
-          config_options->color_defs[COLOR_BRIGHT_RED].red = 157;
-          config_options->color_defs[COLOR_BRIGHT_RED].green = 110;
-          config_options->color_defs[COLOR_BRIGHT_RED].blue = 127;
+          config_options->color_defs[CE_COLOR_BRIGHT_RED].red = 157;
+          config_options->color_defs[CE_COLOR_BRIGHT_RED].green = 110;
+          config_options->color_defs[CE_COLOR_BRIGHT_RED].blue = 127;
 
-          config_options->color_defs[COLOR_BRIGHT_GREEN].red = 110;
-          config_options->color_defs[COLOR_BRIGHT_GREEN].green = 137;
-          config_options->color_defs[COLOR_BRIGHT_GREEN].blue = 106;
+          config_options->color_defs[CE_COLOR_BRIGHT_GREEN].red = 110;
+          config_options->color_defs[CE_COLOR_BRIGHT_GREEN].green = 137;
+          config_options->color_defs[CE_COLOR_BRIGHT_GREEN].blue = 106;
 
-          config_options->color_defs[COLOR_BRIGHT_YELLOW].red = 156;
-          config_options->color_defs[COLOR_BRIGHT_YELLOW].green = 148;
-          config_options->color_defs[COLOR_BRIGHT_YELLOW].blue = 95;
+          config_options->color_defs[CE_COLOR_BRIGHT_YELLOW].red = 156;
+          config_options->color_defs[CE_COLOR_BRIGHT_YELLOW].green = 148;
+          config_options->color_defs[CE_COLOR_BRIGHT_YELLOW].blue = 95;
 
-          config_options->color_defs[COLOR_BRIGHT_BLUE].red = 114;
-          config_options->color_defs[COLOR_BRIGHT_BLUE].green = 151;
-          config_options->color_defs[COLOR_BRIGHT_BLUE].blue = 179;
+          config_options->color_defs[CE_COLOR_BRIGHT_BLUE].red = 114;
+          config_options->color_defs[CE_COLOR_BRIGHT_BLUE].green = 151;
+          config_options->color_defs[CE_COLOR_BRIGHT_BLUE].blue = 179;
 
-          config_options->color_defs[COLOR_BRIGHT_MAGENTA].red = 147;
-          config_options->color_defs[COLOR_BRIGHT_MAGENTA].green = 108;
-          config_options->color_defs[COLOR_BRIGHT_MAGENTA].blue = 151;
+          config_options->color_defs[CE_COLOR_BRIGHT_MAGENTA].red = 147;
+          config_options->color_defs[CE_COLOR_BRIGHT_MAGENTA].green = 108;
+          config_options->color_defs[CE_COLOR_BRIGHT_MAGENTA].blue = 151;
 
-          config_options->color_defs[COLOR_BRIGHT_CYAN].red = 124;
-          config_options->color_defs[COLOR_BRIGHT_CYAN].green = 166;
-          config_options->color_defs[COLOR_BRIGHT_CYAN].blue = 145;
+          config_options->color_defs[CE_COLOR_BRIGHT_CYAN].red = 124;
+          config_options->color_defs[CE_COLOR_BRIGHT_CYAN].green = 166;
+          config_options->color_defs[CE_COLOR_BRIGHT_CYAN].blue = 145;
 
-          config_options->color_defs[COLOR_BRIGHT_WHITE].red = 255;
-          config_options->color_defs[COLOR_BRIGHT_WHITE].green = 255;
-          config_options->color_defs[COLOR_BRIGHT_WHITE].blue = 255;
+          config_options->color_defs[CE_COLOR_BRIGHT_WHITE].red = 255;
+          config_options->color_defs[CE_COLOR_BRIGHT_WHITE].green = 255;
+          config_options->color_defs[CE_COLOR_BRIGHT_WHITE].blue = 255;
 
-          config_options->color_defs[COLOR_FOREGROUND].red = 218;
-          config_options->color_defs[COLOR_FOREGROUND].green = 218;
-          config_options->color_defs[COLOR_FOREGROUND].blue = 218;
+          config_options->color_defs[CE_COLOR_FOREGROUND].red = 218;
+          config_options->color_defs[CE_COLOR_FOREGROUND].green = 218;
+          config_options->color_defs[CE_COLOR_FOREGROUND].blue = 218;
 
-          config_options->color_defs[COLOR_BACKGROUND].red = 25;
-          config_options->color_defs[COLOR_BACKGROUND].green = 25;
-          config_options->color_defs[COLOR_BACKGROUND].blue = 25;
+          config_options->color_defs[CE_COLOR_BACKGROUND].red = 25;
+          config_options->color_defs[CE_COLOR_BACKGROUND].green = 25;
+          config_options->color_defs[CE_COLOR_BACKGROUND].blue = 25;
 
           // GUI options
           config_options->gui_window_width = 1024;
           config_options->gui_window_height = 768;
           config_options->gui_font_size = 16;
           config_options->gui_font_line_separation = 1;
-          strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", PATH_MAX);
+          strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", MAX_PATH_LEN);
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
@@ -945,57 +955,57 @@ int main(int argc, char** argv){
           // syntax
           {
                CeSyntaxDef_t* syntax_defs = malloc(CE_SYNTAX_COLOR_COUNT * sizeof(*syntax_defs));
-               syntax_defs[CE_SYNTAX_COLOR_NORMAL].fg = COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_NORMAL].fg = CE_COLOR_DEFAULT;
                syntax_defs[CE_SYNTAX_COLOR_NORMAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_TYPE].fg = COLOR_BRIGHT_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_TYPE].fg = CE_COLOR_BRIGHT_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_TYPE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_KEYWORD].fg = COLOR_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_KEYWORD].fg = CE_COLOR_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_KEYWORD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_CONTROL].fg = COLOR_YELLOW;
+               syntax_defs[CE_SYNTAX_COLOR_CONTROL].fg = CE_COLOR_YELLOW;
                syntax_defs[CE_SYNTAX_COLOR_CONTROL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].fg = CE_COLOR_MAGENTA;
                syntax_defs[CE_SYNTAX_COLOR_CAPS_VAR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_COMMENT].fg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_COMMENT].fg = CE_COLOR_GREEN;
                syntax_defs[CE_SYNTAX_COLOR_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_STRING].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_STRING].fg = CE_COLOR_RED;
                syntax_defs[CE_SYNTAX_COLOR_STRING].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].fg = CE_COLOR_RED;
                syntax_defs[CE_SYNTAX_COLOR_CHAR_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].fg = CE_COLOR_MAGENTA;
                syntax_defs[CE_SYNTAX_COLOR_NUMBER_LITERAL].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].fg = COLOR_BRIGHT_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].fg = CE_COLOR_BRIGHT_MAGENTA;
                syntax_defs[CE_SYNTAX_COLOR_PREPROCESSOR].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = COLOR_RED;
-               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = COLOR_RED;
-               syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = COLOR_BLACK;
-               syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = COLOR_WHITE;
+               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].fg = CE_COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_TRAILING_WHITESPACE].bg = CE_COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].fg = CE_SYNTAX_USE_CURRENT_COLOR;
+               syntax_defs[CE_SYNTAX_COLOR_VISUAL].bg = CE_COLOR_WHITE;
                syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].fg = CE_SYNTAX_USE_CURRENT_COLOR;
                syntax_defs[CE_SYNTAX_COLOR_CURRENT_LINE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].fg = COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].fg = CE_COLOR_GREEN;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_ADD].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].fg = COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].fg = CE_COLOR_RED;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_REMOVE].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].fg = COLOR_MAGENTA;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].fg = CE_COLOR_MAGENTA;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_HEADER].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].fg = COLOR_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].fg = CE_COLOR_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_DIFF_COMMENT].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = COLOR_BLACK;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = COLOR_YELLOW;
-               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = COLOR_BRIGHT_BLUE;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].fg = CE_COLOR_BLACK;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_SELECTED].bg = CE_COLOR_YELLOW;
+               syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].fg = CE_COLOR_BRIGHT_BLUE;
                syntax_defs[CE_SYNTAX_COLOR_COMPLETE_MATCH].bg = CE_SYNTAX_USE_CURRENT_COLOR;
-               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = COLOR_DEFAULT;
-               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].bg = COLOR_DEFAULT;
-               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].fg = COLOR_DEFAULT;
-               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].bg = COLOR_RED;
-               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].fg = COLOR_DEFAULT;
-               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].bg = COLOR_GREEN;
-               syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].fg = COLOR_YELLOW;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].fg = CE_COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_NUMBER].bg = CE_COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].fg = CE_COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_INACTIVE].bg = CE_COLOR_RED;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].fg = CE_COLOR_DEFAULT;
+               syntax_defs[CE_SYNTAX_COLOR_MULTIPLE_CURSOR_ACTIVE].bg = CE_COLOR_GREEN;
+               syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].fg = CE_COLOR_YELLOW;
                syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].bg = CE_SYNTAX_USE_CURRENT_COLOR;
 
-               app.config_options.ui_fg_color = COLOR_BRIGHT_WHITE;
-               app.config_options.ui_bg_color = COLOR_BLACK;
-               app.config_options.message_fg_color = COLOR_BLUE;
-               app.config_options.message_bg_color = COLOR_WHITE;
+               app.config_options.ui_fg_color = CE_COLOR_BRIGHT_WHITE;
+               app.config_options.ui_bg_color = CE_COLOR_BLACK;
+               app.config_options.message_fg_color = CE_COLOR_BLUE;
+               app.config_options.message_bg_color = CE_COLOR_WHITE;
 
                app.syntax_defs = syntax_defs;
           }
@@ -1069,7 +1079,7 @@ int main(int argc, char** argv){
           buffer_data = app.jump_list_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.shell_command_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 
@@ -1091,6 +1101,11 @@ int main(int argc, char** argv){
          app.cached_filepath_count = 0;
          app.shell_command_buffer_should_scroll = false;
          app.shell_command_thread_should_die = false;
+#if defined(PLATFORM_WINDOWS)
+         app.shell_command_thread = INVALID_HANDLE_VALUE;
+         app.shell_command_thread_id = -1;
+#endif
+
      }
 
  #if defined(DISPLAY_TERMINAL)
@@ -1205,7 +1220,9 @@ int main(int argc, char** argv){
           app.message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
      }
 
+#if !defined(PLATFORM_WINDOWS)
      pipe(g_shell_command_ready_fds);
+#endif
 
  #if defined(DISPLAY_TERMINAL)
      ce_draw_term(&app);
@@ -1213,9 +1230,8 @@ int main(int argc, char** argv){
      ce_draw_gui(&app, &gui);
  #endif
 
-     // init draw thread
-     struct timeval current_draw_time = {};
-     uint64_t time_since_last_message = 0;
+     struct timespec current_draw_time = {};
+     uint64_t time_since_last_message_usec = 0;
 
      // main loop
      while(!app.quit){
@@ -1265,8 +1281,13 @@ int main(int argc, char** argv){
 #endif
 
           if(app.message_mode){
-               time_since_last_message = time_between(app.message_time, current_draw_time);
-               if(time_since_last_message > app.config_options.message_display_time_usec){
+#if defined(PLATFORM_WINDOWS)
+               timespec_get(&current_draw_time, TIME_UTC);
+#else
+               clock_gettime(CLOCK_MONOTONIC, &current_draw_time);
+#endif
+               time_since_last_message_usec = time_between_usec(app.message_time, current_draw_time);
+               if(time_since_last_message_usec > app.config_options.message_display_time_usec){
                     app.message_mode = false;
                }
           }
@@ -1300,7 +1321,11 @@ int main(int argc, char** argv){
                     app.quit = true;
                     break;
                case SDL_KEYDOWN:
+#if defined(PLATFORM_WINDOWS)
+                    if (__isascii(event.key.keysym.sym)) {
+#else
                     if (isascii(event.key.keysym.sym)) {
+#endif
                         keydown_key = event.key.keysym.sym;
                         if (event.key.keysym.mod & KMOD_SHIFT) {
                             keydown_key = toupper(keydown_key);
@@ -1363,6 +1388,7 @@ int main(int argc, char** argv){
 #endif
 
           if (key != KEY_INVALID) {
+              app.message_mode = false;
               // handle input from the user
               app_handle_key(&app, view, key);
           }

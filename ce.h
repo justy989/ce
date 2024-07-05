@@ -5,8 +5,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <regex.h>
-#include <dirent.h>
+
+#if !defined(PLATFORM_WINDOWS)
+    #include <dirent.h>
+    #include <regex.h>
+#endif
+
+#define MAX_PATH_LEN 1024
 
 #ifdef __APPLE__
     #include <time.h> // time_t
@@ -23,20 +28,50 @@
 #define CE_UTF8_SIZE 4
 #define CE_ASCII_PRINTABLE_CHARACTERS (127 - 32)
 
+#if defined(PLATFORM_WINDOWS)
+    #define CE_PATH_SEPARATOR '\\'
+    #define CE_CURRENT_DIR_SEARCH '*'
+    #define CE_CURRENT_DIR_SEARCH_STR "*"
+#else
+    #define CE_PATH_SEPARATOR '/'
+    #define CE_CURRENT_DIR_SEARCH '.'
+    #define CE_CURRENT_DIR_SEARCH_STR "."
+#endif
+
 #define CE_CLAMP(a, min, max) (a = (a < min) ? min : (a > max) ? max : a);
 
-#define COLOR_DEFAULT -1
-#define COLOR_BRIGHT_BLACK 8
-#define COLOR_BRIGHT_RED 9
-#define COLOR_BRIGHT_GREEN 10
-#define COLOR_BRIGHT_YELLOW 11
-#define COLOR_BRIGHT_BLUE 12
-#define COLOR_BRIGHT_MAGENTA 13
-#define COLOR_BRIGHT_CYAN 14
-#define COLOR_BRIGHT_WHITE 15
-#define COLOR_FOREGROUND 16
-#define COLOR_BACKGROUND 17
-#define COLOR_COUNT 18
+#if defined(DISPLAY_TERM)
+  #define CE_COLOR_BLACK COLOR_BLACK
+  #define CE_COLOR_RED COLOR_RED
+  #define CE_COLOR_GREEN COLOR_GREEN
+  #define CE_COLOR_YELLOW COLOR_YELLOW
+  #define CE_COLOR_BLUE COLOR_BLUE
+  #define CE_COLOR_MAGENTA COLOR_MAGENTA
+  #define CE_COLOR_CYAN COLOR_CYAN
+  #define CE_COLOR_WHITE COLOR_WHITE
+#else
+  #define CE_COLOR_BLACK 0
+  #define CE_COLOR_RED 1
+  #define CE_COLOR_GREEN 2
+  #define CE_COLOR_YELLOW 3
+  #define CE_COLOR_BLUE 4
+  #define CE_COLOR_MAGENTA 5
+  #define CE_COLOR_CYAN 6
+  #define CE_COLOR_WHITE 7
+#endif
+
+#define CE_COLOR_DEFAULT -1
+#define CE_COLOR_BRIGHT_BLACK 8
+#define CE_COLOR_BRIGHT_RED 9
+#define CE_COLOR_BRIGHT_GREEN 10
+#define CE_COLOR_BRIGHT_YELLOW 11
+#define CE_COLOR_BRIGHT_BLUE 12
+#define CE_COLOR_BRIGHT_MAGENTA 13
+#define CE_COLOR_BRIGHT_CYAN 14
+#define CE_COLOR_BRIGHT_WHITE 15
+#define CE_COLOR_FOREGROUND 16
+#define CE_COLOR_BACKGROUND 17
+#define CE_COLOR_COUNT 18
 
 typedef int32_t CeRune_t;
 
@@ -160,12 +195,12 @@ typedef struct{
      int cycle_next_completion_key;
      int cycle_prev_completion_key;
      CeRune_t show_line_extends_passed_view_as;
-     CeColorDef_t color_defs[COLOR_COUNT];
+     CeColorDef_t color_defs[CE_COLOR_COUNT];
      int gui_window_width;
      int gui_window_height;
      int gui_font_size;
      int gui_font_line_separation;
-     char gui_font_path[PATH_MAX];
+     char gui_font_path[MAX_PATH_LEN];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
@@ -180,13 +215,19 @@ typedef struct{
 
 typedef struct{
      CePoint_t point;
-     char filepath[PATH_MAX];
+     char filepath[MAX_PATH_LEN];
 }CeDestination_t;
 
 typedef struct{
      CePoint_t start;
      CePoint_t end;
 }CeRange_t;
+
+typedef struct{
+    int64_t count;
+    char** filenames;
+    bool* is_directories;
+}CeListDirResult_t;
 
 bool ce_log_init(const char* filename);
 void ce_log(const char* fmt, ...);
@@ -210,8 +251,10 @@ bool ce_buffer_contains_point(CeBuffer_t* buffer, CePoint_t point);
 int64_t ce_buffer_point_is_valid(CeBuffer_t* buffer, CePoint_t point); // like ce_buffer_contains_point(), but includes end of line as valid // TODO: unittest
 CePoint_t ce_buffer_search_forward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
 CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const char* pattern);
+#if !defined(PLATFORM_WINDOWS)
 CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
 CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex);
+#endif
 
 char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length);
 char* ce_buffer_dupe(CeBuffer_t* buffer);
@@ -273,6 +316,11 @@ int64_t ce_line_number_column_width(CeLineNumber_t line_number, int64_t buffer_l
 int64_t ce_count_digits(int64_t n);
 
 CeRune_t ce_ctrl_key(char ch);
+
+char* ce_strndup(char* str, size_t n);
+
+CeListDirResult_t ce_list_dir(const char* directory);
+void ce_free_list_dir_result(CeListDirResult_t* list_dir_result);
 
 extern FILE* g_ce_log;
 extern CeBuffer_t* g_ce_log_buffer;

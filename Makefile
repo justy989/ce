@@ -1,25 +1,24 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
-#TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
-#GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
+TERM_LDFLAGS := -rdynamic -pthread -lutil -ldl
+GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
-TERM_LDFLAGS := -rdynamic -lutil -ldl
-GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
 
-ifeq ($(OS),Windows_NT)
+#TERM_LDFLAGS := -rdynamic -lutil -ldl
+#GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
 	TERM_LDFLAGS += -lncursesw
-else
-    UNAME_S := $(shell uname -s)
-    ifeq ($(UNAME_S),Linux)
-        TERM_LDFLAGS += -lncursesw
-        GUI_INCFLAGS := -I/usr/include/SDL2
-    endif
-    ifeq ($(UNAME_S),Darwin)
-        TERM_LDFLAGS += -lncurses
-        GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
-    endif
+	GUI_INCFLAGS := -I/usr/include/SDL2
 endif
+ifeq ($(UNAME_S),Darwin)
+	TERM_LDFLAGS += -lncurses
+	GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
+endif
+
+#TERM_INCFLAGS := -I/usr/include/ncursesw
 
 BUILD_DIR ?= build
 TERM_OBJDIR ?= $(BUILD_DIR)/term
@@ -46,7 +45,7 @@ $(TERM_OBJDIR):
 	mkdir -p $@
 
 $(TERM_OBJDIR)/%.o: %.c $(CHDRS) | $(TERM_OBJDIR)
-	$(CC) $(TERM_DEFINES) $(CFLAGS) -c -o $@ $<
+	$(CC) $(TERM_DEFINES) $(CFLAGS) $(TERM_INCFLAGS) -c -o $@ $<
 
 $(TERM_EXE): $(TERM_COBJS)
 	$(CC) $(TERM_DEFINES) $(CFLAGS) $^ -o $@ $(TERM_LDFLAGS)
@@ -55,7 +54,7 @@ $(GUI_OBJDIR):
 	mkdir -p $@
 
 $(GUI_OBJDIR)/%.o: %.c $(CHDRS) | $(GUI_OBJDIR)
-	$(CC) $(GUI_DEFINES) $(CFLAGS) $(GUI_INCFLAGS) -c -o $@ $<
+	$(CC) $(GUI_DEFINES) $(CFLAGS) -c -o $@ $<
 
 $(GUI_EXE): $(GUI_COBJS)
 	$(CC) $(GUI_DEFINES) $(CFLAGS) $^ -o $@ $(GUI_LDFLAGS)
