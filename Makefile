@@ -5,9 +5,6 @@ GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
 
-#TERM_LDFLAGS := -rdynamic -lutil -ldl
-#GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
-
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
 	TERM_LDFLAGS += -lncursesw
@@ -17,8 +14,6 @@ ifeq ($(UNAME_S),Darwin)
 	TERM_LDFLAGS += -lncurses
 	GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
 endif
-
-#TERM_INCFLAGS := -I/usr/include/ncursesw
 
 BUILD_DIR ?= build
 TERM_OBJDIR ?= $(BUILD_DIR)/term
