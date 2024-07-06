@@ -294,7 +294,6 @@ static CePoint_t get_mouse_point(CeGui_t* gui){
     }
     return result;
 }
-#endif
 
 static CePoint_t calculate_view_point_from_screen_point(CeView_t* view,
                                                         CePoint_t screen_point,
@@ -316,6 +315,7 @@ static CePoint_t calculate_view_point_from_screen_point(CeView_t* view,
     result = ce_buffer_clamp_point(view->buffer, result, CE_CLAMP_X_INSIDE);
     return result;
 }
+#endif
 
 void scroll_to_and_center_if_offscreen(CeView_t* view, CePoint_t point, CeConfigOptions_t* config_options){
      view->cursor = point;
