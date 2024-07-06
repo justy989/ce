@@ -407,11 +407,11 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
           if(yank->type == CE_VIM_YANK_TYPE_NONE ||
              yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
 
-          if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text), cursor, vim->chain_undo)){
+          vim->chain_undo = false;
+          if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text),
+                                                       cursor, vim->chain_undo)){
                break;
           }
-
-          vim->chain_undo = true;
      } break;
 #if defined(DISPLAY_GUI)
      case KEY_CTRL_SHIFT_V:

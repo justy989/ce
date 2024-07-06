@@ -13,7 +13,6 @@ todo:
 - keep their view proportions as we resize
 
 bug:
-- sometimes chain undo will undo 2 actions, not sure how to reproduce yet
 - TERM=xterm-256color needs to be set to view ce correctly
 - sometimes in the terminal, arrow keys stop being interpreted normally and they cause weird actions to happen
 - highlighting trailing whitespace doesn't work in multiline strings in python
