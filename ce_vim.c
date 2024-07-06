@@ -169,7 +169,7 @@ bool ce_vim_append_key(CeVim_t* vim, CeRune_t key){
 }
 
 CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeVimVisualData_t* visual,
-                                          CeRune_t key, const CeConfigOptions_t* config_options, bool track){
+                                          CeRune_t key, const CeConfigOptions_t* config_options){
      switch(key){
      default:
           if(isprint(key) || key == CE_NEWLINE){
@@ -338,64 +338,64 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
           break;
      case KEY_ESCAPE: // escape
      {
-          if(track){
-               if(!vim->insert_rune_head &&
-                  (vim->current_action.verb.function == ce_vim_verb_insert_mode ||
-                   vim->current_action.verb.function == ce_vim_verb_append ||
-                   vim->current_action.verb.function == ce_vim_verb_append_at_end_of_line)){
-                    // pass
-               }else if(!vim->verb_last_action){
-                    vim->last_action = vim->current_action;
-                    if(vim->last_insert_rune_head) free(vim->last_insert_rune_head);
-                    vim->last_insert_rune_head = vim->insert_rune_head;
-                    vim->insert_rune_head = NULL;
+          if(!vim->insert_rune_head &&
+             (vim->current_action.verb.function == ce_vim_verb_insert_mode ||
+              vim->current_action.verb.function == ce_vim_verb_append ||
+              vim->current_action.verb.function == ce_vim_verb_append_at_end_of_line)){
+               // pass
+          }else if(!vim->verb_last_action){
+               vim->last_action = vim->current_action;
+               if(vim->last_insert_rune_head){
+                   ce_rune_node_free(&vim->last_insert_rune_head);
                }
-
-               // check if previous line was all whitespace, if so, remove it
-               CePoint_t remove_loc = {0, cursor->y};
-               if(string_is_whitespace(view->buffer->lines[cursor->y])){
-                    int64_t remove_len = strlen(view->buffer->lines[cursor->y]);
-                    ce_buffer_remove_string_change(view->buffer, remove_loc, remove_len, cursor, remove_loc, true);
-               }
-
-               if(!ce_points_equal(visual->block_top_left, visual->block_bottom_right)){
-                    CePoint_t visual_top_left = visual->block_top_left;
-                    CePoint_t visual_bottom_right = visual->block_bottom_right;
-
-                    // adjust range because we've already inserted text the line the cursor is on
-                    CePoint_t cursor_end = *cursor;
-                    if(visual_top_left.y == cursor->y){
-                         visual_top_left.y++;
-                    }else{
-                         visual_bottom_right.y--;
-                    }
-
-                    visual->block_top_left = (CePoint_t){0, 0};
-                    visual->block_bottom_right = (CePoint_t){0, 0};
-
-                    CeRune_t* rune_string = ce_rune_node_string(vim->last_insert_rune_head);
-
-                    if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
-                    vim->chain_undo = true;
-
-                    for(int64_t i = visual_top_left.y; i <= visual_bottom_right.y; i++){
-                         *cursor = (CePoint_t){visual_top_left.x, i};
-                         CeRune_t* itr = rune_string;
-                         while(*itr){
-                              insert_mode_handle_key(vim, view, cursor, visual, *itr, config_options, track);
-                              itr++;
-                         }
-                    }
-
-                    free(rune_string);
-                    *cursor = cursor_end;
-
-                    if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = *cursor;
-               }
-
-               vim->mode = CE_VIM_MODE_NORMAL;
-               vim->chain_undo = false;
+               vim->last_insert_rune_head = vim->insert_rune_head;
+               vim->insert_rune_head = NULL;
           }
+
+          // check if previous line was all whitespace, if so, remove it
+          CePoint_t remove_loc = {0, cursor->y};
+          if(string_is_whitespace(view->buffer->lines[cursor->y])){
+               int64_t remove_len = strlen(view->buffer->lines[cursor->y]);
+               ce_buffer_remove_string_change(view->buffer, remove_loc, remove_len, cursor, remove_loc, true);
+          }
+
+          if(!ce_points_equal(visual->block_top_left, visual->block_bottom_right)){
+               CePoint_t visual_top_left = visual->block_top_left;
+               CePoint_t visual_bottom_right = visual->block_bottom_right;
+
+               // adjust range because we've already inserted text the line the cursor is on
+               CePoint_t cursor_end = *cursor;
+               if(visual_top_left.y == cursor->y){
+                    visual_top_left.y++;
+               }else{
+                    visual_bottom_right.y--;
+               }
+
+               visual->block_top_left = (CePoint_t){0, 0};
+               visual->block_bottom_right = (CePoint_t){0, 0};
+
+               CeRune_t* rune_string = ce_rune_node_string(vim->last_insert_rune_head);
+
+               if(view->buffer->change_node) view->buffer->change_node->change.chain = true;
+               vim->chain_undo = true;
+
+               for(int64_t i = visual_top_left.y; i <= visual_bottom_right.y; i++){
+                    *cursor = (CePoint_t){visual_top_left.x, i};
+                    CeRune_t* itr = rune_string;
+                    while(*itr){
+                         insert_mode_handle_key(vim, view, cursor, visual, *itr, config_options);
+                         itr++;
+                    }
+               }
+
+               free(rune_string);
+               *cursor = cursor_end;
+
+               if(view->buffer->change_node) view->buffer->change_node->change.cursor_after = *cursor;
+          }
+
+          vim->mode = CE_VIM_MODE_NORMAL;
+          vim->chain_undo = false;
 
           if(cursor->x > 0){
                *cursor = ce_buffer_advance_point(view->buffer, *cursor, -1);
@@ -429,13 +429,13 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
 }
 
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeVimVisualData_t* visual, CeRune_t key,
-                                     CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options, bool track){
+                                     CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options){
      switch(vim->mode){
      default:
           return CE_VIM_PARSE_INVALID;
      case CE_VIM_MODE_INSERT:
-          if(!vim->verb_last_action && track) ce_rune_node_insert(&vim->insert_rune_head, key);
-          return insert_mode_handle_key(vim, view, cursor, visual, key, config_options, track);
+          if(!vim->verb_last_action) ce_rune_node_insert(&vim->insert_rune_head, key);
+          return insert_mode_handle_key(vim, view, cursor, visual, key, config_options);
      case CE_VIM_MODE_REPLACE:
           if(key != CE_NEWLINE && key != 27){ // escape
                int64_t last_index = ce_utf8_last_index(view->buffer->lines[cursor->y]);
@@ -446,8 +446,8 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
               }
           }
 
-          if(!vim->verb_last_action && track) ce_rune_node_insert(&vim->insert_rune_head, key);
-          return insert_mode_handle_key(vim, view, cursor, visual, key, config_options, track);
+          if(!vim->verb_last_action) ce_rune_node_insert(&vim->insert_rune_head, key);
+          return insert_mode_handle_key(vim, view, cursor, visual, key, config_options);
      case CE_VIM_MODE_NORMAL:
      case CE_VIM_MODE_VISUAL:
      case CE_VIM_MODE_VISUAL_LINE:
@@ -456,7 +456,7 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
           CeVimAction_t action = {};
 
           if(!ce_vim_append_key(vim, key)){
-               if(track) vim->current_command[0] = 0;
+               vim->current_command[0] = 0;
                break;
           }
 
@@ -464,30 +464,20 @@ CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cu
 
           if(result == CE_VIM_PARSE_COMPLETE){
                ce_vim_apply_action(vim, &action, view, cursor, visual, buffer_data, config_options);
-               if(track){
-                    vim->current_command[0] = 0;
+               vim->current_command[0] = 0;
 
-                    if(!vim->verb_last_action && action.repeatable){
-                         vim->last_action = action;
-                         if(vim->last_insert_rune_head){
-                              free(vim->last_insert_rune_head);
-                              vim->last_insert_rune_head = NULL;
-                         }
-                         vim->insert_rune_head = NULL;
+               if(!vim->verb_last_action && action.repeatable){
+                    vim->last_action = action;
+                    if(vim->last_insert_rune_head){
+                         ce_rune_node_free(&vim->last_insert_rune_head);
                     }
+                    vim->insert_rune_head = NULL;
                }
-          }else if(track && (result == CE_VIM_PARSE_INVALID || result == CE_VIM_PARSE_KEY_NOT_HANDLED)){
+          }else if(result == CE_VIM_PARSE_INVALID || result == CE_VIM_PARSE_KEY_NOT_HANDLED){
                vim->current_command[0] = 0;
           }
 
-          if(track){
-               vim->current_action = action;
-          }else{
-               // undo the command
-               int64_t command_len = istrlen(vim->current_command);
-               vim->current_command[command_len - 1] = 0;
-          }
-
+          vim->current_action = action;
           return result;
      } break;
      }
@@ -2292,6 +2282,12 @@ CeVimMotionResult_t ce_vim_motion_visual(CeVim_t* vim, CeVimAction_t* action, co
           case CE_VIM_YANK_TYPE_LINE:
                motion_range->start = (CePoint_t){0, cursor->y};
                motion_range->end.y = cursor->y + action->motion.integer;
+               if(motion_range->end.y >= view->buffer->line_count){
+                    motion_range->end.y = (view->buffer->line_count - 1);
+               }
+               if(motion_range->end.y < 0){
+                    motion_range->end.y = 0;
+               }
                motion_range->end.x = ce_utf8_strlen(view->buffer->lines[motion_range->end.y]);
                break;
           case CE_VIM_YANK_TYPE_STRING:
@@ -3324,7 +3320,7 @@ bool ce_vim_verb_last_action(CeVim_t* vim, const CeVimAction_t* action, CeRange_
           CeRune_t* itr = rune_string;
 
           while(*itr){
-               ce_vim_handle_key(vim, view, cursor, visual, *itr, buffer_data, config_options, true);
+               ce_vim_handle_key(vim, view, cursor, visual, *itr, buffer_data, config_options);
                itr++;
           }
 

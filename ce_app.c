@@ -425,22 +425,6 @@ bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool swi
      return true;
 }
 
-bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue){
-     // update input view to overlay the current view
-     input_view_overlay(input_view, view);
-
-     // update name based on dialog
-     free(input_view->buffer->app_data);
-     bool success = ce_buffer_alloc(input_view->buffer, 1, dialogue);
-     input_view->buffer->app_data = calloc(1, sizeof(CeAppBufferData_t));
-     input_view->buffer->no_line_numbers = true;
-     input_view->cursor = (CePoint_t){0, 0};
-     vim->mode = CE_VIM_MODE_INSERT;
-     ce_rune_node_free(&vim->insert_rune_head);
-
-     return success;
-}
-
 void input_view_overlay(CeView_t* input_view, CeView_t* view){
      input_view->rect.left = view->rect.left;
      input_view->rect.right = view->rect.right;
@@ -1038,7 +1022,11 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      app->vim_visual_save.visual_point = app->visual.point;
 
      app->vim.mode = CE_VIM_MODE_INSERT;
-     ce_rune_node_free(&app->vim.insert_rune_head);
+     app->vim.current_action.verb.function = ce_vim_verb_insert_mode;
+     app->vim.current_action.motion.function = NULL;
+     if(!app->vim.verb_last_action){
+          ce_rune_node_free(&app->vim.insert_rune_head);
+     }
 
      app->input_complete_func = input_complete_func;
      ce_complete_free(&app->input_complete);

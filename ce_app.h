@@ -208,7 +208,6 @@ CeDestination_t* ce_jump_list_current(CeJumpList_t* jump_list);
 void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim,
                            CeConfigOptions_t* config_options, bool insert_into_jump_list);
 
-bool enable_input_mode(CeView_t* input_view, CeView_t* view, CeVim_t* vim, const char* dialogue);
 void input_view_overlay(CeView_t* input_view, CeView_t* view);
 CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_t line_number);
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,

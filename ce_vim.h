@@ -159,7 +159,7 @@ bool ce_vim_init(CeVim_t* vim); // sets up default keybindings that can be overr
 bool ce_vim_free(CeVim_t* vim);
 bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeVimVisualData_t* visual, CeRune_t key,
-                                     CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options, bool track);
+                                     CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
 
 bool vim_mode_is_visual(CeVimMode_t mode);
 

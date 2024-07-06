@@ -661,7 +661,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 
                CeAppBufferData_t* buffer_data = app->input_view.buffer->app_data;
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, &app->input_view, &app->input_view.cursor,
-                                                               &app->visual, key, &buffer_data->vim, &app->config_options, true);
+                                                               &app->visual, key, &buffer_data->vim, &app->config_options);
 
                if(app->vim.mode == CE_VIM_MODE_INSERT && app->input_view.buffer->line_count){
                     if(app->input_complete_func == load_file_input_complete_func){
@@ -679,7 +679,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
 
                app->last_vim_handle_result = ce_vim_handle_key(&app->vim, view, &view->cursor, &app->visual,
-                                                               key, &buffer_data->vim, &app->config_options, true);
+                                                               key, &buffer_data->vim, &app->config_options);
 
                // A "jump" is one of the following commands: "'", "`", "G", "/", "?", "n",
                // "N", "%", "(", ")", "[[", "]]", "{", "}", ":s", ":tag", "L", "M", "H" and
