@@ -894,7 +894,8 @@ CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView
      char full_path[MAX_PATH_LEN];
      if(!base_directory && destination->filepath[0] != CE_PATH_SEPARATOR) base_directory = ".";
      if(base_directory){
-          snprintf(full_path, MAX_PATH_LEN, "%s/%s", base_directory, destination->filepath);
+          const char* full_path_format = "%s/%s";
+          snprintf(full_path, MAX_PATH_LEN - strlen(full_path_format), full_path_format, base_directory, destination->filepath);
      }else{
           strncpy(full_path, destination->filepath, MAX_PATH_LEN);
      }
@@ -1440,18 +1441,18 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
      bool chain_undo = false;
      int64_t match_len = 0;
 #if !defined(PLATFORM_WINDOWS)
-     regex_t regex = {};
+     CeRegex_t regex = NULL;
 #endif
 
      if(regex_search){
 #if defined(PLATFORM_WINDOWS)
           return;
 #else
-          int rc = regcomp(&regex, match, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
+          CeRegexResult_t regex_result = ce_regex_init(match,
+                                                       &regex);
+          if(regex_result.error_message != NULL){
+               ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+               free(regex_result.error_message);
                return;
           }
 #endif
@@ -1467,7 +1468,7 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
 #if defined(PLATFORM_WINDOWS)
                return;
 #else
-               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, &regex);
+               CeRegexSearchResult_t result = ce_buffer_regex_search_forward(buffer, start, regex);
                match_point = result.point;
                match_len = result.length;
                break;
@@ -1486,6 +1487,9 @@ void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match,
 
           start = ce_buffer_advance_point(buffer, match_point, ce_utf8_strlen(replacement));
      }
+#if !defined(PLATFORM_WINDOWS)
+     ce_regex_free(regex);
+#endif
 }
 
 void replace_all(CeView_t* view, CeVimVisualSave_t* vim_visual_save, const char* match, const char* replace){

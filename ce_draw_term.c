@@ -338,33 +338,34 @@ static void _draw_layout(CeLayout_t* layout, CeVim_t* vim, CeVimVisualData_t* vi
                               }
                          }else if(vim->search_mode == CE_VIM_SEARCH_MODE_REGEX_FORWARD ||
                                   vim->search_mode == CE_VIM_SEARCH_MODE_REGEX_BACKWARD){
-                              regex_t regex = {};
-                              int rc = regcomp(&regex, pattern, REG_EXTENDED);
-                              if(rc == 0){
-                                   const size_t match_count = 1;
-                                   regmatch_t matches[match_count];
-
+                              CeRegex_t regex = NULL;
+                              CeRegexResult_t regex_result = ce_regex_init(pattern,
+                                                                           &regex);
+                              if(regex_result.error_message == NULL){
                                    for(int64_t i = min; i <= max; i++){
                                         char* itr = layout->view.buffer->lines[i];
                                         int64_t prev_end_x = 0;
                                         while(itr){
-                                             rc = regexec(&regex, itr, match_count, matches, 0);
-                                             if(rc == 0){
-                                                  int64_t match_len = matches[0].rm_eo - matches[0].rm_so;
-                                                  if(match_len > 0){
-                                                       CePoint_t start = {prev_end_x + matches[0].rm_so, i};
-                                                       CePoint_t end = {start.x + (match_len - 1), i};
+                                             regex_result = ce_regex_match(regex, itr);
+                                             if(regex_result.error_message != NULL){
+                                                  free(regex_result.error_message);
+                                                  break;
+                                             }else{
+                                                  if(regex_result.match_length > 0){
+                                                       CePoint_t start = {prev_end_x + regex_result.match_start, i};
+                                                       CePoint_t end = {start.x + (regex_result.match_length - 1), i};
                                                        ce_range_list_insert(&range_list, start, end);
-                                                       itr = ce_utf8_iterate_to(itr, matches[0].rm_so + match_len);
+                                                       itr = ce_utf8_iterate_to(itr, regex_result.match_start + regex_result.match_length);
                                                        prev_end_x = end.x + 1;
                                                   }else{
                                                        break;
                                                   }
-                                             }else{
-                                                  break;
                                              }
                                         }
                                    }
+                                   ce_regex_free(regex);
+                              }else{
+                                   free(regex_result.error_message);
                               }
                          }
                     }

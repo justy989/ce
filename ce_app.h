@@ -12,6 +12,8 @@
 
 #if defined(PLATFORM_WINDOWS)
     #include <handleapi.h>
+#else
+    #include <pthread.h>
 #endif
 
 #define ENABLE_DEBUG_KEY_PRESS_INFO

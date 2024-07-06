@@ -112,6 +112,38 @@ static void _append_search_highlight_ranges(const char* pattern, CeLayout_t* lay
                     match = strstr(itr, pattern);
                }
           }
+     }else if(vim->search_mode == CE_VIM_SEARCH_MODE_REGEX_FORWARD ||
+              vim->search_mode == CE_VIM_SEARCH_MODE_REGEX_BACKWARD){
+          CeRegex_t regex = NULL;
+          CeRegexResult_t regex_result = ce_regex_init(pattern,
+                                                       &regex);
+          if(regex_result.error_message == NULL){
+               for(int64_t i = min; i <= max; i++){
+                    char* itr = layout->view.buffer->lines[i];
+                    int64_t prev_end_x = 0;
+                    while(itr){
+                         regex_result = ce_regex_match(regex, itr);
+                         if(regex_result.error_message != NULL){
+                              free(regex_result.error_message);
+                              break;
+                         }else{
+                              if(regex_result.match_length > 0){
+                                   CePoint_t start = {prev_end_x + regex_result.match_start, i};
+                                   CePoint_t end = {start.x + (regex_result.match_length - 1), i};
+                                   ce_range_list_insert(range_list, start, end);
+                                   itr = ce_utf8_iterate_to(itr, regex_result.match_start + regex_result.match_length);
+                                   prev_end_x = end.x + 1;
+                              }else{
+                                   break;
+                              }
+                         }
+                    }
+               }
+               ce_regex_free(regex);
+          }else{
+               free(regex_result.error_message);
+          }
+
      }
 }
 
