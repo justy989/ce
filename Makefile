@@ -1,12 +1,25 @@
 CC = clang
 CFLAGS := -Wall -Werror -Wshadow -Wextra -Wno-unused-parameter -std=gnu11 -ggdb3
-#TERM_LDFLAGS := -rdynamic -pthread -lncursesw -lutil -ldl
-#GUI_LDFLAGS := -rdynamic -pthread -lSDL2 -lSDL2_ttf -lutil -ldl
-TERM_LDFLAGS := -rdynamic -lncursesw -lutil -ldl
+TERM_LDFLAGS := -rdynamic -lutil -ldl
 GUI_LDFLAGS := -rdynamic -lSDL2 -lSDL2_ttf -lutil -ldl
 TERM_DEFINES := -DDISPLAY_TERMINAL
 GUI_DEFINES := -DDISPLAY_GUI
-TERM_INCFLAGS := -I/usr/include/ncursesw
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	TERM_LDFLAGS += -lncursesw -pthread
+	GUI_LDFLAGS += -pthread
+	GUI_INCFLAGS := -I/usr/include/SDL2
+endif
+ifeq ($(UNAME_S),Darwin)
+	TERM_LDFLAGS += -lncurses -pthread
+	GUI_LDFLAGS += -pthread
+	GUI_INCFLAGS := -I/opt/homebrew/include/SDL2
+endif
+ifeq ($(findstring CYGWIN,$(UNAME_S)),CYGWIN)
+	TERM_LDFLAGS += -lncursesw
+	GUI_INCFLAGS := -I/usr/include/SDL2
+endif
 
 BUILD_DIR ?= build
 TERM_OBJDIR ?= $(BUILD_DIR)/term

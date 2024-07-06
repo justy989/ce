@@ -33,9 +33,6 @@ static void _draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_nu
      }
 
      if(view->buffer->line_count >= 0){
-          int last_bg = CE_COLOR_DEFAULT;
-          int last_fg = CE_COLOR_DEFAULT;
-
           for(int64_t y = 0; y < view_height; y++){
                int64_t index = 0;
                int64_t x = 0;
@@ -89,8 +86,6 @@ static void _draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_nu
 
                               int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, bg);
                               attron(COLOR_PAIR(change_color_pair));
-                              last_bg = bg;
-                              last_fg = draw_color_node->fg;
                               draw_color_node = draw_color_node->next;
                          }
 
@@ -241,7 +236,7 @@ void _draw_view_status(CeView_t* view, CeVim_t* vim, CeMacros_t* macros,
 #endif
 
      char cursor_pos_string[32];
-     int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%ld, %ld", view->cursor.x + 1, view->cursor.y + 1);
+     int64_t cursor_pos_string_len = snprintf(cursor_pos_string, 32, "%"PRId64", %"PRId64"", view->cursor.x + 1, view->cursor.y + 1);
      mvprintw(bottom, view->rect.right - (cursor_pos_string_len + 1), "%s", cursor_pos_string);
 }
 

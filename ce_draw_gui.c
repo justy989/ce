@@ -226,8 +226,7 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
                     gui);
 
      // Draw the cursor pos in the bottom right.
-     int64_t cursor_pose_string_len = snprintf(line_buffer, STATUS_LINE_LEN, "%" PRId64 ", %" PRId64,
-                                               view->cursor.x + 1, view->cursor.y + 1);
+     int64_t cursor_pose_string_len = snprintf(line_buffer, STATUS_LINE_LEN, "%" PRId64 ", %" PRId64, view->cursor.x + 1, view->cursor.y + 1);
 
     _draw_text_line(line_buffer,
                     _text_pixel_x(view->rect.right, gui) - _text_pixel_x(cursor_pose_string_len, gui),
