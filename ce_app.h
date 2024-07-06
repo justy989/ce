@@ -257,5 +257,6 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
 
 // Returns the point at the end of the paste if text was pasted.
 CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point);
+bool ce_set_clipboard_from_buffer(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);
 
 extern int g_shell_command_ready_fds[2];

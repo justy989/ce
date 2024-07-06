@@ -26,6 +26,7 @@
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
 #elif defined(DISPLAY_GUI)
+    #include <SDL2/SDL.h>
     #include <SDL2/SDL_clipboard.h>
 #endif
 
@@ -1602,5 +1603,25 @@ CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point){
 
      free(clipboard_text);
      return final_cursor;
+#endif
+}
+
+bool ce_set_clipboard_from_buffer(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
+#if defined(DISPLAY_TERMINAL)
+     return false;
+#elif defined(DISPLAY_GUI)
+     int64_t text_len = ce_buffer_range_len(buffer, start, end);
+     char* clipboard_text = ce_buffer_dupe_string(buffer, start, text_len);
+     if(clipboard_text == NULL){
+          return false;
+     }
+
+     int rc = SDL_SetClipboardText(clipboard_text);
+     free(clipboard_text);
+     if(rc != 0){
+          ce_log("SDL_SetClipboardText() failed: %s\n", SDL_GetError());
+          return false;
+     }
+     return true;
 #endif
 }

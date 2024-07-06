@@ -122,6 +122,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'J', &ce_vim_parse_verb_join);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '~', &ce_vim_parse_verb_flip_case);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'm', &ce_vim_parse_verb_set_mark);
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_CTRL_SHIFT_C , &ce_vim_parse_verb_set_paste_clipboard_to_highlighted);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('a'), &ce_vim_parse_verb_increment_number);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('x'), &ce_vim_parse_verb_decrement_number);
 
@@ -2086,6 +2087,11 @@ CeVimParseResult_t ce_vim_parse_verb_decrement_number(CeVimAction_t* action, con
      action->verb.function = ce_vim_verb_decrement_number;
      return CE_VIM_PARSE_COMPLETE;
 }
+CeVimParseResult_t ce_vim_parse_verb_set_paste_clipboard_to_highlighted(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key){
+     if(action->motion.function) return CE_VIM_PARSE_INVALID;
+     action->verb.function = ce_vim_verb_set_paste_clipboard_to_highlighted;
+     return CE_VIM_PARSE_COMPLETE;
+}
 
 static CeVimMotionResult_t motion_direction(const CeView_t* view, CePoint_t delta, const CeConfigOptions_t* config_options,
                                             CeRange_t* motion_range){
@@ -3588,4 +3594,27 @@ bool ce_vim_verb_decrement_number(CeVim_t* vim, const CeVimAction_t* action, CeR
                                   CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                                   const CeConfigOptions_t* config_options){
      return change_number(view, cursor, motion_range.end, -1);
+}
+
+bool ce_vim_verb_set_paste_clipboard_to_highlighted(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
+                                                    CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
+                                                    const CeConfigOptions_t* config_options){
+     if(vim->mode != CE_VIM_MODE_VISUAL &&
+        vim->mode != CE_VIM_MODE_VISUAL_LINE){
+         return true;
+     }
+
+     CePoint_t highlight_start = visual->point;
+     CePoint_t highlight_end = *cursor;
+     if(ce_point_after(highlight_start, highlight_end)){
+         CePoint_t tmp = highlight_start;
+         highlight_start = highlight_end;
+         highlight_end = tmp;
+     }
+
+     if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
+         highlight_start.x = 0;
+         highlight_end.x = ce_buffer_line_len(view->buffer, highlight_end.y);
+     }
+     return ce_set_clipboard_from_buffer(view->buffer, highlight_start, highlight_end);
 }
