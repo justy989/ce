@@ -462,7 +462,6 @@ CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const c
      return result;
 }
 
-#if !defined(PLATFORM_WINDOWS)
 CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, CeRegex_t regex){
      CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
 
@@ -552,7 +551,6 @@ CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoin
 
      return result;
 }
-#endif
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;

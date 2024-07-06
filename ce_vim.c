@@ -2435,7 +2435,6 @@ CeVimMotionResult_t ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* actio
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
           CeRegex_t regex = NULL;
           CeRegexResult_t regex_result = ce_regex_init(yank->text,
@@ -2448,11 +2447,9 @@ CeVimMotionResult_t ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* actio
                result = search_result.point;
           }
           ce_regex_free(regex);
-#endif
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_BACKWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
           CeRegex_t regex = NULL;
           CeRegexResult_t regex_result = ce_regex_init(yank->text,
@@ -2465,7 +2462,6 @@ CeVimMotionResult_t ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* actio
                result = search_result.point;
           }
           ce_regex_free(regex);
-#endif
      } break;
      }
      if(result.x < 0) return CE_VIM_MOTION_RESULT_FAIL;
@@ -2494,7 +2490,6 @@ CeVimMotionResult_t ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* actio
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
           CeRegex_t regex = NULL;
           CeRegexResult_t regex_result = ce_regex_init(yank->text,
@@ -2506,11 +2501,9 @@ CeVimMotionResult_t ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* actio
                CeRegexSearchResult_t search_result = ce_buffer_regex_search_backward(view->buffer, start, regex);
                result = search_result.point;
           }
-#endif
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_BACKWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
           CeRegex_t regex = NULL;
           CeRegexResult_t regex_result = ce_regex_init(yank->text,
@@ -2522,7 +2515,6 @@ CeVimMotionResult_t ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* actio
                CeRegexSearchResult_t search_result = ce_buffer_regex_search_forward(view->buffer, start, regex);
                result = search_result.point;
           }
-#endif
      } break;
      }
      if(result.x < 0) return CE_VIM_MOTION_RESULT_FAIL;
