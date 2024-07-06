@@ -125,6 +125,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('a'), &ce_vim_parse_verb_increment_number);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('x'), &ce_vim_parse_verb_decrement_number);
 
+     memset(vim->yanks, 0, CE_ASCII_PRINTABLE_CHARACTERS * sizeof(vim->yanks[0]));
      return true;
 }
 
@@ -400,8 +401,8 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
      case KEY_REDO:
      {
           CeVimYank_t* yank = vim->yanks + ce_vim_register_index('"');
-          if(!yank) break;
-          if(yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
+          if(yank->type == CE_VIM_YANK_TYPE_NONE ||
+             yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
 
           if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text), cursor, vim->chain_undo)){
                break;
