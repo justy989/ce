@@ -54,6 +54,7 @@ typedef enum{
 }CeVimMode_t;
 
 typedef enum{
+     CE_VIM_YANK_TYPE_NONE,
      CE_VIM_YANK_TYPE_STRING,
      CE_VIM_YANK_TYPE_LINE,
      CE_VIM_YANK_TYPE_BLOCK,

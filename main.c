@@ -712,38 +712,40 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
 #if !defined(PLATFORM_WINDOWS)
           }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                    regex_t regex = {};
-                    int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
-                    if(rc != 0){
-                         char error_buffer[BUFSIZ];
-                         regerror(rc, &regex, error_buffer, BUFSIZ);
-                         ce_log("regcomp() failed: '%s'", error_buffer);
+                    CeRegex_t regex = NULL;
+                    CeRegexResult_t regex_result = ce_regex_init(app->input_view.buffer->lines[0],
+                                                                 &regex);
+                    if(regex_result.error_message != NULL){
+                         ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+                         free(regex_result.error_message);
                     }else{
-                         CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, &regex);
+                         CeRegexSearchResult_t result = ce_buffer_regex_search_forward(view->buffer, view->cursor, regex);
                          if(result.point.x >= 0){
                               scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
                          }else{
                               view->cursor = app->search_start;
                          }
+                         ce_regex_free(regex);
                     }
                }else{
                     view->cursor = app->search_start;
                }
           }else if(strcmp(app->input_view.buffer->name, "Regex Reverse Search") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
-                    regex_t regex = {};
-                    int rc = regcomp(&regex, app->input_view.buffer->lines[0], REG_EXTENDED);
-                    if(rc != 0){
-                         char error_buffer[BUFSIZ];
-                         regerror(rc, &regex, error_buffer, BUFSIZ);
-                         ce_log("regcomp() failed: '%s'", error_buffer);
+                    CeRegex_t regex = NULL;
+                    CeRegexResult_t regex_result = ce_regex_init(app->input_view.buffer->lines[0],
+                                                                 &regex);
+                    if(regex_result.error_message != NULL){
+                         ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+                         free(regex_result.error_message);
                     }else{
-                         CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, &regex);
+                         CeRegexSearchResult_t result = ce_buffer_regex_search_backward(view->buffer, view->cursor, regex);
                          if(result.point.x >= 0){
                               scroll_to_and_center_if_offscreen(view, result.point, &app->config_options);
                          }else{
                               view->cursor = app->search_start;
                          }
+                         ce_regex_free(regex);
                     }
                }else{
                     view->cursor = app->search_start;
@@ -803,7 +805,8 @@ int main(int argc, char* argv[]){
 
 #if !defined(PLATFORM_WINDOWS)
      char ce_dir[MAX_PATH_LEN];
-     snprintf(ce_dir, MAX_PATH_LEN, "%s/.ce", getenv("HOME"));
+     const char* ce_dir_format = "%s/.ce";
+     snprintf(ce_dir, MAX_PATH_LEN - strlen(ce_dir_format), ce_dir_format, getenv("HOME"));
 
      struct stat st = {};
      if(stat(ce_dir, &st) == -1){
@@ -816,7 +819,8 @@ int main(int argc, char* argv[]){
      }
 
      char log_filepath[MAX_PATH_LEN];
-     snprintf(log_filepath, MAX_PATH_LEN, "%s/ce.log", ce_dir);
+     const char* log_filepath_format = "%s/ce.log";
+     snprintf(log_filepath, MAX_PATH_LEN - strlen(log_filepath_format), log_filepath_format, ce_dir);
      if(!ce_log_init(log_filepath)){
           return 1;
      }
@@ -1001,7 +1005,7 @@ int main(int argc, char* argv[]){
                syntax_defs[CE_SYNTAX_COLOR_LINE_EXTENDS_PASSED_VIEW].bg = CE_SYNTAX_USE_CURRENT_COLOR;
 
                app.config_options.ui_fg_color = CE_COLOR_BRIGHT_WHITE;
-               app.config_options.ui_bg_color = CE_COLOR_BLACK;
+               app.config_options.ui_bg_color = CE_COLOR_WHITE;
                app.config_options.message_fg_color = CE_COLOR_BLUE;
                app.config_options.message_bg_color = CE_COLOR_WHITE;
 

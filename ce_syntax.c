@@ -377,6 +377,7 @@ static int64_t match_c_character_literal(const char* str){
 
                // our next character must be an end quote or we are not in a character literal
                if(str[3] == '\'') return 4;
+               return 0;
           default:
                if(str[2] == '\'') return 3;
           }

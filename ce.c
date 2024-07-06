@@ -462,29 +462,25 @@ CePoint_t ce_buffer_search_backward(CeBuffer_t* buffer, CePoint_t start, const c
      return result;
 }
 
-#if !defined(PLATFORM_WINDOWS)
-CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
+CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint_t start, CeRegex_t regex){
      CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
 
      if(!ce_buffer_point_is_valid(buffer, start)) return result;
 
-     const size_t match_count = 1;
-     regmatch_t matches[match_count];
-
      while(start.y < buffer->line_count){
-          int rc = regexec(regex, buffer->lines[start.y] + start.x, match_count, matches, 0);
-          if(rc == 0){
-               result.point = start;
-               result.point.x += matches[0].rm_so;
-               result.length = matches[0].rm_eo - matches[0].rm_so;
-               break;
-          }else if(rc != REG_NOMATCH){
-               char error_buffer[128];
-               regerror(rc, regex, error_buffer, 128);
-               ce_log("regexec() failed: '%s'", error_buffer);
+          CeRegexResult_t regex_result = ce_regex_match(regex,
+                                                        buffer->lines[start.y] + start.x);
+          if(regex_result.error_message != NULL){
+               ce_log("ce_regex_match() failed: %s", regex_result.error_message);
+               free(regex_result.error_message);
                break;
           }
-
+          if(regex_result.match_start != CE_REGEX_NO_MATCH){
+               result.point = start;
+               result.point.x += regex_result.match_start;
+               result.length = regex_result.match_length;
+               break;
+          }
           start.y++;
           start.x = 0;
      }
@@ -492,13 +488,10 @@ CeRegexSearchResult_t ce_buffer_regex_search_forward(CeBuffer_t* buffer, CePoint
      return result;
 }
 
-CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, const regex_t* regex){
+CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoint_t start, CeRegex_t regex){
      CeRegexSearchResult_t result = {(CePoint_t){-1, -1}, -1};
 
      if(!ce_buffer_point_is_valid(buffer, start)) return result;
-
-     const size_t match_count = 1;
-     regmatch_t matches[match_count];
 
      CePoint_t location = start;
 
@@ -516,28 +509,25 @@ CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoin
 
                // start at the beginning of the line, find all matches up to the cursor and take that one
                while(location.x < search_str_len){
-                    int rc = regexec(regex, search_str + location.x, match_count, matches, 0);
+                    CeRegexResult_t regex_result = ce_regex_match(regex,
+                                                                  search_str + location.x);
+                    if(regex_result.error_message != NULL){
+                         ce_log("ce_regex_match() failed: %s", regex_result.error_message);
+                         free(regex_result.error_message);
+                         return result;
+                    }
 
-                    if(rc == 0){
-                         int64_t match_x = location.x + matches[0].rm_so;
+                    if(regex_result.match_start != CE_REGEX_NO_MATCH){
+                         int64_t match_x = location.x + regex_result.match_start;
 
                          // if the match is after the start, then stop looking in this line
                          if(match_x >= start.x && location.y == start.y) break;
 
                          // save the match if we find one
                          last_valid_match.x = match_x;
-                         last_valid_match_len = matches[0].rm_eo - matches[0].rm_so;
+                         last_valid_match_len = regex_result.match_length;
                          if(last_valid_match_len == 0) break;
                     }else{
-                         // error out if regexec() fails for some reason other than no match
-                         if(rc != REG_NOMATCH){
-                              char error_buffer[128];
-                              regerror(rc, regex, error_buffer, 128);
-                              ce_log("regexec() failed: '%s'", error_buffer);
-                              return result;
-                         }
-
-                         // if there was no match, stop looking in this line
                          break;
                     }
 
@@ -561,7 +551,6 @@ CeRegexSearchResult_t ce_buffer_regex_search_backward(CeBuffer_t* buffer, CePoin
 
      return result;
 }
-#endif
 
 int64_t ce_buffer_range_len(CeBuffer_t* buffer, CePoint_t start, CePoint_t end){
      if(!ce_buffer_point_is_valid(buffer, start)) return -1;

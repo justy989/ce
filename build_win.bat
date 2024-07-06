@@ -15,6 +15,7 @@ cl ^
   ..\..\ce_draw_gui.c ^
   ..\..\ce_layout.c ^
   ..\..\ce_macros.c ^
+  ..\..\ce_regex_windows.cpp ^
   ..\..\ce_subprocess.c ^
   ..\..\ce_syntax.c ^
   ..\..\ce_vim.c ^

@@ -125,6 +125,7 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('a'), &ce_vim_parse_verb_increment_number);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('x'), &ce_vim_parse_verb_decrement_number);
 
+     memset(vim->yanks, 0, CE_ASCII_PRINTABLE_CHARACTERS * sizeof(vim->yanks[0]));
      return true;
 }
 
@@ -400,8 +401,8 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
      case KEY_REDO:
      {
           CeVimYank_t* yank = vim->yanks + ce_vim_register_index('"');
-          if(!yank) break;
-          if(yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
+          if(yank->type == CE_VIM_YANK_TYPE_NONE ||
+             yank->type == CE_VIM_YANK_TYPE_BLOCK) break;
 
           if(!ce_buffer_insert_string_change_at_cursor(view->buffer, strdup(yank->text), cursor, vim->chain_undo)){
                break;
@@ -2435,35 +2436,33 @@ CeVimMotionResult_t ce_vim_motion_search_next(CeVim_t* vim, CeVimAction_t* actio
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
+          CeRegex_t regex = NULL;
+          CeRegexResult_t regex_result = ce_regex_init(yank->text,
+                                                       &regex);
+          if(regex_result.error_message != NULL){
+               ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+               free(regex_result.error_message);
           }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
-               result = regex_result.point;
+               CeRegexSearchResult_t search_result = ce_buffer_regex_search_forward(view->buffer, start, regex);
+               result = search_result.point;
           }
-#endif
+          ce_regex_free(regex);
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_BACKWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
+          CeRegex_t regex = NULL;
+          CeRegexResult_t regex_result = ce_regex_init(yank->text,
+                                                       &regex);
+          if(regex_result.error_message != NULL){
+               ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+               free(regex_result.error_message);
           }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_backward(view->buffer, start, &regex);
-               result = regex_result.point;
+               CeRegexSearchResult_t search_result = ce_buffer_regex_search_backward(view->buffer, start, regex);
+               result = search_result.point;
           }
-#endif
+          ce_regex_free(regex);
      } break;
      }
      if(result.x < 0) return CE_VIM_MOTION_RESULT_FAIL;
@@ -2492,35 +2491,31 @@ CeVimMotionResult_t ce_vim_motion_search_prev(CeVim_t* vim, CeVimAction_t* actio
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_FORWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, -1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
+          CeRegex_t regex = NULL;
+          CeRegexResult_t regex_result = ce_regex_init(yank->text,
+                                                       &regex);
+          if(regex_result.error_message != NULL){
+               ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+               free(regex_result.error_message);
           }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_backward(view->buffer, start, &regex);
-               result = regex_result.point;
+               CeRegexSearchResult_t search_result = ce_buffer_regex_search_backward(view->buffer, start, regex);
+               result = search_result.point;
           }
-#endif
      } break;
      case CE_VIM_SEARCH_MODE_REGEX_BACKWARD:
      {
-#if !defined(PLATFORM_WINDOWS)
           CePoint_t start = ce_buffer_advance_point(view->buffer, motion_range->end, 1);
-          regex_t regex = {};
-          int rc = regcomp(&regex, yank->text, REG_EXTENDED);
-          if(rc != 0){
-               char error_buffer[BUFSIZ];
-               regerror(rc, &regex, error_buffer, BUFSIZ);
-               ce_log("regcomp() failed: '%s'", error_buffer);
+          CeRegex_t regex = NULL;
+          CeRegexResult_t regex_result = ce_regex_init(yank->text,
+                                                       &regex);
+          if(regex_result.error_message != NULL){
+               ce_log("ce_regex_init() failed: '%s'", regex_result.error_message);
+               free(regex_result.error_message);
           }else{
-               CeRegexSearchResult_t regex_result = ce_buffer_regex_search_forward(view->buffer, start, &regex);
-               result = regex_result.point;
+               CeRegexSearchResult_t search_result = ce_buffer_regex_search_forward(view->buffer, start, regex);
+               result = search_result.point;
           }
-#endif
      } break;
      }
      if(result.x < 0) return CE_VIM_MOTION_RESULT_FAIL;
