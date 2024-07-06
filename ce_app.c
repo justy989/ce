@@ -1327,7 +1327,7 @@ DWORD WINAPI run_shell_command_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
 
      CeSubprocess_t subprocess;
-     if(!ce_subprocess_open(&subprocess, shell_command_data->command)){
+     if(!ce_subprocess_open(&subprocess, shell_command_data->command, CE_PROC_COMM_STDOUT)){
           ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
           return -1;
      }

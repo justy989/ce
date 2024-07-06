@@ -38,7 +38,7 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcC
      }
 
      if(comms & CE_PROC_COMM_STDIN){
-         if(!CreatePipe(&subprocess->stdout_write_pipe, &stdin_read_pipe, &security_attributes, 0)) {
+         if(!CreatePipe(&subprocess->stdin_write_pipe, &stdin_read_pipe, &security_attributes, 0)) {
              ce_log("CreatePipe() failed for subprocess");
              return false;
          }
@@ -47,7 +47,7 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcC
              ce_log("Couldn't ensure the read handle to the pipe for STDIN is not inherited.");
              return false;
          }
-         subprocess->startup_info.hStdIn = stdin_read_pipe;
+         subprocess->startup_info.hStdInput = stdin_read_pipe;
      }
 
      bool success = CreateProcess(NULL,
@@ -106,8 +106,8 @@ int ce_subprocess_close(CeSubprocess_t* subprocess) {
      if(subprocess->stdout_read_pipe != INVALID_HANDLE_VALUE){
          CloseHandle(subprocess->stdout_read_pipe);
      }
-     if(subprocess->stdin_read_pipe != INVALID_HANDLE_VALUE){
-         CloseHandle(subprocess->stdin_read_pipe);
+     if(subprocess->stdin_write_pipe != INVALID_HANDLE_VALUE){
+         CloseHandle(subprocess->stdin_write_pipe);
      }
      CloseHandle(subprocess->process.hProcess);
      CloseHandle(subprocess->process.hThread);
