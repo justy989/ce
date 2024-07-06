@@ -86,8 +86,6 @@ static void _draw_view(CeView_t* view, int64_t tab_width, CeLineNumber_t line_nu
 
                               int change_color_pair = ce_color_def_get(color_defs, draw_color_node->fg, bg);
                               attron(COLOR_PAIR(change_color_pair));
-//                              last_bg = bg; // TODO: last_bg unused?
-//                              last_fg = draw_color_node->fg; // TODO: last_fg unused?
                               draw_color_node = draw_color_node->next;
                          }
 
