@@ -29,6 +29,7 @@
   #define KEY_CARRIAGE_RETURN 13
   #define KEY_REDO 18
   #define KEY_DELETE 127
+  #define KEY_CTRL_SHIFT_V -10
 #endif
 
 #define KEY_ESCAPE 27

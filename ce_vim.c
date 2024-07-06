@@ -410,6 +410,14 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
 
           vim->chain_undo = true;
      } break;
+     case KEY_CTRL_SHIFT_V:
+     {
+          CePoint_t resulting_cursor = ce_paste_clipboard_into_buffer(view->buffer,
+                                                                      view->cursor);
+          if(resulting_cursor.x >= 0){
+               view->cursor = resulting_cursor;
+          }
+     } break;
      }
 
      return CE_VIM_PARSE_COMPLETE;

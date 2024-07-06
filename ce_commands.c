@@ -1403,37 +1403,19 @@ CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data
 
 CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data) {
      if(command->arg_count >= 1) return CE_COMMAND_PRINT_HELP;
-#if defined(DISPLAY_TERMINAL)
-     return CE_COMMAND_SUCCESS;
-#elif defined(DISPLAY_GUI)
+
      CeApp_t* app = (CeApp_t*)(user_data);
      CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if (!SDL_HasClipboardText()) {
-         return CE_COMMAND_SUCCESS;
+     CePoint_t resulting_cursor = ce_paste_clipboard_into_buffer(command_context.view->buffer,
+                                                                 command_context.view->cursor);
+     if(resulting_cursor.x <= 0){
+          return CE_COMMAND_FAILURE;
      }
-     char* clipboard_text = SDL_GetClipboardText();
-     if (clipboard_text && *clipboard_text != 0) {
-         ce_buffer_insert_string(command_context.view->buffer, clipboard_text, command_context.view->cursor);
-         int64_t text_len = ce_utf8_strlen(clipboard_text);
 
-         CePoint_t final_cursor = ce_buffer_advance_point(command_context.view->buffer, command_context.view->cursor, text_len);
-
-         CeBufferChange_t change = {};
-         change.chain = false;
-         change.insertion = true;
-         change.string = strdup(clipboard_text);
-         change.location = command_context.view->cursor;
-         change.cursor_before = command_context.view->cursor;
-         change.cursor_after = final_cursor;
-         ce_buffer_change(command_context.view->buffer, &change);
-
-         command_context.view->cursor = final_cursor;
-         free(clipboard_text);
-     }
+     command_context.view->cursor = resulting_cursor;
      return CE_COMMAND_SUCCESS;
-#endif
 }
 
 void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match, const char* replacement, CePoint_t start, CePoint_t end,

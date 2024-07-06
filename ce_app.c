@@ -25,6 +25,8 @@
 
 #if defined(DISPLAY_TERMINAL)
     #include <ncurses.h>
+#elif defined(DISPLAY_GUI)
+    #include <SDL2/SDL_clipboard.h>
 #endif
 
 int g_shell_command_ready_fds[2];
@@ -1569,5 +1571,36 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      }
      return true;
 #endif
+}
 
+CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point){
+#if defined(DISPLAY_TERMINAL)
+     return CePoint_t{-1, -1};
+#elif defined(DISPLAY_GUI)
+     if(!SDL_HasClipboardText()){
+          return (CePoint_t){-1, -1};
+     }
+
+     char* clipboard_text = SDL_GetClipboardText();
+     if(clipboard_text == NULL || *clipboard_text == 0){
+          return (CePoint_t){-1, -1};
+     }
+
+     ce_buffer_insert_string(buffer, clipboard_text, point);
+     int64_t text_len = ce_utf8_strlen(clipboard_text);
+
+     CePoint_t final_cursor = ce_buffer_advance_point(buffer, point, text_len);
+
+     CeBufferChange_t change = {};
+     change.chain = false;
+     change.insertion = true;
+     change.string = strdup(clipboard_text);
+     change.location = point;
+     change.cursor_before = point;
+     change.cursor_after = final_cursor;
+     ce_buffer_change(buffer, &change);
+
+     free(clipboard_text);
+     return final_cursor;
+#endif
 }

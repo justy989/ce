@@ -19,9 +19,6 @@
     #include <time.h> // time_t
     #include <sys/time.h> // struct timeval
     #include <pthread.h> // pthread_t
-    #ifndef PATH_MAX
-        #define PATH_MAX 1024
-    #endif
 #endif
 
 #define CE_NEWLINE '\n'
