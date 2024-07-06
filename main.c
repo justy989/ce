@@ -48,6 +48,12 @@ typedef struct{
      char* newline;
 }FindTrailingResult_t;
 
+typedef struct{
+    bool is_down;
+    CePoint_t start;
+    CeLayout_t* clicked_layout;
+}MouseState_t;
+
 static const char* keyname_str(int key) {
 #if defined(DISPLAY_TERMINAL)
     return keyname(key);
@@ -264,6 +270,51 @@ static int int_strneq(int* a, int* b, size_t len){
      }
 
      return true;
+}
+
+#if defined(DISPLAY_GUI)
+static CePoint_t get_mouse_point(CeGui_t* gui){
+    CePoint_t result = {};
+    int mouse_x = 0;
+    int mouse_y = 0;
+    SDL_GetMouseState(&mouse_x, &mouse_y);
+    result.x = mouse_x / (gui->font_point_size / 2);
+    result.y = mouse_y / (gui->font_point_size + gui->font_line_separation);
+    if (result.x < 0){
+        result.x = 0;
+    }
+    if (result.y < 0){
+        result.y = 0;
+    }
+    if (result.x >= gui->window_width){
+        result.x = (gui->window_width - 1);
+    }
+    if (result.y >= gui->window_height){
+        result.y = (gui->window_height - 1);
+    }
+    return result;
+}
+#endif
+
+static CePoint_t calculate_view_point_from_screen_point(CeView_t* view,
+                                                        CePoint_t screen_point,
+                                                        CeConfigOptions_t* config_options){
+    CePoint_t result = {};
+
+    // Account for line numbers in calculation of new cursor.
+    int line_number_size = 0;
+    if(!view->buffer->no_line_numbers){
+        line_number_size = ce_line_number_column_width(config_options->line_number,
+                                                       view->buffer->line_count,
+                                                       view->rect.top,
+                                                       view->rect.bottom);
+    }
+
+    // Account for view scroll and rect offset in calculation of new cursor.
+    result.x = (screen_point.x + view->scroll.x) - (line_number_size + view->rect.left);
+    result.y = (screen_point.y + view->scroll.y) - view->rect.top;
+    result = ce_buffer_clamp_point(view->buffer, result, CE_CLAMP_X_INSIDE);
+    return result;
 }
 
 void scroll_to_and_center_if_offscreen(CeView_t* view, CePoint_t point, CeConfigOptions_t* config_options){
@@ -709,7 +760,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
-#if !defined(PLATFORM_WINDOWS)
           }else if(strcmp(app->input_view.buffer->name, "Regex Search") == 0){
                if(app->input_view.buffer->line_count && view->buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     CeRegex_t regex = NULL;
@@ -750,7 +800,6 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }else{
                     view->cursor = app->search_start;
                }
-#endif
           }
      }
 }
@@ -1222,15 +1271,14 @@ int main(int argc, char* argv[]){
           app.message_view.buffer->status = CE_BUFFER_STATUS_READONLY;
      }
 
-#if !defined(PLATFORM_WINDOWS)
+#if defined(DISPLAY_TERMINAL)
      pipe(g_shell_command_ready_fds);
-#endif
 
- #if defined(DISPLAY_TERMINAL)
+     // Draw the terminal before the loop in case we don't get any input immediately.
      ce_draw_term(&app);
- #elif defined(DISPLAY_GUI)
-     ce_draw_gui(&app, &gui);
- #endif
+#elif defined(DISPLAY_GUI)
+     MouseState_t mouse_state = {};
+#endif
 
      struct timespec current_draw_time = {};
      uint64_t time_since_last_message_usec = 0;
@@ -1309,6 +1357,7 @@ int main(int argc, char* argv[]){
 #if defined(DISPLAY_TERMINAL)
           int key = KEY_INVALID;
           if(check_stdin) { key = getch(); }
+
 #elif defined(DISPLAY_GUI)
           bool check_stdin = false;
           bool window_resized = false;
@@ -1323,20 +1372,22 @@ int main(int argc, char* argv[]){
                     app.quit = true;
                     break;
                case SDL_KEYDOWN:
+               {
 #if defined(PLATFORM_WINDOWS)
-                    if (__isascii(event.key.keysym.sym)) {
+                    bool key_is_ascii = __isascii(event.key.keysym.sym);
 #else
-                    if (isascii(event.key.keysym.sym)) {
+                    bool key_is_ascii = isascii(event.key.keysym.sym);
 #endif
+                    if (key_is_ascii) {
                         keydown_key = event.key.keysym.sym;
-                        if (event.key.keysym.mod & KMOD_SHIFT) {
+                        if(event.key.keysym.mod & KMOD_SHIFT){
                             keydown_key = toupper(keydown_key);
                         }
-                        if (event.key.keysym.mod & KMOD_CTRL) {
+                        if(event.key.keysym.mod & KMOD_CTRL){
                             keydown_key = ce_ctrl_key(keydown_key);
                         }
                     } else {
-                        switch (event.key.keysym.scancode) {
+                        switch(event.key.keysym.scancode){
                         default:
                             break;
                         case SDL_SCANCODE_LEFT:
@@ -1353,20 +1404,64 @@ int main(int argc, char* argv[]){
                             break;
                         }
                     }
-                    break;
+               } break;
                case SDL_TEXTINPUT:
                     {
                         int decoded_key = ce_utf8_decode(event.text.text, &key_len);
-                        if (isascii(decoded_key)) {
+                        if(isascii(decoded_key)){
                             key = decoded_key;
                         }
                     }
                     break;
                case SDL_WINDOWEVENT:
-                    if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    if(event.window.event == SDL_WINDOWEVENT_RESIZED){
                          window_resized = true;
                     }
                     break;
+               case SDL_MOUSEBUTTONDOWN:
+               {
+                    mouse_state.is_down = true;
+                    mouse_state.start = get_mouse_point(&gui);
+
+                    mouse_state.clicked_layout = ce_layout_find_at(tab_layout, mouse_state.start);
+                    if(mouse_state.clicked_layout->type == CE_LAYOUT_TYPE_VIEW){
+                        CeView_t* clicked_view = &mouse_state.clicked_layout->view;
+                        clicked_view->cursor = calculate_view_point_from_screen_point(clicked_view,
+                                                                                      mouse_state.start,
+                                                                                      &app.config_options);
+
+                        // Select the new tab layout.
+                        tab_layout->tab.current = mouse_state.clicked_layout;
+                        app.vim.mode = CE_VIM_MODE_VISUAL;
+                        app.visual.point = clicked_view->cursor;
+                        app.input_complete_func = NULL;
+                    }else{
+                        ce_log("unsupported click layout type %d\n", mouse_state.clicked_layout->type);
+                    }
+               } break;
+               case SDL_MOUSEBUTTONUP:
+               {
+                    if(!mouse_state.is_down){
+                         break;
+                    }
+                    mouse_state.is_down = false;
+                    CePoint_t mouse_end = get_mouse_point(&gui);
+                    if(ce_points_equal(mouse_state.start, mouse_end)){
+                        app.vim.mode = CE_VIM_MODE_NORMAL;
+                        app.input_complete_func = NULL;
+                    }
+               } break;
+               case SDL_MOUSEMOTION:
+               {
+                    if(mouse_state.is_down){
+                         CePoint_t mouse_end = get_mouse_point(&gui);
+                         // TODO: Check if clicked layout still exists.
+                         CeView_t* clicked_view = &mouse_state.clicked_layout->view;
+                         clicked_view->cursor = calculate_view_point_from_screen_point(clicked_view,
+                                                                                       mouse_end,
+                                                                                       &app.config_options);
+                    }
+               } break;
                }
           }
 
