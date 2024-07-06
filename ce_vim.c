@@ -122,9 +122,11 @@ bool ce_vim_init(CeVim_t* vim){
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'J', &ce_vim_parse_verb_join);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, '~', &ce_vim_parse_verb_flip_case);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, 'm', &ce_vim_parse_verb_set_mark);
-     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_CTRL_SHIFT_C , &ce_vim_parse_verb_set_paste_clipboard_to_highlighted);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('a'), &ce_vim_parse_verb_increment_number);
      ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, ce_ctrl_key('x'), &ce_vim_parse_verb_decrement_number);
+#if defined(DISPLAY_GUI)
+     ce_vim_add_key_bind(vim->key_binds, &vim->key_bind_count, KEY_CTRL_SHIFT_C , &ce_vim_parse_verb_set_paste_clipboard_to_highlighted);
+#endif
 
      memset(vim->yanks, 0, CE_ASCII_PRINTABLE_CHARACTERS * sizeof(vim->yanks[0]));
      return true;
@@ -411,6 +413,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
 
           vim->chain_undo = true;
      } break;
+#if defined(DISPLAY_GUI)
      case KEY_CTRL_SHIFT_V:
      {
           CePoint_t resulting_cursor = ce_paste_clipboard_into_buffer(view->buffer,
@@ -419,6 +422,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                view->cursor = resulting_cursor;
           }
      } break;
+#endif
      }
 
      return CE_VIM_PARSE_COMPLETE;
@@ -1923,6 +1927,7 @@ CeVimParseResult_t ce_vim_parse_verb_yank(CeVimAction_t* action, const CeVim_t* 
      }
 
      action->verb.function = &ce_vim_verb_yank;
+     action->yank_type = CE_VIM_YANK_TYPE_STRING;
      if(action->verb.integer == 0) action->verb.integer = '"';
 
      return CE_VIM_PARSE_IN_PROGRESS;
@@ -2992,7 +2997,8 @@ static bool paste_text(CeVim_t* vim, const CeVimAction_t* action, CeRange_t moti
 
      switch(yank->type){
      default:
-          break;
+          ce_log("unsupported yank type %d\n", yank->type);
+          return false;
      case CE_VIM_YANK_TYPE_LINE:
           insertion_point.x = 0;
           if(after) insertion_point.y++;

@@ -1576,7 +1576,7 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
 
 CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point){
 #if defined(DISPLAY_TERMINAL)
-     return CePoint_t{-1, -1};
+     return (CePoint_t){-1, -1};
 #elif defined(DISPLAY_GUI)
      if(!SDL_HasClipboardText()){
           return (CePoint_t){-1, -1};
