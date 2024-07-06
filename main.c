@@ -62,13 +62,11 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      // calc maxes of things we care about for formatting
      int64_t max_buffer_lines = 0;
      int64_t max_name_len = 0;
-     int64_t buffer_count = 0;
      const CeBufferNode_t* itr = head;
      while(itr){
           if(max_buffer_lines < itr->buffer->line_count) max_buffer_lines = itr->buffer->line_count;
           int64_t name_len = strlen(itr->buffer->name);
           if(max_name_len < name_len) max_buffer_lines = name_len;
-          buffer_count++;
           itr = itr->next;
      }
 
