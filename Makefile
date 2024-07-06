@@ -69,4 +69,4 @@ test_%: test_%.c $(TERM_OBJDIR)/%.o
 
 clean:
 	rm -f $(TERM_EXE) $(GUI_EXE) $(TESTS) ce_test.log valgrind.out
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)/$(TERM_OBJDIR) $(BUILD_DIR)/GUI_OBJDIR)
