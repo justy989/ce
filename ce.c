@@ -1253,6 +1253,16 @@ void ce_view_follow_cursor(CeView_t* view, int64_t horizontal_scroll_off, int64_
      if(!view->buffer) return;
 
      int64_t view_height = (view->rect.bottom - view->rect.top) - 1; // account for status bar
+     int64_t view_width = (view->rect.right - view->rect.left);
+
+     if(view_height <= (vertical_scroll_off * 2)){
+         vertical_scroll_off = 0;
+     }
+
+     if(view_width <= (horizontal_scroll_off * 2)){
+         horizontal_scroll_off = 0;
+     }
+
      int64_t scroll_left = view->scroll.x + horizontal_scroll_off;
      int64_t scroll_top = view->scroll.y + vertical_scroll_off;
      int64_t scroll_right = view->scroll.x + (view->rect.right - view->rect.left) - horizontal_scroll_off;

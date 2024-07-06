@@ -301,6 +301,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
           int64_t buffer_x = 0;
           int64_t line_index = draw_y + row_min;
 
+          // Highlight the current line if enabled.
           if (!view->buffer->no_highlight_current_line &&
               line_index == view->cursor.y) {
                SDL_Color color = color_from_index(config_options,
@@ -322,6 +323,7 @@ static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* m
                break;
           }
 
+          // Add line numbers if enabled.
           if(!view->buffer->no_line_numbers && config_options->line_number > 0){
                SDL_Color color = color_from_index(config_options,
                                                   ce_syntax_def_get_fg(syntax_defs, CE_SYNTAX_COLOR_LINE_NUMBER, CE_COLOR_BLACK),
@@ -734,13 +736,13 @@ int gui_load_font(CeGui_t* gui, const char* font_filepath, int font_point_size, 
           TTF_CloseFont(gui->font);
      }
 
-     printf("loading font: %s at size: %d\n", font_filepath, font_point_size);
+     ce_log("loading font: %s at size: %d\n", font_filepath, font_point_size);
 
      gui->font_point_size = font_point_size;
      gui->font_line_separation = font_line_separation;
      gui->font = TTF_OpenFont(font_filepath, gui->font_point_size);
      if (gui->font == NULL) {
-         printf("TTF_OpenFont() failed: %s\n", TTF_GetError());
+         ce_log("TTF_OpenFont() failed: %s\n", TTF_GetError());
          return 1;
      }
 

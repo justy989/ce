@@ -1191,7 +1191,7 @@ int main(int argc, char* argv[]){
      {
           int rc = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
           if(rc < 0){
-              printf("SDL_Init() failed: %s\n", SDL_GetError());
+              ce_log("SDL_Init() failed: %s\n", SDL_GetError());
               return 1;
           }
 
@@ -1200,7 +1200,7 @@ int main(int argc, char* argv[]){
           gui.application_name = "ce";
           gui.window_width = 1920;
           gui.window_height = 1080;
-          printf("Create window: %s %d, %d\n", gui.application_name, gui.window_width, gui.window_height);
+          ce_log("Create window: %s %d, %d\n", gui.application_name, gui.window_width, gui.window_height);
 
           gui.window = SDL_CreateWindow(gui.application_name,
                                         SDL_WINDOWPOS_CENTERED,
@@ -1209,7 +1209,7 @@ int main(int argc, char* argv[]){
                                         gui.window_height,
                                         SDL_WINDOW_RESIZABLE);
           if(gui.window == NULL){
-              printf("SDL_CreateWindow() failed: %s\n", SDL_GetError());
+              ce_log("SDL_CreateWindow() failed: %s\n", SDL_GetError());
               return 1;
           }
 
@@ -1217,7 +1217,7 @@ int main(int argc, char* argv[]){
 
           rc = TTF_Init();
           if (rc < 0) {
-              printf("TTF_Init() failed: %s\n", TTF_GetError());
+              ce_log("TTF_Init() failed: %s\n", TTF_GetError());
               return 1;
           }
 
@@ -1453,21 +1453,22 @@ int main(int argc, char* argv[]){
                } break;
                case SDL_MOUSEMOTION:
                {
-                    if(mouse_state.is_down){
-                         CePoint_t mouse_end = get_mouse_point(&gui);
-                         // TODO: Check if clicked layout still exists.
-                         CeView_t* clicked_view = &mouse_state.clicked_layout->view;
-                         clicked_view->cursor = calculate_view_point_from_screen_point(clicked_view,
-                                                                                       mouse_end,
-                                                                                       &app.config_options);
+                    if(!mouse_state.is_down){
+                         break;
                     }
+                    CePoint_t mouse_end = get_mouse_point(&gui);
+                    // TODO: Check if clicked layout still exists.
+                    CeView_t* clicked_view = &mouse_state.clicked_layout->view;
+                    clicked_view->cursor = calculate_view_point_from_screen_point(clicked_view,
+                                                                                  mouse_end,
+                                                                                  &app.config_options);
                } break;
                }
           }
 
           if(window_resized){
               SDL_GetWindowSize(gui.window, &gui.window_width, &gui.window_height);
-              printf("window resized to: %d, %d\n", gui.window_width, gui.window_height);
+              ce_log("window resized to: %d, %d\n", gui.window_width, gui.window_height);
               gui.window_surface = SDL_GetWindowSurface(gui.window);
               int calculated_terminal_width = gui.window_width / (gui.font_point_size / 2);
               int calculated_terminal_height = gui.window_height / (gui.font_point_size + gui.font_line_separation);

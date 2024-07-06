@@ -1,7 +1,9 @@
 #pragma once
 
 // TODO:
-// - select parent layout, I don't remember what you do with that though.
+// - Performance: Draw all characters on a surface for each color on init. Then while drawing just
+//                copy from the font color surface to the final surface.
+// - Select parent layout, I don't remember what you do with that though.
 // - Display when line extends passed the view
 
 #if defined(DISPLAY_GUI)
