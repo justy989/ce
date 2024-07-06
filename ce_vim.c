@@ -1843,6 +1843,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete(CeVimAction_t* action, const CeVim_t
      }
 
      action->verb.function = &ce_vim_verb_delete;
+     action->yank_type = CE_VIM_YANK_TYPE_STRING;
      action->clamp_x = CE_CLAMP_X_INSIDE;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
@@ -1851,6 +1852,7 @@ CeVimParseResult_t ce_vim_parse_verb_delete_to_end_of_line(CeVimAction_t* action
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_delete;
+     action->yank_type = CE_VIM_YANK_TYPE_STRING;
      action->clamp_x = CE_CLAMP_X_INSIDE;
      return CE_VIM_PARSE_COMPLETE;
 }
@@ -1863,6 +1865,7 @@ CeVimParseResult_t ce_vim_parse_verb_change(CeVimAction_t* action, const CeVim_t
      }
 
      action->verb.function = &ce_vim_verb_change;
+     action->yank_type = CE_VIM_YANK_TYPE_STRING;
      action->clamp_x = CE_CLAMP_X_ON;
      return CE_VIM_PARSE_IN_PROGRESS;
 }
@@ -1871,6 +1874,7 @@ CeVimParseResult_t ce_vim_parse_verb_change_to_end_of_line(CeVimAction_t* action
      action->repeatable = true;
      action->motion.function = &ce_vim_motion_end_line;
      action->verb.function = &ce_vim_verb_change;
+     action->yank_type = CE_VIM_YANK_TYPE_STRING;
      action->clamp_x = CE_CLAMP_X_ON;
      return CE_VIM_PARSE_COMPLETE;
 }
