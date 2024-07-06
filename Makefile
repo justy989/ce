@@ -8,6 +8,7 @@ GUI_DEFINES := -DDISPLAY_GUI
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
 	TERM_LDFLAGS += -lncursesw -pthread
+	TERM_INCFLAGS += -I/usr/include/ncursesw
 	GUI_LDFLAGS += -pthread
 	GUI_INCFLAGS := -I/usr/include/SDL2
 endif
