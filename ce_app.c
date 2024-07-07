@@ -1430,9 +1430,11 @@ static void* run_shell_command_and_output_to_buffer(void* data){
 
                CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
                ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
+#if defined(DISPLY_TERMINAL)
                do{
                     rc = write(g_shell_command_ready_fds[1], "1", 2);
                }while(rc == -1 && errno == EINTR);
+#endif
 
                if(rc < 0){
                     ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
@@ -1471,9 +1473,11 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
      ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
+#if defined(DISPLY_TERMINAL)
      do{
           rc = write(g_shell_command_ready_fds[1], "1", 2);
      }while(rc == -1 && errno == EINTR);
+#endif
 
      if(rc < 0){
           ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));

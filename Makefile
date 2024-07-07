@@ -63,10 +63,14 @@ $(GUI_EXE): $(GUI_COBJS)
 
 test: $(TESTS)
 
-test_%: test_%.c $(TERM_OBJDIR)/%.o
+test_ce: test_ce.c $(TERM_OBJDIR)/ce.o $(TERM_OBJDIR)/ce_regex_linux.o
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+	./$@
+
+test_ce_json: test_ce_json.c $(TERM_OBJDIR)/ce_json.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 	./$@
 
 clean:
 	rm -f $(TERM_EXE) $(GUI_EXE) $(TESTS) ce_test.log valgrind.out
-	rm -rf $(BUILD_DIR)/$(TERM_OBJDIR) $(BUILD_DIR)/GUI_OBJDIR)
+	rm -rf $(TERM_OBJDIR) $(GUI_OBJDIR)
