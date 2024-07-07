@@ -2,6 +2,9 @@
 
 // https://www.json.org/json-en.html
 
+// TODO:
+// - Convert printf() to ce_log()
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -61,7 +64,7 @@ void ce_json_obj_set_string(CeJsonObj_t* obj, const char* name, const char* stri
 void ce_json_obj_set_number(CeJsonObj_t* obj, const char* name, double number);
 void ce_json_obj_set_boolean(CeJsonObj_t* obj, const char* name, bool boolean);
 void ce_json_obj_set_null(CeJsonObj_t* obj, const char* name);
+void ce_json_obj_to_string(CeJsonObj_t* json, char* string, uint64_t size, uint64_t indent);
 void ce_json_obj_free(CeJsonObj_t* json);
 
 bool ce_json_parse(const char* string, CeJsonObj_t* json);
-void ce_json_to_string(CeJsonObj_t* json, char* string, uint64_t size, uint64_t indent);
