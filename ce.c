@@ -82,7 +82,7 @@ void ce_log(const char* fmt, ...){
      va_end(args);
 
 #if defined(PLATFORM_WINDOWS)
-     (void)(string_len);
+     printf("%s", g_log_string);
 #else
      fwrite(g_log_string, string_len, 1, g_ce_log);
 #endif

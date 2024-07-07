@@ -3,10 +3,12 @@
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
 
-bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command) {
+bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms) {
      // Setup a pipe so that we'll be able to read from stdout.
      subprocess->stdout_read_pipe = INVALID_HANDLE_VALUE;
+     subprocess->stdin_write_pipe = INVALID_HANDLE_VALUE;
      HANDLE stdout_write_pipe = INVALID_HANDLE_VALUE;
+     HANDLE stdin_read_pipe = INVALID_HANDLE_VALUE;
 
      SECURITY_ATTRIBUTES security_attributes;
      memset(&security_attributes, 0, sizeof(security_attributes));
@@ -14,26 +16,39 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command) {
      security_attributes.bInheritHandle = TRUE;
      security_attributes.lpSecurityDescriptor = NULL;
 
-     if(!CreatePipe(&subprocess->stdout_read_pipe, &stdout_write_pipe, &security_attributes, 0)) {
-         ce_log("CreatePipe() failed for subprocess");
-         return false;
-     }
-
-     // idk, msdn said to do this. Windows is weird.
-     if(!SetHandleInformation(subprocess->stdout_read_pipe, HANDLE_FLAG_INHERIT, 0)){
-         ce_log("Couldn't ensure the read handle to the pipe for STDOUT is not inherited.");
-         return false;
-     }
-
      // Populate startup info and start the process.
-
      memset(&subprocess->process, 0, sizeof(subprocess->process));
-
      memset(&subprocess->startup_info, 0, sizeof(subprocess->startup_info));
      subprocess->startup_info.cb = sizeof(subprocess->startup_info);
-     subprocess->startup_info.hStdError = stdout_write_pipe;
-     subprocess->startup_info.hStdOutput = stdout_write_pipe;
      subprocess->startup_info.dwFlags |= STARTF_USESTDHANDLES;
+
+     if(comms & CE_PROC_COMM_STDOUT){
+         if(!CreatePipe(&subprocess->stdout_read_pipe, &stdout_write_pipe, &security_attributes, 0)) {
+             ce_log("CreatePipe() failed for subprocess");
+             return false;
+         }
+
+         // idk, msdn said to do this. Windows is weird.
+         if(!SetHandleInformation(subprocess->stdout_read_pipe, HANDLE_FLAG_INHERIT, 0)){
+             ce_log("Couldn't ensure the read handle to the pipe for STDOUT is not inherited.");
+             return false;
+         }
+         subprocess->startup_info.hStdError = stdout_write_pipe;
+         subprocess->startup_info.hStdOutput = stdout_write_pipe;
+     }
+
+     if(comms & CE_PROC_COMM_STDIN){
+         if(!CreatePipe(&subprocess->stdin_write_pipe, &stdin_read_pipe, &security_attributes, 0)) {
+             ce_log("CreatePipe() failed for subprocess");
+             return false;
+         }
+
+         if(!SetHandleInformation(subprocess->stdin_write_pipe, HANDLE_FLAG_INHERIT, 0)){
+             ce_log("Couldn't ensure the read handle to the pipe for STDIN is not inherited.");
+             return false;
+         }
+         subprocess->startup_info.hStdInput = stdin_read_pipe;
+     }
 
      bool success = CreateProcess(NULL,
                                   (char*)command,
@@ -46,7 +61,12 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command) {
                                   &subprocess->startup_info,
                                   &subprocess->process);
     if(success){
-         CloseHandle(stdout_write_pipe);
+         if(stdout_write_pipe != INVALID_HANDLE_VALUE){
+             CloseHandle(stdout_write_pipe);
+         }
+         if(stdin_read_pipe != INVALID_HANDLE_VALUE){
+             CloseHandle(stdin_read_pipe);
+         }
     }else{
          DWORD error_message_id = GetLastError();
          char buffer[BUFSIZ];
@@ -83,7 +103,12 @@ int ce_subprocess_close(CeSubprocess_t* subprocess) {
          ce_log("GetExitCodeProcess() failed for pid: %d\n", subprocess->process.dwProcessId);
      }
 
-     CloseHandle(subprocess->stdout_read_pipe);
+     if(subprocess->stdout_read_pipe != INVALID_HANDLE_VALUE){
+         CloseHandle(subprocess->stdout_read_pipe);
+     }
+     if(subprocess->stdin_write_pipe != INVALID_HANDLE_VALUE){
+         CloseHandle(subprocess->stdin_write_pipe);
+     }
      CloseHandle(subprocess->process.hProcess);
      CloseHandle(subprocess->process.hThread);
      subprocess->process.hProcess = INVALID_HANDLE_VALUE;
@@ -98,38 +123,47 @@ int ce_subprocess_close(CeSubprocess_t* subprocess) {
 #include <unistd.h>
 
 // NOTE: stderr is redirected to stdout
-static pid_t popen_with_stdout(const char* cmd, int* out_fd){
+static pid_t bidirectional_popen(const char* cmd, CeProcCommFlag_t comms, int* in_fd, int* out_fd){
+     int input_fds[2];
      int output_fds[2];
 
+     if(pipe(input_fds) != 0) return 0;
      if(pipe(output_fds) != 0) return 0;
 
      pid_t pid = fork();
      if(pid < 0) return 0;
 
      if(pid == 0){
+          close(input_fds[1]);
           close(output_fds[0]);
 
+          dup2(input_fds[0], STDIN_FILENO);
           dup2(output_fds[1], STDOUT_FILENO);
           dup2(output_fds[1], STDERR_FILENO);
 
           // TODO: run user's SHELL ?
           execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
      }else{
+         close(input_fds[0]);
          close(output_fds[1]);
-         *out_fd = output_fds[0];
+         if(comms & CE_PROC_COMM_STDIN){
+             *in_fd = input_fds[1];
+         }else{
+             close(input_fds[1]);
+             *in_fd = -1;
+         }
+         if(comms & CE_PROC_COMM_STDOUT){
+             *out_fd = output_fds[0];
+         }else{
+             close(output_fds[0]);
+             *out_fd = -1;
+         }
      }
 
      return pid;
 }
 
-bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command){
-     subprocess->pid = popen_with_stdout(command, &subprocess->stdout_fd);
-     if(subprocess->pid == 0) return false;
-     subprocess->stdout_file = fdopen(subprocess->stdout_fd, "r");
-     return true;
-}
-
-void _close_file(FILE **file){
+static void _close_file(FILE **file){
      FILE *to_close = *file;
      if(to_close == NULL) return;
      *file = NULL;
@@ -137,6 +171,18 @@ void _close_file(FILE **file){
      // stdin prior to calling fclose() so we are guaranteed we don't do it
      // again in a cleanup handler
      fclose(to_close);
+}
+
+bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms){
+     subprocess->pid = bidirectional_popen(command, comms, &subprocess->stdin_fd, &subprocess->stdout_fd);
+     if(subprocess->pid == 0) return false;
+     if(subprocess->stdin_fd >= 0){
+         subprocess->stdin_file = fdopen(subprocess->stdin_fd, "w");
+     }
+     if(subprocess->stdout_fd >= 0){
+         subprocess->stdout_file = fdopen(subprocess->stdout_fd, "r");
+     }
+     return true;
 }
 
 void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal){
@@ -162,7 +208,14 @@ int ce_subprocess_close(CeSubprocess_t* subprocess){
      }while(!WIFEXITED(status) && !WIFSIGNALED(status));
      assert(!(WIFCONTINUED(status)));
 
-     _close_file(&subprocess->stdout_file);
+     if(subprocess->stdout_fd >= 0){
+         _close_file(&subprocess->stdout_file);
+         close(subprocess->stdout_fd);
+     }
+     if(subprocess->stdin_fd >= 0){
+         _close_file(&subprocess->stdin_file);
+         close(subprocess->stdin_fd);
+     }
      return status;
 }
 #endif
