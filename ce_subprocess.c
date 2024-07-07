@@ -164,6 +164,5 @@ int ce_subprocess_close(CeSubprocess_t* subprocess){
 
      _close_file(&subprocess->stdout_file);
      return status;
-     return -1;
 }
 #endif

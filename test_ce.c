@@ -5,9 +5,6 @@
 #include <string.h>
 #include <locale.h>
 
-FILE* g_ce_log = NULL;
-CeBuffer_t* g_ce_log_buffer = NULL;
-
 const char* g_multiline_string = "0123456789\nabcdefghij\nklmnopqrst";
 const char* g_multiline_string_with_empty_line = "0123456789\n\nabcdefghij\nklmnopqrst";
 const char* g_name = "test.txt";
@@ -502,12 +499,13 @@ TEST(view_follow_cursor){
      EXPECT(view.scroll.x == 5);
      EXPECT(view.scroll.y == 0);
 
-     // scroll down again, accounting for tabs
+     // scroll down again, accounting for tabs, but this time, we cannot scroll because our view
+     // is too small.
      view.cursor.x = 1;
      view.cursor.y = 3;
      ce_view_follow_cursor(&view, horizontal_scroll_off, vertical_scroll_off, tab_width);
      EXPECT(view.scroll.x == 0);
-     EXPECT(view.scroll.y == 3);
+     EXPECT(view.scroll.y == 0);
 
      // scroll back to origin
      view.cursor.x = 0;
@@ -583,6 +581,7 @@ TEST(util_visible_index_to_string_index){
 
 int main()
 {
+     printf("we out here\n");
      g_ce_log_buffer = malloc(sizeof(*g_ce_log_buffer));
      ce_buffer_alloc(g_ce_log_buffer, 1, "[log]");
      ce_log_init("ce_test.log");
