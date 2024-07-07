@@ -13,6 +13,8 @@ void print_obj(CeJsonObj_t* obj){
 }
 
 int main(int argc, char** argv){
+     bool verbose = false;
+
      // Build object manually.
      {
           CeJsonObj_t person = {};
@@ -63,9 +65,10 @@ int main(int argc, char** argv){
 
           printf("json:\n%s\n", json_str);
           CeJsonObj_t obj = {};
-          ce_json_parse(json_str, &obj);
-          print_obj(&obj);
-          ce_json_obj_free(&obj);
+          if(ce_json_parse(json_str, &obj, verbose)){
+               print_obj(&obj);
+               ce_json_obj_free(&obj);
+          }
      }
 
      // Parse internet string.
@@ -338,7 +341,6 @@ int main(int argc, char** argv){
                "      \"name\": \"vscode\",\n"
                "      \"version\": \"1.61.0\"\n"
                "    },\n"
-            // "    \"trace\": \"verbose\"\n"
                "    \"trace\": \"verbose\",\n"
                "    \"workspaceFolders\": [\n"
                "      {\n"
@@ -349,9 +351,10 @@ int main(int argc, char** argv){
                "  }\n"
                "}\n";
 
-          printf("internet json:\n%s\n", json_str);
+          printf("internet json:\n%s\n\n", json_str);
           CeJsonObj_t obj = {};
-          if(ce_json_parse(json_str, &obj)){
+          if(ce_json_parse(json_str, &obj, verbose)){
+               printf("parsed json:\n");
                print_obj(&obj);
                ce_json_obj_free(&obj);
           }

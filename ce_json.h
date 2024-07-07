@@ -67,4 +67,4 @@ void ce_json_obj_set_null(CeJsonObj_t* obj, const char* name);
 void ce_json_obj_to_string(CeJsonObj_t* json, char* string, uint64_t size, uint64_t indent);
 void ce_json_obj_free(CeJsonObj_t* json);
 
-bool ce_json_parse(const char* string, CeJsonObj_t* json);
+bool ce_json_parse(const char* string, CeJsonObj_t* json, bool verbose);

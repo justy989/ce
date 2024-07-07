@@ -15,7 +15,7 @@ typedef struct{
 static void _obj_copy(CeJsonObj_t* a, CeJsonObj_t* b);
 static void _obj_print(CeJsonObj_t* obj, char* string, PrintState_t* print_state, uint64_t current_indent,
                        uint64_t indent);
-static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj);
+static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose);
 static void _obj_free(CeJsonObj_t* a);
 
 static void _array_print(CeJsonArray_t* obj, char* string, PrintState_t* print_state,
@@ -522,27 +522,31 @@ static bool _parse_null(ParsePos_t* pos){
 }
 
 static void _transition_array_stage(ArrayParseStage_t* current_stage, ArrayParseStage_t new_stage,
-                                    ParsePos_t* pos){
-     printf("array parse stage change: %d -> %d at %ld, %ld at %c\n",
-            *current_stage, new_stage, pos->x, pos->y, *pos->str);
+                                    ParsePos_t* pos, bool verbose){
+     if(verbose){
+          printf("array parse stage change: %d -> %d at %ld, %ld at %c\n",
+                 *current_stage, new_stage, pos->x, pos->y, *pos->str);
+     }
      *current_stage = new_stage;
 }
 
 static void _transition_obj_stage(ObjParseStage_t* current_stage, ObjParseStage_t new_stage,
-                                  ParsePos_t* pos){
-     printf("obj parse stage change: %d -> %d at %ld, %ld at %c\n",
-            *current_stage, new_stage, pos->x, pos->y, *pos->str);
+                                  ParsePos_t* pos, bool verbose){
+     if(verbose){
+          printf("obj parse stage change: %d -> %d at %ld, %ld at %c\n",
+                 *current_stage, new_stage, pos->x, pos->y, *pos->str);
+     }
      *current_stage = new_stage;
 }
 
-static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
+static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
      ArrayParseStage_t stage = ARR_PARSE_STAGE_START;
      while(*pos->str){
           switch(stage){
           case ARR_PARSE_STAGE_START:
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_OPEN_BRACKET){
-                    _transition_array_stage(&stage, ARR_PARSE_STAGE_VALUE_BEGIN, pos);
+                    _transition_array_stage(&stage, ARR_PARSE_STAGE_VALUE_BEGIN, pos, verbose);
                }else{
                     printf("Error: %ld, %ld expected first non-whitespace character is not an open brace.\n",
                            pos->x, pos->y);
@@ -555,10 +559,10 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_OPEN_BRACE){
                     CeJsonObj_t obj = {};
-                    bool success = _obj_parse(pos, &obj);
+                    bool success = _obj_parse(pos, &obj, verbose);
                     if(success){
-                         _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos);
-                         printf("adding array obj element\n");
+                         _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
+                         if(verbose) printf("adding array obj element\n");
                          ce_json_array_add_obj(array, &obj);
                          ce_json_obj_free(&obj);
                     }else{
@@ -570,8 +574,8 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
                     char* field_string = NULL;
                     bool success = _parse_string(pos, &field_string);
                     if(success){
-                         _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos);
-                         printf("adding array string element\n");
+                         _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
+                         if(verbose) printf("adding array string element\n");
                          ce_json_array_add_string(array, field_string);
                          free(field_string);
                     }else{
@@ -582,8 +586,8 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
                     double number = 0;
                     bool success = _parse_number(pos, &number);
                     if(success){
-                         _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos);
-                         printf("adding array number element\n");
+                         _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
+                         if(verbose) printf("adding array number element\n");
                          ce_json_array_add_number(array, number);
                     }else{
                          printf("Error: %ld, %ld failed to parse expected number.\n",
@@ -591,12 +595,12 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
                          return false;
                     }
                }else if(_parse_boolean(pos, &boolean)){
-                    _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos);
-                    printf("adding array bool element\n");
+                    _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
+                    if(verbose) printf("adding array bool element\n");
                     ce_json_array_add_boolean(array, boolean);
                }else if(_parse_null(pos)){
-                    _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos);
-                    printf("adding array null element\n");
+                    _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
+                    if(verbose) printf("adding array null element\n");
                     ce_json_array_add_null(array);
                }else{
                     printf("Error: %ld, %ld expected value in array.\n",
@@ -607,9 +611,9 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
           case ARR_PARSE_STAGE_CHECK_NEXT_VALUE:
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_COMMA){
-                    _transition_array_stage(&stage, ARR_PARSE_STAGE_VALUE_BEGIN, pos);
+                    _transition_array_stage(&stage, ARR_PARSE_STAGE_VALUE_BEGIN, pos, verbose);
                }else if(*pos->str == TOKEN_CLOSE_BRACKET){
-                    printf("done parsing array\n");
+                    if(verbose) printf("done parsing array\n");
                     return true;
                }
                break;
@@ -627,14 +631,14 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array){
      return true;
 }
 
-static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
+static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
      ObjParseState_t state = {};
      while(*pos->str){
           switch(state.stage){
           case OBJ_PARSE_STAGE_START:
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_OPEN_BRACE){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD, pos);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD, pos, verbose);
                }else{
                     printf("Error: %ld, %ld expected first non-whitespace character is not an open brace.\n",
                            pos->x, pos->y);
@@ -644,9 +648,9 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
           case OBJ_PARSE_STAGE_FIELD:
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_QUOTE){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_NAME_BEGIN, pos);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_NAME_BEGIN, pos, verbose);
                }else if(*pos->str == TOKEN_CLOSE_BRACE){
-                    printf("Done parsing obj.\n");
+                    if(verbose) printf("Done parsing obj.\n");
                     return true;
                }else{
                     printf("Error: %ld, %ld expected field declaration.\n",
@@ -658,7 +662,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
           {
                _parse_string(pos, &state.field_name);
                if(*pos->str == TOKEN_QUOTE){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_NAME_END, pos);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_NAME_END, pos, verbose);
                }else{
                     printf("Error: %ld, %ld expected \" to start string.\n", pos->x, pos->y);
                     return false;
@@ -667,7 +671,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
           case OBJ_PARSE_STAGE_FIELD_NAME_END:
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_COLON){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_BEGIN, pos);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_BEGIN, pos, verbose);
                }else{
                     printf("Error: %ld, %ld expected \" to start string.\n", pos->x, pos->y);
                     return false;
@@ -679,19 +683,19 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_OPEN_BRACE){
                     CeJsonObj_t member_obj = {};
-                    if(!_obj_parse(pos, &member_obj)){
+                    if(!_obj_parse(pos, &member_obj, verbose)){
                          return false;
                     }
-                    printf("adding obj obj field %s\n", state.field_name);
+                    if(verbose) printf("adding obj obj field %s\n", state.field_name);
                     ce_json_obj_set_obj(obj, state.field_name, &member_obj);
                     ce_json_obj_free(&member_obj);
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
                }else if(_starts_number(*pos->str)){
                     double number = 0;
                     bool success = _parse_number(pos, &number);
                     if(success){
-                         _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos);
-                         printf("adding obj number field %s\n", state.field_name);
+                         _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
+                         if(verbose) printf("adding obj number field %s\n", state.field_name);
                          ce_json_obj_set_number(obj, state.field_name, number);
                     }else{
                          printf("Error: %ld, %ld failed to parse expected number.\n",
@@ -700,10 +704,10 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
                     }
                }else if(*pos->str == TOKEN_OPEN_BRACKET){
                     CeJsonArray_t array = {};
-                    bool success = _array_parse(pos, &array);
+                    bool success = _array_parse(pos, &array, verbose);
                     if(success){
-                         _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos);
-                         printf("adding obj array field %s\n", state.field_name);
+                         _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
+                         if(verbose) printf("adding obj array field %s\n", state.field_name);
                          ce_json_obj_set_array(obj, state.field_name, &array);
                          ce_json_array_free(&array);
                     }else{
@@ -715,20 +719,20 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
                     char* field_string = NULL;
                     bool success = _parse_string(pos, &field_string);
                     if(success){
-                         _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos);
-                         printf("adding obj string field %s\n", state.field_name);
+                         _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
+                         if(verbose) printf("adding obj string field %s\n", state.field_name);
                          ce_json_obj_set_string(obj, state.field_name, field_string);
                          free(field_string);
                     }else{
                          printf("Error: %ld, %ld failed to parse string.", pos->x, pos->y);
                     }
                }else if(_parse_boolean(pos, &boolean)){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos);
-                    printf("adding obj boolean field %s\n", state.field_name);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
+                    if(verbose) printf("adding obj boolean field %s\n", state.field_name);
                     ce_json_obj_set_boolean(obj, state.field_name, boolean);
                }else if(_parse_null(pos)){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos);
-                    printf("adding obj null field %s\n", state.field_name);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
+                    if(verbose) printf("adding obj null field %s\n", state.field_name);
                     ce_json_obj_set_null(obj, state.field_name);
                }else{
                     printf("Error: %ld, %ld failed to detect value.\n", pos->x, pos->y);
@@ -738,10 +742,10 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
           case OBJ_PARSE_STAGE_FIELD_VALUE_END:
                _eat_whitespace(pos);
                if(*pos->str == TOKEN_CLOSE_BRACE){
-                    printf("done parsing obj.\n");
+                    if(verbose) printf("done parsing obj.\n");
                     return true;
                }else if(*pos->str == TOKEN_COMMA){
-                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD, pos);
+                    _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD, pos, verbose);
                }else{
                     printf("Error: %ld, %ld failed to parse next element or end of object with %c.\n",
                            pos->x, pos->y, *pos->str);
@@ -762,12 +766,12 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj){
      return true;
 }
 
-bool ce_json_parse(const char* string, CeJsonObj_t* json){
+bool ce_json_parse(const char* string, CeJsonObj_t* json, bool verbose){
      ParsePos_t parse_pos = {};
      parse_pos.x = 1;
      parse_pos.y = 1;
      parse_pos.str = string;
-     bool result = _obj_parse(&parse_pos, json);
+     bool result = _obj_parse(&parse_pos, json, verbose);
      if(!result){
           ce_json_obj_free(json);
      }
