@@ -1,12 +1,13 @@
 #pragma once
 
 #include "ce.h"
+#include "ce_clangd.h"
 #include "ce_command.h"
-#include "ce_vim.h"
-#include "ce_layout.h"
-#include "ce_syntax.h"
 #include "ce_complete.h"
+#include "ce_layout.h"
 #include "ce_macros.h"
+#include "ce_syntax.h"
+#include "ce_vim.h"
 
 #include <time.h>
 
@@ -169,6 +170,8 @@ typedef struct CeApp_t{
      bool shell_command_thread_should_die;
 
      void* gui;
+
+     CeClangD_t clangd;
 
      // debug
      bool log_key_presses;

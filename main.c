@@ -1062,6 +1062,13 @@ int main(int argc, char* argv[]){
           }
      }
 
+     // TODO: Optionall start up clangd
+     {
+          if(!ce_clangd_init("/home/jtiff/ce_config/ce/clangd", &app.clangd)){
+               return 1;
+          }
+     }
+
      // init buffers
      {
           app.buffer_list_buffer = new_buffer();
@@ -1092,6 +1099,8 @@ int main(int argc, char* argv[]){
           ce_buffer_node_insert(&app.buffer_node_head, app.shell_command_buffer);
           ce_buffer_alloc(scratch_buffer, 1, "scratch");
           ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
+          // TODO: Only optionally add this buffer
+          ce_buffer_node_insert(&app.buffer_node_head, app.clangd.buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.bind_list_buffer->status = CE_BUFFER_STATUS_NONE;
@@ -1102,6 +1111,7 @@ int main(int argc, char* argv[]){
           app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.shell_command_buffer->status = CE_BUFFER_STATUS_NONE;
           scratch_buffer->status = CE_BUFFER_STATUS_NONE;
+          app.clangd.buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.bind_list_buffer->no_line_numbers = true;
@@ -1111,6 +1121,7 @@ int main(int argc, char* argv[]){
           app.mark_list_buffer->no_line_numbers = true;
           app.jump_list_buffer->no_line_numbers = true;
           app.shell_command_buffer->no_line_numbers = true;
+          app.clangd.buffer->no_line_numbers = true;
 
           app.complete_list_buffer->no_highlight_current_line = true;
 
@@ -1133,6 +1144,8 @@ int main(int argc, char* argv[]){
           buffer_data->syntax_function = ce_syntax_highlight_plain;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
+          buffer_data = app.clangd.buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_plain;
 
           if(argc > 1){
                for(int64_t i = last_arg_index; i < argc; i++){

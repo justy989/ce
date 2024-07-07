@@ -602,6 +602,9 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
                     _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
                     if(verbose) printf("adding array null element\n");
                     ce_json_array_add_null(array);
+               }else if(*pos->str == TOKEN_CLOSE_BRACKET){
+                    if(verbose) printf("done parsing array\n");
+                    return true;
                }else{
                     printf("Error: %ld, %ld expected value in array.\n",
                            pos->x, pos->y);
