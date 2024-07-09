@@ -1343,8 +1343,8 @@ DWORD WINAPI run_shell_command_output_to_buffer(void* data){
      DWORD bytes_read = 0;
 
      while(!g_shell_command_should_die){
-          bool success = ReadFile(subprocess.stdout_read_pipe, bytes, BUFSIZ - 1, &bytes_read, NULL);
-          if(!success || bytes_read == 0){
+          int64_t bytes_read = ce_subprocess_read_stdout(&subprocess, bytes, BUFSIZ - 1);
+          if(bytes_read <= 0){
               break;
           }else{
                // Sanitize bytes for non-printable characters.
@@ -1419,29 +1419,29 @@ static void* run_shell_command_and_output_to_buffer(void* data){
                return NULL;
           }
 
-          rc = read(stdout_fd, bytes, BUFSIZ);
-          if(rc > 0){
-               bytes[rc] = 0;
+          int64_t bytes_read = ce_subprocess_read_stdout(&subprocess, bytes, BUFSIZ - 1);
+          if(bytes_read > 0){
+               bytes[bytes_read] = 0;
 
                // sanitize bytes for non-printable characters
-               for(int i = 0; i < rc; i++){
+               for(int i = 0; i < bytes_read; i++){
                    if(bytes[i] < 32 && bytes[i] != '\n') bytes[i] = '?';
                }
 
                CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
                ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
-#if defined(DISPLY_TERMINAL)
+#if defined(DISPLAY_TERMINAL)
                do{
-                    rc = write(g_shell_command_ready_fds[1], "1", 2);
-               }while(rc == -1 && errno == EINTR);
+                    bytes_read = write(g_shell_command_ready_fds[1], "1", 2);
+               }while(bytes_read == -1 && errno == EINTR);
 #endif
 
-               if(rc < 0){
+               if(bytes_read < 0){
                     ce_log("%s() write() to terminal ready fd failed: %s", __FUNCTION__, strerror(errno));
                     run_shell_command_cleanup(&cleanup);
                     return NULL;
                }
-          }else if(rc < 0){
+          }else if(bytes_read < 0){
                if(errno == EAGAIN || errno == EWOULDBLOCK){
                     usleep(1000);
                }else if(errno == EBADF){
@@ -1473,7 +1473,7 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      CePoint_t end = ce_buffer_advance_point(shell_command_data->buffer, ce_buffer_end_point(shell_command_data->buffer), 1);
      ce_buffer_insert_string(shell_command_data->buffer, bytes, end);
      shell_command_data->buffer->status = CE_BUFFER_STATUS_READONLY;
-#if defined(DISPLY_TERMINAL)
+#if defined(DISPLAY_TERMINAL)
      do{
           rc = write(g_shell_command_ready_fds[1], "1", 2);
      }while(rc == -1 && errno == EINTR);

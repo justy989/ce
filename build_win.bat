@@ -9,10 +9,12 @@ cl ^
   ..\..\main.c ^
   ..\..\ce.c ^
   ..\..\ce_app.c ^
+  ..\..\ce_clangd.c ^
   ..\..\ce_command.c ^
   ..\..\ce_commands.c ^
   ..\..\ce_complete.c ^
   ..\..\ce_draw_gui.c ^
+  ..\..\ce_json.c ^
   ..\..\ce_layout.c ^
   ..\..\ce_macros.c ^
   ..\..\ce_regex_windows.cpp ^

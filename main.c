@@ -1062,11 +1062,11 @@ int main(int argc, char* argv[]){
           }
      }
 
-     // TODO: Optionall start up clangd
+     // init clangd
      {
-          if(!ce_clangd_init("/home/jtiff/ce_config/ce/clangd", &app.clangd)){
-               return 1;
-          }
+          memset(&app.clangd, 0, sizeof(app.clangd));
+          app.clangd.buffer = new_buffer();
+          ce_buffer_alloc(app.clangd.buffer, 1, "[clangd]");
      }
 
      // init buffers
@@ -1245,6 +1245,14 @@ int main(int argc, char* argv[]){
           app.gui = &gui;
      }
 #endif
+
+     // TODO: Optionall start up clangd
+     {
+          // if(!ce_clangd_init("C:/home/jtiff/ce_config/ce/clangd", &app.clangd)){
+          if(!ce_clangd_init("C:\\Users\\jtiff\\source\\repos\\ce_config\\ce\\clangd.exe", &app.clangd)){
+               return 1;
+          }
+     }
 
      ce_app_init_default_commands(&app);
      ce_vim_init(&app.vim);
@@ -1596,6 +1604,8 @@ int main(int argc, char* argv[]){
      free(binds->binds);
 
      free(app.command_entries);
+
+     ce_clangd_free(&app.clangd);
 
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);

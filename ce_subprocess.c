@@ -38,7 +38,7 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcC
      }
 
      if(comms & CE_PROC_COMM_STDIN){
-         if(!CreatePipe(&subprocess->stdin_write_pipe, &stdin_read_pipe, &security_attributes, 0)) {
+         if(!CreatePipe(&stdin_read_pipe, &subprocess->stdin_write_pipe, &security_attributes, 0)) {
              ce_log("CreatePipe() failed for subprocess");
              return false;
          }
@@ -219,3 +219,64 @@ int ce_subprocess_close(CeSubprocess_t* subprocess){
      return status;
 }
 #endif
+
+int64_t ce_subprocess_read_stdout(CeSubprocess_t* subprocess, char* buffer, int64_t size){
+#if defined(PLATFORM_WINDOWS)
+     if(subprocess->stdout_read_pipe == INVALID_HANDLE_VALUE){
+          ce_log("subprocess created without enabling reading stdout\n");
+          return -1;
+     }
+     DWORD bytes_read = 0;
+     ReadFile(subprocess->stdout_read_pipe, buffer, size, &bytes_read, NULL);
+     if(bytes_read < 0){
+          ce_log("read() from clangd stdout failed.\n");
+     }
+     return bytes_read;
+
+#else
+     if(subprocess->stdout_fd < 0){
+          ce_log("subprocess created without enabling reading stdout\n");
+          return -1;
+     }
+     int bytes_read = read(subprocess->stdout_fd, buffer, size);
+     if(bytes_read > 0){
+          ce_log("read() failed on subprocess pid %d stdin %s\n", strerror(errno));
+          return -1;
+     }
+     return bytes_read;
+#endif
+}
+
+int64_t ce_subprocess_write_stdin(CeSubprocess_t* subprocess, char* buffer, int64_t size){
+     int64_t total_bytes_written = 0;
+     while(total_bytes_written < size){
+#if defined(PLATFORM_WINDOWS)
+          if(subprocess->stdin_write_pipe == INVALID_HANDLE_VALUE){
+               ce_log("subprocess created without enabling reading stdout\n");
+               return -1;
+          }
+          DWORD bytes_written = 0;
+          bool success = WriteFile(subprocess->stdin_write_pipe, buffer + total_bytes_written,
+                                   size - total_bytes_written,
+                                   &bytes_written, NULL);
+          if(!success || bytes_written < 0){
+               ce_log("write() failed on clangd stdin\n");
+               return -1;
+          }
+#else
+          if(subprocess->stdin_fd < 0){
+               ce_log("subprocess created without enabling reading stdout\n");
+               return -1;
+          }
+          int64_t bytes_written = write(subprocess->stdin_fd, buffer + total_bytes_written,
+                                        size - total_bytes_written);
+          if(bytes_written < 0){
+               ce_log("write() failed on clangd stdin %s\n", strerror(errno));
+               return false;
+          }
+
+#endif
+          total_bytes_written += bytes_written;
+     }
+     return total_bytes_written;
+}

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
 
 #if defined(PLATFORM_WINDOWS)
 	#include <processthreadsapi.h>
@@ -37,6 +38,10 @@ typedef struct{
 bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms);
 // send the specified signal to the subprocess
 void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal);
+// Read up to the requested number of bytes from stdout
+int64_t ce_subprocess_read_stdout(CeSubprocess_t* subprocess, char* buffer, int64_t size);
+// Write the requested number of bytes to stdin
+int64_t ce_subprocess_write_stdin(CeSubprocess_t* subprocess, char* buffer, int64_t size);
 // close all subprocess fds and fps and wait for the subprocess to complete
 // returns the exit status from the waitpid() call
 int ce_subprocess_close(CeSubprocess_t* subprocess);
