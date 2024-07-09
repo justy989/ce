@@ -2,7 +2,6 @@
 #include "ce_app.h"
 #include "ce_json.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,10 +9,13 @@
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
 #else
+     #include <errno.h>
      #include <pthread.h>
      #include <unistd.h>
 #endif
 
+#define DEFAULT_MESSAGE_SIZE (16 * 1024 * 1024)
+#define DEFAULT_HEADER_SIZE (1024)
 #define READ_BLOCK_SIZE (4 * 1024)
 #define MAX_HEADER_SIZE 128
 #define MAX_PRINT_SIZE (1024 * 1024)
@@ -31,38 +33,6 @@ typedef struct{
 }ParseResponse_t;
 
 #if defined(PLATFORM_WINDOWS)
-static bool _update_windows_path_for_json(char* path, int64_t max_len){
-     int64_t current_len = 0;
-     int64_t required_len = 0;
-     char* itr = path;
-     for(int64_t i = 0; i < max_len; i++){
-          if(*itr == '\\'){
-               required_len += 2;
-          }else if(*itr == 0){
-               break;
-          }else{
-               required_len++;
-          }
-          current_len++;
-          itr++;
-     }
-     if(required_len >= max_len){
-          return false;
-     }
-     for(int64_t i = current_len; i >= 0; i--){
-          if(path[i] == '\\'){
-               path[required_len] = '\\';
-               required_len--;
-               path[required_len] = '\\';
-               required_len--;
-          }else{
-               path[required_len] = path[i];
-               required_len--;
-          }
-     }
-     return true;
-}
-
 static bool _convert_windows_path_to_uri(char* path, int64_t max_len){
      const char prefix[] = "file:///";
      int64_t prefix_len = 8;
@@ -81,6 +51,99 @@ static bool _convert_windows_path_to_uri(char* path, int64_t max_len){
      return true;
 }
 #endif
+
+static bool _calculate_filename_uri(const char* name, char* uri, size_t size){
+#if defined(PLATFORM_WINDOWS)
+     char* full_file_path = _fullpath(NULL, name, size);
+     strncpy(uri, full_file_path, size);
+     free(full_file_path);
+     if(!_convert_windows_path_to_uri(uri, size)){
+          return false;
+     }
+#else
+     char* full_file_path = realpath(name, NULL);
+     snprintf(uri, size, "file://%s", full_file_path);
+     free(full_file_path);
+#endif
+     return true;
+}
+
+static char* _convert_string_to_json_string(const char* string){
+     char* result = NULL;
+     int64_t string_len = strlen(string);
+     int64_t result_len = 0;
+     int64_t utf8_string_len = ce_utf8_strlen(string);
+
+     // Count how big we need to allocate the string.
+     for(int64_t i = 0; i < string_len; i++){
+          if(string[i] == '"' ||
+             string[i] == '\\' ||
+             string[i] == '/' ||
+             string[i] == '\b' ||
+             string[i] == '\f' ||
+             string[i] == '\n' ||
+             string[i] == '\r' ||
+             string[i] == '\t'){
+             // TODO: support \u
+               result_len += 2;
+          }else{
+               result_len++;
+          }
+     }
+
+     // Allocate and populate the new string with valid
+     result = malloc(result_len + 1);
+     int64_t r = 0;
+     for(int64_t i = 0; i < string_len; i++){
+          switch(string[i]){
+          case '"':
+          case '\\':
+          case '/':
+               result[r] = '\\';
+               r++;
+               result[r] = string[i];
+               r++;
+               break;
+          case '\b':
+               result[r] = '\\';
+               r++;
+               result[r] = 'b';
+               r++;
+               break;
+          case '\f':
+               result[r] = '\\';
+               r++;
+               result[r] = 'f';
+               r++;
+               break;
+          case '\n':
+               result[r] = '\\';
+               r++;
+               result[r] = 'n';
+               r++;
+               break;
+          case '\r':
+               result[r] = '\\';
+               r++;
+               result[r] = 'r';
+               r++;
+               break;
+          case '\t':
+               result[r] = '\\';
+               r++;
+               result[r] = 't';
+               r++;
+               break;
+          default:
+               result[r] = string[i];
+               r++;
+               break;
+          }
+     }
+     // End with null terminator
+     result[r] = 0;
+     return result;
+}
 
 bool parse_response_complete(ParseResponse_t* parse){
      if(parse->message_body != NULL &&
@@ -169,18 +232,23 @@ void parse_response_free(ParseResponse_t* parse){
 
 static bool _send_json_obj(CeJsonObj_t* obj, CeSubprocess_t* subprocess){
      // Build the message boyd
-     char* message_body = malloc(BUFSIZ);
-     ce_json_obj_to_string(obj, message_body, BUFSIZ, 1);
+     char* message_body = malloc(DEFAULT_MESSAGE_SIZE);
+     ce_json_obj_to_string(obj, message_body, DEFAULT_MESSAGE_SIZE - 1, 1);
      uint64_t message_len = strlen(message_body);
 
      // Prepend the header.
-     char* message = malloc(BUFSIZ);
-     int64_t total_bytes_to_write = snprintf(message, BUFSIZ, "Content-Length: %" PRId64 "\r\n\r\n%s",
-                                             message_len, message_body);
+     char* header = malloc(DEFAULT_HEADER_SIZE);
+     int64_t header_len = snprintf(header, DEFAULT_HEADER_SIZE, "Content-Length: %" PRId64 "\r\n\r\n",
+                                             message_len);
 
-     int64_t bytes_written = ce_subprocess_write_stdin(subprocess, message, total_bytes_to_write);
+     int64_t bytes_written = ce_subprocess_write_stdin(subprocess, header, header_len);
+     free(header);
+     if(bytes_written < 0){
+          free(message_body);
+          return false;
+     }
+     bytes_written = ce_subprocess_write_stdin(subprocess, message_body, message_len);
      free(message_body);
-     free(message);
      if(bytes_written < 0){
           return false;
      }
@@ -193,7 +261,7 @@ DWORD WINAPI handle_output_fn(void* user_data){
 static void* handle_output_fn(void* user_data){
 #endif
      HandleOutputData_t* data = (HandleOutputData_t*)(user_data);
-     bool sent_definition_request = false;
+     // bool sent_definition_request = false;
      ParseResponse_t parse = {};
      strcpy(parse.expected_header_prefix, "Content-Length: ");
 
@@ -216,65 +284,65 @@ static void* handle_output_fn(void* user_data){
                     printf("%s\n", buffer);
                     ce_json_obj_free(&obj);
 
-                    // On receiving, send a request.
-                    if(!sent_definition_request){
-                         // NOTE: Explicitly does not have an id field.
-                         ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
-                         ce_json_obj_set_string(&obj, "method", "textDocument/didOpen");
+                    // TEST requests for reference.
+                    // if(!sent_definition_request){
+                    //      // NOTE: Explicitly does not have an id field.
+                    //      ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
+                    //      ce_json_obj_set_string(&obj, "method", "textDocument/didOpen");
 
-                         {
-                              CeJsonObj_t param_obj = {};
-                              CeJsonObj_t text_document_obj = {};
-                              ce_json_obj_set_string(&text_document_obj, "uri", "file:///C:/Users/jtiff/source/repos/ce_config/ce/main.c");
-                              ce_json_obj_set_string(&text_document_obj, "languageId", "c");
-                              ce_json_obj_set_string(&text_document_obj, "text",
-                                   "#include <stdio.h>\\n"
-                                   "#include \\\"ce.h\\\"\\n"
-                                   "int main(){\\n"
-                                   "     CeBuffer_t* buffer = NULL;\\n"
-                                   "     printf(\\\"%lld\\\", (int64_t)(buffer));\\n"
-                                   "     return 0;\\n"
-                                   "}");
-                              ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
+                    //      {
+                    //           CeJsonObj_t param_obj = {};
+                    //           CeJsonObj_t text_document_obj = {};
+                    //           ce_json_obj_set_string(&text_document_obj, "uri", "file:///C:/Users/jtiff/source/repos/ce_config/ce/main.c");
+                    //           ce_json_obj_set_string(&text_document_obj, "languageId", "c");
+                    //           ce_json_obj_set_string(&text_document_obj, "text",
+                    //                "#include <stdio.h>\\n"
+                    //                "#include \\\"ce.h\\\"\\n"
+                    //                "int main(){\\n"
+                    //                "     CeBuffer_t* buffer = NULL;\\n"
+                    //                "     printf(\\\"%lld\\\", (int64_t)(buffer));\\n"
+                    //                "     return 0;\\n"
+                    //                "}");
+                    //           ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
 
-                              ce_json_obj_set_obj(&obj, "params", &param_obj);
-                         }
+                    //           ce_json_obj_set_obj(&obj, "params", &param_obj);
+                    //      }
 
-                         // Print the message.
-                         ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
-                         printf("%s\n", buffer);
-                         _send_json_obj(&obj, data->proc);
+                    //      // Print the message.
+                    //      ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
+                    //      printf("%s\n", buffer);
+                    //      _send_json_obj(&obj, data->proc);
 
-                         ce_json_obj_free(&obj);
+                    //      ce_json_obj_free(&obj);
 
-                         ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
-                         ce_json_obj_set_number(&obj, "id", 1);
-                         ce_json_obj_set_string(&obj, "method", "textDocument/typeDefinition");
+                    //      ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
+                    //      ce_json_obj_set_number(&obj, "id", 1);
+                    //      ce_json_obj_set_string(&obj, "method", "textDocument/typeDefinition");
 
-                         {
-                              CeJsonObj_t param_obj = {};
+                    //      {
+                    //           CeJsonObj_t param_obj = {};
 
-                              CeJsonObj_t pos_obj = {};
-                              ce_json_obj_set_number(&pos_obj, "line", 3);
-                              ce_json_obj_set_number(&pos_obj, "character", 20);
-                              ce_json_obj_set_obj(&param_obj, "position", &pos_obj);
+                    //           CeJsonObj_t pos_obj = {};
+                    //           ce_json_obj_set_number(&pos_obj, "line", 3);
+                    //           ce_json_obj_set_number(&pos_obj, "character", 20);
+                    //           ce_json_obj_set_obj(&param_obj, "position", &pos_obj);
 
-                              CeJsonObj_t text_document_obj = {};
-                              ce_json_obj_set_string(&text_document_obj, "uri", "file:///C:/Users/jtiff/source/repos/ce_config/ce/main.c");
-                              ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
+                    //           CeJsonObj_t text_document_obj = {};
+                    //           ce_json_obj_set_string(&text_document_obj, "uri", "file:///C:/Users/jtiff/source/repos/ce_config/ce/main.c");
+                    //           ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
 
-                              ce_json_obj_set_obj(&obj, "params", &param_obj);
-                         }
+                    //           ce_json_obj_set_obj(&obj, "params", &param_obj);
+                    //      }
 
-                         // Print the message.
-                         ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
-                         printf("%s\n", buffer);
+                    //      // Print the message.
+                    //      ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
+                    //      printf("%s\n", buffer);
 
-                         _send_json_obj(&obj, data->proc);
-                         ce_json_obj_free(&obj);
+                    //      _send_json_obj(&obj, data->proc);
+                    //      ce_json_obj_free(&obj);
 
-                         sent_definition_request = true;
-                    }
+                    //      sent_definition_request = true;
+                    // }
 
                     free(buffer);
                }else{
@@ -354,12 +422,13 @@ bool ce_clangd_init(const char* executable_path,
 #if defined(PLATFORM_WINDOWS)
      strncpy(cwd_uri, cwd, MAX_PATH_LEN);
      _convert_windows_path_to_uri(cwd_uri, MAX_PATH_LEN);
-     _update_windows_path_for_json(cwd, MAX_PATH_LEN);
+     char* json_cwd = _convert_string_to_json_string(cwd);
 #else
      snprintf(cwd_uri, MAX_PATH_LEN, "file://%s", cwd);
+     char* json_cwd = _convert_string_to_json_string(cwd);
 #endif
 
-     ce_json_obj_set_string(&params_obj, "rootPath", cwd);
+     ce_json_obj_set_string(&params_obj, "rootPath", json_cwd);
      ce_json_obj_set_string(&params_obj, "rootUri", cwd_uri);
      ce_json_obj_set_obj(&initialize_obj, "params", &params_obj);
 
@@ -368,8 +437,65 @@ bool ce_clangd_init(const char* executable_path,
      ce_json_obj_set_string(&client_info_obj, "version", "9.8.7");
      ce_json_obj_set_obj(&initialize_obj, "ClientInfo", &client_info_obj);
 
-     _send_json_obj(&initialize_obj, &clangd->proc);
-     return true;
+     bool result = _send_json_obj(&initialize_obj, &clangd->proc);
+     ce_json_obj_free(&initialize_obj);
+     ce_json_obj_free(&params_obj);
+     ce_json_obj_free(&client_info_obj);
+     free(json_cwd);
+     return result;
+}
+
+bool ce_clangd_file_open(CeClangD_t* clangd, CeBuffer_t* buffer){
+     char file_uri[MAX_PATH_LEN + 1];
+     if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
+          return false;
+     }
+
+     char* buffer_str = ce_buffer_dupe(buffer);
+     char* sanitized_buffer_str = _convert_string_to_json_string(buffer_str);
+
+     CeJsonObj_t obj = {};
+     ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
+     ce_json_obj_set_string(&obj, "method", "textDocument/didOpen");
+
+     CeJsonObj_t text_document_obj = {};
+     ce_json_obj_set_string(&text_document_obj, "uri", file_uri);
+     ce_json_obj_set_string(&text_document_obj, "languageId", "c");
+     ce_json_obj_set_string(&text_document_obj, "text", sanitized_buffer_str);
+     CeJsonObj_t param_obj = {};
+     ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
+     ce_json_obj_set_obj(&obj, "params", &param_obj);
+
+     bool result = _send_json_obj(&obj, &clangd->proc);
+     ce_json_obj_free(&param_obj);
+     ce_json_obj_free(&text_document_obj);
+     ce_json_obj_free(&obj);
+     free(sanitized_buffer_str);
+     free(buffer_str);
+     return result;
+}
+
+bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer){
+     char file_uri[MAX_PATH_LEN + 1];
+     if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
+          return false;
+     }
+
+     CeJsonObj_t obj = {};
+     ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
+     ce_json_obj_set_string(&obj, "method", "textDocument/didClose");
+
+     CeJsonObj_t text_document_obj = {};
+     ce_json_obj_set_string(&text_document_obj, "uri", file_uri);
+     CeJsonObj_t param_obj = {};
+     ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
+     ce_json_obj_set_obj(&obj, "params", &param_obj);
+
+     bool result = _send_json_obj(&obj, &clangd->proc);
+     ce_json_obj_free(&param_obj);
+     ce_json_obj_free(&text_document_obj);
+     ce_json_obj_free(&obj);
+     return result;
 }
 
 void ce_clangd_free(CeClangD_t* clangd){

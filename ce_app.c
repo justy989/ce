@@ -466,14 +466,7 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
 
      char* result = NULL;
      char cwd[MAX_PATH_LEN + 1];
-
-#if defined(PLATFORM_WINDOWS)
-    result = _getcwd(cwd, sizeof(cwd));
-#else
-    result = getcwd(cwd, sizeof(cwd));
-#endif
-
-     if(result != NULL){
+     if(ce_get_cwd(cwd, MAX_PATH_LEN)){
           size_t cwd_len = strlen(cwd);
           // append a path separator so it looks like a path
           if(cwd_len < MAX_PATH_LEN){
@@ -1169,6 +1162,9 @@ bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
                errno = 0;
                return false;
           }
+          if(!ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer)){
+               return false;
+          }
      }
 
      free(base_directory);
@@ -1187,6 +1183,10 @@ bool load_project_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffe
                ce_app_message(app, "failed to load file '%s': '%s'", input_buffer->lines[i], strerror(errno));
                errno = 0;
                return false;
+          }else{
+               if(!ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer)){
+                    return false;
+               }
           }
      }
 
@@ -1616,4 +1616,13 @@ bool ce_set_clipboard_from_buffer(CeBuffer_t* buffer, CePoint_t start, CePoint_t
      }
      return true;
 #endif
+}
+
+bool ce_get_cwd(char* buffer, size_t size){
+#if defined(PLATFORM_WINDOWS)
+     char* result = _getcwd(buffer, size);
+#else
+     char* result = getcwd(buffer, size);
+#endif
+     return result == buffer;
 }

@@ -1060,7 +1060,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length)
 
 char* ce_buffer_dupe(CeBuffer_t* buffer){
      CePoint_t start = {0, 0};
-     CePoint_t end = {buffer->line_count, 0};
+     CePoint_t end = {0, buffer->line_count};
      if(end.y) end.y--;
      end.x = ce_utf8_last_index(buffer->lines[end.y]);
      int64_t len = ce_buffer_range_len(buffer, start, end);

@@ -257,6 +257,8 @@ bool buffer_modified_outside_editor_complete_func(CeApp_t* app, CeBuffer_t* inpu
 bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative);
 
+bool ce_get_cwd(char* buffer, size_t size);
+
 // Returns the point at the end of the paste if text was pasted.
 CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point);
 bool ce_set_clipboard_from_buffer(CeBuffer_t* buffer, CePoint_t start, CePoint_t end);

@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <ctype.h>
-#include <errno.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -18,7 +17,6 @@
 #endif
 
 #include "ce_app.h"
-#include "ce_commands.h"
 #include "ce_key_defines.h"
 
 #if defined(DISPLAY_TERMINAL)
@@ -29,6 +27,7 @@
 #endif
 
 #if !defined(PLATFORM_WINDOWS)
+    #include <errno.h>
     #include <unistd.h>
 #endif
 
@@ -1147,29 +1146,13 @@ int main(int argc, char* argv[]){
           buffer_data = app.clangd.buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_plain;
 
-          if(argc > 1){
-               for(int64_t i = last_arg_index; i < argc; i++){
-                    CeBuffer_t* buffer = new_buffer();
-                    if(ce_buffer_load_file(buffer, argv[i])){
-                         ce_buffer_node_insert(&app.buffer_node_head, buffer);
-                         determine_buffer_syntax(buffer);
-                    }else{
-                         free(buffer);
-                    }
-               }
-          }else{
-               CeBuffer_t* buffer = new_buffer();
-               ce_buffer_alloc(buffer, 1, "unnamed");
-          }
-
-         app.cached_filepath_count = 0;
-         app.shell_command_buffer_should_scroll = false;
-         app.shell_command_thread_should_die = false;
+          app.cached_filepath_count = 0;
+          app.shell_command_buffer_should_scroll = false;
+          app.shell_command_thread_should_die = false;
 #if defined(PLATFORM_WINDOWS)
-         app.shell_command_thread = INVALID_HANDLE_VALUE;
-         app.shell_command_thread_id = -1;
+          app.shell_command_thread = INVALID_HANDLE_VALUE;
+          app.shell_command_thread_id = -1;
 #endif
-
      }
 
  #if defined(DISPLAY_TERMINAL)
@@ -1248,10 +1231,28 @@ int main(int argc, char* argv[]){
 
      // TODO: Optionall start up clangd
      {
-          // if(!ce_clangd_init("C:/home/jtiff/ce_config/ce/clangd", &app.clangd)){
           if(!ce_clangd_init("C:\\Users\\jtiff\\source\\repos\\ce_config\\ce\\clangd.exe", &app.clangd)){
                return 1;
           }
+     }
+
+     // Load any files requested on the command line.
+     if(argc > 1){
+          for(int64_t i = last_arg_index; i < argc; i++){
+               CeBuffer_t* buffer = new_buffer();
+               if(ce_buffer_load_file(buffer, argv[i])){
+                    if(!ce_clangd_file_open(&app.clangd, buffer)){
+                         return 1;
+                    }
+                    ce_buffer_node_insert(&app.buffer_node_head, buffer);
+                    determine_buffer_syntax(buffer);
+               }else{
+                    free(buffer);
+               }
+          }
+     }else{
+          CeBuffer_t* buffer = new_buffer();
+          ce_buffer_alloc(buffer, 1, "unnamed");
      }
 
      ce_app_init_default_commands(&app);
