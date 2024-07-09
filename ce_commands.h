@@ -51,6 +51,10 @@ CeCommandStatus_t command_shell_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_clang_goto_def(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_clang_goto_decl(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_clang_goto_impl(CeCommand_t* command, void* user_data);
 
 // NOTE: these are to make vim users feel at home
 CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);

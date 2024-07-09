@@ -69,4 +69,9 @@ bool ce_clangd_init(const char* executable_path,
 bool ce_clangd_file_open(CeClangD_t* clangd, CeBuffer_t* buffer);
 bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer);
 
+bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
+bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
+bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
+bool ce_clangd_request_goto_impl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
+
 void ce_clangd_free(CeClangD_t* clangd);

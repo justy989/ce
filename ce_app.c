@@ -869,6 +869,10 @@ void ce_app_init_default_commands(CeApp_t* app){
      CeCommandEntry_t command_entries[] = {
           {command_balance_layout, "balance_layout", "rebalance layout based on the node tree"},
           {command_blank, "blank", "empty command"},
+          {command_clang_goto_def, "clang_goto_def", "If clangd is enabled, request to go the definition of the symbol under the cursor."},
+          {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
+          {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
+          {command_clang_goto_impl, "clang_goto_impl", "If clangd is enabled, request to go the implementation of the symbol under the cursor."},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},

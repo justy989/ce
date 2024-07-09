@@ -145,6 +145,63 @@ static char* _convert_string_to_json_string(const char* string){
      return result;
 }
 
+static bool _send_json_obj(CeJsonObj_t* obj, CeSubprocess_t* subprocess){
+     // Build the message boyd
+     char* message_body = malloc(DEFAULT_MESSAGE_SIZE);
+     ce_json_obj_to_string(obj, message_body, DEFAULT_MESSAGE_SIZE - 1, 1);
+     uint64_t message_len = strlen(message_body);
+
+     // Prepend the header.
+     char* header = malloc(DEFAULT_HEADER_SIZE);
+     int64_t header_len = snprintf(header, DEFAULT_HEADER_SIZE, "Content-Length: %" PRId64 "\r\n\r\n",
+                                             message_len);
+
+     int64_t bytes_written = ce_subprocess_write_stdin(subprocess, header, header_len);
+     free(header);
+     if(bytes_written < 0){
+          free(message_body);
+          return false;
+     }
+     bytes_written = ce_subprocess_write_stdin(subprocess, message_body, message_len);
+     free(message_body);
+     if(bytes_written < 0){
+          return false;
+     }
+     return true;
+}
+
+static bool _clangd_request_goto(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point, const char* method){
+     char file_uri[MAX_PATH_LEN + 1];
+     if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
+          return false;
+     }
+
+     CeJsonObj_t obj = {};
+     ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
+     ce_json_obj_set_number(&obj, "id", 1);
+     ce_json_obj_set_string(&obj, "method", method);
+
+     CeJsonObj_t param_obj = {};
+
+     CeJsonObj_t pos_obj = {};
+     ce_json_obj_set_number(&pos_obj, "line", point.y);
+     ce_json_obj_set_number(&pos_obj, "character", point.x);
+     ce_json_obj_set_obj(&param_obj, "position", &pos_obj);
+
+     CeJsonObj_t text_document_obj = {};
+     ce_json_obj_set_string(&text_document_obj, "uri", file_uri);
+     ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
+
+     ce_json_obj_set_obj(&obj, "params", &param_obj);
+
+     bool result = _send_json_obj(&obj, &clangd->proc);
+     ce_json_obj_free(&text_document_obj);
+     ce_json_obj_free(&pos_obj);
+     ce_json_obj_free(&param_obj);
+     ce_json_obj_free(&obj);
+     return result;
+}
+
 bool parse_response_complete(ParseResponse_t* parse){
      if(parse->message_body != NULL &&
         (int64_t)(strlen(parse->message_body)) == parse->message_body_size){
@@ -228,31 +285,6 @@ void parse_response_free(ParseResponse_t* parse){
           free(parse->message_body);
           parse->message_body = NULL;
      }
-}
-
-static bool _send_json_obj(CeJsonObj_t* obj, CeSubprocess_t* subprocess){
-     // Build the message boyd
-     char* message_body = malloc(DEFAULT_MESSAGE_SIZE);
-     ce_json_obj_to_string(obj, message_body, DEFAULT_MESSAGE_SIZE - 1, 1);
-     uint64_t message_len = strlen(message_body);
-
-     // Prepend the header.
-     char* header = malloc(DEFAULT_HEADER_SIZE);
-     int64_t header_len = snprintf(header, DEFAULT_HEADER_SIZE, "Content-Length: %" PRId64 "\r\n\r\n",
-                                             message_len);
-
-     int64_t bytes_written = ce_subprocess_write_stdin(subprocess, header, header_len);
-     free(header);
-     if(bytes_written < 0){
-          free(message_body);
-          return false;
-     }
-     bytes_written = ce_subprocess_write_stdin(subprocess, message_body, message_len);
-     free(message_body);
-     if(bytes_written < 0){
-          return false;
-     }
-     return true;
 }
 
 #if defined(PLATFORM_WINDOWS)
@@ -496,6 +528,22 @@ bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer){
      ce_json_obj_free(&text_document_obj);
      ce_json_obj_free(&obj);
      return result;
+}
+
+bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     return _clangd_request_goto(clangd, buffer, point, "textDocument/typeDefinition");
+}
+
+bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     return _clangd_request_goto(clangd, buffer, point, "textDocument/definition");
+}
+
+bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     return _clangd_request_goto(clangd, buffer, point, "textDocument/declaration");
+}
+
+bool ce_clangd_request_goto_impl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     return _clangd_request_goto(clangd, buffer, point, "textDocument/implementation");
 }
 
 void ce_clangd_free(CeClangD_t* clangd){

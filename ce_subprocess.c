@@ -1,4 +1,5 @@
 #include "ce_subprocess.h"
+#include "ce.h"
 
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
@@ -70,13 +71,13 @@ bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcC
     }else{
          DWORD error_message_id = GetLastError();
          char buffer[BUFSIZ];
-         DWORD rc = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                                  NULL,
-                                  error_message_id,
-                                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                                  buffer,
-                                  BUFSIZ,
-                                  NULL);
+         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
+                       NULL,
+                       error_message_id,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                       buffer,
+                       BUFSIZ,
+                       NULL);
         ce_log("CreateProcess() failed with code %d : error %s\n",
                error_message_id,
                buffer);

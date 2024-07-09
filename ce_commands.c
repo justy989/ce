@@ -1422,6 +1422,62 @@ CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data)
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_clang_goto_def(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_def(&app->clangd,
+                                    command_context.view->buffer,
+                                    command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_goto_decl(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_decl(&app->clangd,
+                                     command_context.view->buffer,
+                                     command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_type_def(&app->clangd,
+                                         command_context.view->buffer,
+                                         command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_goto_impl(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_impl(&app->clangd,
+                                     command_context.view->buffer,
+                                     command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 void buffer_replace_all(CeBuffer_t* buffer, CePoint_t cursor, const char* match, const char* replacement, CePoint_t start, CePoint_t end,
                         bool regex_search){
      bool chain_undo = false;
