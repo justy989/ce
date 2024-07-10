@@ -10,10 +10,10 @@
 //   - DidChange: Save for after gotos
 //     - Maybe initial implementation is to just send the whole file each time ?
 // - Requests
-//   - Goto definiton
-//   - Goto declaration
-//   - Goto type definition
-//   - Goto implementaion
+//   + Goto definiton
+//   + Goto declaration
+//   + Goto type definition
+//   + Goto implementaion
 //   - Find references
 //     - Display in ui
 //   - Completion
@@ -40,27 +40,44 @@
 
 typedef struct{
      int64_t request_id;
-     CeJsonObj_t obj;
+     CeJsonObj_t* obj;
+     char* method;
 }CeClangDResponse_t;
+
+typedef struct{
+     int64_t size;
+     CeClangDResponse_t* elements;
+#if defined(PLATFORM_WINDOWS)
+     HANDLE mutex;
+#else
+     // TODO: linux queue mutex
+#endif
+}CeClangDResponseQueue_t;
+
+typedef struct{
+     char* method;
+     int64_t id;
+}CeClangDRequest_t;
+
+typedef struct{
+     int64_t size;
+     CeClangDRequest_t* requests;
+}CeClangDRequestLookup_t;
 
 typedef struct{
 #if defined(PLATFORM_WINDOWS)
      HANDLE thread_handle;
      DWORD thread_id;
-     HANDLE queue_mutex_handle;
 #else
      pthread_t thread;
-     // TODO: queue mutex
 #endif
      CeSubprocess_t proc;
-
      // Buffer for stdout that user can inspect.
      // TODO: Can this grow too big ?
      CeBuffer_t* buffer;
-
      int64_t current_request_id;
-
-     CeClangDResponse_t* response_queue;
+     CeClangDResponseQueue_t response_queue;
+     CeClangDRequestLookup_t request_lookup;
 }CeClangD_t;
 
 bool ce_clangd_init(const char* executable_path,
@@ -74,4 +91,9 @@ bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_
 bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
 bool ce_clangd_request_goto_impl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
 
+bool ce_clangd_outstanding_responses(CeClangD_t* clangd);
+CeClangDResponse_t ce_clangd_pop_response(CeClangD_t* clangd);
+
 void ce_clangd_free(CeClangD_t* clangd);
+
+void ce_clangd_response_free(CeClangDResponse_t* response);

@@ -1513,6 +1513,8 @@ int main(int argc, char* argv[]){
               app_handle_key(&app, view, key);
           }
 
+          ce_app_handle_clangd_response(&app);
+
           // update refs to view and tab_layout
           tab_layout = app.tab_list_layout->tab_list.current;
 

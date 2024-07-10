@@ -243,6 +243,8 @@ void ce_app_message(CeApp_t* app, const char* fmt, ...);
 void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input_complete_func);
 bool ce_app_apply_completion(CeApp_t* app);
 
+void ce_app_handle_clangd_response(CeApp_t* app);
+
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_project_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
@@ -256,6 +258,10 @@ bool buffer_modified_outside_editor_complete_func(CeApp_t* app, CeBuffer_t* inpu
 
 bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative);
+
+CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
+                                       CeVim_t* vim, bool insert_into_jump_list,
+                                       const char* base_directory, CeDestination_t* destination);
 
 bool ce_get_cwd(char* buffer, size_t size);
 

@@ -770,6 +770,53 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
      return true;
 }
 
+CeJsonFindResult_t ce_json_obj_find(CeJsonObj_t* obj, const char* name){
+     CeJsonFindResult_t result = {};
+     for(int64_t i = 0; i < obj->count; i++){
+          if(strcmp(obj->fields[i].name, name) == 0){
+               result.type = obj->fields[i].value.type;
+               result.index = i;
+               return result;
+          }
+     }
+     return result;
+}
+
+CeJsonObj_t* ce_json_obj_get_obj(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_OBJECT){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.obj;
+}
+
+CeJsonArray_t* ce_json_obj_get_array(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_ARRAY){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.array;
+}
+
+const char* ce_json_obj_get_string(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_STRING){
+          return NULL;
+     }
+     return obj->fields[find->index].value.string;
+}
+
+double* ce_json_obj_get_number(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_NUMBER){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.number;
+}
+
+bool* ce_json_obj_get_boolean(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_BOOL){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.boolean;
+}
+
 bool ce_json_parse(const char* string, CeJsonObj_t* json, bool verbose){
      ParsePos_t parse_pos = {};
      parse_pos.x = 1;

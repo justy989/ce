@@ -890,30 +890,6 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
-CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
-                                       CeVim_t* vim, bool insert_into_jump_list,
-                                       const char* base_directory, CeDestination_t* destination){
-     char full_path[MAX_PATH_LEN];
-     if(!base_directory && destination->filepath[0] != CE_PATH_SEPARATOR) base_directory = ".";
-     if(base_directory){
-          const char* full_path_format = "%s/%s";
-          snprintf(full_path, MAX_PATH_LEN - strlen(full_path_format), full_path_format, base_directory, destination->filepath);
-     }else{
-          strncpy(full_path, destination->filepath, MAX_PATH_LEN);
-     }
-     CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim,
-                                                   insert_into_jump_list, full_path);
-     if(!load_buffer) return load_buffer;
-
-     if(destination->point.y < load_buffer->line_count){
-          view->cursor.y = destination->point.y;
-          int64_t line_len = ce_utf8_strlen(load_buffer->lines[view->cursor.y]);
-          if(destination->point.x < line_len) view->cursor.x = destination->point.x;
-     }
-
-     return load_buffer;
-}
-
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 

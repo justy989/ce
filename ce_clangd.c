@@ -23,6 +23,7 @@
 typedef struct{
      CeBuffer_t* buffer;
      CeSubprocess_t* proc;
+     CeClangDResponseQueue_t* response_queue;
 }HandleOutputData_t;
 
 typedef struct{
@@ -170,7 +171,8 @@ static bool _send_json_obj(CeJsonObj_t* obj, CeSubprocess_t* subprocess){
      return true;
 }
 
-static bool _clangd_request_goto(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point, const char* method){
+static bool _clangd_request_goto(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point,
+                                 const char* method){
      char file_uri[MAX_PATH_LEN + 1];
      if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
           return false;
@@ -178,7 +180,7 @@ static bool _clangd_request_goto(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint
 
      CeJsonObj_t obj = {};
      ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
-     ce_json_obj_set_number(&obj, "id", 1);
+     ce_json_obj_set_number(&obj, "id", clangd->current_request_id);
      ce_json_obj_set_string(&obj, "method", method);
 
      CeJsonObj_t param_obj = {};
@@ -202,7 +204,7 @@ static bool _clangd_request_goto(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint
      return result;
 }
 
-bool parse_response_complete(ParseResponse_t* parse){
+static bool _parse_response_complete(ParseResponse_t* parse){
      if(parse->message_body != NULL &&
         (int64_t)(strlen(parse->message_body)) == parse->message_body_size){
           return true;
@@ -210,9 +212,9 @@ bool parse_response_complete(ParseResponse_t* parse){
      return false;
 }
 
-void parse_response_block(ParseResponse_t* parse,
-                          char* block,
-                          int64_t block_size){
+static void _parse_response_block(ParseResponse_t* parse,
+                                  char* block,
+                                  int64_t block_size){
      int64_t expected_header_prefix_len = 0;
      int64_t header_len = 0;
      int64_t message_body_len = 0;
@@ -278,13 +280,75 @@ void parse_response_block(ParseResponse_t* parse,
      }
 }
 
-void parse_response_free(ParseResponse_t* parse){
+static void _parse_response_free(ParseResponse_t* parse){
      memset(parse->header, 0, MAX_HEADER_SIZE);
      if(parse->message_body){
           parse->message_body_size = 0;
           free(parse->message_body);
           parse->message_body = NULL;
      }
+}
+
+static bool _push_response(CeClangDResponseQueue_t* queue, CeJsonObj_t* obj){
+     int64_t request_id = -1;
+     CeJsonFindResult_t find = ce_json_obj_find(obj, "id");
+     if(find.type == CE_JSON_TYPE_NUMBER){
+          double* number = ce_json_obj_get_number(obj, &find);
+          if(number){
+               request_id = (int64_t)(*number);
+          }
+     }else{
+          return false;
+     }
+
+#if defined(PLATFORM_WINDOWS)
+     DWORD result = WaitForSingleObject(queue->mutex, INFINITE);
+     if(result != WAIT_OBJECT_0){
+          ce_log("Failed to acquire clangd response queue mutex: %d\n", GetLastError());
+          return false;
+     }
+#else
+#endif
+
+     int64_t new_size = queue->size + 1;
+     queue->elements = realloc(queue->elements, new_size * sizeof(queue->elements[0]));
+     memset(queue->elements + queue->size, 0, sizeof(queue->elements[0]));
+     CeClangDResponse_t* new_response = queue->elements + queue->size;
+     new_response->request_id = request_id;
+     new_response->obj = obj;
+     queue->size = new_size;
+
+     ReleaseMutex(queue->mutex);
+     return true;
+}
+
+static CeClangDResponse_t _pop_response(CeClangDResponseQueue_t* queue){
+     CeClangDResponse_t result = {};
+
+#if defined(PLATFORM_WINDOWS)
+     DWORD wait_result = WaitForSingleObject(queue->mutex, INFINITE);
+     if(wait_result != WAIT_OBJECT_0){
+          ce_log("Failed to acquire clangd response queue mutex: %d\n", GetLastError());
+          return result;
+     }
+#else
+#endif
+     if(queue->size == 0){
+          return result;
+     }
+
+     // Copy the element
+     result = *queue->elements;
+
+     // Update the queue.
+     int64_t new_size = (queue->size - 1);
+     // Shift down all of the elements.
+     memmove(queue->elements, queue->elements + 1, new_size * sizeof(queue->elements[0]));
+     queue->elements = realloc(queue->elements, new_size * sizeof(queue->elements[0]));
+     queue->size = new_size;
+
+     ReleaseMutex(queue->mutex);
+     return result;
 }
 
 #if defined(PLATFORM_WINDOWS)
@@ -307,80 +371,23 @@ static void* handle_output_fn(void* user_data){
           block[bytes_read] = 0;
 
           // Attempt to parse the messages before we sanitize and print them.
-          parse_response_block(&parse, block, bytes_read);
-          if(parse_response_complete(&parse)){
-               CeJsonObj_t obj = {};
-               if(ce_json_parse(parse.message_body, &obj, false)){
+          _parse_response_block(&parse, block, bytes_read);
+          if(_parse_response_complete(&parse)){
+               CeJsonObj_t* obj = malloc(sizeof(*obj));
+               memset(obj, 0, sizeof(*obj));
+               if(ce_json_parse(parse.message_body, obj, false)){
                     char* buffer = malloc(MAX_PRINT_SIZE + 1);
-                    ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
+                    ce_json_obj_to_string(obj, buffer, MAX_PRINT_SIZE, 1);
                     printf("%s\n", buffer);
-                    ce_json_obj_free(&obj);
-
-                    // TEST requests for reference.
-                    // if(!sent_definition_request){
-                    //      // NOTE: Explicitly does not have an id field.
-                    //      ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
-                    //      ce_json_obj_set_string(&obj, "method", "textDocument/didOpen");
-
-                    //      {
-                    //           CeJsonObj_t param_obj = {};
-                    //           CeJsonObj_t text_document_obj = {};
-                    //           ce_json_obj_set_string(&text_document_obj, "uri", "file:///C:/Users/jtiff/source/repos/ce_config/ce/main.c");
-                    //           ce_json_obj_set_string(&text_document_obj, "languageId", "c");
-                    //           ce_json_obj_set_string(&text_document_obj, "text",
-                    //                "#include <stdio.h>\\n"
-                    //                "#include \\\"ce.h\\\"\\n"
-                    //                "int main(){\\n"
-                    //                "     CeBuffer_t* buffer = NULL;\\n"
-                    //                "     printf(\\\"%lld\\\", (int64_t)(buffer));\\n"
-                    //                "     return 0;\\n"
-                    //                "}");
-                    //           ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
-
-                    //           ce_json_obj_set_obj(&obj, "params", &param_obj);
-                    //      }
-
-                    //      // Print the message.
-                    //      ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
-                    //      printf("%s\n", buffer);
-                    //      _send_json_obj(&obj, data->proc);
-
-                    //      ce_json_obj_free(&obj);
-
-                    //      ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
-                    //      ce_json_obj_set_number(&obj, "id", 1);
-                    //      ce_json_obj_set_string(&obj, "method", "textDocument/typeDefinition");
-
-                    //      {
-                    //           CeJsonObj_t param_obj = {};
-
-                    //           CeJsonObj_t pos_obj = {};
-                    //           ce_json_obj_set_number(&pos_obj, "line", 3);
-                    //           ce_json_obj_set_number(&pos_obj, "character", 20);
-                    //           ce_json_obj_set_obj(&param_obj, "position", &pos_obj);
-
-                    //           CeJsonObj_t text_document_obj = {};
-                    //           ce_json_obj_set_string(&text_document_obj, "uri", "file:///C:/Users/jtiff/source/repos/ce_config/ce/main.c");
-                    //           ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
-
-                    //           ce_json_obj_set_obj(&obj, "params", &param_obj);
-                    //      }
-
-                    //      // Print the message.
-                    //      ce_json_obj_to_string(&obj, buffer, MAX_PRINT_SIZE, 1);
-                    //      printf("%s\n", buffer);
-
-                    //      _send_json_obj(&obj, data->proc);
-                    //      ce_json_obj_free(&obj);
-
-                    //      sent_definition_request = true;
-                    // }
-
+                    if(!_push_response(data->response_queue, obj)){
+                         ce_json_obj_free(obj);
+                         free(obj);
+                    }
                     free(buffer);
                }else{
                     printf("Failed to parse json obj\n");
                }
-               parse_response_free(&parse);
+               _parse_response_free(&parse);
           }
 
           // sanitize block for non-printable characters
@@ -399,26 +406,62 @@ static void* handle_output_fn(void* user_data){
      return 0;
 }
 
+static CeClangDRequest_t* _alloc_clangd_request(CeClangDRequestLookup_t* request_lookup){
+     int64_t new_size = request_lookup->size + 1;
+     request_lookup->requests = realloc(request_lookup->requests,
+                                        new_size * sizeof(request_lookup->requests[0]));
+     memset(request_lookup->requests + request_lookup->size, 0, sizeof(request_lookup->requests[0]));
+     CeClangDRequest_t* new_request = request_lookup->requests + request_lookup->size;
+     request_lookup->size = new_size;
+     return new_request;
+}
+
+static void _remove_clangd_request(CeClangDRequestLookup_t* request_lookup, int64_t index){
+     if(index < 0 || index >= request_lookup->size){
+          return;
+     }
+     for(int64_t i = (index + 1); i < request_lookup->size; i++){
+          request_lookup->requests[i - 1] = request_lookup->requests[i];
+     }
+     int64_t new_size = (request_lookup->size - 1);
+     request_lookup->requests = realloc(request_lookup->requests,
+                                       new_size * sizeof(request_lookup->requests[0]));
+     request_lookup->size = new_size;
+}
+
+static void _clangd_track_request(CeClangD_t* clangd, const char* method){
+     CeClangDRequest_t* new_request = _alloc_clangd_request(&clangd->request_lookup);
+     new_request->id = clangd->current_request_id;
+     new_request->method = strdup(method);
+}
+
 bool ce_clangd_init(const char* executable_path,
                     CeClangD_t* clangd){
+     // TODO: remove verbose logging.
      char command[MAX_COMMAND_SIZE];
-     // snprintf(command, MAX_COMMAND_SIZE, "%s --enable-config --log=verbose", executable_path);
      snprintf(command, MAX_COMMAND_SIZE, "%s --log=verbose", executable_path);
      if(!ce_subprocess_open(&clangd->proc, command, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT)){
+          return false;
+     }
+
+     clangd->response_queue.mutex = CreateMutex(NULL, false, NULL);
+     if(clangd->response_queue.mutex == NULL){
+          ce_log("Failed to create clangd mutex\n");
           return false;
      }
 
      HandleOutputData_t* thread_data = malloc(sizeof(*thread_data));
      thread_data->buffer = clangd->buffer;
      thread_data->proc = &clangd->proc;
+     thread_data->response_queue = &clangd->response_queue;
 
 #if defined(PLATFORM_WINDOWS)
      clangd->thread_handle = CreateThread(NULL,
-                                   0,
-                                   handle_output_fn,
-                                   thread_data,
-                                   0,
-                                   &clangd->thread_id);
+                                          0,
+                                          handle_output_fn,
+                                          thread_data,
+                                          0,
+                                          &clangd->thread_id);
      if(clangd->thread_handle == INVALID_HANDLE_VALUE){
           ce_log("failed to create thread to run command\n");
           return false;
@@ -531,19 +574,47 @@ bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer){
 }
 
 bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
-     return _clangd_request_goto(clangd, buffer, point, "textDocument/typeDefinition");
+     const char* method = "textDocument/typeDefinition";
+     clangd->current_request_id++;
+     _clangd_track_request(clangd, method);
+     return _clangd_request_goto(clangd, buffer, point, method);
 }
 
 bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
-     return _clangd_request_goto(clangd, buffer, point, "textDocument/definition");
+     const char* method = "textDocument/definition";
+     clangd->current_request_id++;
+     _clangd_track_request(clangd, method);
+     return _clangd_request_goto(clangd, buffer, point, method);
 }
 
 bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
-     return _clangd_request_goto(clangd, buffer, point, "textDocument/declaration");
+     const char* method = "textDocument/declaration";
+     clangd->current_request_id++;
+     _clangd_track_request(clangd, method);
+     return _clangd_request_goto(clangd, buffer, point, method);
 }
 
 bool ce_clangd_request_goto_impl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
-     return _clangd_request_goto(clangd, buffer, point, "textDocument/implementation");
+     const char* method = "textDocument/implementation";
+     clangd->current_request_id++;
+     _clangd_track_request(clangd, method);
+     return _clangd_request_goto(clangd, buffer, point, method);
+}
+
+bool ce_clangd_outstanding_responses(CeClangD_t* clangd){
+     return (clangd->response_queue.size > 0);
+}
+
+CeClangDResponse_t ce_clangd_pop_response(CeClangD_t* clangd){
+     CeClangDResponse_t response = _pop_response(&clangd->response_queue);
+     for(int64_t i = 0; i < clangd->request_lookup.size; i++){
+          if(clangd->request_lookup.requests[i].id == response.request_id){
+               response.method = clangd->request_lookup.requests[i].method;
+               _remove_clangd_request(&clangd->request_lookup, i);
+               return response;
+          }
+     }
+     return response;
 }
 
 void ce_clangd_free(CeClangD_t* clangd){
@@ -557,4 +628,13 @@ void ce_clangd_free(CeClangD_t* clangd){
      ce_subprocess_close(&clangd->proc);
 
      memset(clangd, 0, sizeof(*clangd));
+}
+
+void ce_clangd_response_free(CeClangDResponse_t* response){
+     if(response->obj == NULL){
+          return;
+     }
+     ce_json_obj_free(response->obj);
+     free(response->obj);
+     free(response->method);
 }
