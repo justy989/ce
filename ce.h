@@ -115,7 +115,6 @@ typedef struct{
 
 typedef struct{
      bool chain;
-
      bool insertion; // opposite is deletion
      char* string;
      CePoint_t location;
@@ -127,6 +126,7 @@ typedef struct CeBufferChangeNode_t{
      CeBufferChange_t change;
      struct CeBufferChangeNode_t* next;
      struct CeBufferChangeNode_t* prev;
+     int64_t index;
 }CeBufferChangeNode_t;
 
 typedef struct{

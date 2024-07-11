@@ -1509,8 +1509,17 @@ int main(int argc, char* argv[]){
 
           if (key != KEY_INVALID) {
               app.message_mode = false;
+
+              CeBuffer_t* latest_buffer_before_input = view->buffer;
+              CeBufferChangeNode_t* lastest_change_before_input = view->buffer->change_node;
+
               // handle input from the user
               app_handle_key(&app, view, key);
+
+              if(latest_buffer_before_input == view->buffer &&
+                 view->buffer->change_node != lastest_change_before_input){
+                   ce_clangd_file_report_changes(&app.clangd, view->buffer, lastest_change_before_input);
+              }
           }
 
           ce_app_handle_clangd_response(&app);

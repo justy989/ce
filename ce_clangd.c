@@ -435,6 +435,88 @@ static void _clangd_track_request(CeClangD_t* clangd, const char* method){
      new_request->method = strdup(method);
 }
 
+static bool _clangd_file_report_change(CeClangD_t* clangd, CeBuffer_t* buffer, CeBufferChange_t* change, bool undo){
+     // TODO: We could take this as a parameter rather than calculating it each time.
+     char file_uri[MAX_PATH_LEN + 1];
+     if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
+          return false;
+     }
+
+     bool is_insertion = ((!undo && change->insertion) ||
+                          (undo && !change->insertion));
+
+     CeJsonObj_t obj = {};
+     ce_json_obj_set_string(&obj, "jsonrpc", "2.0");
+     ce_json_obj_set_string(&obj, "method", "textDocument/didChange");
+     CeJsonObj_t text_document_obj = {};
+     ce_json_obj_set_string(&text_document_obj, "uri", file_uri);
+     CeJsonObj_t param_obj = {};
+     ce_json_obj_set_obj(&param_obj, "textDocument", &text_document_obj);
+
+     int64_t change_len = strlen(change->string);
+
+     CeJsonObj_t range_obj = {};
+     CeJsonObj_t start_obj = {};
+     ce_json_obj_set_number(&start_obj, "character", change->location.x);
+     ce_json_obj_set_number(&start_obj, "line", change->location.y);
+     ce_json_obj_set_obj(&range_obj, "start", &start_obj);
+
+     // Insertions use the same point, deletions use a range.
+     CePoint_t end_location = change->location;
+     if(!is_insertion){
+          int64_t string_lines = ce_util_count_string_lines(change->string);
+          if(string_lines > 1){
+               end_location.y += (string_lines - 1);
+               char* last_line_start = change->string + (change_len - 1);
+               while(true){
+                    char* prev = last_line_start - 1;
+                    if(*prev == CE_NEWLINE){
+                         break;
+                    }
+                    last_line_start = prev;
+               }
+               end_location.x = strlen(last_line_start);
+          }else if(change_len > 0){
+               end_location.x += (change_len - 1);
+          }
+     }
+     CeJsonObj_t end_obj = {};
+     ce_json_obj_set_number(&end_obj, "character", end_location.x);
+     ce_json_obj_set_number(&end_obj, "line", end_location.y);
+     ce_json_obj_set_obj(&range_obj, "end", &end_obj);
+
+     CeJsonObj_t content_change_obj = {};
+     ce_json_obj_set_obj(&content_change_obj, "range", &range_obj);
+
+     if(is_insertion){
+          ce_json_obj_set_string(&content_change_obj, "text", change->string);
+     }else{
+          ce_json_obj_set_string(&content_change_obj, "text", "");
+     }
+
+     CeJsonArray_t content_changes_array = {};
+     ce_json_array_add_obj(&content_changes_array, &content_change_obj);
+
+     ce_json_obj_set_array(&param_obj, "contentChanges", &content_changes_array);
+     ce_json_obj_set_obj(&obj, "params", &param_obj);
+
+     char* obj_buffer = malloc(MAX_PRINT_SIZE + 1);
+     ce_json_obj_to_string(&obj, obj_buffer, MAX_PRINT_SIZE, 1);
+     printf("%s\n", obj_buffer);
+     free(obj_buffer);
+
+     bool result = _send_json_obj(&obj, &clangd->proc);
+     ce_json_array_free(&content_changes_array);
+     ce_json_obj_free(&content_change_obj);
+     ce_json_obj_free(&end_obj);
+     ce_json_obj_free(&start_obj);
+     ce_json_obj_free(&range_obj);
+     ce_json_obj_free(&param_obj);
+     ce_json_obj_free(&text_document_obj);
+     ce_json_obj_free(&obj);
+     return result;
+}
+
 bool ce_clangd_init(const char* executable_path,
                     CeClangD_t* clangd){
      // TODO: remove verbose logging.
@@ -571,6 +653,40 @@ bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer){
      ce_json_obj_free(&text_document_obj);
      ce_json_obj_free(&obj);
      return result;
+}
+
+bool ce_clangd_file_report_changes(CeClangD_t* clangd, CeBuffer_t* buffer, CeBufferChangeNode_t* last_change){
+     CeBufferChangeNode_t* current_change = buffer->change_node;
+     if(last_change == current_change){
+          return true;
+     }
+
+     if(last_change == NULL){
+          // If the last change is null, find the first buffer change.
+          last_change = current_change;
+          while(last_change->prev){
+               last_change = last_change->prev;
+          }
+     }
+
+     bool undo = (last_change->index > current_change->index);
+     if(!undo){
+          last_change = last_change->next;
+     }
+     while(last_change){
+          if(!_clangd_file_report_change(clangd, buffer, &last_change->change, undo)){
+               ce_log("Failed to report file change to clangd, going to be out of sync.\n");
+               return false;
+          }
+          if(last_change->index < current_change->index){
+               last_change = last_change->next;
+          }else if(last_change->index > current_change->index){
+               last_change = last_change->prev;
+          }else{
+               break;
+          }
+     };
+     return true;
 }
 
 bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){

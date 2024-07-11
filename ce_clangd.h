@@ -1,7 +1,7 @@
 #pragma once
 
 // TODO
-// - Locked Queue
+// + Locked Queue
 // + Convert buffer to valid json string
 // - Timeout for requests ?
 // - Document management
@@ -26,6 +26,7 @@
 // - initialize response
 // - Move executable path and args into config.
 // - Only enable clangd when command line option is used, find all references and check this.
+// - Only apply clangd requests to c/c++ files based on syntax.
 //
 
 #include "ce_subprocess.h"
@@ -85,6 +86,7 @@ bool ce_clangd_init(const char* executable_path,
 
 bool ce_clangd_file_open(CeClangD_t* clangd, CeBuffer_t* buffer);
 bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer);
+bool ce_clangd_file_report_changes(CeClangD_t* clangd, CeBuffer_t* buffer, CeBufferChangeNode_t* last_change);
 
 bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
 bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);

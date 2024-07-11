@@ -1134,6 +1134,7 @@ bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
           }
 
           node->prev = buffer->change_node;
+          node->index = buffer->change_node->index + 1;
           buffer->change_node->next = node;
      }else{
           CeBufferChangeNode_t* first_empty_node = calloc(1, sizeof(*node));
