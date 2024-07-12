@@ -4,11 +4,11 @@
 // + Locked Queue
 // + Convert buffer to valid json string
 // - Timeout for requests ?
-// - Document management
+// + Document management
 //   + DidOpen
 //   - DidClose
-//   - DidChange: Save for after gotos
-//     - Maybe initial implementation is to just send the whole file each time ?
+//   + DidChange: Save for after gotos
+//     + Maybe initial implementation is to just send the whole file each time ?
 // - Requests
 //   + Goto definiton
 //   + Goto declaration
@@ -27,6 +27,14 @@
 // - Move executable path and args into config.
 // - Only enable clangd when command line option is used, find all references and check this.
 // - Only apply clangd requests to c/c++ files based on syntax.
+//
+// Important learnings
+// - DidChange deltas are stupid and basically end up sending the whole file if you make multi-line changes.
+// - uris store spaces as %20
+// - Detecting relative vs absolute paths is different on windows. Duh.
+// - clangd gives you the best textDocument/defintion it knows about, so itll give you the header
+//   if the source file hasn't been loaded. This means its a good idea to load all files in the
+//   project on startup. I wish it could just find it...
 //
 
 #include "ce_subprocess.h"

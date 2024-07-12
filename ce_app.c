@@ -458,7 +458,13 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
                                 bool insert_into_jump_list, const char* filepath){
     char load_path[MAX_PATH_LEN + 1];
 #if defined(PLATFORM_WINDOWS)
-     char* res = _fullpath(NULL, filepath, MAX_PATH_LEN);
+     char* res = NULL;
+     if(filepath[0] != 0 &&
+        filepath[1] == ':'){
+          res = strdup(filepath);
+     }else{
+          res = _fullpath(NULL, filepath, MAX_PATH_LEN);
+     }
 #else
      char* res = realpath(filepath, NULL);
 #endif
@@ -492,6 +498,19 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
           if(strcmp(itr->buffer->name, load_path) == 0){
                ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
                return itr->buffer;
+          }
+          if(strstr(load_path, itr->buffer->name) != NULL){
+#if defined(PLATFORM_WINDOWS)
+               char* buffer_full_path = _fullpath(NULL, itr->buffer->name, MAX_PATH_LEN);
+#else
+               char* buffer_full_path = realpath(itr->buffer->name, NULL);
+#endif
+               if(strcmp(buffer_full_path, load_path) == 0){
+                    ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
+                    free(buffer_full_path);
+                    return itr->buffer;
+               }
+               free(buffer_full_path);
           }
           itr = itr->next;
      }
@@ -1076,11 +1095,19 @@ static void _convert_uri_to_windows_path(char* uri){
      }else{
           uri_len = strlen(uri);
      }
+     int64_t u = 0;
      for(int64_t i = 0; i < uri_len; i++){
           if(uri[i] == '/'){
-               uri[i] = '\\';
+               uri[u] = '\\';
+          }else if(strncmp(uri + i, "%20", 3) == 0){
+               uri[u] = ' ';
+               i += 2;
+          }else{
+               uri[u] = uri[i];
           }
+          u++;
      }
+     uri[u] = 0;
 }
 
 static CeDestination_t _extract_destination_from_range_response(CeJsonObj_t* obj){
@@ -1166,6 +1193,7 @@ static CeDestination_t _extract_destination_from_range_response(CeJsonObj_t* obj
 
 #if defined(PLATFORM_WINDOWS)
      _convert_uri_to_windows_path(dest.filepath);
+     printf("%s\n", dest.filepath);
 #else
      // TODO: Linux
 #endif
@@ -1706,7 +1734,16 @@ CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView
                                        CeVim_t* vim, bool insert_into_jump_list,
                                        const char* base_directory, CeDestination_t* destination){
      char full_path[MAX_PATH_LEN];
-     if(!base_directory && destination->filepath[0] != CE_PATH_SEPARATOR) base_directory = ".";
+     if(!base_directory){
+#if defined(PLATFORM_WINDOWS)
+          bool is_absolute_path = (destination->filepath[0] != 0 && destination->filepath[1] == ':');
+#else
+          bool is_absolute_path = (destination->filepath[0] != CE_PATH_SEPARATOR);
+#endif
+          if(!is_absolute_path){
+               base_directory = ".";
+          }
+     }
      if(base_directory){
           const char* full_path_format = "%s/%s";
           snprintf(full_path, MAX_PATH_LEN - strlen(full_path_format), full_path_format, base_directory, destination->filepath);
