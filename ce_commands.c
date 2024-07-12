@@ -1440,14 +1440,14 @@ CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_d
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_clang_goto_impl(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_clang_auto_complete(CeCommand_t* command, void* user_data){
      CeApp_t* app = (CeApp_t*)(user_data);
      CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     if(!ce_clangd_request_goto_impl(&app->clangd,
-                                     command_context.view->buffer,
-                                     command_context.view->cursor)){
+     if(!ce_clangd_request_auto_complete(&app->clangd,
+                                         command_context.view->buffer,
+                                         command_context.view->cursor)){
          return CE_COMMAND_FAILURE;
      }
 

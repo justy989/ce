@@ -640,8 +640,8 @@ bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint
      return _clangd_request_goto(clangd, buffer, point, method);
 }
 
-bool ce_clangd_request_goto_impl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
-     const char* method = "textDocument/implementation";
+bool ce_clangd_request_auto_complete(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     const char* method = "textDocument/completion";
      clangd->current_request_id++;
      _clangd_track_request(clangd, method);
      return _clangd_request_goto(clangd, buffer, point, method);
