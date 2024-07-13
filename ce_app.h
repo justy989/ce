@@ -67,6 +67,7 @@ typedef struct{
      int64_t last_goto_destination;
      CeSyntaxHighlightFunc_t* syntax_function;
      char* base_directory;
+     CeClangDDiagnostics_t clangd_diagnostics;
 }CeAppBufferData_t;
 
 typedef struct{
@@ -137,6 +138,7 @@ typedef struct CeApp_t{
      CeBuffer_t* jump_list_buffer;
      CeBuffer_t* shell_command_buffer;
      CeBuffer_t* last_goto_buffer;
+     CeBuffer_t* clangd_diagnostics_buffer;
      CeComplete_t input_complete;
      CeHistory_t command_history;
      CeHistory_t search_history;
@@ -255,6 +257,8 @@ void build_clangd_completion_view(CeView_t* view,
                                   CeBuffer_t* buffer,
                                   CeConfigOptions_t* config_options,
                                   CeRect_t* terminal_rect);
+void build_clangd_diagnostics_buffer(CeBuffer_t* buffer,
+                                     CeBuffer_t* source);
 
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);

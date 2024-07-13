@@ -1142,6 +1142,7 @@ int main(int argc, char* argv[]){
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
           app.shell_command_buffer = new_buffer();
+          app.clangd_diagnostics_buffer = new_buffer();
           app.clangd_completion.buffer = new_buffer();
           CeBuffer_t* scratch_buffer = new_buffer();
 
@@ -1163,6 +1164,8 @@ int main(int argc, char* argv[]){
           ce_buffer_node_insert(&app.buffer_node_head, app.shell_command_buffer);
           ce_buffer_alloc(app.clangd_completion.buffer, 1, "[clangd completions]");
           ce_buffer_node_insert(&app.buffer_node_head, app.clangd_completion.buffer);
+          ce_buffer_alloc(app.clangd_diagnostics_buffer, 1, "[clangd diagnostics]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.clangd_diagnostics_buffer);
           ce_buffer_alloc(scratch_buffer, 1, "scratch");
           ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
           // TODO: Only optionally add this buffer
@@ -1179,6 +1182,7 @@ int main(int argc, char* argv[]){
           scratch_buffer->status = CE_BUFFER_STATUS_NONE;
           app.clangd.buffer->status = CE_BUFFER_STATUS_NONE;
           app.clangd_completion.buffer->status = CE_BUFFER_STATUS_NONE;
+          app.clangd_diagnostics_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.bind_list_buffer->no_line_numbers = true;
@@ -1190,6 +1194,7 @@ int main(int argc, char* argv[]){
           app.shell_command_buffer->no_line_numbers = true;
           app.clangd.buffer->no_line_numbers = true;
           app.clangd_completion.buffer->no_line_numbers = true;
+          app.clangd_diagnostics_buffer->no_line_numbers = true;
 
           app.complete_list_buffer->no_highlight_current_line = true;
 
@@ -1216,6 +1221,8 @@ int main(int argc, char* argv[]){
           buffer_data->syntax_function = ce_syntax_highlight_plain;
           buffer_data = app.clangd_completion.buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_completions;
+          buffer_data = app.clangd_diagnostics_buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_c;
 
           app.clangd_completion.start = (CePoint_t){-1, -1};
           app.clangd_completion.initiate = (CePoint_t){-1, -1};
@@ -1662,6 +1669,12 @@ int main(int argc, char* argv[]){
                          shell_command_layout->view.cursor.x = 0;
                          ce_view_follow_cursor(&shell_command_layout->view, 1, 1, app.config_options.tab_width);
                     }
+               }
+
+               CeLayout_t* clangd_diagnostics_layout = ce_layout_buffer_in_view(tab_layout, app.clangd_diagnostics_buffer);
+               if(clangd_diagnostics_layout){
+                   build_clangd_diagnostics_buffer(clangd_diagnostics_layout->view.buffer,
+                                                   view->buffer);
                }
           }
 

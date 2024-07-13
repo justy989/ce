@@ -75,6 +75,18 @@ typedef struct{
 }CeClangDRequestLookup_t;
 
 typedef struct{
+     CePoint_t start;
+     CePoint_t end;
+     char* message;
+}CeClangDDiagnostic_t;
+
+typedef struct{
+    CeClangDDiagnostic_t* elements;
+    int64_t count;
+    char* filepath;
+}CeClangDDiagnostics_t;
+
+typedef struct{
 #if defined(PLATFORM_WINDOWS)
      HANDLE thread_handle;
      DWORD thread_id;
@@ -108,3 +120,6 @@ CeClangDResponse_t ce_clangd_pop_response(CeClangD_t* clangd);
 void ce_clangd_free(CeClangD_t* clangd);
 
 void ce_clangd_response_free(CeClangDResponse_t* response);
+
+void ce_clangd_diag_add(CeClangDDiagnostics_t* diags, CeClangDDiagnostic_t* elem);
+void ce_clangd_diag_free(CeClangDDiagnostics_t* diags);

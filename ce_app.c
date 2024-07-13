@@ -453,6 +453,29 @@ CePoint_t view_cursor_on_screen(CeView_t* view, int64_t tab_width, CeLineNumber_
                         view->cursor.y - view->scroll.y + view->rect.top};
 }
 
+CeBuffer_t* find_already_loaded_file(CeBufferNode_t* buffer_node_head, const char* filename){
+     CeBufferNode_t* itr = buffer_node_head;
+     while(itr){
+          if(strcmp(itr->buffer->name, filename) == 0){
+               return itr->buffer;
+          }
+          if(strstr(filename, itr->buffer->name) != NULL){
+#if defined(PLATFORM_WINDOWS)
+               char* buffer_full_path = _fullpath(NULL, itr->buffer->name, MAX_PATH_LEN);
+#else
+               char* buffer_full_path = realpath(itr->buffer->name, NULL);
+#endif
+               if(strcmp(buffer_full_path, filename) == 0){
+                    free(buffer_full_path);
+                    return itr->buffer;
+               }
+               free(buffer_full_path);
+          }
+          itr = itr->next;
+     }
+     return NULL;
+}
+
 CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view,
                                 CeConfigOptions_t* config_options, CeVim_t* vim,
                                 bool insert_into_jump_list, const char* filepath){
@@ -492,27 +515,10 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
 
      free(res);
 
-     // have we already loaded this file?
-     CeBufferNode_t* itr = *buffer_node_head;
-     while(itr){
-          if(strcmp(itr->buffer->name, load_path) == 0){
-               ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
-               return itr->buffer;
-          }
-          if(strstr(load_path, itr->buffer->name) != NULL){
-#if defined(PLATFORM_WINDOWS)
-               char* buffer_full_path = _fullpath(NULL, itr->buffer->name, MAX_PATH_LEN);
-#else
-               char* buffer_full_path = realpath(itr->buffer->name, NULL);
-#endif
-               if(strcmp(buffer_full_path, load_path) == 0){
-                    ce_view_switch_buffer(view, itr->buffer, vim, config_options, insert_into_jump_list);
-                    free(buffer_full_path);
-                    return itr->buffer;
-               }
-               free(buffer_full_path);
-          }
-          itr = itr->next;
+     CeBuffer_t* already_loaded_buffer = find_already_loaded_file(*buffer_node_head, load_path);
+     if(already_loaded_buffer){
+         ce_view_switch_buffer(view, already_loaded_buffer, vim, config_options, insert_into_jump_list);
+         return already_loaded_buffer;
      }
 
      // load file
@@ -1251,41 +1257,42 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
      char** descriptions = NULL;
 
      for(int64_t i = 0; i < items_array->count; i++){
-          if(items_array->values[i].type != CE_JSON_TYPE_OBJECT){
+          CeJsonValue_t* value = items_array->values + i;
+          if(value->type != CE_JSON_TYPE_OBJECT){
                continue;
           }
 
-          CeJsonFindResult_t insert_text_find = ce_json_obj_find(&items_array->values[i].obj, "insertText");
+          CeJsonFindResult_t insert_text_find = ce_json_obj_find(&value->obj, "insertText");
           if(insert_text_find.type != CE_JSON_TYPE_STRING){
                continue;
           }
 
-          CeJsonFindResult_t detail_find = ce_json_obj_find(&items_array->values[i].obj, "detail");
+          CeJsonFindResult_t detail_find = ce_json_obj_find(&value->obj, "detail");
           if(detail_find.type != CE_JSON_TYPE_STRING){
                continue;
           }
 
-          char* completion = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &insert_text_find));
+          char* completion = strdup(ce_json_obj_get_string(&value->obj, &insert_text_find));
 
 
-          CeJsonFindResult_t label_find = ce_json_obj_find(&items_array->values[i].obj, "label");
+          CeJsonFindResult_t label_find = ce_json_obj_find(&value->obj, "label");
 
           char* description = NULL;
           if(label_find.type == CE_JSON_TYPE_STRING){
                int64_t completion_len = strlen(completion);
-               char* match = strstr(ce_json_obj_get_string(&items_array->values[i].obj, &label_find),
+               char* match = strstr(ce_json_obj_get_string(&value->obj, &label_find),
                                     completion);
                if(match && strlen(match + completion_len) > 0){
                     char buffer[BUFSIZ];
                     snprintf(buffer, BUFSIZ, "%s%s",
-                             ce_json_obj_get_string(&items_array->values[i].obj, &detail_find),
+                             ce_json_obj_get_string(&value->obj, &detail_find),
                              match + completion_len);
                     description = strdup(buffer);
                }else{
-                    description = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &detail_find));
+                    description = strdup(ce_json_obj_get_string(&value->obj, &detail_find));
                }
           }else{
-               description = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &detail_find));
+               description = strdup(ce_json_obj_get_string(&value->obj, &detail_find));
           }
 
           int64_t new_completion_count = completion_count + 1;
@@ -1295,11 +1302,11 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
           descriptions[completion_count] = description;
           completion_count = new_completion_count;
 
-          CeJsonFindResult_t text_edit_find = ce_json_obj_find(&items_array->values[i].obj, "textEdit");
+          CeJsonFindResult_t text_edit_find = ce_json_obj_find(&value->obj, "textEdit");
           if(text_edit_find.type != CE_JSON_TYPE_OBJECT){
                continue;
           }
-          CeJsonObj_t* text_edit_obj = ce_json_obj_get_obj(&items_array->values[i].obj, &text_edit_find);
+          CeJsonObj_t* text_edit_obj = ce_json_obj_get_obj(&value->obj, &text_edit_find);
           if(text_edit_obj == NULL){
                continue;
           }
@@ -1411,6 +1418,143 @@ void build_clangd_completion_view(CeView_t* view,
      }
 }
 
+// {
+//  "jsonrpc" : "2.0",
+//  "method" : "textDocument/publishDiagnostics",
+//  "params" : {
+//   "diagnostics" : [
+//    {
+//     "code" : "-Wdeprecated-declarations",
+//     "message" : "'strncpy' is deprecated: This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.\n\n:334:1:\nnote: 'strncpy' has been explicitly marked deprecated here",
+//     "range" : {
+//      "end" : {
+//       "character" : 32.0000,
+//       "line" : 124.0000
+//      },
+//      "start" : {
+//       "character" : 25.0000,
+//       "line" : 124.0000
+//      }
+//     },
+//     "severity" : 1.0000,
+//     "source" : "clang",
+//     "tags" : [
+//      2.0000
+//     ]
+//    },
+
+CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
+     CeClangDDiagnostics_t result = {};
+
+     CeJsonFindResult_t params_find = ce_json_obj_find(obj, "params");
+     if(params_find.type != CE_JSON_TYPE_OBJECT){
+         return result;
+     }
+     CeJsonObj_t* params_obj = ce_json_obj_get_obj(obj, &params_find);
+     if(params_obj == NULL){
+         return result;
+     }
+
+     CeJsonFindResult_t uri_find = ce_json_obj_find(params_obj, "uri");
+     if(uri_find.type != CE_JSON_TYPE_STRING){
+         return result;
+     }
+
+     const char* file_uri = ce_json_obj_get_string(params_obj, &uri_find);
+     if(file_uri == NULL){
+         return result;
+     }
+     result.filepath = strdup(file_uri);
+#if defined(PLATFORM_WINDOWS)
+     _convert_uri_to_windows_path(result.filepath);
+#else
+     // TODO: Linux
+#endif
+
+     CeJsonFindResult_t diagnostics_find = ce_json_obj_find(params_obj, "diagnostics");
+     if(diagnostics_find.type != CE_JSON_TYPE_ARRAY){
+         return result;
+     }
+
+     CeJsonArray_t* diagnostics_array = ce_json_obj_get_array(params_obj, &diagnostics_find);
+     if(diagnostics_array == NULL){
+         return result;
+     }
+
+     for(int64_t i = 0; i < diagnostics_array->count; i++){
+          CeJsonValue_t* value = diagnostics_array->values + i;
+          if(value->type != CE_JSON_TYPE_OBJECT){
+               continue;
+          }
+
+          CeJsonFindResult_t message_find = ce_json_obj_find(&value->obj, "message");
+          if(message_find.type != CE_JSON_TYPE_STRING){
+              continue;
+          }
+          CeClangDDiagnostic_t diag = {};
+          diag.message = (char*)(ce_json_obj_get_string(&value->obj, &message_find));
+          if(diag.message == NULL){
+              continue;
+          }
+
+          CeJsonFindResult_t range_find = ce_json_obj_find(&value->obj, "range");
+          if(range_find.type != CE_JSON_TYPE_OBJECT){
+              continue;
+          }
+
+          CeJsonObj_t* range_obj = ce_json_obj_get_obj(&value->obj, &range_find);
+          if(range_obj == NULL){
+              continue;
+          }
+
+          // This logic can be compressed.
+          {
+              CeJsonFindResult_t start_find = ce_json_obj_find(range_obj, "start");
+              if(start_find.type != CE_JSON_TYPE_OBJECT){
+                   continue;
+              }
+              CeJsonObj_t* start_obj = ce_json_obj_get_obj(range_obj, &start_find);
+              if(start_obj == NULL){
+                   continue;
+              }
+              CeJsonFindResult_t line_find = ce_json_obj_find(start_obj, "line");
+              if(line_find.type != CE_JSON_TYPE_NUMBER){
+                   continue;
+              }
+              CeJsonFindResult_t character_find = ce_json_obj_find(start_obj, "character");
+              if(character_find.type != CE_JSON_TYPE_NUMBER){
+                   continue;
+              }
+              diag.start.x = (int64_t)(*ce_json_obj_get_number(start_obj, &character_find));
+              diag.start.y = (int64_t)(*ce_json_obj_get_number(start_obj, &line_find));
+          }
+          {
+              CeJsonFindResult_t end_find = ce_json_obj_find(range_obj, "end");
+              if(end_find.type != CE_JSON_TYPE_OBJECT){
+                   continue;
+              }
+              CeJsonObj_t* end_obj = ce_json_obj_get_obj(range_obj, &end_find);
+              if(end_obj == NULL){
+                   continue;
+              }
+              CeJsonFindResult_t line_find = ce_json_obj_find(end_obj, "line");
+              if(line_find.type != CE_JSON_TYPE_NUMBER){
+                   continue;
+              }
+              CeJsonFindResult_t character_find = ce_json_obj_find(end_obj, "character");
+              if(character_find.type != CE_JSON_TYPE_NUMBER){
+                   continue;
+              }
+              diag.end.x = (int64_t)(*ce_json_obj_get_number(end_obj, &character_find));
+              diag.end.y = (int64_t)(*ce_json_obj_get_number(end_obj, &line_find));
+          }
+
+          ce_clangd_diag_add(&result, &diag);
+     }
+
+     return result;
+}
+
 void ce_app_handle_clangd_response(CeApp_t* app){
      while(ce_clangd_outstanding_responses(&app->clangd)){
           CeClangDResponse_t response = ce_clangd_pop_response(&app->clangd);
@@ -1423,12 +1567,12 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                     CeView_t* view = &tab_layout->tab.current->view;
                     CeDestination_t dest = _extract_destination_from_range_response(response.obj);
                     if(load_destination_into_view(&app->buffer_node_head,
-                                               view,
-                                               &app->config_options,
-                                               &app->vim,
-                                               true,
-                                               NULL,
-                                               &dest)){
+                                                  view,
+                                                  &app->config_options,
+                                                  &app->vim,
+                                                  true,
+                                                  NULL,
+                                                  &dest)){
                          ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
                     }
                }else if(strcmp(response.method, "textDocument/completion") == 0){
@@ -1458,8 +1602,50 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                                                       &app->terminal_rect);
                     }
                }
+          }else{
+               CeJsonFindResult_t method_find = ce_json_obj_find(response.obj, "method");
+               if(method_find.type == CE_JSON_TYPE_STRING){
+                    const char* method = ce_json_obj_get_string(response.obj, &method_find);
+                    if(method != NULL){
+                        if(strcmp(method, "textDocument/publishDiagnostics") == 0){
+                            CeClangDDiagnostics_t diagnostics = _extract_diagnostics_from_response(response.obj);
+                            if(diagnostics.count){
+                                // DEBUG
+                                // printf("diags: %s %lld\n", diagnostics.filepath, diagnostics.count);
+                                // for(int64_t i = 0; i < diagnostics.count; i++){
+                                //     CeClangDDiagnostic_t* diag = diagnostics.elements + i;
+                                //     printf("  %lld, %lld -> %lld, %lld %s\n",
+                                //            diag->start.x, diag->start.y, diag->end.x, diag->end.y,
+                                //            diag->message);
+                                // }
+                                CeBuffer_t* buffer = find_already_loaded_file(app->buffer_node_head, diagnostics.filepath);
+                                if(buffer){
+                                    CeAppBufferData_t* app_data = (CeAppBufferData_t*)(buffer->app_data);
+                                    if(app_data->clangd_diagnostics.count > 0){
+                                        ce_clangd_diag_free(&app_data->clangd_diagnostics);
+                                    }
+                                    memcpy(&app_data->clangd_diagnostics, &diagnostics, sizeof(diagnostics));
+                                }else{
+                                    ce_clangd_diag_free(&diagnostics);
+                                }
+                            }
+                        }
+                    }
+               }
           }
           ce_clangd_response_free(&response);
+     }
+}
+
+void build_clangd_diagnostics_buffer(CeBuffer_t* buffer, CeBuffer_t* source){
+     CeAppBufferData_t* app_data = (CeAppBufferData_t*)(source->app_data);
+     char line[BUFSIZ];
+     ce_buffer_empty(buffer);
+     for(int64_t i = 0; i < app_data->clangd_diagnostics.count; i++){
+         CeClangDDiagnostic_t* diag = app_data->clangd_diagnostics.elements + i;
+         snprintf(line, BUFSIZ, "%s:%" PRId64 ":%" PRId64 " %s",
+                  source->name, diag->start.y, diag->start.x, diag->message);
+         buffer_append_on_new_line(buffer, line);
      }
 }
 

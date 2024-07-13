@@ -301,8 +301,6 @@ static bool _push_response(CeClangDResponseQueue_t* queue, CeJsonObj_t* obj){
           if(number){
                request_id = (int64_t)(*number);
           }
-     }else{
-          return false;
      }
 
 #if defined(PLATFORM_WINDOWS)
@@ -380,6 +378,7 @@ static void* handle_output_fn(void* user_data){
                CeJsonObj_t* obj = malloc(sizeof(*obj));
                memset(obj, 0, sizeof(*obj));
                if(ce_json_parse(parse.message_body, obj, false)){
+                    // DEBUG
                     // char* buffer = malloc(MAX_PRINT_SIZE + 1);
                     // ce_json_obj_to_string(obj, buffer, MAX_PRINT_SIZE, 1);
                     // printf("%s\n", buffer);
@@ -683,4 +682,21 @@ void ce_clangd_response_free(CeClangDResponse_t* response){
      ce_json_obj_free(response->obj);
      free(response->obj);
      free(response->method);
+}
+
+void ce_clangd_diag_add(CeClangDDiagnostics_t* diags, CeClangDDiagnostic_t* elem){
+    int64_t new_count = diags->count + 1;
+    diags->elements = realloc(diags->elements, new_count * sizeof(diags->elements[0]));
+    memcpy(diags->elements + diags->count, elem, sizeof(diags->elements[0]));
+    diags->elements[diags->count].message = strdup(elem->message);
+    diags->count = new_count;
+}
+
+void ce_clangd_diag_free(CeClangDDiagnostics_t* diags){
+    for(int64_t i = 0; i < diags->count; i++){
+        free(diags->elements[i].message);
+    }
+    free(diags->elements);
+    free(diags->filepath);
+    memset(diags, 0, sizeof(*diags));
 }

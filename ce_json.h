@@ -27,7 +27,7 @@ typedef enum{
 
 typedef struct CeJsonObj_s{
      CeJsonField_t* fields;
-     uint64_t count;
+     int64_t count;
 }CeJsonObj_t;
 
 typedef struct CeJsonArray_s{

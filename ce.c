@@ -1224,7 +1224,6 @@ static CePoint_t move_point_based_on_buffer_change(CeBuffer_t* buffer, CeBufferC
                }
           }
      }
-
      return point;
 }
 
