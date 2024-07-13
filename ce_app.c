@@ -891,7 +891,6 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_goto_def, "clang_goto_def", "If clangd is enabled, request to go the definition of the symbol under the cursor."},
           {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
           {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
-          {command_clang_auto_complete, "clang_auto_complete", "If clangd is enabled, request auto completion at the cursor."},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
@@ -1187,62 +1186,7 @@ static CeDestination_t _extract_destination_from_range_response(CeJsonObj_t* obj
      return dest;
 }
 
-
-// {
-//  "id" : 2.0000,
-//  "jsonrpc" : "2.0",
-//  "result" : {
-//   "isIncomplete" : false,
-//   "items" : [
-//    {
-//     "detail" : "time_t",
-//     "filterText" : "file_modified_time",
-//     "insertText" : "file_modified_time",
-//     "insertTextFormat" : 1.0000,
-//     "kind" : 5.0000,
-//     "label" : " file_modified_time",
-//     "score" : 1.2385,
-//     "sortText" : "406178d1file_modified_time",
-//     "textEdit" : {
-//      "newText" : "file_modified_time",
-//      "range" : {
-//       "end" : {
-//        "character" : 45.0000,
-//        "line" : 71.0000
-//       },
-//       "start" : {
-//        "character" : 45.0000,
-//        "line" : 71.0000
-//       }
-//      }
-//     }
-//    },
-//    {
-//     "detail" : "int64_t",
-//     "filterText" : "line_count",
-//     "insertText" : "line_count",
-//     "insertTextFormat" : 1.0000,
-//     "kind" : 5.0000,
-//     "label" : " line_count",
-//     "score" : 1.2385,
-//     "sortText" : "406178d1line_count",
-//     "textEdit" : {
-//      "newText" : "line_count",
-//      "range" : {
-//       "end" : {
-//        "character" : 45.0000,
-//        "line" : 71.0000
-//       },
-//       "start" : {
-//        "character" : 45.0000,
-//        "line" : 71.0000
-//       }
-//      }
-//     }
-//    },
-//    ...
-
-CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj){
+CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* start){
      CeComplete_t* result = NULL;
 
      CeJsonFindResult_t result_find = ce_json_obj_find(obj, "result");
@@ -1283,12 +1227,70 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj){
                continue;
           }
 
+          char* completion = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &insert_text_find));
+
+
+          CeJsonFindResult_t label_find = ce_json_obj_find(&items_array->values[i].obj, "label");
+
+          char* description = NULL;
+          if(label_find.type == CE_JSON_TYPE_STRING){
+               int64_t completion_len = strlen(completion);
+               char* match = strstr(ce_json_obj_get_string(&items_array->values[i].obj, &label_find),
+                                    completion);
+               if(match && strlen(match + completion_len) > 0){
+                    char buffer[BUFSIZ];
+                    snprintf(buffer, BUFSIZ, "%s%s",
+                             ce_json_obj_get_string(&items_array->values[i].obj, &detail_find),
+                             match + completion_len);
+                    description = strdup(buffer);
+               }else{
+                    description = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &detail_find));
+               }
+          }else{
+               description = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &detail_find));
+          }
+
           int64_t new_completion_count = completion_count + 1;
           completions = realloc(completions, new_completion_count * sizeof(completions[0]));
           descriptions = realloc(descriptions, new_completion_count * sizeof(descriptions[0]));
-          completions[completion_count] = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &insert_text_find));
-          descriptions[completion_count] = strdup(ce_json_obj_get_string(&items_array->values[i].obj, &detail_find));
+          completions[completion_count] = completion;
+          descriptions[completion_count] = description;
           completion_count = new_completion_count;
+
+          CeJsonFindResult_t text_edit_find = ce_json_obj_find(&items_array->values[i].obj, "textEdit");
+          if(text_edit_find.type != CE_JSON_TYPE_OBJECT){
+               continue;
+          }
+          CeJsonObj_t* text_edit_obj = ce_json_obj_get_obj(&items_array->values[i].obj, &text_edit_find);
+          if(text_edit_obj == NULL){
+               continue;
+          }
+          CeJsonFindResult_t range_find = ce_json_obj_find(text_edit_obj, "range");
+          if(range_find.type != CE_JSON_TYPE_OBJECT){
+               continue;
+          }
+          CeJsonObj_t* range_obj = ce_json_obj_get_obj(text_edit_obj, &range_find);
+          if(range_obj == NULL){
+               continue;
+          }
+          CeJsonFindResult_t start_find = ce_json_obj_find(range_obj, "start");
+          if(start_find.type != CE_JSON_TYPE_OBJECT){
+               continue;
+          }
+          CeJsonObj_t* start_obj = ce_json_obj_get_obj(range_obj, &start_find);
+          if(start_obj == NULL){
+               continue;
+          }
+          CeJsonFindResult_t line_find = ce_json_obj_find(start_obj, "line");
+          if(line_find.type != CE_JSON_TYPE_NUMBER){
+               continue;
+          }
+          CeJsonFindResult_t character_find = ce_json_obj_find(start_obj, "character");
+          if(character_find.type != CE_JSON_TYPE_NUMBER){
+               continue;
+          }
+          start->x = *ce_json_obj_get_number(start_obj, &character_find);
+          start->y = *ce_json_obj_get_number(start_obj, &line_find);
      }
 
      result = malloc(sizeof(*result));
@@ -1301,6 +1303,74 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj){
      free(completions);
      free(descriptions);
      return result;
+}
+
+void _build_complete_view(CeView_t* view,
+                          CePoint_t start,
+                          CeView_t* completed_view,
+                          CeBuffer_t* buffer,
+                          CeConfigOptions_t* config_options,
+                          CeRect_t* terminal_rect){
+     int64_t view_height = 0;
+     if(buffer->line_count > config_options->completion_line_limit){
+          view_height = config_options->completion_line_limit;
+     }else{
+          view_height = buffer->line_count;
+     }
+
+     CePoint_t view_start = (CePoint_t){completed_view->rect.left + (start.x - completed_view->scroll.x),
+                                        completed_view->rect.top + (start.y - completed_view->scroll.y)};
+
+     if(start.y > view_height){
+          view->rect.bottom = view_start.y;
+          view->rect.top = view->rect.bottom - view_height;
+     }else{
+          view->rect.top = view_start.y + 1;
+          view->rect.bottom = view->rect.top + view_height;
+     }
+
+     view->rect.left = view_start.x;
+     if(!completed_view->buffer->no_line_numbers){
+          view->rect.left += ce_line_number_column_width(config_options->line_number,
+                                                         completed_view->buffer->line_count,
+                                                         completed_view->rect.top,
+                                                         completed_view->rect.bottom);
+     }
+
+     int64_t longest_line = 0;
+     for(int64_t i = 0; i < buffer->line_count; i++){
+          int64_t line_len = ce_buffer_line_len(buffer, i);
+          if(line_len > longest_line){
+               longest_line = line_len;
+          }
+     }
+     view->rect.right = view->rect.left + longest_line;
+
+     // Clamp to the view.
+     if(view->rect.left >= terminal_rect->right){
+          view->rect.left = terminal_rect->right - 1;
+     }
+     if(view->rect.right >= terminal_rect->right){
+          view->rect.right = terminal_rect->right - 1;
+     }
+     if(view->rect.bottom >= terminal_rect->bottom){
+          view->rect.bottom = terminal_rect->bottom - 1;
+     }
+     if(view->rect.top >= terminal_rect->bottom){
+          view->rect.top = terminal_rect->bottom - 1;
+     }
+     if(view->rect.left < 0){
+          view->rect.left = 0;
+     }
+     if(view->rect.right < 0){
+          view->rect.right = 0;
+     }
+     if(view->rect.bottom < 0){
+          view->rect.bottom = 0;
+     }
+     if(view->rect.top < 0){
+          view->rect.top = 0;
+     }
 }
 
 void ce_app_handle_clangd_response(CeApp_t* app){
@@ -1324,15 +1394,25 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                          ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
                     }
                }else if(strcmp(response.method, "textDocument/completion") == 0){
-                    CeComplete_t* clang_completion = _extract_completion_from_response(response.obj);
-                    if(clang_completion){
-                         printf("auto completions: %lld\n", clang_completion->count);
-                         for(int64_t i = 0; i < clang_completion->count; i++){
-                              CeCompleteElement_t* element = clang_completion->elements + i;
-                              printf("%s : %s\n", element->string, element->description);
+                    if(app->clangd_completion.complete){
+                         ce_complete_free(app->clangd_completion.complete);
+                         free(app->clangd_completion.complete);
+                    }
+                    app->clangd_completion.complete = _extract_completion_from_response(response.obj,
+                                                                                        &app->clangd_completion.start);
+                    if(app->clangd_completion.complete){
+                         build_complete_list(app->clangd_completion.buffer,
+                                             app->clangd_completion.complete);
+                         CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+                         if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+                              CeView_t* completed_view = &tab_layout->tab.current->view;
+                              _build_complete_view(&app->clangd_completion.view,
+                                                   app->clangd_completion.start,
+                                                   completed_view,
+                                                   app->clangd_completion.buffer,
+                                                   &app->config_options,
+                                                   &app->terminal_rect);
                          }
-                         ce_complete_free(clang_completion);
-                         free(clang_completion);
                     }
                }
           }

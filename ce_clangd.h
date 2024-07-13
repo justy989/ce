@@ -16,7 +16,7 @@
 //   + Goto implementaion
 //   - Find references
 //     - Display in ui
-//   - Completion
+//   + Completion
 //     - Display in ui
 //   - Prepare Call Hierarchy
 //     - Display in ui

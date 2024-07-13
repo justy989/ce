@@ -595,18 +595,37 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     return;
                }
           }else if(key == app->config_options.cycle_next_completion_key){
-               CeComplete_t* complete = ce_app_is_completing(app);
-               if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
-                    ce_complete_next_match(complete);
-                    build_complete_list(app->complete_list_buffer, complete);
-                    return;
+               if(app->vim.mode == CE_VIM_MODE_INSERT){
+                    CeComplete_t* complete = ce_app_is_completing(app);
+                    if(complete){
+                         ce_complete_next_match(complete);
+                         build_complete_list(app->complete_list_buffer, complete);
+                         return;
+                    }
+
+                    if(app->clangd_completion.start.x >= 0 &&
+                       app->clangd_completion.start.y >= 0){
+                         ce_complete_next_match(app->clangd_completion.complete);
+                         build_complete_list(app->clangd_completion.buffer,
+                                             app->clangd_completion.complete);
+                         return;
+                    }
                }
           }else if(key == app->config_options.cycle_prev_completion_key){
-               CeComplete_t* complete = ce_app_is_completing(app);
-               if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
-                    ce_complete_previous_match(complete);
-                    build_complete_list(app->complete_list_buffer, complete);
-                    return;
+               if(app->vim.mode == CE_VIM_MODE_INSERT){
+                    CeComplete_t* complete = ce_app_is_completing(app);
+                    if(complete){
+                         ce_complete_previous_match(complete);
+                         build_complete_list(app->complete_list_buffer, complete);
+                         return;
+                    }
+                    if(app->clangd_completion.start.x >= 0 &&
+                       app->clangd_completion.start.y >= 0){
+                         ce_complete_previous_match(app->clangd_completion.complete);
+                         build_complete_list(app->clangd_completion.buffer,
+                                             app->clangd_completion.complete);
+                         return;
+                    }
                }
           }else if(key == KEY_ESCAPE && app->input_complete_func && app->vim.mode == CE_VIM_MODE_NORMAL){ // Escape
                ce_history_reset_current(&app->command_history);
@@ -673,6 +692,10 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                          build_complete_list(app->complete_list_buffer, &app->input_complete);
                     }
                }
+          // TODO: Make completion key configurable
+          }else if(app->vim.mode == CE_VIM_MODE_INSERT && key == ce_ctrl_key('f')){
+               ce_clangd_request_auto_complete(&app->clangd, view->buffer, view->cursor);
+               app->clangd_completion.initiate = view->cursor;
           }else{
                // TODO: how are we going to let this be supported through customization
                CeAppBufferData_t* buffer_data = view->buffer->app_data;
@@ -707,6 +730,12 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                if(app->last_vim_handle_result == CE_VIM_PARSE_COMPLETE &&
                   app->vim.current_action.repeatable){
                     app->last_macro_register = 0;
+               }
+
+               if(app->vim.mode != CE_VIM_MODE_INSERT &&
+                  app->clangd_completion.start.x >= 0 &&
+                  app->clangd_completion.start.y >= 0){
+                    app->clangd_completion.start = (CePoint_t){-1, -1};
                }
           }
      }else{
@@ -1078,6 +1107,7 @@ int main(int argc, char* argv[]){
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
           app.shell_command_buffer = new_buffer();
+          app.clangd_completion.buffer = new_buffer();
           CeBuffer_t* scratch_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
@@ -1096,6 +1126,8 @@ int main(int argc, char* argv[]){
           ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
           ce_buffer_alloc(app.shell_command_buffer, 1, "[shell command]");
           ce_buffer_node_insert(&app.buffer_node_head, app.shell_command_buffer);
+          ce_buffer_alloc(app.clangd_completion.buffer, 1, "[clangd completions]");
+          ce_buffer_node_insert(&app.buffer_node_head, app.clangd_completion.buffer);
           ce_buffer_alloc(scratch_buffer, 1, "scratch");
           ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
           // TODO: Only optionally add this buffer
@@ -1111,6 +1143,7 @@ int main(int argc, char* argv[]){
           app.shell_command_buffer->status = CE_BUFFER_STATUS_NONE;
           scratch_buffer->status = CE_BUFFER_STATUS_NONE;
           app.clangd.buffer->status = CE_BUFFER_STATUS_NONE;
+          app.clangd_completion.buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.bind_list_buffer->no_line_numbers = true;
@@ -1121,6 +1154,7 @@ int main(int argc, char* argv[]){
           app.jump_list_buffer->no_line_numbers = true;
           app.shell_command_buffer->no_line_numbers = true;
           app.clangd.buffer->no_line_numbers = true;
+          app.clangd_completion.buffer->no_line_numbers = true;
 
           app.complete_list_buffer->no_highlight_current_line = true;
 
@@ -1145,6 +1179,12 @@ int main(int argc, char* argv[]){
           buffer_data->syntax_function = ce_syntax_highlight_c;
           buffer_data = app.clangd.buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_plain;
+          buffer_data = app.clangd_completion.buffer->app_data;
+          buffer_data->syntax_function = ce_syntax_highlight_completions;
+
+          app.clangd_completion.start = (CePoint_t){-1, -1};
+          app.clangd_completion.initiate = (CePoint_t){-1, -1};
+          app.clangd_completion.view.buffer = app.clangd_completion.buffer;
 
           app.cached_filepath_count = 0;
           app.shell_command_buffer_should_scroll = false;

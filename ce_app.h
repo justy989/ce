@@ -99,12 +99,12 @@ typedef struct{
 }CeVimVisualSave_t;
 
 typedef struct{
-     CePoint_t* cursors;
-     CeVimVisualData_t* visuals;
-     int64_t* motion_columns;
-     int64_t count;
-     bool active;
-}CeMultipleCursors_t;
+     CePoint_t start;
+     CePoint_t initiate;
+     CeComplete_t* complete;
+     CeBuffer_t* buffer;
+     CeView_t view;
+}CeClangDCompletion_t;
 
 typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
 
@@ -172,6 +172,7 @@ typedef struct CeApp_t{
      void* gui;
 
      CeClangD_t clangd;
+     CeClangDCompletion_t clangd_completion;
 
      // debug
      bool log_key_presses;
