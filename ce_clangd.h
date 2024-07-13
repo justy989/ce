@@ -27,6 +27,7 @@
 // - Move executable path and args into config.
 // - Only enable clangd when command line option is used, find all references and check this.
 // - Only apply clangd requests to c/c++ files based on syntax.
+// - Customizable auto complete key.
 //
 // Important learnings
 // - DidChange deltas are stupid and basically end up sending the whole file if you make multi-line changes.

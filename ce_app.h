@@ -242,9 +242,19 @@ void ce_app_init_default_commands(CeApp_t* app);
 void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete);
 void ce_app_message(CeApp_t* app, const char* fmt, ...);
 void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input_complete_func);
-bool ce_app_apply_completion(CeApp_t* app);
+
+bool apply_completion_to_buffer(CeComplete_t* complete,
+                                CeBuffer_t* buffer,
+                                int64_t start_x,
+                                CePoint_t* cursor);
 
 void ce_app_handle_clangd_response(CeApp_t* app);
+void build_clangd_completion_view(CeView_t* view,
+                                  CePoint_t start,
+                                  CeView_t* completed_view,
+                                  CeBuffer_t* buffer,
+                                  CeConfigOptions_t* config_options,
+                                  CeRect_t* terminal_rect);
 
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);

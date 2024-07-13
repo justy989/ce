@@ -161,6 +161,7 @@ bool ce_vim_rebind(CeVim_t* vim, CeRune_t key, CeVimParseFunc_t function);
 CeVimParseResult_t ce_vim_handle_key(CeVim_t* vim, CeView_t* view, CePoint_t* cursor, CeVimVisualData_t* visual, CeRune_t key,
                                      CeVimBufferData_t* buffer_data, const CeConfigOptions_t* config_options);
 
+void ce_vim_insert_mode(CeVim_t* vim);
 bool vim_mode_is_visual(CeVimMode_t mode);
 
 // action

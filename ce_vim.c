@@ -29,7 +29,7 @@ void ce_vim_add_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeR
      (*key_bind_count)++;
 }
 
-static void insert_mode(CeVim_t* vim){
+void ce_vim_insert_mode(CeVim_t* vim){
      vim->mode = CE_VIM_MODE_INSERT;
      if(!vim->verb_last_action) ce_rune_node_free(&vim->insert_rune_head);
 }
@@ -2871,7 +2871,7 @@ bool ce_vim_verb_change(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
                         const CeConfigOptions_t* config_options){
      if(!ce_vim_verb_delete(vim, action, motion_range, view, cursor, visual, buffer_data, config_options)) return false;
      vim->chain_undo = true;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -2943,7 +2943,7 @@ bool ce_vim_verb_substitute_character(CeVim_t* vim, const CeVimAction_t* action,
      bool success = ce_vim_verb_delete_character(vim, action, motion_range, view, cursor, visual, buffer_data, config_options);
      if(success){
           vim->chain_undo = true;
-          insert_mode(vim);
+          ce_vim_insert_mode(vim);
      }
      return success;
 }
@@ -2960,14 +2960,14 @@ bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* a
 
      // if the line is empty, just enter insert mode
      if(motion_range.end.x == 0){
-          insert_mode(vim);
+          ce_vim_insert_mode(vim);
           return true;
      }
 
      bool success = ce_vim_verb_change(vim, action, motion_range, view, cursor, visual, buffer_data, config_options);
      if(success){
           vim->chain_undo = true;
-          insert_mode(vim);
+          ce_vim_insert_mode(vim);
      }
      return success;
 }
@@ -3189,7 +3189,7 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeRange_t
      }
 
      vim->chain_undo = true;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3223,7 +3223,7 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeRange_t
      }
 
      vim->chain_undo = true;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3242,7 +3242,7 @@ bool ce_vim_verb_redo(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motio
 bool ce_vim_verb_insert_mode(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                              CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                              const CeConfigOptions_t* config_options){
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3285,7 +3285,7 @@ bool ce_vim_verb_append(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      int64_t last_valid_index = ce_utf8_strlen(view->buffer->lines[cursor->y]);
      cursor->x++;
      if(cursor->x > last_valid_index) cursor->x = last_valid_index;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3293,7 +3293,7 @@ bool ce_vim_verb_append_at_end_of_line(CeVim_t* vim, const CeVimAction_t* action
                                        CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                                        const CeConfigOptions_t* config_options){
      cursor->x = ce_utf8_strlen(view->buffer->lines[cursor->y]);
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3303,7 +3303,7 @@ bool ce_vim_verb_insert_at_soft_begin_line(CeVim_t* vim, const CeVimAction_t* ac
      int64_t result = ce_vim_soft_begin_line(view->buffer, cursor->y);
      if(result < 0) return false;
      cursor->x = result;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 

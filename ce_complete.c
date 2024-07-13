@@ -82,6 +82,19 @@ void ce_complete_match(CeComplete_t* complete, const char* match){
      }
 }
 
+int64_t ce_complete_current_match(CeComplete_t* complete){
+     int64_t result = 0;
+     for(int64_t i = 0; i < complete->count; i++){
+          if(i == complete->current){
+               return result;
+          }
+          if(complete->elements[i].match){
+               result++;
+          }
+     }
+     return 0;
+}
+
 void ce_complete_next_match(CeComplete_t* complete){
      if(complete->current < 0) return;
 

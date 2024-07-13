@@ -709,10 +709,27 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
      if(app->clangd_completion.start.x >= 0 &&
         app->clangd_completion.start.y >= 0){
           SDL_Rect view_rect = rect_from_view(&app->clangd_completion.view, gui);
+
+          SDL_Color border_color = color_from_index(&app->config_options,
+                                                    app->config_options.ui_bg_color,
+                                                    false);
+          uint32_t border_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                    border_color.r,
+                                                    border_color.g,
+                                                    border_color.b);
+          SDL_Rect border_rect = view_rect;
+          border_rect.x -= _text_pixel_x(1, gui);
+          border_rect.y -= _text_pixel_x(1, gui); // intentionally x !
+          border_rect.w += _text_pixel_x(1, gui);
+          border_rect.h += _text_pixel_x(1, gui); // intentionally x !
+
+          SDL_FillRect(gui->window_surface, &border_rect, border_color_packed);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
           app->clangd_completion.view.cursor.x = 0;
-          app->clangd_completion.view.cursor.y = app->clangd_completion.complete->current;
+          app->clangd_completion.view.cursor.y = ce_complete_current_match(app->clangd_completion.complete);
+          app->clangd_completion.view.scroll.y = 0;
+          app->clangd_completion.view.scroll.x = 0;
           ce_view_follow_cursor(&app->clangd_completion.view, 0, 0, 0);
 
           CeDrawColorList_t draw_color_list = {};

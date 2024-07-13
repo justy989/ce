@@ -380,14 +380,14 @@ static void* handle_output_fn(void* user_data){
                CeJsonObj_t* obj = malloc(sizeof(*obj));
                memset(obj, 0, sizeof(*obj));
                if(ce_json_parse(parse.message_body, obj, false)){
-                    char* buffer = malloc(MAX_PRINT_SIZE + 1);
-                    ce_json_obj_to_string(obj, buffer, MAX_PRINT_SIZE, 1);
-                    printf("%s\n", buffer);
+                    // char* buffer = malloc(MAX_PRINT_SIZE + 1);
+                    // ce_json_obj_to_string(obj, buffer, MAX_PRINT_SIZE, 1);
+                    // printf("%s\n", buffer);
+                    // free(buffer);
                     if(!_push_response(data->response_queue, obj)){
                          ce_json_obj_free(obj);
                          free(obj);
                     }
-                    free(buffer);
                }else{
                     printf("Failed to parse json obj\n");
                }

@@ -505,6 +505,10 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
           }
      }
 
+     CeComplete_t* app_complete = ce_app_is_completing(app);
+     bool clangd_is_completing = (app->clangd_completion.start.x >= 0 &&
+                                  app->clangd_completion.start.y >= 0);
+
      if(view){
           if(key == KEY_CARRIAGE_RETURN) key = CE_NEWLINE;
           if(key == CE_NEWLINE && !app->input_complete_func && view->buffer == app->buffer_list_buffer){
@@ -572,15 +576,21 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     free(macro_string);
                }
           }else if(key == CE_NEWLINE && app->input_complete_func){
-               ce_app_apply_completion(app);
+               if(app->vim.mode == CE_VIM_MODE_INSERT && app_complete){
+                    apply_completion_to_buffer(app_complete, app->input_view.buffer, 0, &app->input_view.cursor);
+               }
                app->vim.mode = CE_VIM_MODE_NORMAL;
                CeInputCompleteFunc* input_complete_func = app->input_complete_func;
                app->input_complete_func = NULL;
                if(app->input_view.buffer->line_count && strlen(app->input_view.buffer->lines[0])){
                     input_complete_func(app, app->input_view.buffer);
                }
-          }else if(key == app->config_options.apply_completion_key && ce_app_is_completing(app)){
-               if(ce_app_apply_completion(app)){
+          }else if((app_complete || clangd_is_completing) &&
+                   key == app->config_options.apply_completion_key &&
+                   app->vim.mode == CE_VIM_MODE_INSERT){
+               if(app_complete &&
+                  apply_completion_to_buffer(app_complete, app->input_view.buffer, 0,
+                                             &app->input_view.cursor)){
                     // TODO: compress with other similar code elsewhere
                     if(app->input_complete_func == load_file_input_complete_func){
                          char* base_directory = buffer_base_directory(view->buffer);
@@ -593,13 +603,17 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
 
                     return;
+               }else if(clangd_is_completing){
+                  apply_completion_to_buffer(app->clangd_completion.complete, view->buffer,
+                                             app->clangd_completion.start.x,
+                                             &view->cursor);
+                   app->clangd_completion.start = (CePoint_t){-1, -1};
                }
           }else if(key == app->config_options.cycle_next_completion_key){
                if(app->vim.mode == CE_VIM_MODE_INSERT){
-                    CeComplete_t* complete = ce_app_is_completing(app);
-                    if(complete){
-                         ce_complete_next_match(complete);
-                         build_complete_list(app->complete_list_buffer, complete);
+                    if(app_complete){
+                         ce_complete_next_match(app_complete);
+                         build_complete_list(app->complete_list_buffer, app_complete);
                          return;
                     }
 
@@ -613,10 +627,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }
           }else if(key == app->config_options.cycle_prev_completion_key){
                if(app->vim.mode == CE_VIM_MODE_INSERT){
-                    CeComplete_t* complete = ce_app_is_completing(app);
-                    if(complete){
-                         ce_complete_previous_match(complete);
-                         build_complete_list(app->complete_list_buffer, complete);
+                    if(app_complete){
+                         ce_complete_previous_match(app_complete);
+                         build_complete_list(app->complete_list_buffer, app_complete);
                          return;
                     }
                     if(app->clangd_completion.start.x >= 0 &&
@@ -632,8 +645,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                ce_history_reset_current(&app->search_history);
                app->input_complete_func = NULL;
 
-               CeComplete_t* complete = ce_app_is_completing(app);
-               if(complete) ce_complete_reset(complete);
+               if(app_complete) ce_complete_reset(app_complete);
                return;
           }else if(key == 'd' && view->buffer == app->buffer_list_buffer){ // Escape
                CeBufferNode_t* itr = app->buffer_node_head;
@@ -693,7 +705,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     }
                }
           // TODO: Make completion key configurable
-          }else if(app->vim.mode == CE_VIM_MODE_INSERT && key == ce_ctrl_key('f')){
+          }else if((app->vim.mode == CE_VIM_MODE_NORMAL || app->vim.mode == CE_VIM_MODE_INSERT) &&
+                   key == ce_ctrl_key('y')){
+               ce_vim_insert_mode(&app->vim);
                ce_clangd_request_auto_complete(&app->clangd, view->buffer, view->cursor);
                app->clangd_completion.initiate = view->cursor;
           }else{
@@ -732,10 +746,31 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                     app->last_macro_register = 0;
                }
 
-               if(app->vim.mode != CE_VIM_MODE_INSERT &&
-                  app->clangd_completion.start.x >= 0 &&
+               if(app->clangd_completion.start.x >= 0 &&
                   app->clangd_completion.start.y >= 0){
-                    app->clangd_completion.start = (CePoint_t){-1, -1};
+                    if(app->vim.mode == CE_VIM_MODE_INSERT){
+                         if((!ce_point_after(view->cursor, app->clangd_completion.start) &&
+                            !ce_points_equal(view->cursor, app->clangd_completion.start)) ||
+                            view->cursor.y != app->clangd_completion.start.y){
+                              app->clangd_completion.start = (CePoint_t){-1, -1};
+                         }else{
+                              int64_t match_len = view->cursor.x - app->clangd_completion.start.x;
+                              char* match = ce_buffer_dupe_string(view->buffer, app->clangd_completion.start, match_len);
+                              ce_complete_match(app->clangd_completion.complete, match);
+                              free(match);
+                              build_complete_list(app->clangd_completion.buffer,
+                                                  app->clangd_completion.complete);
+                              build_clangd_completion_view(&app->clangd_completion.view,
+                                                           app->clangd_completion.start,
+                                                           view,
+                                                           app->clangd_completion.buffer,
+                                                           &app->config_options,
+                                                           &app->terminal_rect);
+                         }
+
+                    }else{
+                         app->clangd_completion.start = (CePoint_t){-1, -1};
+                    }
                }
           }
      }else{

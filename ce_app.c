@@ -1047,41 +1047,79 @@ void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input
      ce_complete_free(&app->input_complete);
 }
 
-bool ce_app_apply_completion(CeApp_t* app){
-     CeComplete_t* complete = ce_app_is_completing(app);
-     if(app->vim.mode == CE_VIM_MODE_INSERT && complete){
-          if(complete->current >= 0){
-               int64_t completion_len = strlen(complete->elements[complete->current].string);
-               int64_t input_len = strlen(app->input_view.buffer->lines[app->input_view.cursor.y]);
-               int64_t input_offset = 0;
-               if(input_len > completion_len) input_offset = input_len - completion_len;
-               if(strcmp(complete->elements[complete->current].string, app->input_view.buffer->lines[app->input_view.cursor.y] + input_offset) == 0){
-                    return false;
-               }
+bool _str_endswith(const char* string,
+                   const char* extension){
+     int64_t string_len = strlen(string);
+     int64_t extension_len = strlen(extension);
 
-               char* insertion = strdup(complete->elements[complete->current].string);
-               int64_t insertion_len = strlen(insertion);
-               CePoint_t delete_point = app->input_view.cursor;
-               if(complete->current_match){
-                    int64_t delete_len = strlen(complete->current_match);
-                    delete_point = ce_buffer_advance_point(app->input_view.buffer, app->input_view.cursor, -delete_len);
-                    if(delete_len > 0){
-                         ce_buffer_remove_string_change(app->input_view.buffer, delete_point, delete_len,
-                                                        &app->input_view.cursor, app->input_view.cursor, true);
-                    }
-               }
-
-               if(insertion_len > 0){
-                    CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
-                    ce_buffer_insert_string_change(app->input_view.buffer, insertion, delete_point, &app->input_view.cursor,
-                                                   cursor_end, true);
-               }
-          }
-
-          return true;
+     if(extension_len > string_len){
+          return false;
      }
 
-     return false;
+     return strcmp(string + (string_len - extension_len),
+                   extension) == 0;
+}
+
+bool apply_completion_to_buffer(CeComplete_t* complete,
+                                CeBuffer_t* buffer,
+                                int64_t start_x,
+                                CePoint_t* cursor){
+     if(complete->current < 0){
+          return false;
+     }
+
+     // Do we even need completion ?
+     int64_t completion_len = strlen(complete->elements[complete->current].string);
+     int64_t input_len = strlen(buffer->lines[cursor->y] + start_x);
+     int64_t input_offset = 0;
+     if(input_len > completion_len) input_offset = input_len - completion_len;
+     if(strcmp(complete->elements[complete->current].string, buffer->lines[cursor->y] + start_x + input_offset) == 0){
+          return false;
+     }
+
+     // If the input text matches a later section of the current match, delete it.
+     char* insertion = strdup(complete->elements[complete->current].string);
+     int64_t insertion_len = strlen(insertion);
+     CePoint_t delete_point = *cursor;
+     if(complete->current_match){
+          int64_t delete_len = strlen(complete->current_match);
+          delete_point = ce_buffer_advance_point(buffer, *cursor, -delete_len);
+          if(delete_len > 0){
+               ce_buffer_remove_string_change(buffer, delete_point, delete_len, cursor, *cursor,
+                                              true);
+          }
+     }
+
+     // Insert the match from the start of the matching completion.
+     CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
+     if(insertion_len > 0){
+          ce_buffer_insert_string_change(buffer, insertion, delete_point, cursor, cursor_end,
+                                         true);
+     }
+
+     // Delete any previous match from after the cursor
+     int64_t extra_len = strlen(buffer->lines[cursor->y] + cursor->x);
+     char* extra = strdup(buffer->lines[cursor->y] + cursor->x);
+     bool removed = false;
+     for(int64_t i = extra_len; i > 0; i--){
+          extra[i] = 0;
+          for(int64_t c = 0; c < complete->count; c++){
+               if(_str_endswith(complete->elements[c].string, extra)){
+                    ce_buffer_remove_string_change(buffer, *cursor, i, cursor, cursor_end, true);
+                    removed = true;
+                    break;
+               }
+          }
+          if(removed){
+               break;
+          }
+     }
+     free(extra);
+
+     // We explicitly do not free insertion as its ownership was given to
+     // ce_buffer_insert_string_change().
+
+     return true;
 }
 
 static void _convert_uri_to_windows_path(char* uri){
@@ -1305,12 +1343,12 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
      return result;
 }
 
-void _build_complete_view(CeView_t* view,
-                          CePoint_t start,
-                          CeView_t* completed_view,
-                          CeBuffer_t* buffer,
-                          CeConfigOptions_t* config_options,
-                          CeRect_t* terminal_rect){
+void build_clangd_completion_view(CeView_t* view,
+                                  CePoint_t start,
+                                  CeView_t* completed_view,
+                                  CeBuffer_t* buffer,
+                                  CeConfigOptions_t* config_options,
+                                  CeRect_t* terminal_rect){
      int64_t view_height = 0;
      if(buffer->line_count > config_options->completion_line_limit){
           view_height = config_options->completion_line_limit;
@@ -1400,19 +1438,24 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                     }
                     app->clangd_completion.complete = _extract_completion_from_response(response.obj,
                                                                                         &app->clangd_completion.start);
-                    if(app->clangd_completion.complete){
+                    CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+                    if(app->clangd_completion.complete &&
+                       tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
+                         CeView_t* completed_view = &tab_layout->tab.current->view;
+                         int64_t match_len = completed_view->cursor.x - app->clangd_completion.start.x;
+                         if(match_len > 0){
+                              char* match = ce_buffer_dupe_string(completed_view->buffer, app->clangd_completion.start, match_len);
+                              ce_complete_match(app->clangd_completion.complete, match);
+                              free(match);
+                         }
                          build_complete_list(app->clangd_completion.buffer,
                                              app->clangd_completion.complete);
-                         CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
-                         if(tab_layout->tab.current->type == CE_LAYOUT_TYPE_VIEW){
-                              CeView_t* completed_view = &tab_layout->tab.current->view;
-                              _build_complete_view(&app->clangd_completion.view,
-                                                   app->clangd_completion.start,
-                                                   completed_view,
-                                                   app->clangd_completion.buffer,
-                                                   &app->config_options,
-                                                   &app->terminal_rect);
-                         }
+                         build_clangd_completion_view(&app->clangd_completion.view,
+                                                      app->clangd_completion.start,
+                                                      completed_view,
+                                                      app->clangd_completion.buffer,
+                                                      &app->config_options,
+                                                      &app->terminal_rect);
                     }
                }
           }
