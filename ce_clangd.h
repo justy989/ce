@@ -6,7 +6,7 @@
 // - Timeout for requests ?
 // + Document management
 //   + DidOpen
-//   - DidClose
+//   + DidClose
 //   + DidChange: Save for after gotos
 //     + Maybe initial implementation is to just send the whole file each time ?
 // - Requests
@@ -20,14 +20,14 @@
 //     - Display in ui
 //   - Prepare Call Hierarchy
 //     - Display in ui
-// - Diagnostics
-//   - Check for latest diagnostics
+// + Diagnostics
+//   + Check for latest diagnostics
 // - More initialize request capabilities ?
 // - initialize response
-// - Move executable path and args into config.
-// - Only enable clangd when command line option is used, find all references and check this.
-// - Only apply clangd requests to c/c++ files based on syntax.
-// - Customizable auto complete key.
+// + Move executable path and args into config.
+// + Only enable clangd when command line option is used, find all references and check this.
+// + Only apply clangd requests to c/c++ files based on syntax.
+// + Customizable auto complete key.
 //
 // Important learnings
 // - DidChange deltas are stupid and basically end up sending the whole file if you make multi-line changes.

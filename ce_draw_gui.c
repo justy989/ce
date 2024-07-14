@@ -7,7 +7,7 @@
 
 #define STATUS_LINE_LEN 128
 
-static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index, bool foreground) {
+static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index, bool foreground){
     SDL_Color result;
     if(index == CE_COLOR_DEFAULT){
         if (foreground) {

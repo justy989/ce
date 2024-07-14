@@ -1559,6 +1559,9 @@ CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
 }
 
 void ce_app_handle_clangd_response(CeApp_t* app){
+     if(app->clangd.buffer == NULL){
+          return;
+     }
      while(ce_clangd_outstanding_responses(&app->clangd)){
           CeClangDResponse_t response = ce_clangd_pop_response(&app->clangd);
           if(response.method != NULL){

@@ -1,6 +1,7 @@
-#include "ce_clangd.h"
 #include "ce_app.h"
+#include "ce_clangd.h"
 #include "ce_json.h"
+#include "ce_syntax.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -440,9 +441,10 @@ static void _clangd_track_request(CeClangD_t* clangd, const char* method){
 
 bool ce_clangd_init(const char* executable_path,
                     CeClangD_t* clangd){
-     // TODO: remove verbose logging.
      char command[MAX_COMMAND_SIZE];
-     snprintf(command, MAX_COMMAND_SIZE, "%s --log=verbose", executable_path);
+     // DEBUG
+     // snprintf(command, MAX_COMMAND_SIZE, "%s --log=verbose", executable_path);
+     snprintf(command, MAX_COMMAND_SIZE, "%s", executable_path);
      if(!ce_subprocess_open(&clangd->proc, command, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT)){
           return false;
      }
@@ -525,6 +527,15 @@ bool ce_clangd_init(const char* executable_path,
 }
 
 bool ce_clangd_file_open(CeClangD_t* clangd, CeBuffer_t* buffer){
+     if(clangd->buffer == NULL){
+          return true;
+     }
+     CeAppBufferData_t* buffer_data = buffer->app_data;
+     if(buffer_data->syntax_function != ce_syntax_highlight_c &&
+        buffer_data->syntax_function != ce_syntax_highlight_cpp){
+          printf("skipping %s for clangd\n", buffer->name);
+          return true;
+     }
      char file_uri[MAX_PATH_LEN + 1];
      if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
           return false;
@@ -555,6 +566,14 @@ bool ce_clangd_file_open(CeClangD_t* clangd, CeBuffer_t* buffer){
 }
 
 bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer){
+     if(clangd->buffer == NULL){
+          return true;
+     }
+     CeAppBufferData_t* buffer_data = buffer->app_data;
+     if(buffer_data->syntax_function != ce_syntax_highlight_c &&
+        buffer_data->syntax_function != ce_syntax_highlight_cpp){
+          return true;
+     }
      char file_uri[MAX_PATH_LEN + 1];
      if(!_calculate_filename_uri(buffer->name, file_uri, MAX_PATH_LEN)){
           return false;
@@ -578,6 +597,9 @@ bool ce_clangd_file_close(CeClangD_t* clangd, CeBuffer_t* buffer){
 }
 
 bool ce_clangd_file_report_changes(CeClangD_t* clangd, CeBuffer_t* buffer, CeBufferChangeNode_t* last_change){
+     if(clangd->buffer == NULL){
+          return true;
+     }
      if(last_change == buffer->change_node){
           return true;
      }
@@ -620,6 +642,9 @@ bool ce_clangd_file_report_changes(CeClangD_t* clangd, CeBuffer_t* buffer, CeBuf
 }
 
 bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     if(clangd->buffer == NULL){
+          return true;
+     }
      const char* method = "textDocument/typeDefinition";
      clangd->current_request_id++;
      _clangd_track_request(clangd, method);
@@ -627,6 +652,9 @@ bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CeP
 }
 
 bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     if(clangd->buffer == NULL){
+          return true;
+     }
      const char* method = "textDocument/definition";
      clangd->current_request_id++;
      _clangd_track_request(clangd, method);
@@ -634,6 +662,9 @@ bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_
 }
 
 bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     if(clangd->buffer == NULL){
+          return true;
+     }
      const char* method = "textDocument/declaration";
      clangd->current_request_id++;
      _clangd_track_request(clangd, method);
@@ -641,6 +672,9 @@ bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint
 }
 
 bool ce_clangd_request_auto_complete(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     if(clangd->buffer == NULL){
+          return true;
+     }
      const char* method = "textDocument/completion";
      clangd->current_request_id++;
      _clangd_track_request(clangd, method);
@@ -652,6 +686,9 @@ bool ce_clangd_outstanding_responses(CeClangD_t* clangd){
 }
 
 CeClangDResponse_t ce_clangd_pop_response(CeClangD_t* clangd){
+     if(clangd->buffer == NULL){
+          return (CeClangDResponse_t){};
+     }
      CeClangDResponse_t response = _pop_response(&clangd->response_queue);
      for(int64_t i = 0; i < clangd->request_lookup.size; i++){
           if(clangd->request_lookup.requests[i].id == response.request_id){
@@ -664,6 +701,9 @@ CeClangDResponse_t ce_clangd_pop_response(CeClangD_t* clangd){
 }
 
 void ce_clangd_free(CeClangD_t* clangd){
+     if(clangd->buffer == NULL){
+          return;
+     }
 #if defined(PLATFORM_WINDOWS)
      ce_subprocess_kill(&clangd->proc, 0);
      CloseHandle(clangd->thread_handle);

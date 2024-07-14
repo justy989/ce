@@ -666,6 +666,9 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                        itr->buffer == app->shell_command_buffer ||
                        itr->buffer == g_ce_log_buffer ||
                        itr->buffer == app->message_view.buffer ||
+                       itr->buffer == app->clangd_diagnostics_buffer ||
+                       itr->buffer == app->clangd_completion.buffer ||
+                       itr->buffer == app->clangd.buffer ||
                        itr->buffer == app->input_view.buffer){
                          ce_app_message(app, "cannot delete buffer '%s'", itr->buffer->name);
                     }else{
@@ -677,6 +680,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                               }
                          }
 
+                         ce_clangd_file_close(&app->clangd, itr->buffer);
                          ce_buffer_node_delete(&app->buffer_node_head, itr->buffer);
                     }
                }
@@ -706,7 +710,8 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                }
           // TODO: Make completion key configurable
           }else if((app->vim.mode == CE_VIM_MODE_NORMAL || app->vim.mode == CE_VIM_MODE_INSERT) &&
-                   key == ce_ctrl_key('y')){
+                   key == app->config_options.clangd_trigger_completion_key &&
+                   app->clangd.buffer != NULL){
                ce_vim_insert_mode(&app->vim);
                ce_clangd_request_auto_complete(&app->clangd, view->buffer, view->cursor);
                app->clangd_completion.initiate = view->cursor;
@@ -875,6 +880,7 @@ void print_help(char* program){
 
 int main(int argc, char* argv[]){
      const char* config_filepath = NULL;
+     bool enable_clangd = false;
      int last_arg_index = 0;
 
      // setup signal handler
@@ -884,13 +890,17 @@ int main(int argc, char* argv[]){
      for(int i = 1; i < argc; i++){
          char* arg = argv[i];
          if (arg[0] == '-') {
-             if (strcmp(arg, "-c") == 0) {
+             if (strcmp(arg, "-c") == 0 ||
+                 strcmp(arg, "--config") == 0) {
                  if ((i + 1) >= argc) {
                      printf("error: missing config argument. See help.\n");
                      return 1;
                  }
                  config_filepath = argv[i + 1];
                  i++;
+             }else if (strcmp(arg, "-e") == 0 ||
+                       strcmp(arg, "--enable_clangd") == 0) {
+                 enable_clangd = true;
              } else if (strcmp(arg, "-h") == 0) {
                  print_help(argv[0]);
                  return 1;
@@ -1125,12 +1135,9 @@ int main(int argc, char* argv[]){
           }
      }
 
-     // init clangd
-     {
-          memset(&app.clangd, 0, sizeof(app.clangd));
-          app.clangd.buffer = new_buffer();
-          ce_buffer_alloc(app.clangd.buffer, 1, "[clangd]");
-     }
+     memset(&app.clangd, 0, sizeof(app.clangd));
+     app.clangd_completion.start = (CePoint_t){-1, -1};
+     app.clangd_completion.initiate = (CePoint_t){-1, -1};
 
      // init buffers
      {
@@ -1142,8 +1149,6 @@ int main(int argc, char* argv[]){
           app.mark_list_buffer = new_buffer();
           app.jump_list_buffer = new_buffer();
           app.shell_command_buffer = new_buffer();
-          app.clangd_diagnostics_buffer = new_buffer();
-          app.clangd_completion.buffer = new_buffer();
           CeBuffer_t* scratch_buffer = new_buffer();
 
           ce_buffer_alloc(app.buffer_list_buffer, 1, "[buffers]");
@@ -1162,14 +1167,8 @@ int main(int argc, char* argv[]){
           ce_buffer_node_insert(&app.buffer_node_head, app.jump_list_buffer);
           ce_buffer_alloc(app.shell_command_buffer, 1, "[shell command]");
           ce_buffer_node_insert(&app.buffer_node_head, app.shell_command_buffer);
-          ce_buffer_alloc(app.clangd_completion.buffer, 1, "[clangd completions]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.clangd_completion.buffer);
-          ce_buffer_alloc(app.clangd_diagnostics_buffer, 1, "[clangd diagnostics]");
-          ce_buffer_node_insert(&app.buffer_node_head, app.clangd_diagnostics_buffer);
           ce_buffer_alloc(scratch_buffer, 1, "scratch");
           ce_buffer_node_insert(&app.buffer_node_head, scratch_buffer);
-          // TODO: Only optionally add this buffer
-          ce_buffer_node_insert(&app.buffer_node_head, app.clangd.buffer);
 
           app.buffer_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.bind_list_buffer->status = CE_BUFFER_STATUS_NONE;
@@ -1180,9 +1179,6 @@ int main(int argc, char* argv[]){
           app.jump_list_buffer->status = CE_BUFFER_STATUS_NONE;
           app.shell_command_buffer->status = CE_BUFFER_STATUS_NONE;
           scratch_buffer->status = CE_BUFFER_STATUS_NONE;
-          app.clangd.buffer->status = CE_BUFFER_STATUS_NONE;
-          app.clangd_completion.buffer->status = CE_BUFFER_STATUS_NONE;
-          app.clangd_diagnostics_buffer->status = CE_BUFFER_STATUS_NONE;
 
           app.buffer_list_buffer->no_line_numbers = true;
           app.bind_list_buffer->no_line_numbers = true;
@@ -1192,9 +1188,6 @@ int main(int argc, char* argv[]){
           app.mark_list_buffer->no_line_numbers = true;
           app.jump_list_buffer->no_line_numbers = true;
           app.shell_command_buffer->no_line_numbers = true;
-          app.clangd.buffer->no_line_numbers = true;
-          app.clangd_completion.buffer->no_line_numbers = true;
-          app.clangd_diagnostics_buffer->no_line_numbers = true;
 
           app.complete_list_buffer->no_highlight_current_line = true;
 
@@ -1217,16 +1210,35 @@ int main(int argc, char* argv[]){
           buffer_data->syntax_function = ce_syntax_highlight_plain;
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
-          buffer_data = app.clangd.buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_plain;
-          buffer_data = app.clangd_completion.buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_completions;
-          buffer_data = app.clangd_diagnostics_buffer->app_data;
-          buffer_data->syntax_function = ce_syntax_highlight_c;
 
-          app.clangd_completion.start = (CePoint_t){-1, -1};
-          app.clangd_completion.initiate = (CePoint_t){-1, -1};
-          app.clangd_completion.view.buffer = app.clangd_completion.buffer;
+          if(enable_clangd){
+               app.clangd.buffer = new_buffer();
+               app.clangd_diagnostics_buffer = new_buffer();
+               app.clangd_completion.buffer = new_buffer();
+
+               ce_buffer_alloc(app.clangd.buffer, 1, "[clangd]");
+               ce_buffer_node_insert(&app.buffer_node_head, app.clangd.buffer);
+               ce_buffer_alloc(app.clangd_completion.buffer, 1, "[clangd completions]");
+               ce_buffer_node_insert(&app.buffer_node_head, app.clangd_completion.buffer);
+               ce_buffer_alloc(app.clangd_diagnostics_buffer, 1, "[clangd diagnostics]");
+               ce_buffer_node_insert(&app.buffer_node_head, app.clangd_diagnostics_buffer);
+
+               app.clangd.buffer->status = CE_BUFFER_STATUS_NONE;
+               app.clangd_completion.buffer->status = CE_BUFFER_STATUS_NONE;
+               app.clangd_diagnostics_buffer->status = CE_BUFFER_STATUS_NONE;
+               app.clangd.buffer->no_line_numbers = true;
+               app.clangd_completion.buffer->no_line_numbers = true;
+               app.clangd_diagnostics_buffer->no_line_numbers = true;
+
+               buffer_data = app.clangd.buffer->app_data;
+               buffer_data->syntax_function = ce_syntax_highlight_plain;
+               buffer_data = app.clangd_completion.buffer->app_data;
+               buffer_data->syntax_function = ce_syntax_highlight_completions;
+               buffer_data = app.clangd_diagnostics_buffer->app_data;
+               buffer_data->syntax_function = ce_syntax_highlight_c;
+
+               app.clangd_completion.view.buffer = app.clangd_completion.buffer;
+          }
 
           app.cached_filepath_count = 0;
           app.shell_command_buffer_should_scroll = false;
@@ -1311,11 +1323,8 @@ int main(int argc, char* argv[]){
      }
 #endif
 
-     // TODO: Optionall start up clangd
-     {
-          if(!ce_clangd_init("C:\\Users\\jtiff\\source\\repos\\ce_config\\ce\\clangd.exe", &app.clangd)){
-               return 1;
-          }
+     if (enable_clangd && !ce_clangd_init(app.config_options.clangd_path, &app.clangd)){
+          return 1;
      }
 
      // Load any files requested on the command line.
@@ -1323,11 +1332,11 @@ int main(int argc, char* argv[]){
           for(int64_t i = last_arg_index; i < argc; i++){
                CeBuffer_t* buffer = new_buffer();
                if(ce_buffer_load_file(buffer, argv[i])){
+                    ce_buffer_node_insert(&app.buffer_node_head, buffer);
+                    determine_buffer_syntax(buffer);
                     if(!ce_clangd_file_open(&app.clangd, buffer)){
                          return 1;
                     }
-                    ce_buffer_node_insert(&app.buffer_node_head, buffer);
-                    determine_buffer_syntax(buffer);
                }else{
                     free(buffer);
                }
@@ -1671,11 +1680,13 @@ int main(int argc, char* argv[]){
                     }
                }
 
-               CeLayout_t* clangd_diagnostics_layout = ce_layout_buffer_in_view(tab_layout, app.clangd_diagnostics_buffer);
-               if(clangd_diagnostics_layout){
-                   build_clangd_diagnostics_buffer(clangd_diagnostics_layout->view.buffer,
-                                                   view->buffer);
-                   app.last_goto_buffer = clangd_diagnostics_layout->view.buffer;
+               if(enable_clangd){
+                    CeLayout_t* clangd_diagnostics_layout = ce_layout_buffer_in_view(tab_layout, app.clangd_diagnostics_buffer);
+                    if(clangd_diagnostics_layout){
+                        build_clangd_diagnostics_buffer(clangd_diagnostics_layout->view.buffer,
+                                                        view->buffer);
+                        app.last_goto_buffer = clangd_diagnostics_layout->view.buffer;
+                    }
                }
           }
 
@@ -1706,7 +1717,9 @@ int main(int argc, char* argv[]){
 
      free(app.command_entries);
 
-     ce_clangd_free(&app.clangd);
+     if(enable_clangd){
+          ce_clangd_free(&app.clangd);
+     }
 
      ce_layout_free(&app.tab_list_layout);
      ce_vim_free(&app.vim);
