@@ -1,10 +1,12 @@
 #include "ce_subprocess.h"
 #include "ce.h"
 
+#include <string.h>
+
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
 
-bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms) {
+bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms, bool use_shell) {
      // Setup a pipe so that we'll be able to read from stdout.
      subprocess->stdout_read_pipe = INVALID_HANDLE_VALUE;
      subprocess->stdin_write_pipe = INVALID_HANDLE_VALUE;
@@ -124,7 +126,8 @@ int ce_subprocess_close(CeSubprocess_t* subprocess) {
 #include <unistd.h>
 
 // NOTE: stderr is redirected to stdout
-static pid_t bidirectional_popen(const char* cmd, CeProcCommFlag_t comms, int* in_fd, int* out_fd){
+static pid_t bidirectional_popen(const char* cmd, CeProcCommFlag_t comms, int* in_fd, int* out_fd,
+                                 bool use_shell){
      int input_fds[2];
      int output_fds[2];
 
@@ -142,8 +145,26 @@ static pid_t bidirectional_popen(const char* cmd, CeProcCommFlag_t comms, int* i
           dup2(output_fds[1], STDOUT_FILENO);
           dup2(output_fds[1], STDERR_FILENO);
 
-          // TODO: run user's SHELL ?
-          execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+          if(use_shell){
+              // TODO: run user's SHELL ?
+              execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+          }else{
+              // TODO: split this string up by spaces and use execv(). probably don't use strtok()
+              // since it isn't thread safe.
+              bool contains_space = false;
+              int64_t cmd_len = strlen(cmd);
+              for(int64_t i = 0; i < cmd_len; i++){
+                  if(cmd[i] == ' '){
+                      contains_space = true;
+                      break;
+                  }
+              }
+              if(contains_space){
+                  ce_log("command contains arguments, which is not yet supported when not using the shell\n");
+                  return 0;
+              }
+              execl(cmd, cmd, NULL);
+          }
      }else{
          close(input_fds[0]);
          close(output_fds[1]);
@@ -174,8 +195,10 @@ static void _close_file(FILE **file){
      fclose(to_close);
 }
 
-bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms){
-     subprocess->pid = bidirectional_popen(command, comms, &subprocess->stdin_fd, &subprocess->stdout_fd);
+bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms,
+                        bool use_shell){
+     subprocess->pid = bidirectional_popen(command, comms, &subprocess->stdin_fd,
+                                           &subprocess->stdout_fd, use_shell);
      if(subprocess->pid == 0) return false;
      if(subprocess->stdin_fd >= 0){
          subprocess->stdin_file = fdopen(subprocess->stdin_fd, "w");
@@ -231,6 +254,7 @@ int64_t ce_subprocess_read_stdout(CeSubprocess_t* subprocess, char* buffer, int6
      ReadFile(subprocess->stdout_read_pipe, buffer, size, &bytes_read, NULL);
      if(bytes_read < 0){
           ce_log("read() from clangd stdout failed.\n");
+          return -1;
      }
      return bytes_read;
 
@@ -240,9 +264,11 @@ int64_t ce_subprocess_read_stdout(CeSubprocess_t* subprocess, char* buffer, int6
           return -1;
      }
      int bytes_read = read(subprocess->stdout_fd, buffer, size);
-     if(bytes_read > 0){
-          ce_log("read() failed on subprocess pid %d stdin %s\n", strerror(errno));
-          return -1;
+     if(bytes_read < 0){
+          if(errno != EINTR && errno != EAGAIN){
+              ce_log("read() failed on subprocess pid %d stdin %s\n", strerror(errno));
+          }
+          return bytes_read;
      }
      return bytes_read;
 #endif
@@ -272,8 +298,10 @@ int64_t ce_subprocess_write_stdin(CeSubprocess_t* subprocess, char* buffer, int6
           int64_t bytes_written = write(subprocess->stdin_fd, buffer + total_bytes_written,
                                         size - total_bytes_written);
           if(bytes_written < 0){
-               ce_log("write() failed on clangd stdin %s\n", strerror(errno));
-               return false;
+               if(errno != EINTR && errno != EAGAIN){
+                   ce_log("write() failed on clangd stdin %s\n", strerror(errno));
+               }
+               return bytes_written;
           }
 
 #endif

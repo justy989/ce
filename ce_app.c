@@ -1130,6 +1130,7 @@ bool apply_completion_to_buffer(CeComplete_t* complete,
      return true;
 }
 
+#if defined(PLATFORM_WINDOWS)
 static void _convert_uri_to_windows_path(char* uri){
      const char prefix[] = "file:///";
      int64_t uri_len = 0;
@@ -1154,6 +1155,30 @@ static void _convert_uri_to_windows_path(char* uri){
      }
      uri[u] = 0;
 }
+#else
+static void _convert_uri_to_linux_path(char* uri){
+     const char prefix[] = "file://";
+     int64_t uri_len = 0;
+     if(strncmp(uri, prefix, 7) == 0){
+          uri_len = strlen(uri + 7);
+          memmove(uri, uri + 7, uri_len);
+          uri[uri_len] = 0;
+     }else{
+          uri_len = strlen(uri);
+     }
+     int64_t u = 0;
+     for(int64_t i = 0; i < uri_len; i++){
+          if(strncmp(uri + i, "%20", 3) == 0){
+               uri[u] = ' ';
+               i += 2;
+          }else{
+               uri[u] = uri[i];
+          }
+          u++;
+     }
+     uri[u] = 0;
+}
+#endif
 
 static CeDestination_t _extract_destination_from_range_response(CeJsonObj_t* obj){
      CeDestination_t dest = {};
@@ -1227,7 +1252,7 @@ static CeDestination_t _extract_destination_from_range_response(CeJsonObj_t* obj
 #if defined(PLATFORM_WINDOWS)
      _convert_uri_to_windows_path(dest.filepath);
 #else
-     // TODO: Linux
+     _convert_uri_to_linux_path(dest.filepath);
 #endif
      return dest;
 }
@@ -1291,7 +1316,7 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
                          snprintf(buffer, BUFSIZ, "%s", match + completion_len);
                     }
                     description = strdup(buffer);
-               }else{
+               }else if(detail_find.type == CE_JSON_TYPE_STRING){
                     description = strdup(ce_json_obj_get_string(&value->obj, &detail_find));
                }
           }else{
@@ -1343,7 +1368,7 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
 
      result = malloc(sizeof(*result));
      memset(result, 0, sizeof(*result));
-     ce_complete_init(result, completions, descriptions, completion_count);
+     ce_complete_init(result, (const char**)completions, (const char**)descriptions, completion_count);
      for(int64_t i = 0; i < completion_count; i++){
           free(completions[i]);
           free(descriptions[i]);
@@ -1421,31 +1446,6 @@ void build_clangd_completion_view(CeView_t* view,
      }
 }
 
-// {
-//  "jsonrpc" : "2.0",
-//  "method" : "textDocument/publishDiagnostics",
-//  "params" : {
-//   "diagnostics" : [
-//    {
-//     "code" : "-Wdeprecated-declarations",
-//     "message" : "'strncpy' is deprecated: This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.\n\n:334:1:\nnote: 'strncpy' has been explicitly marked deprecated here",
-//     "range" : {
-//      "end" : {
-//       "character" : 32.0000,
-//       "line" : 124.0000
-//      },
-//      "start" : {
-//       "character" : 25.0000,
-//       "line" : 124.0000
-//      }
-//     },
-//     "severity" : 1.0000,
-//     "source" : "clang",
-//     "tags" : [
-//      2.0000
-//     ]
-//    },
-
 CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
      CeClangDDiagnostics_t result = {};
 
@@ -1471,7 +1471,7 @@ CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
 #if defined(PLATFORM_WINDOWS)
      _convert_uri_to_windows_path(result.filepath);
 #else
-     // TODO: Linux
+     _convert_uri_to_linux_path(result.filepath);
 #endif
 
      CeJsonFindResult_t diagnostics_find = ce_json_obj_find(params_obj, "diagnostics");
@@ -1553,6 +1553,7 @@ CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
           }
 
           ce_clangd_diag_add(&result, &diag);
+          ce_log("%d -> %" PRId64 "\n", __LINE__, result.count);
      }
 
      return result;
@@ -1625,6 +1626,8 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                                 //            diag->message);
                                 // }
                                 CeBuffer_t* buffer = find_already_loaded_file(app->buffer_node_head, diagnostics.filepath);
+                                ce_log("checking for already loaded: %s, res: %d\n",
+                                       diagnostics.filepath, buffer != NULL);
                                 if(buffer){
                                     CeAppBufferData_t* app_data = (CeAppBufferData_t*)(buffer->app_data);
                                     if(app_data->clangd_diagnostics.count > 0){
@@ -1988,7 +1991,8 @@ static void* run_shell_command_and_output_to_buffer(void* data){
      ShellCommandData_t* shell_command_data = (ShellCommandData_t*)(data);
 
      CeSubprocess_t subprocess;
-     if(!ce_subprocess_open(&subprocess, shell_command_data->command, CE_PROC_COMM_STDOUT)){
+     bool use_shell = true;
+     if(!ce_subprocess_open(&subprocess, shell_command_data->command, CE_PROC_COMM_STDOUT, use_shell)){
           ce_log("failed to run shell command '%s': '%s'", shell_command_data->command, strerror(errno));
           pthread_exit(NULL);
      }
@@ -2035,9 +2039,9 @@ static void* run_shell_command_and_output_to_buffer(void* data){
                     return NULL;
                }
           }else if(bytes_read < 0){
-               if(errno == EAGAIN || errno == EWOULDBLOCK){
+               if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
                     usleep(1000);
-               }else if(errno == EBADF){
+               }else{
                     break;
                }
           }else{

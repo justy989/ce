@@ -35,7 +35,7 @@ typedef struct{
 }CeSubprocess_t;
 
 // run the provided shell command as a subprocess. Only stdout is provided.
-bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms);
+bool ce_subprocess_open(CeSubprocess_t* subprocess, const char* command, CeProcCommFlag_t comms, bool use_shell);
 // send the specified signal to the subprocess
 void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal);
 // Read up to the requested number of bytes from stdout

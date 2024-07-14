@@ -60,7 +60,7 @@ typedef struct{
 #if defined(PLATFORM_WINDOWS)
      HANDLE mutex;
 #else
-     // TODO: linux queue mutex
+     pthread_mutex_t mutex;
 #endif
 }CeClangDResponseQueue_t;
 

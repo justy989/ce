@@ -898,8 +898,8 @@ int main(int argc, char* argv[]){
                  }
                  config_filepath = argv[i + 1];
                  i++;
-             }else if (strcmp(arg, "-e") == 0 ||
-                       strcmp(arg, "--enable_clangd") == 0) {
+             }else if (strcmp(arg, "-l") == 0 ||
+                       strcmp(arg, "--ls-clangd") == 0) {
                  enable_clangd = true;
              } else if (strcmp(arg, "-h") == 0) {
                  print_help(argv[0]);

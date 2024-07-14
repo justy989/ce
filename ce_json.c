@@ -48,7 +48,7 @@ static void _field_free(CeJsonField_t* field){
 
 static void _array_copy(CeJsonArray_t* a, CeJsonArray_t* b){
      _array_free(a);
-     for(uint64_t i = 0; i < b->count; i++){
+     for(int64_t i = 0; i < b->count; i++){
           CeJsonValue_t* value = b->values + i;
           switch(value->type){
           case CE_JSON_TYPE_OBJECT:
@@ -76,7 +76,7 @@ static void _array_copy(CeJsonArray_t* a, CeJsonArray_t* b){
 }
 
 static void _array_free(CeJsonArray_t* a){
-     for(uint64_t i = 0; i < a->count; i++){
+     for(int64_t i = 0; i < a->count; i++){
           CeJsonValue_t* value = a->values + i;
           _value_free(value);
      }
@@ -87,7 +87,7 @@ static void _array_free(CeJsonArray_t* a){
 static void _obj_copy(CeJsonObj_t* a, CeJsonObj_t* b){
      _obj_free(a);
 
-     for(uint64_t i = 0; i < b->count; i++){
+     for(int64_t i = 0; i < b->count; i++){
           CeJsonField_t* field = b->fields + i;
           switch(field->value.type){
           case CE_JSON_TYPE_OBJECT:
@@ -115,7 +115,7 @@ static void _obj_copy(CeJsonObj_t* a, CeJsonObj_t* b){
 }
 
 static void _obj_free(CeJsonObj_t* obj){
-     for(uint64_t i = 0; i < obj->count; i++){
+     for(int64_t i = 0; i < obj->count; i++){
           CeJsonField_t* field = obj->fields + i;
           _field_free(field);
      }
@@ -125,7 +125,7 @@ static void _obj_free(CeJsonObj_t* obj){
 }
 
 static void _obj_free_field_of_name(CeJsonObj_t* obj, const char* name){
-     for(uint64_t i = 0; i < obj->count; i++){
+     for(int64_t i = 0; i < obj->count; i++){
           CeJsonField_t* field = obj->fields + i;
           if (strcmp(field->name, name) != 0){
                continue;
@@ -201,8 +201,8 @@ static void _array_print(CeJsonArray_t* array, char* string, PrintState_t* print
      char field_indentation[MAX_INDENTATION];
      _make_indentation(field_indentation, MAX_INDENTATION, current_indent + indent);
      // This is fine to wrap arround because we won't go into the loop.
-     uint64_t last_index = (array->count - 1);
-     for(uint64_t i = 0; i < array->count; i++){
+     int64_t last_index = (array->count - 1);
+     for(int64_t i = 0; i < array->count; i++){
           CeJsonValue_t* value = array->values + i;
           _print_state_update(print_state, snprintf(string + print_state->printed,
                                                     print_state->remaining, "%s",
@@ -225,8 +225,8 @@ static void _obj_print(CeJsonObj_t* obj, char* string, PrintState_t* print_state
      _make_indentation(indentation, MAX_INDENTATION, current_indent);
      _print_state_update(print_state, snprintf(string + print_state->printed, print_state->remaining, "{\n"));
      // This is fine to wrap arround because we won't go into the loop.
-     uint64_t last_index = (obj->count - 1);
-     for(uint64_t i = 0; i < obj->count; i++){
+     int64_t last_index = (obj->count - 1);
+     for(int64_t i = 0; i < obj->count; i++){
           CeJsonField_t* field = obj->fields + i;
           _field_print(field, string, print_state, current_indent + indent, indent);
           if(i != last_index){

@@ -3,6 +3,7 @@
 #include "ce_json.h"
 #include "ce_syntax.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,7 +79,6 @@ static char* _convert_string_to_json_string(const char* string){
      char* result = NULL;
      int64_t string_len = strlen(string);
      int64_t result_len = 0;
-     int64_t utf8_string_len = ce_utf8_strlen(string);
 
      // Count how big we need to allocate the string.
      for(int64_t i = 0; i < string_len; i++){
@@ -311,6 +311,11 @@ static bool _push_response(CeClangDResponseQueue_t* queue, CeJsonObj_t* obj){
           return false;
      }
 #else
+     int rc = pthread_mutex_lock(&queue->mutex);
+     if(rc != 0){
+         ce_log("Failed to aquire clangd response queue mutex: %s", strerror(rc));
+         return false;
+     }
 #endif
 
      int64_t new_size = queue->size + 1;
@@ -321,7 +326,14 @@ static bool _push_response(CeClangDResponseQueue_t* queue, CeJsonObj_t* obj){
      new_response->obj = obj;
      queue->size = new_size;
 
+#if defined(PLATFORM_WINDOWS)
      ReleaseMutex(queue->mutex);
+#else
+     rc = pthread_mutex_unlock(&queue->mutex);
+     if(rc != 0){
+         ce_log("Failed to release clangd response queue mutex: %s", strerror(rc));
+     }
+#endif
      return true;
 }
 
@@ -335,6 +347,11 @@ static CeClangDResponse_t _pop_response(CeClangDResponseQueue_t* queue){
           return result;
      }
 #else
+     int rc = pthread_mutex_lock(&queue->mutex);
+     if(rc != 0){
+         ce_log("Failed to aquire clangd response queue mutex: %s", strerror(rc));
+         return result;
+     }
 #endif
      if(queue->size == 0){
           return result;
@@ -350,15 +367,23 @@ static CeClangDResponse_t _pop_response(CeClangDResponseQueue_t* queue){
      queue->elements = realloc(queue->elements, new_size * sizeof(queue->elements[0]));
      queue->size = new_size;
 
+#if defined(PLATFORM_WINDOWS)
      ReleaseMutex(queue->mutex);
+#else
+     rc = pthread_mutex_unlock(&queue->mutex);
+     if(rc != 0){
+         ce_log("Failed to release clangd response queue mutex: %s", strerror(rc));
+     }
+#endif
      return result;
 }
 
 #if defined(PLATFORM_WINDOWS)
-DWORD WINAPI handle_output_fn(void* user_data){
+DWORD WINAPI handle_output_fn(void* user_data)
 #else
-static void* handle_output_fn(void* user_data){
+static void* handle_output_fn(void* user_data)
 #endif
+{
      HandleOutputData_t* data = (HandleOutputData_t*)(user_data);
      // bool sent_definition_request = false;
      ParseResponse_t parse = {};
@@ -368,6 +393,12 @@ static void* handle_output_fn(void* user_data){
      while(true){
           int64_t bytes_read = ce_subprocess_read_stdout(data->proc, block, (READ_BLOCK_SIZE - 1));
           if(bytes_read <= 0){
+#if !defined(PLATFORM_WINDOWS)
+               if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
+                    usleep(1000);
+                    continue;
+               }
+#endif
                break;
           }
 
@@ -404,7 +435,31 @@ static void* handle_output_fn(void* user_data){
           data->buffer->status = CE_BUFFER_STATUS_NONE;
           ce_buffer_insert_string(data->buffer, block, end);
           data->buffer->status = CE_BUFFER_STATUS_READONLY;
+
+#if defined(DISPLAY_TERMINAL)
+          int64_t bell_bytes_read = 0;
+          do{
+               bell_bytes_read = write(g_shell_command_ready_fds[1], "1", 2);
+          }while(bell_bytes_read == -1 && errno == EINTR);
+#endif
      }
+
+     int status = ce_subprocess_close(data->proc);
+
+#if defined(PLATFORM_WINDOWS)
+    (void)(status);
+#else
+     // TODO: Could compress this with ce_app.c's version.
+     if(WIFEXITED(status)){
+          snprintf(block, READ_BLOCK_SIZE, "\npid %d exited with code %d", data->proc->pid, WEXITSTATUS(status));
+     }else if(WIFSIGNALED(status)){
+          snprintf(block, READ_BLOCK_SIZE, "\npid %d killed by signal %d", data->proc->pid, WTERMSIG(status));
+     }else if(WIFSTOPPED(status)){
+          snprintf(block, READ_BLOCK_SIZE, "\npid %d stopped by signal %d", data->proc->pid, WSTOPSIG(status));
+     }else{
+          snprintf(block, READ_BLOCK_SIZE, "\npid %d stopped with unexpected status %d", data->proc->pid, status);
+     }
+#endif
 
      free(data);
      return 0;
@@ -445,13 +500,8 @@ bool ce_clangd_init(const char* executable_path,
      // DEBUG
      // snprintf(command, MAX_COMMAND_SIZE, "%s --log=verbose", executable_path);
      snprintf(command, MAX_COMMAND_SIZE, "%s", executable_path);
-     if(!ce_subprocess_open(&clangd->proc, command, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT)){
-          return false;
-     }
-
-     clangd->response_queue.mutex = CreateMutex(NULL, false, NULL);
-     if(clangd->response_queue.mutex == NULL){
-          ce_log("Failed to create clangd mutex\n");
+     bool use_shell = false;
+     if(!ce_subprocess_open(&clangd->proc, command, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT, use_shell)){
           return false;
      }
 
@@ -461,6 +511,12 @@ bool ce_clangd_init(const char* executable_path,
      thread_data->response_queue = &clangd->response_queue;
 
 #if defined(PLATFORM_WINDOWS)
+     clangd->response_queue.mutex = CreateMutex(NULL, false, NULL);
+     if(clangd->response_queue.mutex == NULL){
+          ce_log("Failed to create clangd mutex\n");
+          return false;
+     }
+
      clangd->thread_handle = CreateThread(NULL,
                                           0,
                                           handle_output_fn,
@@ -475,6 +531,12 @@ bool ce_clangd_init(const char* executable_path,
      int rc = pthread_create(&clangd->thread, NULL, handle_output_fn, thread_data);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
+          return false;
+     }
+
+     rc = pthread_mutex_init(&clangd->response_queue.mutex, NULL);
+     if(rc != 0){
+          ce_log("pthread_mutex_init() failed: %s\n", strerror(rc));
           return false;
      }
 #endif
@@ -709,9 +771,15 @@ void ce_clangd_free(CeClangD_t* clangd){
      CloseHandle(clangd->thread_handle);
 #else
      ce_subprocess_kill(&clangd->proc, SIGINT);
-     pthread_join(clangd->thread, NULL);
 #endif
-     ce_subprocess_close(&clangd->proc);
+
+#if defined(PLATFORM_WINDOWS)
+     CloseHandle(clangd->thread);
+     CloseHandle(clangd->response_queue.mutex);
+#else
+     pthread_join(clangd->thread, NULL);
+     pthread_mutex_destroy(&clangd->response_queue.mutex);
+#endif
 
      memset(clangd, 0, sizeof(*clangd));
 }

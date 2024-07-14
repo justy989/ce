@@ -32,7 +32,7 @@ typedef struct CeJsonObj_s{
 
 typedef struct CeJsonArray_s{
      CeJsonValue_t* values;
-     uint64_t count;
+     int64_t count;
 }CeJsonArray_t;
 
 typedef struct CeJsonValue_s{
