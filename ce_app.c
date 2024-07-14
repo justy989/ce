@@ -493,7 +493,6 @@ CeBuffer_t* load_file_into_view(CeBufferNode_t** buffer_node_head, CeView_t* vie
 #endif
      if(!res) return NULL;
 
-     char* result = NULL;
      char cwd[MAX_PATH_LEN + 1];
      if(ce_get_cwd(cwd, MAX_PATH_LEN)){
           size_t cwd_len = strlen(cwd);
@@ -1645,7 +1644,7 @@ void build_clangd_diagnostics_buffer(CeBuffer_t* buffer, CeBuffer_t* source){
      for(int64_t i = 0; i < app_data->clangd_diagnostics.count; i++){
          CeClangDDiagnostic_t* diag = app_data->clangd_diagnostics.elements + i;
          snprintf(line, BUFSIZ, "%s:%" PRId64 ":%" PRId64 " %s",
-                  source->name, diag->start.y, diag->start.x, diag->message);
+                  source->name, diag->start.y + 1, diag->start.x + 1, diag->message);
          buffer_append_on_new_line(buffer, line);
      }
 }
@@ -2200,6 +2199,7 @@ CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point){
           return (CePoint_t){-1, -1};
      }
 
+
      ce_buffer_insert_string(buffer, clipboard_text, point);
      int64_t text_len = ce_utf8_strlen(clipboard_text);
 
@@ -2213,8 +2213,10 @@ CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point){
      change.cursor_before = point;
      change.cursor_after = final_cursor;
      ce_buffer_change(buffer, &change);
-
+     // SDL_Free(clipboard_text);
+#if defined(PLATFORM_LINUX)
      free(clipboard_text);
+#endif
      return final_cursor;
 #endif
 }

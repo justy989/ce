@@ -22,6 +22,10 @@ static bool string_is_whitespace(const char* string){
      return all_whitespace;
 }
 
+static bool _is_print(char ch){
+     return ch >= 32 && ch <= 126;
+}
+
 void ce_vim_add_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* function){
      assert(*key_bind_count < CE_VIM_MAX_KEY_BINDS);
      key_binds[*key_bind_count].key = key;
@@ -172,7 +176,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                                           CeRune_t key, const CeConfigOptions_t* config_options){
      switch(key){
      default:
-          if(isprint(key) || key == CE_NEWLINE){
+          if(_is_print(key) || key == CE_NEWLINE){
                if(ce_buffer_insert_rune(view->buffer, key, *cursor)){
                     const char str[2] = {key, 0};
                     CePoint_t save_cursor = *cursor;
@@ -1885,7 +1889,7 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, const 
           action->verb.function = &ce_vim_verb_set_character;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
      }else{
-          if(!isprint(key)) return CE_VIM_PARSE_INVALID;
+          if(!_is_print(key)) return CE_VIM_PARSE_INVALID;
           action->verb.integer = key;
           return CE_VIM_PARSE_COMPLETE;
      }
@@ -2702,7 +2706,7 @@ CeVimMotionResult_t ce_vim_motion_next_zero_indentation_line(CeVim_t* vim, CeVim
                }
           }
 
-          if(isprint((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
+          if(_is_print((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
                motion_range->end = (CePoint_t){0, y};
                return CE_VIM_MOTION_RESULT_SUCCESS;
           }
@@ -2724,7 +2728,7 @@ CeVimMotionResult_t ce_vim_motion_previous_zero_indentation_line(CeVim_t* vim, C
                }
           }
 
-          if(isprint((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
+          if(_is_print((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
                motion_range->end = (CePoint_t){0, y};
                return CE_VIM_MOTION_RESULT_SUCCESS;
           }

@@ -1388,6 +1388,8 @@ CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data)
      CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
+     printf("Attempting to paste clipboard\n");
+
      CePoint_t resulting_cursor = ce_paste_clipboard_into_buffer(command_context.view->buffer,
                                                                  command_context.view->cursor);
      if(resulting_cursor.x <= 0){

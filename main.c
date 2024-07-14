@@ -1675,6 +1675,7 @@ int main(int argc, char* argv[]){
                if(clangd_diagnostics_layout){
                    build_clangd_diagnostics_buffer(clangd_diagnostics_layout->view.buffer,
                                                    view->buffer);
+                   app.last_goto_buffer = clangd_diagnostics_layout->view.buffer;
                }
           }
 
