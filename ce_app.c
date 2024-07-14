@@ -1553,7 +1553,6 @@ CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
           }
 
           ce_clangd_diag_add(&result, &diag);
-          ce_log("%d -> %" PRId64 "\n", __LINE__, result.count);
      }
 
      return result;
@@ -1626,8 +1625,6 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                                 //            diag->message);
                                 // }
                                 CeBuffer_t* buffer = find_already_loaded_file(app->buffer_node_head, diagnostics.filepath);
-                                ce_log("checking for already loaded: %s, res: %d\n",
-                                       diagnostics.filepath, buffer != NULL);
                                 if(buffer){
                                     CeAppBufferData_t* app_data = (CeAppBufferData_t*)(buffer->app_data);
                                     if(app_data->clangd_diagnostics.count > 0){

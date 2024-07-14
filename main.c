@@ -880,7 +880,7 @@ void print_help(char* program){
 
 int main(int argc, char* argv[]){
      const char* config_filepath = NULL;
-     bool enable_clangd = false;
+     bool ls_clangd = false;
      int last_arg_index = 0;
 
      // setup signal handler
@@ -900,7 +900,7 @@ int main(int argc, char* argv[]){
                  i++;
              }else if (strcmp(arg, "-l") == 0 ||
                        strcmp(arg, "--ls-clangd") == 0) {
-                 enable_clangd = true;
+                 ls_clangd = true;
              } else if (strcmp(arg, "-h") == 0) {
                  print_help(argv[0]);
                  return 1;
@@ -1211,7 +1211,7 @@ int main(int argc, char* argv[]){
           buffer_data = scratch_buffer->app_data;
           buffer_data->syntax_function = ce_syntax_highlight_c;
 
-          if(enable_clangd){
+          if(ls_clangd){
                app.clangd.buffer = new_buffer();
                app.clangd_diagnostics_buffer = new_buffer();
                app.clangd_completion.buffer = new_buffer();
@@ -1323,8 +1323,15 @@ int main(int argc, char* argv[]){
      }
 #endif
 
-     if (enable_clangd && !ce_clangd_init(app.config_options.clangd_path, &app.clangd)){
-          return 1;
+     if (ls_clangd){
+         if(strlen(app.config_options.clangd_path) == 0){
+              printf("Error: Attempted to enable language server clangd without specifying config "
+                     "option clangd_path\n");
+              return 1;
+         }
+         if(!ce_clangd_init(app.config_options.clangd_path, &app.clangd)){
+              return 1;
+         }
      }
 
      // Load any files requested on the command line.
@@ -1680,7 +1687,7 @@ int main(int argc, char* argv[]){
                     }
                }
 
-               if(enable_clangd){
+               if(ls_clangd){
                     CeLayout_t* clangd_diagnostics_layout = ce_layout_buffer_in_view(tab_layout, app.clangd_diagnostics_buffer);
                     if(clangd_diagnostics_layout){
                         build_clangd_diagnostics_buffer(clangd_diagnostics_layout->view.buffer,
@@ -1717,7 +1724,7 @@ int main(int argc, char* argv[]){
 
      free(app.command_entries);
 
-     if(enable_clangd){
+     if(ls_clangd){
           ce_clangd_free(&app.clangd);
      }
 
