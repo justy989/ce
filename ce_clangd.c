@@ -519,6 +519,7 @@ bool ce_clangd_init(const char* executable_path,
      ce_json_obj_free(&initialize_obj);
      ce_json_obj_free(&params_obj);
      ce_json_obj_free(&client_info_obj);
+
      free(json_cwd);
      return result;
 }

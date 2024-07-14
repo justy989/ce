@@ -1268,9 +1268,6 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
           }
 
           CeJsonFindResult_t detail_find = ce_json_obj_find(&value->obj, "detail");
-          if(detail_find.type != CE_JSON_TYPE_STRING){
-               continue;
-          }
 
           char* completion = strdup(ce_json_obj_get_string(&value->obj, &insert_text_find));
 
@@ -1284,9 +1281,13 @@ CeComplete_t* _extract_completion_from_response(CeJsonObj_t* obj, CePoint_t* sta
                                     completion);
                if(match && strlen(match + completion_len) > 0){
                     char buffer[BUFSIZ];
-                    snprintf(buffer, BUFSIZ, "%s%s",
-                             ce_json_obj_get_string(&value->obj, &detail_find),
-                             match + completion_len);
+                    if(detail_find.type == CE_JSON_TYPE_STRING){
+                         snprintf(buffer, BUFSIZ, "%s%s",
+                                  ce_json_obj_get_string(&value->obj, &detail_find),
+                                  match + completion_len);
+                    }else{
+                         snprintf(buffer, BUFSIZ, "%s", match + completion_len);
+                    }
                     description = strdup(buffer);
                }else{
                     description = strdup(ce_json_obj_get_string(&value->obj, &detail_find));
