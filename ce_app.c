@@ -1086,20 +1086,23 @@ bool apply_completion_to_buffer(CeComplete_t* complete,
      char* insertion = strdup(complete->elements[complete->current].string);
      int64_t insertion_len = strlen(insertion);
      CePoint_t delete_point = *cursor;
+     int64_t delete_len = 0;
      if(complete->current_match){
-          int64_t delete_len = strlen(complete->current_match);
+          delete_len = strlen(complete->current_match);
           delete_point = ce_buffer_advance_point(buffer, *cursor, -delete_len);
           if(delete_len > 0){
                ce_buffer_remove_string_change(buffer, delete_point, delete_len, cursor, *cursor,
-                                              true);
+                                              false);
           }
      }
 
      // Insert the match from the start of the matching completion.
      CePoint_t cursor_end = {delete_point.x + insertion_len, delete_point.y};
      if(insertion_len > 0){
+          // This chain is based on whether nor not the remove string change above was called.
+          bool chain_undo = (complete->current_match && delete_len > 0);
           ce_buffer_insert_string_change(buffer, insertion, delete_point, cursor, cursor_end,
-                                         true);
+                                         chain_undo);
      }
 
      // Delete any previous match from after the cursor
