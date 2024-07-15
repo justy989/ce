@@ -2171,7 +2171,7 @@ CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView
 #if defined(PLATFORM_WINDOWS)
           bool is_absolute_path = (destination->filepath[0] != 0 && destination->filepath[1] == ':');
 #else
-          bool is_absolute_path = (destination->filepath[0] != CE_PATH_SEPARATOR);
+          bool is_absolute_path = (destination->filepath[0] == CE_PATH_SEPARATOR);
 #endif
           if(!is_absolute_path){
                base_directory = ".";

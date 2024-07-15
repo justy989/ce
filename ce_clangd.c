@@ -548,7 +548,7 @@ bool ce_clangd_init(const char* executable_path,
      ce_json_obj_set_string(&initialize_obj, "method", "initialize");
 
      char cwd[MAX_PATH_LEN + 1];
-     char cwd_uri[MAX_PATH_LEN + 1];
+     char cwd_uri[MAX_PATH_LEN + 16];
 
      CeJsonObj_t params_obj = {};
 
@@ -566,7 +566,7 @@ bool ce_clangd_init(const char* executable_path,
      _convert_windows_path_to_uri(cwd_uri, MAX_PATH_LEN);
      char* json_cwd = _convert_string_to_json_string(cwd);
 #else
-     snprintf(cwd_uri, MAX_PATH_LEN, "file://%s", cwd);
+     snprintf(cwd_uri, MAX_PATH_LEN + 15, "file://%s", cwd);
      char* json_cwd = _convert_string_to_json_string(cwd);
 #endif
 
