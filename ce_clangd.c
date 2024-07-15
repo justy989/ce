@@ -774,7 +774,7 @@ void ce_clangd_free(CeClangD_t* clangd){
 #endif
 
 #if defined(PLATFORM_WINDOWS)
-     CloseHandle(clangd->thread);
+     CloseHandle(clangd->thread_handle);
      CloseHandle(clangd->response_queue.mutex);
 #else
      pthread_join(clangd->thread, NULL);
