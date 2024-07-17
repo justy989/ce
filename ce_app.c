@@ -751,44 +751,49 @@ CeDestination_t scan_line_for_destination(const char* line){
           if(row_end){
                char* row_start = file_end + 1;
                destination.point.y = strtol(row_start, &end, 10);
-               if(end == row_start) destination.point.y = -1;
+               if(end == row_start) {
+                   destination.point.y = -1;
+               }else {
+                   if(destination.point.y > 0){
+                        destination.point.y--; // account for format which is 1 indexed
+                   }
 
-               if(destination.point.y > 0){
-                    destination.point.y--; // account for format which is 1 indexed
-               }
-
-               if(col_end){
-                    char* col_start = row_end + 1;
-                    destination.point.x = strtol(col_start, &end, 10);
-                    if(end == col_start) destination.point.x = 0;
-                    if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
-               }else{
-                    destination.point.x = 0;
+                   if(col_end){
+                        char* col_start = row_end + 1;
+                        destination.point.x = strtol(col_start, &end, 10);
+                        if(end == col_start) destination.point.x = 0;
+                        if(destination.point.x > 0) destination.point.x--; // account for format which is 1 indexed
+                   }else{
+                        destination.point.x = 0;
+                   }
+                   return destination;
                }
           }
-
-          return destination;
      }
 
-     // cscope format
-     // ce_app.c buffer_append_on_new_line 694 bool buffer_append_on_new_line(CeBuffer_t* buffer, const char * string){
-     file_end = strchr(line, ' ');
+     // Windows cl format.
+     // code\main.cpp(31): error C2065: 'renderer': undeclared identifier
+     file_end = strchr(line, '(');
      if(file_end){
-          char* symbol_end = strchr(file_end + 1, ' ');
-          if(symbol_end){
-               char* row_start = symbol_end + 1;
-               char* end = NULL;
-               destination.point.y = strtol(row_start, &end, 10);
-               if(end != row_start){
-                    if(destination.point.y > 0) destination.point.y--;
-                    destination.point.x = 0;
+          char* row_start = file_end + 1;
+          char* row_end = strchr(row_start, ')');
+          int64_t filepath_len = file_end - line;
+          if(filepath_len >= MAX_PATH_LEN){
+               return destination;
+          }
+          strncpy(destination.filepath, line, filepath_len);
+          destination.filepath[filepath_len] = 0;
 
-                    int64_t filepath_len = file_end - line;
-                    if(filepath_len >= MAX_PATH_LEN) return destination;
-                    strncpy(destination.filepath, line, filepath_len);
-                    destination.filepath[filepath_len] = 0;
-                    return destination;
+          char* end = NULL;
+          if(row_end){
+               destination.point.y = strtol(row_start, &end, 10);
+               if(end == NULL){
+                    destination.point.y = -1;
+               }else if(destination.point.y > 0){
+                    destination.point.y--; // account for format which is 1 indexed
                }
+               destination.point.x = 0;
+               return destination;
           }
      }
 
@@ -1147,6 +1152,12 @@ static void _convert_uri_to_windows_path(char* uri){
                uri[u] = '\\';
           }else if(strncmp(uri + i, "%20", 3) == 0){
                uri[u] = ' ';
+               i += 2;
+          }else if(strncmp(uri + i, "%28", 3) == 0){
+               uri[u] = '(';
+               i += 2;
+          }else if(strncmp(uri + i, "%29", 3) == 0){
+               uri[u] = ')';
                i += 2;
           }else{
                uri[u] = uri[i];
@@ -1615,7 +1626,7 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                     if(method != NULL){
                         if(strcmp(method, "textDocument/publishDiagnostics") == 0){
                             CeClangDDiagnostics_t diagnostics = _extract_diagnostics_from_response(response.obj);
-                            if(diagnostics.count){
+                            if(diagnostics.filepath != NULL){
                                 // DEBUG
                                 // printf("diags: %s %lld\n", diagnostics.filepath, diagnostics.count);
                                 // for(int64_t i = 0; i < diagnostics.count; i++){
