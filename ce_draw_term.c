@@ -501,6 +501,28 @@ void ce_draw_term(CeApp_t* app){
           }
      }
 
+     if(app->clangd_completion.start.x >= 0 &&
+        app->clangd_completion.start.y >= 0){
+          app->clangd_completion.view.cursor.x = 0;
+          app->clangd_completion.view.cursor.y = ce_complete_current_match(app->clangd_completion.complete);
+          app->clangd_completion.view.scroll.y = 0;
+          app->clangd_completion.view.scroll.x = 0;
+          ce_view_follow_cursor(&app->clangd_completion.view, 0, 0, 0);
+
+          CeDrawColorList_t draw_color_list = {};
+          CeRangeList_t highlight_ranges = {};
+          CeAppBufferData_t* buffer_data = app->clangd_completion.buffer->app_data;
+          if (buffer_data->syntax_function) {
+               buffer_data->syntax_function(&app->clangd_completion.view, &highlight_ranges, &draw_color_list, app->syntax_defs,
+                                            app->clangd_completion.buffer->syntax_data);
+               ce_range_list_free(&highlight_ranges);
+          }
+
+          _draw_view(&app->clangd_completion.view, app->config_options.tab_width, app->config_options.line_number,
+                    app->config_options.visual_line_display_type, &draw_color_list, &color_defs, app->syntax_defs,
+                    app->terminal_rect.right, app->config_options.show_line_extends_passed_view_as);
+     }
+
      if(app->message_mode){
           CeDrawColorList_t draw_color_list = {};
           CeRangeList_t range_list = {};

@@ -115,7 +115,6 @@ typedef struct{
 
 typedef struct{
      bool chain;
-
      bool insertion; // opposite is deletion
      char* string;
      CePoint_t location;
@@ -127,6 +126,7 @@ typedef struct CeBufferChangeNode_t{
      CeBufferChange_t change;
      struct CeBufferChangeNode_t* next;
      struct CeBufferChangeNode_t* prev;
+     int64_t index;
 }CeBufferChangeNode_t;
 
 typedef struct{
@@ -193,6 +193,7 @@ typedef struct{
      int apply_completion_key;
      int cycle_next_completion_key;
      int cycle_prev_completion_key;
+     int clangd_trigger_completion_key;
      CeRune_t show_line_extends_passed_view_as;
      CeColorDef_t color_defs[CE_COLOR_COUNT];
      int gui_window_width;
@@ -200,6 +201,7 @@ typedef struct{
      int gui_font_size;
      int gui_font_line_separation;
      char gui_font_path[MAX_PATH_LEN];
+     char clangd_path[MAX_PATH_LEN];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{

@@ -1,12 +1,13 @@
 #pragma once
 
 #include "ce.h"
+#include "ce_clangd.h"
 #include "ce_command.h"
-#include "ce_vim.h"
-#include "ce_layout.h"
-#include "ce_syntax.h"
 #include "ce_complete.h"
+#include "ce_layout.h"
 #include "ce_macros.h"
+#include "ce_syntax.h"
+#include "ce_vim.h"
 
 #include <time.h>
 
@@ -66,6 +67,7 @@ typedef struct{
      int64_t last_goto_destination;
      CeSyntaxHighlightFunc_t* syntax_function;
      char* base_directory;
+     CeClangDDiagnostics_t clangd_diagnostics;
 }CeAppBufferData_t;
 
 typedef struct{
@@ -98,12 +100,12 @@ typedef struct{
 }CeVimVisualSave_t;
 
 typedef struct{
-     CePoint_t* cursors;
-     CeVimVisualData_t* visuals;
-     int64_t* motion_columns;
-     int64_t count;
-     bool active;
-}CeMultipleCursors_t;
+     CePoint_t start;
+     CePoint_t initiate;
+     CeComplete_t* complete;
+     CeBuffer_t* buffer;
+     CeView_t view;
+}CeClangDCompletion_t;
 
 typedef bool CeInputCompleteFunc(struct CeApp_t*, CeBuffer_t* input_buffer);
 
@@ -136,6 +138,7 @@ typedef struct CeApp_t{
      CeBuffer_t* jump_list_buffer;
      CeBuffer_t* shell_command_buffer;
      CeBuffer_t* last_goto_buffer;
+     CeBuffer_t* clangd_diagnostics_buffer;
      CeComplete_t input_complete;
      CeHistory_t command_history;
      CeHistory_t search_history;
@@ -169,6 +172,9 @@ typedef struct CeApp_t{
      bool shell_command_thread_should_die;
 
      void* gui;
+
+     CeClangD_t clangd;
+     CeClangDCompletion_t clangd_completion;
 
      // debug
      bool log_key_presses;
@@ -238,7 +244,21 @@ void ce_app_init_default_commands(CeApp_t* app);
 void ce_app_init_command_completion(CeApp_t* app, CeComplete_t* complete);
 void ce_app_message(CeApp_t* app, const char* fmt, ...);
 void ce_app_input(CeApp_t* app, const char* dialogue, CeInputCompleteFunc* input_complete_func);
-bool ce_app_apply_completion(CeApp_t* app);
+
+bool apply_completion_to_buffer(CeComplete_t* complete,
+                                CeBuffer_t* buffer,
+                                int64_t start_x,
+                                CePoint_t* cursor);
+
+void ce_app_handle_clangd_response(CeApp_t* app);
+void build_clangd_completion_view(CeView_t* view,
+                                  CePoint_t start,
+                                  CeView_t* completed_view,
+                                  CeBuffer_t* buffer,
+                                  CeConfigOptions_t* config_options,
+                                  CeRect_t* terminal_rect);
+void build_clangd_diagnostics_buffer(CeBuffer_t* buffer,
+                                     CeBuffer_t* source);
 
 bool command_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
 bool load_file_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer);
@@ -253,6 +273,12 @@ bool buffer_modified_outside_editor_complete_func(CeApp_t* app, CeBuffer_t* inpu
 
 bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative);
+
+CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
+                                       CeVim_t* vim, bool insert_into_jump_list,
+                                       const char* base_directory, CeDestination_t* destination);
+
+bool ce_get_cwd(char* buffer, size_t size);
 
 // Returns the point at the end of the paste if text was pasted.
 CePoint_t ce_paste_clipboard_into_buffer(CeBuffer_t* buffer, CePoint_t point);

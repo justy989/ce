@@ -1,6 +1,7 @@
 #include "ce_json.h"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -47,7 +48,7 @@ static void _field_free(CeJsonField_t* field){
 
 static void _array_copy(CeJsonArray_t* a, CeJsonArray_t* b){
      _array_free(a);
-     for(uint64_t i = 0; i < b->count; i++){
+     for(int64_t i = 0; i < b->count; i++){
           CeJsonValue_t* value = b->values + i;
           switch(value->type){
           case CE_JSON_TYPE_OBJECT:
@@ -75,7 +76,7 @@ static void _array_copy(CeJsonArray_t* a, CeJsonArray_t* b){
 }
 
 static void _array_free(CeJsonArray_t* a){
-     for(uint64_t i = 0; i < a->count; i++){
+     for(int64_t i = 0; i < a->count; i++){
           CeJsonValue_t* value = a->values + i;
           _value_free(value);
      }
@@ -86,7 +87,7 @@ static void _array_free(CeJsonArray_t* a){
 static void _obj_copy(CeJsonObj_t* a, CeJsonObj_t* b){
      _obj_free(a);
 
-     for(uint64_t i = 0; i < b->count; i++){
+     for(int64_t i = 0; i < b->count; i++){
           CeJsonField_t* field = b->fields + i;
           switch(field->value.type){
           case CE_JSON_TYPE_OBJECT:
@@ -114,7 +115,7 @@ static void _obj_copy(CeJsonObj_t* a, CeJsonObj_t* b){
 }
 
 static void _obj_free(CeJsonObj_t* obj){
-     for(uint64_t i = 0; i < obj->count; i++){
+     for(int64_t i = 0; i < obj->count; i++){
           CeJsonField_t* field = obj->fields + i;
           _field_free(field);
      }
@@ -124,7 +125,7 @@ static void _obj_free(CeJsonObj_t* obj){
 }
 
 static void _obj_free_field_of_name(CeJsonObj_t* obj, const char* name){
-     for(uint64_t i = 0; i < obj->count; i++){
+     for(int64_t i = 0; i < obj->count; i++){
           CeJsonField_t* field = obj->fields + i;
           if (strcmp(field->name, name) != 0){
                continue;
@@ -200,8 +201,8 @@ static void _array_print(CeJsonArray_t* array, char* string, PrintState_t* print
      char field_indentation[MAX_INDENTATION];
      _make_indentation(field_indentation, MAX_INDENTATION, current_indent + indent);
      // This is fine to wrap arround because we won't go into the loop.
-     uint64_t last_index = (array->count - 1);
-     for(uint64_t i = 0; i < array->count; i++){
+     int64_t last_index = (array->count - 1);
+     for(int64_t i = 0; i < array->count; i++){
           CeJsonValue_t* value = array->values + i;
           _print_state_update(print_state, snprintf(string + print_state->printed,
                                                     print_state->remaining, "%s",
@@ -224,8 +225,8 @@ static void _obj_print(CeJsonObj_t* obj, char* string, PrintState_t* print_state
      _make_indentation(indentation, MAX_INDENTATION, current_indent);
      _print_state_update(print_state, snprintf(string + print_state->printed, print_state->remaining, "{\n"));
      // This is fine to wrap arround because we won't go into the loop.
-     uint64_t last_index = (obj->count - 1);
-     for(uint64_t i = 0; i < obj->count; i++){
+     int64_t last_index = (obj->count - 1);
+     for(int64_t i = 0; i < obj->count; i++){
           CeJsonField_t* field = obj->fields + i;
           _field_print(field, string, print_state, current_indent + indent, indent);
           if(i != last_index){
@@ -524,7 +525,7 @@ static bool _parse_null(ParsePos_t* pos){
 static void _transition_array_stage(ArrayParseStage_t* current_stage, ArrayParseStage_t new_stage,
                                     ParsePos_t* pos, bool verbose){
      if(verbose){
-          printf("array parse stage change: %d -> %d at %ld, %ld at %c\n",
+          printf("array parse stage change: %d -> %d at %" PRId64 ", %" PRId64 " at %c\n",
                  *current_stage, new_stage, pos->x, pos->y, *pos->str);
      }
      *current_stage = new_stage;
@@ -533,7 +534,7 @@ static void _transition_array_stage(ArrayParseStage_t* current_stage, ArrayParse
 static void _transition_obj_stage(ObjParseStage_t* current_stage, ObjParseStage_t new_stage,
                                   ParsePos_t* pos, bool verbose){
      if(verbose){
-          printf("obj parse stage change: %d -> %d at %ld, %ld at %c\n",
+          printf("obj parse stage change: %d -> %d at %" PRId64 ", %" PRId64 " at %c\n",
                  *current_stage, new_stage, pos->x, pos->y, *pos->str);
      }
      *current_stage = new_stage;
@@ -548,7 +549,7 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
                if(*pos->str == TOKEN_OPEN_BRACKET){
                     _transition_array_stage(&stage, ARR_PARSE_STAGE_VALUE_BEGIN, pos, verbose);
                }else{
-                    printf("Error: %ld, %ld expected first non-whitespace character is not an open brace.\n",
+                    printf("Error: %" PRId64 ", %" PRId64 " expected first non-whitespace character is not an open brace.\n",
                            pos->x, pos->y);
                     return false;
                }
@@ -566,7 +567,7 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
                          ce_json_array_add_obj(array, &obj);
                          ce_json_obj_free(&obj);
                     }else{
-                         printf("Error: %ld, %ld failed to parse object.", pos->x, pos->y);
+                         printf("Error: %" PRId64 ", %" PRId64 " failed to parse object.", pos->x, pos->y);
                          return false;
                     }
                }else if(*pos->str == TOKEN_QUOTE){
@@ -579,7 +580,7 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
                          ce_json_array_add_string(array, field_string);
                          free(field_string);
                     }else{
-                         printf("Error: %ld, %ld failed to parse string.", pos->x, pos->y);
+                         printf("Error: %" PRId64 ", %" PRId64 " failed to parse string.", pos->x, pos->y);
                          return false;
                     }
                }else if(_starts_number(*pos->str)){
@@ -590,7 +591,7 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
                          if(verbose) printf("adding array number element\n");
                          ce_json_array_add_number(array, number);
                     }else{
-                         printf("Error: %ld, %ld failed to parse expected number.\n",
+                         printf("Error: %" PRId64 ", %" PRId64 " failed to parse expected number.\n",
                                 pos->x, pos->y);
                          return false;
                     }
@@ -602,8 +603,11 @@ static bool _array_parse(ParsePos_t* pos, CeJsonArray_t* array, bool verbose){
                     _transition_array_stage(&stage, ARR_PARSE_STAGE_CHECK_NEXT_VALUE, pos, verbose);
                     if(verbose) printf("adding array null element\n");
                     ce_json_array_add_null(array);
+               }else if(*pos->str == TOKEN_CLOSE_BRACKET){
+                    if(verbose) printf("done parsing array\n");
+                    return true;
                }else{
-                    printf("Error: %ld, %ld expected value in array.\n",
+                    printf("Error: %" PRId64 ", %" PRId64 " expected value in array.\n",
                            pos->x, pos->y);
                     return false;
                }
@@ -640,7 +644,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                if(*pos->str == TOKEN_OPEN_BRACE){
                     _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD, pos, verbose);
                }else{
-                    printf("Error: %ld, %ld expected first non-whitespace character is not an open brace.\n",
+                    printf("Error: %" PRId64 ", %" PRId64 " expected first non-whitespace character is not an open brace.\n",
                            pos->x, pos->y);
                     return false;
                }
@@ -653,7 +657,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                     if(verbose) printf("Done parsing obj.\n");
                     return true;
                }else{
-                    printf("Error: %ld, %ld expected field declaration.\n",
+                    printf("Error: %" PRId64 ", %" PRId64 " expected field declaration.\n",
                            pos->x, pos->y);
                     return false;
                }
@@ -664,7 +668,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                if(*pos->str == TOKEN_QUOTE){
                     _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_NAME_END, pos, verbose);
                }else{
-                    printf("Error: %ld, %ld expected \" to start string.\n", pos->x, pos->y);
+                    printf("Error: %" PRId64 ", %" PRId64 " expected \" to start string.\n", pos->x, pos->y);
                     return false;
                }
           } break;
@@ -673,7 +677,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                if(*pos->str == TOKEN_COLON){
                     _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_BEGIN, pos, verbose);
                }else{
-                    printf("Error: %ld, %ld expected \" to start string.\n", pos->x, pos->y);
+                    printf("Error: %" PRId64 ", %" PRId64 " expected \" to start string.\n", pos->x, pos->y);
                     return false;
                }
                break;
@@ -698,7 +702,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                          if(verbose) printf("adding obj number field %s\n", state.field_name);
                          ce_json_obj_set_number(obj, state.field_name, number);
                     }else{
-                         printf("Error: %ld, %ld failed to parse expected number.\n",
+                         printf("Error: %" PRId64 ", %" PRId64 " failed to parse expected number.\n",
                                 pos->x, pos->y);
                          return false;
                     }
@@ -711,7 +715,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                          ce_json_obj_set_array(obj, state.field_name, &array);
                          ce_json_array_free(&array);
                     }else{
-                         printf("Error: %ld, %ld failed to parse array.\n", pos->x, pos->y);
+                         printf("Error: %" PRId64 ", %" PRId64 " failed to parse array.\n", pos->x, pos->y);
                          return false;
                     }
                }else if(*pos->str == TOKEN_QUOTE){
@@ -724,7 +728,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                          ce_json_obj_set_string(obj, state.field_name, field_string);
                          free(field_string);
                     }else{
-                         printf("Error: %ld, %ld failed to parse string.", pos->x, pos->y);
+                         printf("Error: %" PRId64 ", %" PRId64 " failed to parse string.", pos->x, pos->y);
                     }
                }else if(_parse_boolean(pos, &boolean)){
                     _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD_VALUE_END, pos, verbose);
@@ -735,7 +739,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                     if(verbose) printf("adding obj null field %s\n", state.field_name);
                     ce_json_obj_set_null(obj, state.field_name);
                }else{
-                    printf("Error: %ld, %ld failed to detect value.\n", pos->x, pos->y);
+                    printf("Error: %" PRId64 ", %" PRId64 " failed to detect value.\n", pos->x, pos->y);
                     return false;
                }
           } break;
@@ -747,7 +751,7 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
                }else if(*pos->str == TOKEN_COMMA){
                     _transition_obj_stage(&state.stage, OBJ_PARSE_STAGE_FIELD, pos, verbose);
                }else{
-                    printf("Error: %ld, %ld failed to parse next element or end of object with %c.\n",
+                    printf("Error: %" PRId64 ", %" PRId64 " failed to parse next element or end of object with %c.\n",
                            pos->x, pos->y, *pos->str);
                     return false;
                }
@@ -764,6 +768,53 @@ static bool _obj_parse(ParsePos_t* pos, CeJsonObj_t* obj, bool verbose){
           }
      }
      return true;
+}
+
+CeJsonFindResult_t ce_json_obj_find(CeJsonObj_t* obj, const char* name){
+     CeJsonFindResult_t result = {};
+     for(int64_t i = 0; i < obj->count; i++){
+          if(strcmp(obj->fields[i].name, name) == 0){
+               result.type = obj->fields[i].value.type;
+               result.index = i;
+               return result;
+          }
+     }
+     return result;
+}
+
+CeJsonObj_t* ce_json_obj_get_obj(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_OBJECT){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.obj;
+}
+
+CeJsonArray_t* ce_json_obj_get_array(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_ARRAY){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.array;
+}
+
+const char* ce_json_obj_get_string(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_STRING){
+          return NULL;
+     }
+     return obj->fields[find->index].value.string;
+}
+
+double* ce_json_obj_get_number(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_NUMBER){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.number;
+}
+
+bool* ce_json_obj_get_boolean(CeJsonObj_t* obj, const CeJsonFindResult_t* find){
+     if(find->type != CE_JSON_TYPE_BOOL){
+          return NULL;
+     }
+     return &obj->fields[find->index].value.boolean;
 }
 
 bool ce_json_parse(const char* string, CeJsonObj_t* json, bool verbose){

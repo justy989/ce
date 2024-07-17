@@ -2,14 +2,15 @@
 #include "ce_json.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define PRINT_LEN (1024 * 1024)
 
 void print_obj(CeJsonObj_t* obj){
-     char printed_obj[PRINT_LEN];
-     printed_obj[0] = 0;
+     char* printed_obj = malloc(PRINT_LEN);
+     memset(printed_obj, 0, (PRINT_LEN - 1));
      ce_json_obj_to_string(obj, printed_obj, PRINT_LEN, 1);
-     printf("%s\n", printed_obj);
+     free(printed_obj);
 }
 
 int main(int argc, char** argv){

@@ -1060,7 +1060,7 @@ char* ce_buffer_dupe_string(CeBuffer_t* buffer, CePoint_t point, int64_t length)
 
 char* ce_buffer_dupe(CeBuffer_t* buffer){
      CePoint_t start = {0, 0};
-     CePoint_t end = {buffer->line_count, 0};
+     CePoint_t end = {0, buffer->line_count};
      if(end.y) end.y--;
      end.x = ce_utf8_last_index(buffer->lines[end.y]);
      int64_t len = ce_buffer_range_len(buffer, start, end);
@@ -1134,6 +1134,7 @@ bool ce_buffer_change(CeBuffer_t* buffer, CeBufferChange_t* change){
           }
 
           node->prev = buffer->change_node;
+          node->index = buffer->change_node->index + 1;
           buffer->change_node->next = node;
      }else{
           CeBufferChangeNode_t* first_empty_node = calloc(1, sizeof(*node));
@@ -1223,7 +1224,6 @@ static CePoint_t move_point_based_on_buffer_change(CeBuffer_t* buffer, CeBufferC
                }
           }
      }
-
      return point;
 }
 

@@ -7,7 +7,7 @@
 
 #define STATUS_LINE_LEN 128
 
-static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index, bool foreground) {
+static SDL_Color color_from_index(CeConfigOptions_t* config_options, int index, bool foreground){
     SDL_Color result;
     if(index == CE_COLOR_DEFAULT){
         if (foreground) {
@@ -234,7 +234,7 @@ static void _draw_view_status(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacr
                     gui);
 }
 
-static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim, CeMacros_t* macros,
+static void _draw_view(CeView_t* view, CeGui_t* gui, CeVim_t* vim,
                        CeDrawColorList_t* syntax_color_list, CeSyntaxDef_t* syntax_defs,
                        CeConfigOptions_t* config_options, int terminal_right) {
      if(view->buffer->line_count == 0){
@@ -522,7 +522,7 @@ static void _draw_layout(CeLayout_t* layout, CeGui_t* gui, CeVim_t* vim, CeVimVi
                     ce_range_list_free(&highlight_ranges);
                }
 
-               _draw_view(&layout->view, gui, vim, macros, &syntax_color_list, syntax_defs,
+               _draw_view(&layout->view, gui, vim, &syntax_color_list, syntax_defs,
                           config_options, terminal_right);
                ce_draw_color_list_free(&syntax_color_list);
                _draw_view_status(&layout->view,
@@ -623,7 +623,7 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
           SDL_Rect view_rect = rect_from_view(&app->input_view, gui);
           SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
 
-          _draw_view(&app->input_view, gui, NULL, &app->macros, NULL, app->syntax_defs,
+          _draw_view(&app->input_view, gui, NULL, NULL, app->syntax_defs,
                      &app->config_options, app->terminal_rect.right);
           _draw_view_status(&app->input_view,
                             gui,
@@ -702,14 +702,53 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
                ce_range_list_free(&highlight_ranges);
           }
 
-          _draw_view(&app->complete_view, gui, NULL, &app->macros, &draw_color_list,
+          _draw_view(&app->complete_view, gui, NULL, &draw_color_list,
+                     app->syntax_defs, &app->config_options, app->terminal_rect.right);
+     }
+
+     if(app->clangd_completion.start.x >= 0 &&
+        app->clangd_completion.start.y >= 0){
+          SDL_Rect view_rect = rect_from_view(&app->clangd_completion.view, gui);
+
+          SDL_Color border_color = color_from_index(&app->config_options,
+                                                    app->config_options.ui_bg_color,
+                                                    false);
+          uint32_t border_color_packed = SDL_MapRGB(gui->window_surface->format,
+                                                    border_color.r,
+                                                    border_color.g,
+                                                    border_color.b);
+          SDL_Rect border_rect = view_rect;
+          border_rect.x -= _text_pixel_x(1, gui);
+          border_rect.y -= _text_pixel_x(1, gui); // intentionally x !
+          border_rect.w += _text_pixel_x(1, gui);
+          border_rect.h += _text_pixel_x(1, gui); // intentionally x !
+
+          SDL_FillRect(gui->window_surface, &border_rect, border_color_packed);
+          SDL_FillRect(gui->window_surface, &view_rect, background_color_packed);
+
+          app->clangd_completion.view.cursor.x = 0;
+          app->clangd_completion.view.cursor.y = ce_complete_current_match(app->clangd_completion.complete);
+          app->clangd_completion.view.scroll.y = 0;
+          app->clangd_completion.view.scroll.x = 0;
+          ce_view_follow_cursor(&app->clangd_completion.view, 0, 0, 0);
+
+          CeDrawColorList_t draw_color_list = {};
+          CeRangeList_t highlight_ranges = {};
+          CeAppBufferData_t* buffer_data = app->clangd_completion.buffer->app_data;
+          if (buffer_data->syntax_function) {
+               buffer_data->syntax_function(&app->clangd_completion.view, &highlight_ranges, &draw_color_list, app->syntax_defs,
+                                            app->clangd_completion.buffer->syntax_data);
+               ce_range_list_free(&highlight_ranges);
+          }
+
+          _draw_view(&app->clangd_completion.view, gui, NULL, &draw_color_list,
                      app->syntax_defs, &app->config_options, app->terminal_rect.right);
      }
 
      if(app->message_mode){
           CeDrawColorList_t draw_color_list = {};
           ce_draw_color_list_insert(&draw_color_list, CE_COLOR_RED, app->config_options.ui_bg_color, (CePoint_t){0, 0});
-          _draw_view(&app->message_view, gui, NULL, &app->macros, &draw_color_list,
+          _draw_view(&app->message_view, gui, NULL, &draw_color_list,
                      app->syntax_defs, &app->config_options, app->terminal_rect.right);
      }
 

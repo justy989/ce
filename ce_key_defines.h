@@ -12,6 +12,7 @@
   #define KEY_ONLY_BACKSPACE KEY_BACKSPACE
   #define KEY_DELETE KEY_DC
   #define KEY_INVALID ERR
+  #define KEY_CTRL_F 6
 #elif defined(DISPLAY_GUI)
   // TODO: figure out the real values here.
   #define KEY_UP_ARROW -2
@@ -31,6 +32,7 @@
   #define KEY_DELETE 127
   #define KEY_CTRL_SHIFT_C -29
   #define KEY_CTRL_SHIFT_V -10
+  #define KEY_CTRL_F 102
 #endif
 
 #define KEY_ESCAPE 27

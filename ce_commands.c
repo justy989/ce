@@ -403,6 +403,8 @@ CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data){
           if(!load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
                                   true, command->args[0].string)){
                ce_app_message(app, "failed to load file %s: '%s'", command->args[0].string, strerror(errno));
+          }else{
+               ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
           }
      }else{ // it's 0
           ce_app_input(app, "Load File", load_file_input_complete_func);
@@ -888,30 +890,6 @@ CeCommandStatus_t command_redraw(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
-CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
-                                       CeVim_t* vim, bool insert_into_jump_list,
-                                       const char* base_directory, CeDestination_t* destination){
-     char full_path[MAX_PATH_LEN];
-     if(!base_directory && destination->filepath[0] != CE_PATH_SEPARATOR) base_directory = ".";
-     if(base_directory){
-          const char* full_path_format = "%s/%s";
-          snprintf(full_path, MAX_PATH_LEN - strlen(full_path_format), full_path_format, base_directory, destination->filepath);
-     }else{
-          strncpy(full_path, destination->filepath, MAX_PATH_LEN);
-     }
-     CeBuffer_t* load_buffer = load_file_into_view(buffer_node_head, view, config_options, vim,
-                                                   insert_into_jump_list, full_path);
-     if(!load_buffer) return load_buffer;
-
-     if(destination->point.y < load_buffer->line_count){
-          view->cursor.y = destination->point.y;
-          int64_t line_len = ce_utf8_strlen(load_buffer->lines[view->cursor.y]);
-          if(destination->point.x < line_len) view->cursor.x = destination->point.x;
-     }
-
-     return load_buffer;
-}
-
 CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* user_data){
      if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
 
@@ -936,6 +914,7 @@ CeCommandStatus_t command_goto_destination_in_line(CeCommand_t* command, void* u
                                                      true, base_directory, &destination);
      free(base_directory);
      if(!buffer) return CE_COMMAND_NO_ACTION;
+     ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1242,6 +1221,7 @@ CeCommandStatus_t command_jump_list(CeCommand_t* command, void* user_data){
                                  false, destination->filepath)){
                command_context.view->cursor = destination->point;
           }else{
+               ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
                CeBufferNode_t* itr = app->buffer_node_head;
                while(itr){
                     if(strcmp(itr->buffer->name, destination->filepath) == 0){
@@ -1408,6 +1388,8 @@ CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data)
      CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
+     printf("Attempting to paste clipboard\n");
+
      CePoint_t resulting_cursor = ce_paste_clipboard_into_buffer(command_context.view->buffer,
                                                                  command_context.view->cursor);
      if(resulting_cursor.x <= 0){
@@ -1415,6 +1397,48 @@ CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data)
      }
 
      command_context.view->cursor = resulting_cursor;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_goto_def(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_def(&app->clangd,
+                                    command_context.view->buffer,
+                                    command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_goto_decl(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_decl(&app->clangd,
+                                     command_context.view->buffer,
+                                     command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+
+     if(!ce_clangd_request_goto_type_def(&app->clangd,
+                                         command_context.view->buffer,
+                                         command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+
      return CE_COMMAND_SUCCESS;
 }
 
@@ -1512,8 +1536,12 @@ CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data){
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
-                         true, command->args[0].string);
+     if(load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
+                         true, command->args[0].string)){
+          ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
+     }else{
+          return CE_COMMAND_FAILURE;
+     }
 
      return CE_COMMAND_SUCCESS;
 }
@@ -1588,8 +1616,12 @@ CeCommandStatus_t command_vim_sp(CeCommand_t* command, void* user_data){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
           CommandContext_t command_context = {};
           if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
-          load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
-                              true, command->args[0].string);
+          if(load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
+                              true, command->args[0].string)){
+               ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
+          }else{
+               return CE_COMMAND_FAILURE;
+          }
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1606,8 +1638,12 @@ CeCommandStatus_t command_vim_vsp(CeCommand_t* command, void* user_data){
           if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
           CommandContext_t command_context = {};
           if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
-          load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
-                              true, command->args[0].string);
+          if(load_file_into_view(&app->buffer_node_head, command_context.view, &app->config_options, &app->vim,
+                              true, command->args[0].string)){
+               ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
+          }else{
+               return CE_COMMAND_FAILURE;
+          }
      }
 
      return CE_COMMAND_SUCCESS;
@@ -1687,8 +1723,10 @@ static void open_file_in_dir_recursively(char* path, char* match, CeApp_t* app, 
           }else if(strcmp(list_dir_result.filenames[i], match) == 0){
                char full_path[MAX_PATH_LEN];
                snprintf(full_path, MAX_PATH_LEN, "%s%c%s", path, CE_PATH_SEPARATOR, list_dir_result.filenames[i]);
-               load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
-                                   true, full_path);
+               if(load_file_into_view(&app->buffer_node_head, view, &app->config_options, &app->vim,
+                                   true, full_path)){
+                    ce_clangd_file_open(&app->clangd, app->buffer_node_head->buffer);
+               }
           }
      }
      ce_free_list_dir_result(&list_dir_result);

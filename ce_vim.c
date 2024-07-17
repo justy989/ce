@@ -22,6 +22,10 @@ static bool string_is_whitespace(const char* string){
      return all_whitespace;
 }
 
+static bool _is_print(char ch){
+     return ch >= 32 && ch <= 126;
+}
+
 void ce_vim_add_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeRune_t key, CeVimParseFunc_t* function){
      assert(*key_bind_count < CE_VIM_MAX_KEY_BINDS);
      key_binds[*key_bind_count].key = key;
@@ -29,7 +33,7 @@ void ce_vim_add_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeR
      (*key_bind_count)++;
 }
 
-static void insert_mode(CeVim_t* vim){
+void ce_vim_insert_mode(CeVim_t* vim){
      vim->mode = CE_VIM_MODE_INSERT;
      if(!vim->verb_last_action) ce_rune_node_free(&vim->insert_rune_head);
 }
@@ -172,7 +176,7 @@ CeVimParseResult_t insert_mode_handle_key(CeVim_t* vim, CeView_t* view, CePoint_
                                           CeRune_t key, const CeConfigOptions_t* config_options){
      switch(key){
      default:
-          if(isprint(key) || key == CE_NEWLINE){
+          if(_is_print(key) || key == CE_NEWLINE){
                if(ce_buffer_insert_rune(view->buffer, key, *cursor)){
                     const char str[2] = {key, 0};
                     CePoint_t save_cursor = *cursor;
@@ -1885,7 +1889,7 @@ CeVimParseResult_t ce_vim_parse_verb_set_character(CeVimAction_t* action, const 
           action->verb.function = &ce_vim_verb_set_character;
           return CE_VIM_PARSE_CONSUME_ADDITIONAL_KEY;
      }else{
-          if(!isprint(key)) return CE_VIM_PARSE_INVALID;
+          if(!_is_print(key)) return CE_VIM_PARSE_INVALID;
           action->verb.integer = key;
           return CE_VIM_PARSE_COMPLETE;
      }
@@ -2702,7 +2706,7 @@ CeVimMotionResult_t ce_vim_motion_next_zero_indentation_line(CeVim_t* vim, CeVim
                }
           }
 
-          if(isprint((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
+          if(_is_print((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
                motion_range->end = (CePoint_t){0, y};
                return CE_VIM_MOTION_RESULT_SUCCESS;
           }
@@ -2724,7 +2728,7 @@ CeVimMotionResult_t ce_vim_motion_previous_zero_indentation_line(CeVim_t* vim, C
                }
           }
 
-          if(isprint((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
+          if(_is_print((int)(view->buffer->lines[y][0])) && !isspace((int)(view->buffer->lines[y][0])) && strchr(view->buffer->lines[y], '(')){
                motion_range->end = (CePoint_t){0, y};
                return CE_VIM_MOTION_RESULT_SUCCESS;
           }
@@ -2871,7 +2875,7 @@ bool ce_vim_verb_change(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
                         const CeConfigOptions_t* config_options){
      if(!ce_vim_verb_delete(vim, action, motion_range, view, cursor, visual, buffer_data, config_options)) return false;
      vim->chain_undo = true;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -2943,7 +2947,7 @@ bool ce_vim_verb_substitute_character(CeVim_t* vim, const CeVimAction_t* action,
      bool success = ce_vim_verb_delete_character(vim, action, motion_range, view, cursor, visual, buffer_data, config_options);
      if(success){
           vim->chain_undo = true;
-          insert_mode(vim);
+          ce_vim_insert_mode(vim);
      }
      return success;
 }
@@ -2960,14 +2964,14 @@ bool ce_vim_verb_substitute_soft_begin_line(CeVim_t* vim, const CeVimAction_t* a
 
      // if the line is empty, just enter insert mode
      if(motion_range.end.x == 0){
-          insert_mode(vim);
+          ce_vim_insert_mode(vim);
           return true;
      }
 
      bool success = ce_vim_verb_change(vim, action, motion_range, view, cursor, visual, buffer_data, config_options);
      if(success){
           vim->chain_undo = true;
-          insert_mode(vim);
+          ce_vim_insert_mode(vim);
      }
      return success;
 }
@@ -3189,7 +3193,7 @@ bool ce_vim_verb_open_above(CeVim_t* vim, const CeVimAction_t* action, CeRange_t
      }
 
      vim->chain_undo = true;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3223,7 +3227,7 @@ bool ce_vim_verb_open_below(CeVim_t* vim, const CeVimAction_t* action, CeRange_t
      }
 
      vim->chain_undo = true;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3242,7 +3246,7 @@ bool ce_vim_verb_redo(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motio
 bool ce_vim_verb_insert_mode(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                              CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                              const CeConfigOptions_t* config_options){
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3285,7 +3289,7 @@ bool ce_vim_verb_append(CeVim_t* vim, const CeVimAction_t* action, CeRange_t mot
      int64_t last_valid_index = ce_utf8_strlen(view->buffer->lines[cursor->y]);
      cursor->x++;
      if(cursor->x > last_valid_index) cursor->x = last_valid_index;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3293,7 +3297,7 @@ bool ce_vim_verb_append_at_end_of_line(CeVim_t* vim, const CeVimAction_t* action
                                        CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                                        const CeConfigOptions_t* config_options){
      cursor->x = ce_utf8_strlen(view->buffer->lines[cursor->y]);
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
@@ -3303,7 +3307,7 @@ bool ce_vim_verb_insert_at_soft_begin_line(CeVim_t* vim, const CeVimAction_t* ac
      int64_t result = ce_vim_soft_begin_line(view->buffer, cursor->y);
      if(result < 0) return false;
      cursor->x = result;
-     insert_mode(vim);
+     ce_vim_insert_mode(vim);
      return true;
 }
 
