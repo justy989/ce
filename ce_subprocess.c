@@ -95,6 +95,13 @@ void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal) {
     }
 }
 
+void ce_subprocess_close_stdin(CeSubprocess_t* subprocess){
+     if(subprocess->stdin_write_pipe != INVALID_HANDLE_VALUE){
+         CloseHandle(subprocess->stdin_write_pipe);
+         subprocess->stdin_write_pipe = INVALID_HANDLE_VALUE;
+     }
+}
+
 int ce_subprocess_close(CeSubprocess_t* subprocess) {
      if(subprocess->process.hProcess == INVALID_HANDLE_VALUE){
          return -1;
@@ -214,6 +221,14 @@ void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal){
           return;
      }
      kill(subprocess->pid, signal);
+}
+
+void ce_subprocess_close_stdin(CeSubprocess_t* subprocess){
+     if(subprocess->stdout_fd >= 0){
+         _close_file(&subprocess->stdout_file);
+         close(subprocess->stdout_fd);
+         subprocess->stdout_fd = -1;
+     }
 }
 
 int ce_subprocess_close(CeSubprocess_t* subprocess){

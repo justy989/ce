@@ -901,6 +901,8 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_goto_def, "clang_goto_def", "If clangd is enabled, request to go the definition of the symbol under the cursor."},
           {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
           {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
+          {command_clang_format_file, "clang_format_file", "Run the configured clang-format binary/executable on the current buffer."},
+          // {command_clang_format_selection, "clang_format_file", "Run the configured clang-format binary/executable on the current selected text."},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
@@ -2170,6 +2172,80 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      }
      return true;
 #endif
+}
+
+bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
+    char* buffer_str = ce_buffer_dupe(buffer);
+    CeSubprocess_t proc = {};
+    bool use_shell = false;
+    // TODO(jtardiff): move to config
+    const char* clang_format_exe = "C:\\Users\\jtiff\\Desktop\\clang+llvm-18.1.8-x86_64-pc-windows-msvc\\bin\\clang-format.exe";
+    if(!ce_subprocess_open(&proc, clang_format_exe, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT, use_shell)){
+        free(buffer_str);
+        return false;
+    }
+
+    // Write our buffer to stdin, including the null terminator.
+    int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
+    int64_t bytes_to_write = buffer_str_len + 1;
+    int64_t bytes_written = ce_subprocess_write_stdin(&proc, buffer_str, bytes_to_write);
+    free(buffer_str);
+    if(bytes_written != bytes_to_write){
+        ce_log("Failed to write full buffer string to clang format process to format buffer: %s\n", buffer->name);
+        return false;
+    }
+    ce_subprocess_close_stdin(&proc);
+
+    // Read bytes from stdout, clear our buffer and re-insert it.
+    char* bytes = NULL;
+    int64_t bytes_size = 0;
+    int64_t total_bytes_read = 0;
+    int64_t bytes_read = 0;
+    do{
+        int64_t new_bytes_size = bytes_size + BUFSIZ;
+        bytes = realloc(bytes, new_bytes_size);
+        if(bytes == NULL){
+            ce_log("failed to realloc() %" PRId64 " bytes.\n", new_bytes_size);
+            return false;
+        }
+        bytes_size = new_bytes_size;
+
+        bytes_read = ce_subprocess_read_stdout(&proc, bytes + total_bytes_read, (BUFSIZ - 1));
+        if(bytes_read < 0){
+            ce_subprocess_close(&proc);
+            return false;
+        }
+        bytes[total_bytes_read + bytes_read] = 0;
+        total_bytes_read += bytes_read;
+    }while(bytes_read > 0);
+    ce_subprocess_close(&proc);
+
+    if(total_bytes_read == 0){
+        free(bytes);
+        return true;
+    }
+
+    // The last byte is null and the 2nd to last byte is a newline, just trim it.
+    if(total_bytes_read > 2 &&
+       bytes[total_bytes_read - 2] == CE_NEWLINE &&
+       bytes[total_bytes_read - 1] == 0){
+        bytes[total_bytes_read - 2] = 0;
+    }
+
+    bool removed = ce_buffer_remove_string_change(buffer, (CePoint_t){0, 0}, buffer_str_len,
+                                                  &cursor, cursor, false);
+    if(!removed){
+        ce_log("Failed to clear buffer %s to insert clang format results\n", buffer->name);
+        return false;
+    }
+    bool inserted = ce_buffer_insert_string_change(buffer, bytes, (CePoint_t){0, 0}, &cursor,
+                                                   cursor, true);
+    if(!inserted){
+        ce_log("Failed to insert clang format results into %s\n", buffer->name);
+        free(bytes);
+        return false;
+    }
+    return true;
 }
 
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
