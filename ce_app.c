@@ -2179,7 +2179,7 @@ typedef struct {
     char* bytes;
 }ClangFormatResult_t;
 
-ClangFormatResult_t _clang_format_string(char* clang_format_exe, char* string, int64_t string_len, bool trim_ending_newline){
+ClangFormatResult_t _clang_format_string(char* clang_format_exe, char* string, int64_t string_len){
     ClangFormatResult_t result = {};
     CeSubprocess_t proc = {};
     bool use_shell = false;
@@ -2227,8 +2227,7 @@ ClangFormatResult_t _clang_format_string(char* clang_format_exe, char* string, i
     }
 
     // The last byte is null and the 2nd to last byte is a newline, just trim it.
-    if(trim_ending_newline &&
-       total_bytes_read > 2 &&
+    if(total_bytes_read > 2 &&
        bytes[total_bytes_read - 2] == CE_NEWLINE &&
        bytes[total_bytes_read - 1] == 0){
         bytes[total_bytes_read - 2] = 0;
@@ -2241,9 +2240,7 @@ ClangFormatResult_t _clang_format_string(char* clang_format_exe, char* string, i
 bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_t cursor){
     char* buffer_str = ce_buffer_dupe(buffer);
     int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
-    bool trim_ending_newline = true;
-    ClangFormatResult_t result = _clang_format_string(clang_format_exe, buffer_str, buffer_str_len,
-                                                      trim_ending_newline);
+    ClangFormatResult_t result = _clang_format_string(clang_format_exe, buffer_str, buffer_str_len);
     free(buffer_str);
     if(!result.success){
         return false;
@@ -2281,9 +2278,8 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
         highlight_len--;
         highlighted_string[highlight_len] = 0;
     }
-    bool trim_ending_newline = true;
     ClangFormatResult_t result = _clang_format_string(clang_format_exe, highlighted_string,
-                                                      highlight_len, trim_ending_newline);
+                                                      highlight_len);
     free(highlighted_string);
     if(!result.success){
         return false;
