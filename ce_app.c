@@ -2179,12 +2179,11 @@ typedef struct {
     char* bytes;
 }ClangFormatResult_t;
 
-ClangFormatResult_t _clang_format_string(char* string, int64_t string_len, bool trim_ending_newline){
+ClangFormatResult_t _clang_format_string(char* clang_format_exe, char* string, int64_t string_len, bool trim_ending_newline){
     ClangFormatResult_t result = {};
     CeSubprocess_t proc = {};
     bool use_shell = false;
     // TODO(jtardiff): move to config
-    const char* clang_format_exe = "C:\\Users\\jtiff\\Desktop\\clang+llvm-18.1.8-x86_64-pc-windows-msvc\\bin\\clang-format.exe";
     if(!ce_subprocess_open(&proc, clang_format_exe, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT, use_shell)){
         return result;
     }
@@ -2239,11 +2238,12 @@ ClangFormatResult_t _clang_format_string(char* string, int64_t string_len, bool 
     return result;
 }
 
-bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
+bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_t cursor){
     char* buffer_str = ce_buffer_dupe(buffer);
     int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
     bool trim_ending_newline = true;
-    ClangFormatResult_t result = _clang_format_string(buffer_str, buffer_str_len, trim_ending_newline);
+    ClangFormatResult_t result = _clang_format_string(clang_format_exe, buffer_str, buffer_str_len,
+                                                      trim_ending_newline);
     free(buffer_str);
     if(!result.success){
         return false;
@@ -2266,7 +2266,7 @@ bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
     return true;
 }
 
-bool ce_clang_format_selection(CeView_t* view, CeVimMode_t vim_mode, CeVimVisualData_t* visual){
+bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode_t vim_mode, CeVimVisualData_t* visual){
     CePoint_t highlight_start = {};
     CePoint_t highlight_end = {};
     if(!ce_vim_get_selection_range(vim_mode, visual, view, &highlight_start, &highlight_end)){
@@ -2282,8 +2282,8 @@ bool ce_clang_format_selection(CeView_t* view, CeVimMode_t vim_mode, CeVimVisual
         highlighted_string[highlight_len] = 0;
     }
     bool trim_ending_newline = true;
-    ClangFormatResult_t result = _clang_format_string(highlighted_string, highlight_len,
-                                                      trim_ending_newline);
+    ClangFormatResult_t result = _clang_format_string(clang_format_exe, highlighted_string,
+                                                      highlight_len, trim_ending_newline);
     free(highlighted_string);
     if(!result.success){
         return false;
