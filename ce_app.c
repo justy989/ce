@@ -902,7 +902,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
           {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
           {command_clang_format_file, "clang_format_file", "Run the configured clang-format binary/executable on the current buffer."},
-          // {command_clang_format_selection, "clang_format_file", "Run the configured clang-format binary/executable on the current selected text."},
+          {command_clang_format_selection, "clang_format_selection", "Run the configured clang-format binary/executable on the current selected text."},
           {command_command, "command", "interactively send a commmand"},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
@@ -2174,25 +2174,27 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
 #endif
 }
 
-bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
-    char* buffer_str = ce_buffer_dupe(buffer);
+typedef struct {
+    bool success;
+    char* bytes;
+}ClangFormatResult_t;
+
+ClangFormatResult_t _clang_format_string(char* string, int64_t string_len, bool trim_ending_newline){
+    ClangFormatResult_t result = {};
     CeSubprocess_t proc = {};
     bool use_shell = false;
     // TODO(jtardiff): move to config
     const char* clang_format_exe = "C:\\Users\\jtiff\\Desktop\\clang+llvm-18.1.8-x86_64-pc-windows-msvc\\bin\\clang-format.exe";
     if(!ce_subprocess_open(&proc, clang_format_exe, CE_PROC_COMM_STDIN | CE_PROC_COMM_STDOUT, use_shell)){
-        free(buffer_str);
-        return false;
+        return result;
     }
 
     // Write our buffer to stdin, including the null terminator.
-    int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
-    int64_t bytes_to_write = buffer_str_len + 1;
-    int64_t bytes_written = ce_subprocess_write_stdin(&proc, buffer_str, bytes_to_write);
-    free(buffer_str);
+    int64_t bytes_to_write = string_len + 1;
+    int64_t bytes_written = ce_subprocess_write_stdin(&proc, string, bytes_to_write);
     if(bytes_written != bytes_to_write){
-        ce_log("Failed to write full buffer string to clang format process to format buffer: %s\n", buffer->name);
-        return false;
+        ce_log("Failed to write string to clang format process to format buffer\n");
+        return result;
     }
     ce_subprocess_close_stdin(&proc);
 
@@ -2206,14 +2208,14 @@ bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
         bytes = realloc(bytes, new_bytes_size);
         if(bytes == NULL){
             ce_log("failed to realloc() %" PRId64 " bytes.\n", new_bytes_size);
-            return false;
+            return result;
         }
         bytes_size = new_bytes_size;
 
         bytes_read = ce_subprocess_read_stdout(&proc, bytes + total_bytes_read, (BUFSIZ - 1));
         if(bytes_read < 0){
             ce_subprocess_close(&proc);
-            return false;
+            return result;
         }
         bytes[total_bytes_read + bytes_read] = 0;
         total_bytes_read += bytes_read;
@@ -2222,29 +2224,90 @@ bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
 
     if(total_bytes_read == 0){
         free(bytes);
-        return true;
+        return result;
     }
 
     // The last byte is null and the 2nd to last byte is a newline, just trim it.
-    if(total_bytes_read > 2 &&
+    if(trim_ending_newline &&
+       total_bytes_read > 2 &&
        bytes[total_bytes_read - 2] == CE_NEWLINE &&
        bytes[total_bytes_read - 1] == 0){
         bytes[total_bytes_read - 2] = 0;
+    }
+    result.bytes = bytes;
+    result.success = true;
+    return result;
+}
+
+bool ce_clang_format_buffer(CeBuffer_t* buffer, CePoint_t cursor){
+    char* buffer_str = ce_buffer_dupe(buffer);
+    int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
+    bool trim_ending_newline = true;
+    ClangFormatResult_t result = _clang_format_string(buffer_str, buffer_str_len, trim_ending_newline);
+    free(buffer_str);
+    if(!result.success){
+        return false;
     }
 
     bool removed = ce_buffer_remove_string_change(buffer, (CePoint_t){0, 0}, buffer_str_len,
                                                   &cursor, cursor, false);
     if(!removed){
         ce_log("Failed to clear buffer %s to insert clang format results\n", buffer->name);
+        free(result.bytes);
         return false;
     }
-    bool inserted = ce_buffer_insert_string_change(buffer, bytes, (CePoint_t){0, 0}, &cursor,
+    bool inserted = ce_buffer_insert_string_change(buffer, result.bytes, (CePoint_t){0, 0}, &cursor,
                                                    cursor, true);
     if(!inserted){
         ce_log("Failed to insert clang format results into %s\n", buffer->name);
-        free(bytes);
+        free(result.bytes);
         return false;
     }
+    return true;
+}
+
+bool ce_clang_format_selection(CeView_t* view, CeVimMode_t vim_mode, CeVimVisualData_t* visual){
+    CePoint_t highlight_start = {};
+    CePoint_t highlight_end = {};
+    if(!ce_vim_get_selection_range(vim_mode, visual, view, &highlight_start, &highlight_end)){
+        return false;
+    }
+    int64_t highlight_len = ce_buffer_range_len(view->buffer, highlight_start, highlight_end);
+    if(highlight_len <= 0){
+        return false;
+    }
+    char* highlighted_string = ce_buffer_dupe_string(view->buffer, highlight_start, highlight_len);
+    if(highlighted_string[highlight_len - 1] == CE_NEWLINE){
+        highlight_len--;
+        highlighted_string[highlight_len] = 0;
+    }
+    bool trim_ending_newline = true;
+    ClangFormatResult_t result = _clang_format_string(highlighted_string, highlight_len,
+                                                      trim_ending_newline);
+    free(highlighted_string);
+    if(!result.success){
+        return false;
+    }
+    int64_t result_len = ce_utf8_strlen(result.bytes);
+    if(result_len <= 0){
+        return false;
+    }
+
+    bool removed = ce_buffer_remove_string_change(view->buffer, highlight_start, highlight_len,
+                                                  &view->cursor, view->cursor, false);
+    if(!removed){
+        ce_log("Failed to clear buffer %s to insert clang format results\n", view->buffer->name);
+        free(result.bytes);
+        return false;
+    }
+    bool inserted = ce_buffer_insert_string_change(view->buffer, result.bytes, highlight_start,
+                                                   &view->cursor, view->cursor, true);
+    if(!inserted){
+        ce_log("Failed to insert clang format results into %s\n", view->buffer->name);
+        free(result.bytes);
+        return false;
+    }
+    view->cursor = ce_buffer_advance_point(view->buffer, highlight_start, (result_len - 1));
     return true;
 }
 

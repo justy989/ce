@@ -3609,22 +3609,32 @@ bool ce_vim_verb_decrement_number(CeVim_t* vim, const CeVimAction_t* action, CeR
 bool ce_vim_verb_set_paste_clipboard_to_highlighted(CeVim_t* vim, const CeVimAction_t* action, CeRange_t motion_range, CeView_t* view,
                                                     CePoint_t* cursor, CeVimVisualData_t* visual, CeVimBufferData_t* buffer_data,
                                                     const CeConfigOptions_t* config_options){
-     if(vim->mode != CE_VIM_MODE_VISUAL &&
-        vim->mode != CE_VIM_MODE_VISUAL_LINE){
-         return true;
-     }
-
-     CePoint_t highlight_start = visual->point;
-     CePoint_t highlight_end = *cursor;
-     if(ce_point_after(highlight_start, highlight_end)){
-         CePoint_t tmp = highlight_start;
-         highlight_start = highlight_end;
-         highlight_end = tmp;
-     }
-
-     if(vim->mode == CE_VIM_MODE_VISUAL_LINE){
-         highlight_start.x = 0;
-         highlight_end.x = ce_buffer_line_len(view->buffer, highlight_end.y);
+     CePoint_t highlight_start = {};
+     CePoint_t highlight_end = {};
+     if(!ce_vim_get_selection_range(vim->mode, visual, view, &highlight_start, &highlight_end)){
+          return false;
      }
      return ce_set_clipboard_from_buffer(view->buffer, highlight_start, highlight_end);
+}
+
+bool ce_vim_get_selection_range(CeVimMode_t vim_mode, CeVimVisualData_t* visual, CeView_t* view,
+                                CePoint_t* highlight_start, CePoint_t* highlight_end){
+     if(vim_mode != CE_VIM_MODE_VISUAL &&
+        vim_mode != CE_VIM_MODE_VISUAL_LINE){
+         return false;
+     }
+
+     *highlight_start = visual->point;
+     *highlight_end = view->cursor;
+     if(ce_point_after(*highlight_start, *highlight_end)){
+         CePoint_t tmp = *highlight_start;
+         *highlight_start = *highlight_end;
+         *highlight_end = tmp;
+     }
+
+     if(vim_mode == CE_VIM_MODE_VISUAL_LINE){
+         highlight_start->x = 0;
+         highlight_end->x = ce_buffer_line_len(view->buffer, highlight_end->y);
+     }
+     return true;
 }
