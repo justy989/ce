@@ -224,10 +224,10 @@ void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal){
 }
 
 void ce_subprocess_close_stdin(CeSubprocess_t* subprocess){
-     if(subprocess->stdout_fd >= 0){
-         _close_file(&subprocess->stdout_file);
-         close(subprocess->stdout_fd);
-         subprocess->stdout_fd = -1;
+     if(subprocess->stdin_fd >= 0){
+         _close_file(&subprocess->stdin_file);
+         close(subprocess->stdin_fd);
+         subprocess->stdin_fd = -1;
      }
 }
 
