@@ -1047,6 +1047,7 @@ int main(int argc, char* argv[]){
           config_options->gui_font_size = 16;
           config_options->gui_font_line_separation = 1;
           strncpy(config_options->gui_font_path, "Inconsolata-SemiBold.ttf", MAX_PATH_LEN);
+          config_options->mouse_wheel_line_scroll = 5;
 
           // keybinds
           CeKeyBindDef_t normal_mode_bind_defs[] = {
@@ -1582,6 +1583,16 @@ int main(int argc, char* argv[]){
                     clicked_view->cursor = calculate_view_point_from_screen_point(clicked_view,
                                                                                   mouse_end,
                                                                                   &app.config_options);
+               } break;
+               case SDL_MOUSEWHEEL:
+               {
+                   CePoint_t delta = {0, -event.wheel.y * app.config_options.mouse_wheel_line_scroll};
+                   CePoint_t destination = ce_buffer_move_point(view->buffer, view->cursor,
+                                                                delta, app.config_options.tab_width,
+                                                                CE_CLAMP_X_INSIDE);
+                   if(destination.x >= 0){
+                       view->cursor = destination;
+                   }
                } break;
                }
           }

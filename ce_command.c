@@ -38,6 +38,7 @@ static const char* find_end_of_arg(const char* string){
 static bool parse_arg(CeCommandArg_t* arg, const char* string){
      if(*string == 0) return false;
 
+     int64_t size = 0;
      bool digits_only = true;
      bool decimal = false;
      const char* itr = string;
@@ -54,6 +55,11 @@ static bool parse_arg(CeCommandArg_t* arg, const char* string){
                }
           }
           itr++;
+          size++;
+     }
+
+     if(decimal && digits_only && size == 1){
+         digits_only = false;
      }
 
      if(digits_only){

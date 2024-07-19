@@ -203,6 +203,7 @@ typedef struct{
      char gui_font_path[MAX_PATH_LEN];
      char clangd_path[MAX_PATH_LEN];
      char clang_format_path[MAX_PATH_LEN];
+     int mouse_wheel_line_scroll;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{
