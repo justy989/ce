@@ -460,7 +460,8 @@ CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNod
      CeListDirResult_t list_dir_result = ce_list_dir(path);
 
      int64_t path_len = strnlen(path, MAX_PATH_LEN);
-     // WINDOWS: compress this as a helper function with the logic in open_file_in_dir_recursively().
+
+    // Strip the search characters at the end of the path if they exist.
 #if defined(PLATFORM_WINDOWS)
      if(path_len > 0 && path_len < MAX_PATH_LEN){
          if(path[path_len - 1] == CE_CURRENT_DIR_SEARCH){
@@ -472,16 +473,28 @@ CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNod
              path_len--;
          }
      }
+#else
+     if(path_len > 2){
+         if(path[path_len - 1] == CE_CURRENT_DIR_SEARCH){
+             path[path_len - 1] = 0;
+             path_len--;
+         }
+         if(path_len > 0 && path[path_len - 1] == CE_PATH_SEPARATOR){
+             path[path_len - 1] = 0;
+             path_len--;
+         }
+     }
+
 #endif
+
      bool path_is_current_dir = false;
 #if defined(PLATFORM_WINDOWS)
      path_is_current_dir = path_len == 2 &&
                            path[0] == '.' &&
                            path[1] == '\\';
 #else
-     path_is_current_dir = path_len == 2 &&
-                           path[0] == '.' &&
-                           path[1] == '/';
+     path_is_current_dir = path_len == 1 &&
+                           path[0] == '.';
 #endif
 
 
