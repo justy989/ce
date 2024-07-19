@@ -191,6 +191,9 @@ void ce_vim_add_key_bind(CeVimKeyBind_t* key_binds, int64_t* key_bind_count, CeR
 int64_t ce_vim_get_indentation(CeBuffer_t* buffer, CePoint_t point, int64_t tab_length);
 bool ce_vim_join_next_line(CeBuffer_t* buffer, int64_t line, CePoint_t cursor, bool chain_undo);
 
+bool ce_vim_get_selection_range(CeVimMode_t vim_mode, CeVimVisualData_t* visual, CeView_t* view,
+                                CePoint_t* highlight_start, CePoint_t* highlight_end);
+
 // parse functions
 CeVimParseResult_t ce_vim_parse_motion_left(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key);
 CeVimParseResult_t ce_vim_parse_motion_right(CeVimAction_t* action, const CeVim_t* vim, CeRune_t key);

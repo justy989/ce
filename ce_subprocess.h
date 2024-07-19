@@ -42,6 +42,8 @@ void ce_subprocess_kill(CeSubprocess_t* subprocess, int signal);
 int64_t ce_subprocess_read_stdout(CeSubprocess_t* subprocess, char* buffer, int64_t size);
 // Write the requested number of bytes to stdin
 int64_t ce_subprocess_write_stdin(CeSubprocess_t* subprocess, char* buffer, int64_t size);
+// Close stdin.
+void ce_subprocess_close_stdin(CeSubprocess_t* subprocess);
 // close all subprocess fds and fps and wait for the subprocess to complete
 // returns the exit status from the waitpid() call
 int ce_subprocess_close(CeSubprocess_t* subprocess);

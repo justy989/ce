@@ -202,6 +202,7 @@ typedef struct{
      int gui_font_line_separation;
      char gui_font_path[MAX_PATH_LEN];
      char clangd_path[MAX_PATH_LEN];
+     char clang_format_path[MAX_PATH_LEN];
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{

@@ -1388,8 +1388,6 @@ CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data)
      CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-     printf("Attempting to paste clipboard\n");
-
      CePoint_t resulting_cursor = ce_paste_clipboard_into_buffer(command_context.view->buffer,
                                                                  command_context.view->cursor);
      if(resulting_cursor.x <= 0){
@@ -1439,6 +1437,37 @@ CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_d
          return CE_COMMAND_FAILURE;
      }
 
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_format_file(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+     if(strlen(app->config_options.clang_format_path) == 0){
+         ce_app_message(app, "clang format binary/executable path not configured");
+         return CE_COMMAND_FAILURE;
+     }
+     if(!ce_clang_format_buffer(app->config_options.clang_format_path, command_context.view->buffer,
+                                command_context.view->cursor)){
+         return CE_COMMAND_FAILURE;
+     }
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_clang_format_selection(CeCommand_t* command, void* user_data){
+     CeApp_t* app = (CeApp_t*)(user_data);
+     CommandContext_t command_context = {};
+     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
+     if(strlen(app->config_options.clang_format_path) == 0){
+         ce_app_message(app, "clang format binary/executable path not configured");
+         return CE_COMMAND_FAILURE;
+     }
+     if(!ce_clang_format_selection(app->config_options.clang_format_path, command_context.view,
+                                   app->vim.mode, &app->visual)){
+         return CE_COMMAND_FAILURE;
+     }
+     app->vim.mode = CE_VIM_MODE_NORMAL;
      return CE_COMMAND_SUCCESS;
 }
 

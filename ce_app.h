@@ -274,6 +274,9 @@ bool buffer_modified_outside_editor_complete_func(CeApp_t* app, CeBuffer_t* inpu
 bool ce_app_switch_to_prev_buffer_in_view(CeApp_t* app, CeView_t* view, bool switch_if_deleted);
 bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab_layout, CeView_t* view, bool relative);
 
+bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_t cursor);
+bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode_t vim_mode, CeVimVisualData_t* visual);
+
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
                                        CeVim_t* vim, bool insert_into_jump_list,
                                        const char* base_directory, CeDestination_t* destination);
