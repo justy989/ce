@@ -1467,6 +1467,7 @@ CeCommandStatus_t command_clang_format_selection(CeCommand_t* command, void* use
                                    app->vim.mode, &app->visual)){
          return CE_COMMAND_FAILURE;
      }
+     app->vim.mode = CE_VIM_MODE_NORMAL;
      return CE_COMMAND_SUCCESS;
 }
 

@@ -2219,10 +2219,14 @@ ClangFormatResult_t _clang_format_string(char* clang_format_exe, char* string, i
         bytes[total_bytes_read + bytes_read] = 0;
         total_bytes_read += bytes_read;
     }while(bytes_read > 0);
-    ce_subprocess_close(&proc);
+    int exit_code = ce_subprocess_close(&proc);
 
     if(total_bytes_read == 0){
         free(bytes);
+        return result;
+    }
+    if(exit_code != 0){
+        ce_log("clang format returned: %d\n", exit_code);
         return result;
     }
 
