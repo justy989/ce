@@ -173,7 +173,7 @@ static CeRect_t ce_layout_rect(CeLayout_t* layout){
      return result;
 }
 
-CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
+CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical, bool always_add_last){
      assert(layout->type == CE_LAYOUT_TYPE_TAB);
      CeLayout_t* parent_of_current = ce_layout_find_parent(layout, layout->tab.current);
      if(parent_of_current){
@@ -191,11 +191,15 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
                     new_layout->view.cursor = layout->tab.current->view.cursor;
 
                     int64_t split_layout_index = 0;
-                    for(int64_t i = 0; i < parent_of_current->list.layout_count; i++){
-                         if(parent_of_current->list.layouts[i] == layout->tab.current){
-                              split_layout_index = i;
-                              break;
-                         }
+                    if(always_add_last){
+                        split_layout_index = parent_of_current->list.layout_count;
+                    }else{
+                        for(int64_t i = 0; i < parent_of_current->list.layout_count; i++){
+                             if(parent_of_current->list.layouts[i] == layout->tab.current){
+                                  split_layout_index = i;
+                                  break;
+                             }
+                        }
                     }
 
                     int64_t new_layout_count = parent_of_current->list.layout_count + 1;
@@ -233,7 +237,7 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
                          }
                     }
 
-                    return ce_layout_split(layout, vertical);
+                    return ce_layout_split(layout, vertical, always_add_last);
                }
                break;
           case CE_LAYOUT_TYPE_TAB:
@@ -247,10 +251,11 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
 
                parent_of_current->tab.root = list_layout;
 
-               return ce_layout_split(layout, vertical);
+               return ce_layout_split(layout, vertical, always_add_last);
           } break;
           case CE_LAYOUT_TYPE_TAB_LIST:
-               if(layout->tab_list.current) return ce_layout_split(layout->tab_list.current, vertical);
+               if(layout->tab_list.current) return ce_layout_split(layout->tab_list.current,
+                                                                   vertical, always_add_last);
                break;
           }
      }

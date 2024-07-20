@@ -232,7 +232,8 @@ CeCommandStatus_t command_show_jumps(CeCommand_t* command, void* user_data){
 
 CeLayout_t* split_layout(CeApp_t* app, bool vertical){
      CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
-     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical);
+     bool always_add_last = false;
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical, always_add_last);
 
      if(new_layout){
           ce_view_follow_cursor(&new_layout->view, app->config_options.horizontal_scroll_off,
@@ -391,9 +392,29 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
 }
 
 CeCommandStatus_t command_open_popup_view(CeCommand_t* command, void* user_data){
-     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
+     if(command->arg_count == 1 &&
+        command->args[0].type != CE_COMMAND_ARG_STRING){
+         printf("this man\n");
+         return CE_COMMAND_PRINT_HELP;
+     }
      CeApp_t* app = user_data;
-     if(!ce_app_open_popup_view(app, app->shell_command_buffer)) return CE_COMMAND_FAILURE;
+     CeBuffer_t* buffer = app->shell_command_buffer;
+     if(command->arg_count == 0){
+         if(app->last_popup_buffer){
+             buffer = app->last_popup_buffer;
+         }
+     }else{
+         CeBufferNode_t* itr = app->buffer_node_head;
+         while(itr){
+              if(strcmp(itr->buffer->name, command->args[0].string) == 0){
+                  buffer = itr->buffer;
+                  break;
+              }
+              itr = itr->next;
+         }
+     }
+     if(!ce_app_open_popup_view(app, buffer)) return CE_COMMAND_FAILURE;
      return CE_COMMAND_SUCCESS;
 }
 

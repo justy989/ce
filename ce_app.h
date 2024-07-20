@@ -176,6 +176,8 @@ typedef struct CeApp_t{
      CeClangD_t clangd;
      CeClangDCompletion_t clangd_completion;
 
+     CeBuffer_t* last_popup_buffer;
+
      // debug
      bool log_key_presses;
 }CeApp_t;

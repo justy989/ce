@@ -204,6 +204,7 @@ typedef struct{
      char clangd_path[MAX_PATH_LEN];
      char clang_format_path[MAX_PATH_LEN];
      int mouse_wheel_line_scroll;
+     int popup_view_height;
 }CeConfigOptions_t;
 
 typedef struct CeRuneNode_t{

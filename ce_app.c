@@ -921,7 +921,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_new_tab, "new_tab", "create a new tab"},
           {command_noh, "noh", "turn off search highlighting"},
-          {command_open_popup_view, "open_popup_view", "Open the popup view."},
+          {command_open_popup_view, "open_popup_view", "Open the popup view. Optionally takes a buffer name to use. Defaults to the shell command buffer."},
           {command_paste_clipboard, "paste_clipboard", "Grabs the user's clipboard and inserts into the current buffer"},
           {command_quit, "quit", "quit ce"},
           {command_redraw, "redraw", "redraw the entire editor"},
@@ -1662,6 +1662,7 @@ void ce_app_handle_clangd_response(CeApp_t* app){
 void build_clangd_diagnostics_buffer(CeBuffer_t* buffer, CeBuffer_t* source){
      CeAppBufferData_t* app_data = (CeAppBufferData_t*)(source->app_data);
      char line[BUFSIZ];
+     buffer->status = CE_BUFFER_STATUS_NONE;
      ce_buffer_empty(buffer);
      for(int64_t i = 0; i < app_data->clangd_diagnostics.count; i++){
          CeClangDDiagnostic_t* diag = app_data->clangd_diagnostics.elements + i;
@@ -1669,6 +1670,7 @@ void build_clangd_diagnostics_buffer(CeBuffer_t* buffer, CeBuffer_t* source){
                   source->name, diag->start.y + 1, diag->start.x + 1, diag->message);
          buffer_append_on_new_line(buffer, line);
      }
+     buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
 bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
@@ -2329,22 +2331,28 @@ bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer){
      tab_layout->tab.current = parent_layout;
 
      // split the layout
-     CeLayout_t* new_layout = ce_layout_split(tab_layout, true);
+     bool vertical = true;
+     bool always_add_last = true;
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical, always_add_last);
      if(new_layout == NULL){
          return false;
      }
      new_layout->view.buffer = buffer;
      new_layout->view.scroll = (CePoint_t){0, 0};
      new_layout->popup = true;
-     tab_layout->tab.current = save_current;
 
      // shrink the window after the even split.
-     CePoint_t parent_point = {parent_layout->list.rect.left, parent_layout->list.rect.top};
+     CePoint_t parent_point = {parent_layout->list.rect.left, parent_layout->list.rect.bottom};
      CeLayout_t* layout_to_resize = ce_layout_find_at(app->tab_list_layout, parent_point);
-     if(layout_to_resize){
-         ce_layout_resize_rect(app->tab_list_layout, layout_to_resize, app->terminal_rect, CE_UP, true, 10);
+     int64_t current_popup_height = (new_layout->view.rect.bottom - new_layout->view.rect.top);
+     if(layout_to_resize && app->config_options.popup_view_height < current_popup_height &&
+        app->config_options.popup_view_height < app->terminal_rect.bottom){
+         int64_t popup_resize_delta = current_popup_height - app->config_options.popup_view_height;
+         ce_layout_resize_rect(app->tab_list_layout, layout_to_resize, app->terminal_rect, CE_DOWN, true, popup_resize_delta);
          ce_layout_distribute_rect(parent_layout, parent_layout->list.rect);
      }
+     app->last_popup_buffer = buffer;
+     tab_layout->tab.current = save_current;
      return true;
 }
 
