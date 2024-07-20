@@ -44,6 +44,7 @@ typedef struct CeLayout_t{
           CeTabLayout_t tab;
           CeTabListLayout_t tab_list;
      };
+     bool popup;
 }CeLayout_t;
 
 typedef struct{
@@ -61,6 +62,7 @@ void ce_layout_distribute_rect(CeLayout_t* layout, CeRect_t rect);
 bool ce_layout_resize_rect(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, CeDirection_t direction, bool expand, int64_t amount);
 CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point);
 CeLayout_t* ce_layout_find_parent(CeLayout_t* root, CeLayout_t* node);
+CeLayout_t* ce_layout_find_popup(CeLayout_t* root);
 bool ce_layout_delete(CeLayout_t* root, CeLayout_t* node);
 CeLayout_t* ce_layout_buffer_in_view(CeLayout_t* root, CeBuffer_t* buffer);
 CeLayoutBufferInViewsResult_t ce_layout_buffer_in_views(CeLayout_t* root, CeBuffer_t* buffer);

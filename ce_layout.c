@@ -198,8 +198,6 @@ CeLayout_t* ce_layout_split(CeLayout_t* layout, bool vertical){
                          }
                     }
 
-                    ce_log("split layout index: %d\n", split_layout_index);
-
                     int64_t new_layout_count = parent_of_current->list.layout_count + 1;
                     parent_of_current->list.layouts = realloc(parent_of_current->list.layouts,
                                                               new_layout_count * sizeof(*parent_of_current->list.layouts));
@@ -682,6 +680,54 @@ bool ce_layout_resize_rect(CeLayout_t* root, CeLayout_t* layout, CeRect_t rect, 
                layout->view.rect.bottom = result.new_value;
                break;
           }
+
+          // Update parent rect
+          CeLayout_t* parent = ce_layout_find_parent(root, layout);
+          do{
+              CeRect_t* parent_rect = NULL;
+              switch(parent->type){
+              default:
+                  break;
+              case CE_LAYOUT_TYPE_LIST:
+                  parent_rect = &parent->list.rect;
+                  break;
+              case CE_LAYOUT_TYPE_TAB:
+                  parent_rect = &parent->tab.rect;
+                  break;
+              case CE_LAYOUT_TYPE_TAB_LIST:
+                  parent_rect = &parent->tab_list.rect;
+                  break;
+              }
+              if(parent_rect){
+                   switch(direction){
+                   default:
+                        break;
+                   case CE_LEFT:
+                        if(layout->view.rect.left < parent_rect->left){
+                            parent_rect->left = layout->view.rect.left;
+                        }
+                        break;
+                   case CE_RIGHT:
+                        if(layout->view.rect.right > parent_rect->right){
+                            parent_rect->right = layout->view.rect.right;
+                        }
+                        break;
+                   case CE_UP:
+                        if(layout->view.rect.top < parent_rect->top){
+                            parent_rect->top = layout->view.rect.top;
+                        }
+                        break;
+                   case CE_DOWN:
+                        if(layout->view.rect.bottom > parent_rect->bottom){
+                            parent_rect->bottom = layout->view.rect.bottom;
+                        }
+                        break;
+                   }
+
+              }
+              parent = ce_layout_find_parent(root, parent);
+          }while(parent);
+
      } break;
      case CE_LAYOUT_TYPE_LIST:
           break;
@@ -711,6 +757,30 @@ CeLayout_t* ce_layout_find_at(CeLayout_t* layout, CePoint_t point){
           return ce_layout_find_at(layout->tab.root, point);
      case CE_LAYOUT_TYPE_TAB_LIST:
           return ce_layout_find_at(layout->tab_list.current, point);
+     }
+
+     return NULL;
+}
+
+CeLayout_t* ce_layout_find_popup(CeLayout_t* layout){
+     if(layout->popup){
+         return layout;
+     }
+     switch(layout->type){
+     default:
+          break;
+     case CE_LAYOUT_TYPE_VIEW:
+          break;
+     case CE_LAYOUT_TYPE_LIST:
+          for(int64_t i = 0; i < layout->list.layout_count; i++){
+               CeLayout_t* found = ce_layout_find_popup(layout->list.layouts[i]);
+               if(found) return found;
+          }
+          break;
+     case CE_LAYOUT_TYPE_TAB:
+          return ce_layout_find_popup(layout->tab.root);
+     case CE_LAYOUT_TYPE_TAB_LIST:
+          return ce_layout_find_popup(layout->tab_list.current);
      }
 
      return NULL;

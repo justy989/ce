@@ -904,6 +904,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_format_file, "clang_format_file", "Run the configured clang-format binary/executable on the current buffer."},
           {command_clang_format_selection, "clang_format_selection", "Run the configured clang-format binary/executable on the current selected text."},
           {command_command, "command", "interactively send a commmand"},
+          {command_close_popup_view, "close_popup_view", "Close the popup view if open."},
           {command_create_file, "create_file", "Create the specified filepath."},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
@@ -920,8 +921,9 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_new_tab, "new_tab", "create a new tab"},
           {command_noh, "noh", "turn off search highlighting"},
-          {command_quit, "quit", "quit ce"},
+          {command_open_popup_view, "open_popup_view", "Open the popup view."},
           {command_paste_clipboard, "paste_clipboard", "Grabs the user's clipboard and inserts into the current buffer"},
+          {command_quit, "quit", "quit ce"},
           {command_redraw, "redraw", "redraw the entire editor"},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_reload_config, "reload_config", "reload the config shared object"},
@@ -2124,21 +2126,6 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      app->last_goto_buffer = app->shell_command_buffer;
 
      char* base_directory = relative ? buffer_base_directory(view->buffer) : NULL;
-     CeLayout_t* view_layout = ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer);
-     if(view_layout){
-          view_layout->view.cursor = (CePoint_t){0, 0};
-          view_layout->view.scroll = (CePoint_t){0, 0};
-     }else{
-          ce_view_switch_buffer(view, app->shell_command_buffer, &app->vim,
-                                &app->config_options, true);
-          view->cursor = (CePoint_t){0, 0};
-          view->scroll = (CePoint_t){0, 0};
-          free(buffer_data->base_directory);
-          buffer_data->base_directory = NULL;
-          if(base_directory){
-               buffer_data->base_directory = strdup(base_directory);
-          }
-     }
 
      char updated_command[BUFSIZ];
      if(base_directory){
@@ -2163,16 +2150,15 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
           ce_log("failed to create thread to run command\n");
           return false;
      }
-
-     return true;
 #else
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
           return false;
      }
-     return true;
 #endif
+     ce_app_open_popup_view(app, app->shell_command_buffer);
+     return true;
 }
 
 typedef struct {
@@ -2310,6 +2296,81 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
     }
     view->cursor = ce_buffer_advance_point(view->buffer, highlight_start, (result_len - 1));
     return true;
+}
+
+bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->type != CE_LAYOUT_TYPE_TAB){
+         return false;
+     }
+
+     // If the split already exists, just re-use it.
+     CeLayout_t* popup_layout = ce_layout_find_popup(app->tab_list_layout);
+     if(popup_layout){
+         if(popup_layout->type == CE_LAYOUT_TYPE_VIEW){
+             popup_layout->view.buffer = buffer;
+             return true;
+         }
+         ce_log("error layout at active view position not view type\n");
+         return false;
+     }
+
+     // Find the highest level parent layout that isn't a tab, which should be a list.
+     CeLayout_t* parent_layout = ce_layout_find_parent(tab_layout->tab.root, tab_layout->tab.current);
+     CeLayout_t* save_current = tab_layout->tab.current;
+     CeLayout_t* new_parent_layout = NULL;
+     while(true){
+         new_parent_layout = ce_layout_find_parent(tab_layout->tab.root, parent_layout);
+         if(!new_parent_layout || new_parent_layout->type == CE_LAYOUT_TYPE_TAB){
+             break;
+         }
+         parent_layout = new_parent_layout;
+     }
+     tab_layout->tab.current = parent_layout;
+
+     // split the layout
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, true);
+     if(new_layout == NULL){
+         return false;
+     }
+     new_layout->view.buffer = buffer;
+     new_layout->view.scroll = (CePoint_t){0, 0};
+     new_layout->popup = true;
+     tab_layout->tab.current = save_current;
+
+     // shrink the window after the even split.
+     CePoint_t parent_point = {parent_layout->list.rect.left, parent_layout->list.rect.top};
+     CeLayout_t* layout_to_resize = ce_layout_find_at(app->tab_list_layout, parent_point);
+     if(layout_to_resize){
+         ce_layout_resize_rect(app->tab_list_layout, layout_to_resize, app->terminal_rect, CE_UP, true, 10);
+         ce_layout_distribute_rect(parent_layout, parent_layout->list.rect);
+     }
+     return true;
+}
+
+bool ce_app_close_popup_view(CeApp_t* app){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     CeLayout_t* current_layout = tab_layout->tab.current;
+     CeLayout_t* popup_layout = ce_layout_find_popup(app->tab_list_layout);
+     if(popup_layout == NULL){
+         return false;
+     }
+     // Save a point in the popup layout.
+     CePoint_t popup_point = {};
+     if(popup_layout->type == CE_LAYOUT_TYPE_VIEW){
+         popup_point.x = popup_layout->view.rect.left;
+         popup_point.y = popup_layout->view.rect.top;
+     }
+     bool result = ce_layout_delete(app->tab_list_layout, popup_layout);
+     // Find the layout that is where the popup layout used to be, and make it the current one if
+     // the delete was successful.
+     if(result && current_layout == popup_layout){
+          CeLayout_t* select_layout = ce_layout_find_at(tab_layout, popup_point);
+          if(select_layout){
+              tab_layout->tab.current = select_layout;
+          }
+     }
+     return result;
 }
 
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,

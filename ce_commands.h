@@ -20,6 +20,8 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_resize_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_parent_layout(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_open_popup_view(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_close_popup_view(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_create_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_load_directory_files(CeCommand_t* command, void* user_data);

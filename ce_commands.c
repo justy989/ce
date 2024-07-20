@@ -390,6 +390,20 @@ CeCommandStatus_t command_delete_layout(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_open_popup_view(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     if(!ce_app_open_popup_view(app, app->shell_command_buffer)) return CE_COMMAND_FAILURE;
+     return CE_COMMAND_SUCCESS;
+}
+
+CeCommandStatus_t command_close_popup_view(CeCommand_t* command, void* user_data){
+     if(command->arg_count != 0) return CE_COMMAND_PRINT_HELP;
+     CeApp_t* app = user_data;
+     if(!ce_app_close_popup_view(app)) return CE_COMMAND_FAILURE;
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_create_file(CeCommand_t* command, void* user_data){
      if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 
