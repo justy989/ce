@@ -2311,6 +2311,8 @@ bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer){
      if(popup_layout){
          if(popup_layout->type == CE_LAYOUT_TYPE_VIEW){
              popup_layout->view.buffer = buffer;
+             popup_layout->view.scroll = (CePoint_t){0, 0};
+             app->last_popup_buffer = buffer;
              return true;
          }
          ce_log("error layout at active view position not view type\n");
@@ -2321,14 +2323,18 @@ bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer){
      CeLayout_t* parent_layout = ce_layout_find_parent(tab_layout->tab.root, tab_layout->tab.current);
      CeLayout_t* save_current = tab_layout->tab.current;
      CeLayout_t* new_parent_layout = NULL;
-     while(true){
+     while(parent_layout){
          new_parent_layout = ce_layout_find_parent(tab_layout->tab.root, parent_layout);
          if(!new_parent_layout || new_parent_layout->type == CE_LAYOUT_TYPE_TAB){
              break;
          }
          parent_layout = new_parent_layout;
      }
-     tab_layout->tab.current = parent_layout;
+     if(parent_layout != NULL){
+         tab_layout->tab.current = parent_layout;
+     }else{
+         parent_layout = tab_layout->tab.current;
+     }
 
      // split the layout
      bool vertical = true;
@@ -2349,7 +2355,9 @@ bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer){
         app->config_options.popup_view_height < app->terminal_rect.bottom){
          int64_t popup_resize_delta = current_popup_height - app->config_options.popup_view_height;
          ce_layout_resize_rect(app->tab_list_layout, layout_to_resize, app->terminal_rect, CE_DOWN, true, popup_resize_delta);
-         ce_layout_distribute_rect(parent_layout, parent_layout->list.rect);
+         if(parent_layout->type != CE_LAYOUT_TYPE_VIEW){
+             ce_layout_distribute_rect(parent_layout, parent_layout->list.rect);
+         }
      }
      app->last_popup_buffer = buffer;
      tab_layout->tab.current = save_current;

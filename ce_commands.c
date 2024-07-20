@@ -276,7 +276,9 @@ CeCommandStatus_t command_split_layout(CeCommand_t* command, void* user_data){
      }
 
      CeLayout_t* new_layout = split_layout(app, vertical);
-     (void)(new_layout);
+     if(new_layout == NULL){
+         return CE_COMMAND_FAILURE;
+     }
 
      return CE_COMMAND_SUCCESS;
 }
