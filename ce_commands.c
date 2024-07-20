@@ -1341,7 +1341,10 @@ CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* use
      CommandContext_t command_context = {};
 
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
-
+#if defined(PLATFORM_WINDOWS)
+     ce_app_message(app, "shell_command_relative not yet supported on windows. Please use shell_command.");
+     return CE_COMMAND_FAILURE;
+#else
      char* command_args = build_string_from_command_args(command);
 
      if(!ce_app_run_shell_command(app, command_args, command_context.tab_layout, command_context.view, true)){
@@ -1351,6 +1354,7 @@ CeCommandStatus_t command_shell_command_relative(CeCommand_t* command, void* use
 
      free(command_args);
      return CE_COMMAND_SUCCESS;
+#endif
 }
 
 CeCommandStatus_t command_font_adjust_size(CeCommand_t* command, void* user_data) {
