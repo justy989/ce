@@ -2369,7 +2369,6 @@ bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_
     ClangFormatResult_t result = _clang_format_string(clang_format_exe, buffer_str, buffer_str_len);
     free(buffer_str);
     if(!result.success){
-        printf("%d\n", __LINE__);
         return false;
     }
 
@@ -2378,7 +2377,6 @@ bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_
     if(!removed){
         ce_log("Failed to clear buffer %s to insert clang format results\n", buffer->name);
         free(result.bytes);
-        printf("%d\n", __LINE__);
         return false;
     }
     bool inserted = ce_buffer_insert_string_change(buffer, result.bytes, (CePoint_t){0, 0}, &cursor,
@@ -2386,7 +2384,6 @@ bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_
     if(!inserted){
         ce_log("Failed to insert clang format results into %s\n", buffer->name);
         free(result.bytes);
-        printf("%d\n", __LINE__);
         return false;
     }
     return true;
@@ -2402,14 +2399,15 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
     if(highlight_len <= 0){
         return false;
     }
-    char* highlighted_string = ce_buffer_dupe_string(view->buffer, highlight_start, highlight_len);
-    if(highlighted_string[highlight_len - 1] == CE_NEWLINE){
-        highlight_len--;
-        highlighted_string[highlight_len] = 0;
-    }
-    ClangFormatResult_t result = _clang_format_string(clang_format_exe, highlighted_string,
-                                                      highlight_len);
-    free(highlighted_string);
+    // Pass clang-format the entire buffer, but tell it the offset and length to format.
+    char* buffer_str = ce_buffer_dupe(view->buffer);
+    int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
+    int64_t highlight_start_offset = ce_buffer_range_len(view->buffer, (CePoint_t){0, 0}, highlight_start);
+    char command_buffer[MAX_PATH_LEN];
+    snprintf(command_buffer, MAX_PATH_LEN, "%s --offset=%" PRId64 " --length=%" PRId64,
+             clang_format_exe, highlight_start_offset, highlight_len);
+    ClangFormatResult_t result = _clang_format_string(command_buffer, buffer_str,
+                                                      buffer_str_len);
     if(!result.success){
         return false;
     }
@@ -2418,21 +2416,20 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
         return false;
     }
 
-    bool removed = ce_buffer_remove_string_change(view->buffer, highlight_start, highlight_len,
+    bool removed = ce_buffer_remove_string_change(view->buffer, (CePoint_t){0, 0}, buffer_str_len,
                                                   &view->cursor, view->cursor, false);
     if(!removed){
         ce_log("Failed to clear buffer %s to insert clang format results\n", view->buffer->name);
         free(result.bytes);
         return false;
     }
-    bool inserted = ce_buffer_insert_string_change(view->buffer, result.bytes, highlight_start,
-                                                   &view->cursor, view->cursor, true);
+    bool inserted = ce_buffer_insert_string_change(view->buffer, result.bytes, (CePoint_t){0, 0}, &view->cursor,
+                                                   view->cursor, true);
     if(!inserted){
         ce_log("Failed to insert clang format results into %s\n", view->buffer->name);
         free(result.bytes);
         return false;
     }
-    view->cursor = ce_buffer_advance_point(view->buffer, highlight_start, (result_len - 1));
     return true;
 }
 
