@@ -882,7 +882,7 @@ void print_help(char* program){
 int main(int argc, char* argv[]){
      const char* config_filepath = NULL;
      bool ls_clangd = false;
-     int last_arg_index = 0;
+     int last_arg_index = argc;
 
      // setup signal handler
      signal(SIGINT, handle_sigint);
@@ -1349,15 +1349,26 @@ int main(int argc, char* argv[]){
      if(argc > 1){
           for(int64_t i = last_arg_index; i < argc; i++){
 #if defined(PLATFORM_WINDOWS)
+               char* relative_path = NULL;
+               char* last_slash = strrchr(argv[i], '\\');
+               if(last_slash){
+                   relative_path = ce_strndup(argv[i], last_slash - argv[i]);
+               }
                // Windows makes every program do the expansion themselves...
                CeListDirResult_t list_dir_result = ce_list_dir(argv[i]);
                for(int64_t i = 0; i < list_dir_result.count; i++){
                    if(list_dir_result.is_directories[i]){
                        continue;
                    }
-                   char* filename = list_dir_result.filenames[i];
+                   char filepath[MAX_PATH_LEN];
+                   if(relative_path){
+                       snprintf(filepath, MAX_PATH_LEN, "%s\\%s",
+                                relative_path, list_dir_result.filenames[i]);
+                   }else{
+                       strncpy(filepath, list_dir_result.filenames[i], MAX_PATH_LEN);
+                   }
                    CeBuffer_t* buffer = new_buffer();
-                   if(ce_buffer_load_file(buffer, filename)){
+                   if(ce_buffer_load_file(buffer, filepath)){
                         ce_buffer_node_insert(&app.buffer_node_head, buffer);
                         determine_buffer_syntax(buffer);
                         initial_buffer = app.buffer_node_head->buffer;
