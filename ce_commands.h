@@ -57,6 +57,7 @@ CeCommandStatus_t command_paste_clipboard(CeCommand_t* command, void* user_data)
 CeCommandStatus_t command_clang_goto_def(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_goto_decl(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_clang_find_references(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_format_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_format_selection(CeCommand_t* command, void* user_data);
 

@@ -736,6 +736,12 @@ CeDestination_t scan_line_for_destination(const char* line){
      // grep/gcc format
      // ce_app.c:1515:23
      char* file_end = strchr(line, ':');
+#if defined(PLATFORM_WINDOWS)
+     // detect windows path.
+     if(file_end && line[1] == ':'){
+         file_end = strchr(line + 2, ':');
+     }
+#endif
      if(file_end){
           char* row_end = strchr(file_end + 1, ':');
           char* col_end = NULL;
@@ -901,6 +907,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_goto_def, "clang_goto_def", "If clangd is enabled, request to go the definition of the symbol under the cursor."},
           {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
           {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
+          {command_clang_find_references, "clang_find_references", "If clangd is enabled, request a list of references to the symbol under the cursor."},
           {command_clang_format_file, "clang_format_file", "Run the configured clang-format binary/executable on the current buffer."},
           {command_clang_format_selection, "clang_format_selection", "Run the configured clang-format binary/executable on the current selected text."},
           {command_command, "command", "interactively send a commmand"},
@@ -1574,6 +1581,115 @@ CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
      return result;
 }
 
+void _extract_reference_locations_to_buffer(CeJsonObj_t* obj, CeBuffer_t* buffer,
+                                            CeBufferNode_t* buffer_node_head){
+     buffer->status = CE_BUFFER_STATUS_NONE;
+     ce_buffer_empty(buffer);
+
+     CeJsonFindResult_t result_find = ce_json_obj_find(obj, "result");
+     if(result_find.type != CE_JSON_TYPE_ARRAY){
+         return;
+     }
+     CeJsonArray_t* result_array = ce_json_obj_get_array(obj, &result_find);
+     if(result_array == NULL){
+         return;
+     }
+
+     char* filepath = NULL;
+     for(int64_t i = 0; i < result_array->count; i++){
+          if(filepath){
+               free(filepath);
+               filepath = NULL;
+          }
+
+          CeJsonValue_t* value = result_array->values + i;
+          if(value->type != CE_JSON_TYPE_OBJECT){
+                continue;
+          }
+
+          CeJsonFindResult_t uri_find = ce_json_obj_find(&value->obj, "uri");
+          if(uri_find.type != CE_JSON_TYPE_STRING){
+               continue;
+          }
+
+          const char* file_uri = ce_json_obj_get_string(&value->obj, &uri_find);
+          if(file_uri == NULL){
+               continue;
+          }
+
+          filepath = strdup(file_uri);
+#if defined(PLATFORM_WINDOWS)
+          _convert_uri_to_windows_path(filepath);
+#else
+          _convert_uri_to_linux_path(filepath);
+#endif
+
+          CeJsonFindResult_t range_find = ce_json_obj_find(&value->obj, "range");
+          if(range_find.type != CE_JSON_TYPE_OBJECT){
+              continue;
+          }
+
+          CeJsonObj_t* range_obj = ce_json_obj_get_obj(&value->obj, &range_find);
+          if(range_obj == NULL){
+              continue;
+          }
+
+          // This logic can be compressed.
+          CeJsonFindResult_t start_find = ce_json_obj_find(range_obj, "start");
+          if(start_find.type != CE_JSON_TYPE_OBJECT){
+               continue;
+          }
+          CeJsonObj_t* start_obj = ce_json_obj_get_obj(range_obj, &start_find);
+          if(start_obj == NULL){
+               continue;
+          }
+          CeJsonFindResult_t line_find = ce_json_obj_find(start_obj, "line");
+          if(line_find.type != CE_JSON_TYPE_NUMBER){
+               continue;
+          }
+          CeJsonFindResult_t character_find = ce_json_obj_find(start_obj, "character");
+          if(character_find.type != CE_JSON_TYPE_NUMBER){
+               continue;
+          }
+          int64_t start_x = (int64_t)(*ce_json_obj_get_number(start_obj, &character_find));
+          int64_t start_y = (int64_t)(*ce_json_obj_get_number(start_obj, &line_find));
+
+          char line[MAX_PATH_LEN];
+          snprintf(line, MAX_PATH_LEN, "%s:%" PRId64 ":%" PRId64 " ", filepath, start_y + 1, start_x + 1);
+          CePoint_t end = ce_buffer_end_point(buffer);
+          ce_buffer_insert_string(buffer, line, end);
+
+          // Find the line to insert text from that buffer.
+          CeBufferNode_t* buffer_itr = buffer_node_head;
+          while(buffer_itr){
+#if defined(PLATFORM_WINDOWS)
+              char* buffer_full_path = _fullpath(NULL, buffer_itr->buffer->name, MAX_PATH_LEN);
+#else
+              char* buffer_full_path = realpath(buffer_itr->buffer->name, NULL);
+#endif
+              bool matches = (strcmp(filepath, buffer_full_path) == 0);
+              free(buffer_full_path);
+              if(matches){
+                  if(start_y < buffer_itr->buffer->line_count){
+                      char* buffer_line = buffer_itr->buffer->lines[start_y];
+                      end = ce_buffer_end_point(buffer);
+                      ce_buffer_insert_string(buffer, buffer_line, end);
+                  }
+                  break;
+              }
+              buffer_itr = buffer_itr->next;
+          }
+
+          end = ce_buffer_end_point(buffer);
+          ce_buffer_insert_string(buffer, "\n", end);
+     }
+     if(filepath){
+          free(filepath);
+          filepath = NULL;
+     }
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
 void ce_app_handle_clangd_response(CeApp_t* app){
      if(app->clangd.buffer == NULL){
           return;
@@ -1623,6 +1739,12 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                                                       &app->config_options,
                                                       &app->terminal_rect);
                     }
+               }else if(strcmp(response.method, "textDocument/references") == 0){
+                   _extract_reference_locations_to_buffer(response.obj, app->clangd_references_buffer,
+                                                          app->buffer_node_head);
+                   if(app->clangd_references_buffer->line_count > 0){
+                       ce_app_open_popup_view(app, app->clangd_references_buffer);
+                   }
                }
           }else{
                CeJsonFindResult_t method_find = ce_json_obj_find(response.obj, "method");

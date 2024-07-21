@@ -113,6 +113,7 @@ bool ce_clangd_request_goto_type_def(CeClangD_t* clangd, CeBuffer_t* buffer, CeP
 bool ce_clangd_request_goto_def(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
 bool ce_clangd_request_goto_decl(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
 bool ce_clangd_request_auto_complete(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
+bool ce_clangd_request_find_references(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point);
 
 bool ce_clangd_outstanding_responses(CeClangD_t* clangd);
 CeClangDResponse_t ce_clangd_pop_response(CeClangD_t* clangd);

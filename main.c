@@ -71,7 +71,7 @@ static void build_buffer_list(CeBuffer_t* buffer, CeBufferNode_t* head){
      while(itr){
           if(max_buffer_lines < itr->buffer->line_count) max_buffer_lines = itr->buffer->line_count;
           int64_t name_len = strlen(itr->buffer->name);
-          if(max_name_len < name_len) max_buffer_lines = name_len;
+          if(max_name_len < name_len) max_name_len = name_len;
           itr = itr->next;
      }
 
@@ -667,6 +667,7 @@ void app_handle_key(CeApp_t* app, CeView_t* view, int key){
                        itr->buffer == g_ce_log_buffer ||
                        itr->buffer == app->message_view.buffer ||
                        itr->buffer == app->clangd_diagnostics_buffer ||
+                       itr->buffer == app->clangd_references_buffer ||
                        itr->buffer == app->clangd_completion.buffer ||
                        itr->buffer == app->clangd.buffer ||
                        itr->buffer == app->input_view.buffer){
@@ -1216,6 +1217,7 @@ int main(int argc, char* argv[]){
           if(ls_clangd){
                app.clangd.buffer = new_buffer();
                app.clangd_diagnostics_buffer = new_buffer();
+               app.clangd_references_buffer = new_buffer();
                app.clangd_completion.buffer = new_buffer();
 
                ce_buffer_alloc(app.clangd.buffer, 1, "[clangd]");
@@ -1224,13 +1226,17 @@ int main(int argc, char* argv[]){
                ce_buffer_node_insert(&app.buffer_node_head, app.clangd_completion.buffer);
                ce_buffer_alloc(app.clangd_diagnostics_buffer, 1, "[clangd diagnostics]");
                ce_buffer_node_insert(&app.buffer_node_head, app.clangd_diagnostics_buffer);
+               ce_buffer_alloc(app.clangd_references_buffer, 1, "[clangd references]");
+               ce_buffer_node_insert(&app.buffer_node_head, app.clangd_references_buffer);
 
                app.clangd.buffer->status = CE_BUFFER_STATUS_NONE;
                app.clangd_completion.buffer->status = CE_BUFFER_STATUS_NONE;
                app.clangd_diagnostics_buffer->status = CE_BUFFER_STATUS_NONE;
+               app.clangd_references_buffer->status = CE_BUFFER_STATUS_NONE;
                app.clangd.buffer->no_line_numbers = true;
                app.clangd_completion.buffer->no_line_numbers = true;
                app.clangd_diagnostics_buffer->no_line_numbers = true;
+               app.clangd_references_buffer->no_line_numbers = true;
 
                buffer_data = app.clangd.buffer->app_data;
                buffer_data->syntax_function = ce_syntax_highlight_plain;
@@ -1238,6 +1244,8 @@ int main(int argc, char* argv[]){
                buffer_data->syntax_function = ce_syntax_highlight_completions;
                buffer_data = app.clangd_diagnostics_buffer->app_data;
                buffer_data->syntax_function = ce_syntax_highlight_c;
+               buffer_data = app.clangd_references_buffer->app_data;
+               buffer_data->syntax_function = ce_syntax_highlight_plain;
 
                app.clangd_completion.view.buffer = app.clangd_completion.buffer;
           }
@@ -1337,12 +1345,14 @@ int main(int argc, char* argv[]){
      }
 
      // Load any files requested on the command line.
+     CeBuffer_t* initial_buffer = app.buffer_list_buffer;
      if(argc > 1){
           for(int64_t i = last_arg_index; i < argc; i++){
                CeBuffer_t* buffer = new_buffer();
                if(ce_buffer_load_file(buffer, argv[i])){
                     ce_buffer_node_insert(&app.buffer_node_head, buffer);
                     determine_buffer_syntax(buffer);
+                    initial_buffer = app.buffer_node_head->buffer;
                     if(!ce_clangd_file_open(&app.clangd, buffer)){
                          return 1;
                     }
@@ -1350,9 +1360,6 @@ int main(int argc, char* argv[]){
                     free(buffer);
                }
           }
-     }else{
-          CeBuffer_t* buffer = new_buffer();
-          ce_buffer_alloc(buffer, 1, "unnamed");
      }
 
      ce_app_init_default_commands(&app);
@@ -1361,7 +1368,7 @@ int main(int argc, char* argv[]){
      // init layout
      {
           CeRect_t rect = {};
-          CeLayout_t* tab_layout = ce_layout_tab_init(app.buffer_node_head->buffer, rect);
+          CeLayout_t* tab_layout = ce_layout_tab_init(initial_buffer, rect);
           app.tab_list_layout = ce_layout_tab_list_init(tab_layout);
 #if defined(DISPLAY_TERMINAL)
           int terminal_width = 0;
@@ -1705,6 +1712,11 @@ int main(int argc, char* argv[]){
                         build_clangd_diagnostics_buffer(clangd_diagnostics_layout->view.buffer,
                                                         view->buffer);
                         app.last_goto_buffer = clangd_diagnostics_layout->view.buffer;
+                    }else{
+                        CeLayout_t* clangd_references_layout = ce_layout_buffer_in_view(tab_layout, app.clangd_references_buffer);
+                        if(clangd_references_layout){
+                            app.last_goto_buffer = clangd_references_layout->view.buffer;
+                        }
                     }
                }
           }

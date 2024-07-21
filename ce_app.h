@@ -139,6 +139,7 @@ typedef struct CeApp_t{
      CeBuffer_t* shell_command_buffer;
      CeBuffer_t* last_goto_buffer;
      CeBuffer_t* clangd_diagnostics_buffer;
+     CeBuffer_t* clangd_references_buffer;
      CeComplete_t input_complete;
      CeHistory_t command_history;
      CeHistory_t search_history;
