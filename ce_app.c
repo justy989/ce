@@ -943,6 +943,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_paste_clipboard, "paste_clipboard", "Grabs the user's clipboard and inserts into the current buffer"},
           {command_quit, "quit", "quit ce"},
           {command_redraw, "redraw", "redraw the entire editor"},
+          {command_rename_file, "rename_file", "Rename the first specified filename to the second specified filename."},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_reload_config, "reload_config", "reload the config shared object"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},

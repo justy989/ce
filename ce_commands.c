@@ -444,6 +444,23 @@ CeCommandStatus_t command_create_file(CeCommand_t* command, void* user_data){
      return CE_COMMAND_SUCCESS;
 }
 
+CeCommandStatus_t command_rename_file(CeCommand_t* command, void* user_data){
+     if(command->arg_count < 0 || command->arg_count != 2) return CE_COMMAND_PRINT_HELP;
+
+     CeApp_t* app = user_data;
+
+     if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+     if(command->args[1].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
+
+     int rc = rename(command->args[0].string, command->args[1].string);
+     if (rc != 0) {
+         ce_log("rename() failed: %s\n", strerror(errno));
+         return CE_COMMAND_FAILURE;
+     }
+
+     return CE_COMMAND_SUCCESS;
+}
+
 CeCommandStatus_t command_remove_file(CeCommand_t* command, void* user_data){
      if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
 

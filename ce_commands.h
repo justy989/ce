@@ -32,6 +32,7 @@ CeCommandStatus_t command_search(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_noh(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_setpaste(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_setnopaste(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_rename_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_regex_search(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_command(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_switch_buffer(CeCommand_t* command, void* user_data);
