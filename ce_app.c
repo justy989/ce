@@ -828,6 +828,12 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
           ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
           return false;
      }
+
+     user_config->save_func = (CeOnSaveFunc*)(GetProcAddress(user_config->library_instance,
+                                                             "ce_on_save_file"));
+     if(user_config->save_func != NULL){
+          ce_log("Detected 'ce_on_save_func()' in %s\n", user_config->filepath);
+     }
 #else
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
@@ -846,6 +852,11 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
      if(!user_config->free_func){
           ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
           return false;
+     }
+
+     user_config->save_func = dlsym(user_config->handle, "ce_on_save_file");
+     if(user_config->save_func){
+          ce_log("detected 'ce_on_save_file()' in %s\n", user_config->filepath);
      }
 #endif
      return true;
@@ -2358,6 +2369,7 @@ bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_
     ClangFormatResult_t result = _clang_format_string(clang_format_exe, buffer_str, buffer_str_len);
     free(buffer_str);
     if(!result.success){
+        printf("%d\n", __LINE__);
         return false;
     }
 
@@ -2366,6 +2378,7 @@ bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_
     if(!removed){
         ce_log("Failed to clear buffer %s to insert clang format results\n", buffer->name);
         free(result.bytes);
+        printf("%d\n", __LINE__);
         return false;
     }
     bool inserted = ce_buffer_insert_string_change(buffer, result.bytes, (CePoint_t){0, 0}, &cursor,
@@ -2373,6 +2386,7 @@ bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_
     if(!inserted){
         ce_log("Failed to insert clang format results into %s\n", buffer->name);
         free(result.bytes);
+        printf("%d\n", __LINE__);
         return false;
     }
     return true;

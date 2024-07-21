@@ -83,6 +83,8 @@ typedef bool (WINAPI CeUserConfigFunc)(struct CeApp_t*);
 typedef bool CeUserConfigFunc(struct CeApp_t*);
 #endif
 
+typedef bool CeOnSaveFunc(struct CeApp_t*, CeBuffer_t*);
+
 typedef struct{
 #if defined(PLATFORM_WINDOWS)
      HINSTANCE library_instance;
@@ -92,6 +94,7 @@ typedef struct{
      char* filepath;
      CeUserConfigFunc* init_func;
      CeUserConfigFunc* free_func;
+     CeOnSaveFunc* save_func;
 }CeUserConfig_t;
 
 typedef struct{
