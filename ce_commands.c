@@ -398,7 +398,6 @@ CeCommandStatus_t command_open_popup_view(CeCommand_t* command, void* user_data)
      if(command->arg_count < 0 || command->arg_count > 1) return CE_COMMAND_PRINT_HELP;
      if(command->arg_count == 1 &&
         command->args[0].type != CE_COMMAND_ARG_STRING){
-         printf("this man\n");
          return CE_COMMAND_PRINT_HELP;
      }
      CeApp_t* app = user_data;
@@ -595,7 +594,13 @@ CeStrNode_t* find_files_in_directory_recursively(const char* directory, CeStrNod
      return node;
 }
 
-CeCommandStatus_t command_load_directory_files(CeCommand_t* command, void* user_data){
+int _strstrcmp(const void* a, const void* b){
+    char* a_str = *(char**)(a);
+    char* b_str = *(char**)(b);
+    return strcmp(a_str, b_str);
+}
+
+CeCommandStatus_t command_discover_directory_files(CeCommand_t* command, void* user_data){
     CeApp_t* app = user_data;
     CommandContext_t command_context = {};
 
@@ -641,54 +646,108 @@ CeCommandStatus_t command_load_directory_files(CeCommand_t* command, void* user_
     free(ignore_dirs);
     free(ignore_dir_lens);
 
-    // convert linked list of strings to array of strings
-    CeStrNode_t* save_head = head;
-
-    ce_app_clear_filepath_cache(app);
-
-    app->cached_filepath_count = 0;
-    while(head){
-        if(head->string){
-            app->cached_filepath_count++;
+    // Count the paths.
+    int64_t filepath_count = 0;
+    CeStrNode_t* itr = head;
+    while(itr){
+        if(itr->string){
+            filepath_count++;
         }
-        head = head->next;
+        itr = itr->next;
     }
 
-    app->cached_filepaths = malloc(sizeof(*app->cached_filepaths) * app->cached_filepath_count);
+    // Build an array of strings for the paths.
+    char** filepaths = malloc(filepath_count * sizeof(filepaths[0]));
+    bool* filepaths_already_exists = calloc(filepath_count, sizeof(filepaths_already_exists[0]));
 
-    head = save_head;
-
-    uint64_t file_index = 0;
-    while(head){
-        if(head->string){
-            app->cached_filepaths[file_index] = strdup(head->string);
-            file_index++;
+    int64_t filepath_index = 0;
+    itr = head;
+    while(itr){
+        if(itr->string){
+            filepaths[filepath_index] = strdup(itr->string);
+            filepath_index++;
         }
         CeStrNode_t* node = head;
-        head = head->next;
+        itr = itr->next;
         free(node->string);
         free(node);
     }
 
+    // Sort the filepaths.
+    qsort(filepaths,
+          filepath_count,
+          sizeof(filepaths[0]),
+          _strstrcmp);
+
+    // Since both lists are sorted, compare the elements in lock step.
+    int64_t matching_filepath_count = 0;
+    int64_t discovered_index = 0;
+    filepath_index = 0;
+    while(filepath_index < filepath_count &&
+          discovered_index < app->discovered_filepath_count){
+        int rc = strcmp(filepaths[filepath_index],
+                        app->discovered_filepaths[discovered_index]);
+        if(rc < 0){
+            discovered_index++;
+        }else if(rc > 0){
+            filepath_index++;
+        }else{
+            filepaths_already_exists[filepath_index] = true;
+            matching_filepath_count++;
+            filepath_index++;
+            discovered_index++;
+        }
+    }
+
+    int64_t new_filepath_count = filepath_count - matching_filepath_count;
+    if(new_filepath_count > 0){
+        int64_t new_discovered_filepath_count = app->discovered_filepath_count + new_filepath_count;
+        app->discovered_filepaths = realloc(
+            app->discovered_filepaths,
+            sizeof(*app->discovered_filepaths) * new_discovered_filepath_count);
+
+        discovered_index = app->discovered_filepath_count;
+        for(int64_t i = 0; i < filepath_count; i++){
+            if(!filepaths_already_exists[i]){
+                app->discovered_filepaths[discovered_index] = strdup(filepaths[i]);
+                discovered_index++;
+            }
+        }
+
+        app->discovered_filepath_count = new_discovered_filepath_count;
+
+        // Sort the final list of paths.
+        qsort(app->discovered_filepaths,
+              app->discovered_filepath_count,
+              sizeof(app->discovered_filepaths[0]),
+              _strstrcmp);
+    }
+
+    for(int64_t i = 0; i < filepath_count; i++){
+        free(filepaths[i]);
+    }
+    free(filepaths);
+    free(filepaths_already_exists);
+
     // setup input and completion
-    ce_app_input(app, "Load Directory File", load_project_file_input_complete_func);
-    ce_complete_init(&app->input_complete, (const char**)(app->cached_filepaths), NULL, app->cached_filepath_count);
+    ce_app_input(app, "Load Discovered File", load_project_file_input_complete_func);
+    ce_complete_init(&app->input_complete, (const char**)(app->discovered_filepaths), NULL, app->discovered_filepath_count);
     build_complete_list(app->complete_list_buffer, &app->input_complete);
 
     return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_load_cached_files(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_load_discovered_files(CeCommand_t* command, void* user_data){
     CeApp_t* app = user_data;
     CommandContext_t command_context = {};
 
     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
 
-    if(app->cached_filepath_count <= 0) return CE_COMMAND_NO_ACTION;
+    if(app->discovered_filepath_count <= 0) return CE_COMMAND_NO_ACTION;
 
     // setup input and completion
-    ce_app_input(app, "Load Directory File", load_project_file_input_complete_func);
-    ce_complete_init(&app->input_complete, (const char**)(app->cached_filepaths), NULL, app->cached_filepath_count);
+    ce_app_input(app, "Load Discovered File", load_project_file_input_complete_func);
+    ce_complete_init(&app->input_complete, (const char**)(app->discovered_filepaths), NULL, app->discovered_filepath_count);
     build_complete_list(app->complete_list_buffer, &app->input_complete);
 
     return CE_COMMAND_SUCCESS;

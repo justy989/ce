@@ -24,8 +24,8 @@ CeCommandStatus_t command_open_popup_view(CeCommand_t* command, void* user_data)
 CeCommandStatus_t command_close_popup_view(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_create_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_load_directory_files(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_load_cached_files(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_discover_directory_files(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_load_discovered_files(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_search(CeCommand_t* command, void* user_data);

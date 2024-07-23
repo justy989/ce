@@ -169,8 +169,8 @@ typedef struct CeApp_t{
      pthread_t shell_command_thread;
 #endif
 
-     int64_t cached_filepath_count;
-     char** cached_filepaths;
+     int64_t discovered_filepath_count;
+     char** discovered_filepaths;
 
      bool shell_command_buffer_should_scroll;
      bool shell_command_thread_should_die;

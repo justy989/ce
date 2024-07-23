@@ -1250,7 +1250,7 @@ int main(int argc, char* argv[]){
                app.clangd_completion.view.buffer = app.clangd_completion.buffer;
           }
 
-          app.cached_filepath_count = 0;
+          app.discovered_filepath_count = 0;
           app.shell_command_buffer_should_scroll = false;
           app.shell_command_thread_should_die = false;
 #if defined(PLATFORM_WINDOWS)
