@@ -446,8 +446,6 @@ CeCommandStatus_t command_create_file(CeCommand_t* command, void* user_data){
 CeCommandStatus_t command_rename_file(CeCommand_t* command, void* user_data){
      if(command->arg_count < 0 || command->arg_count != 2) return CE_COMMAND_PRINT_HELP;
 
-     CeApp_t* app = user_data;
-
      if(command->args[0].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
      if(command->args[1].type != CE_COMMAND_ARG_STRING) return CE_COMMAND_PRINT_HELP;
 
