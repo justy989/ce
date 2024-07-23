@@ -919,8 +919,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
           {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
           {command_clang_find_references, "clang_find_references", "If clangd is enabled, request a list of references to the symbol under the cursor."},
-          {command_clang_format_file, "clang_format_file", "Run the configured clang-format binary/executable on the current buffer."},
-          {command_clang_format_selection, "clang_format_selection", "Run the configured clang-format binary/executable on the current selected text."},
+          {command_clang_format, "clang_format", "Run the configured clang-format binary/executable on the current buffer. If visual mode is used, runs on the current selection."},
           {command_command, "command", "interactively send a commmand"},
           {command_close_popup_view, "close_popup_view", "Close the popup view if open."},
           {command_create_file, "create_file", "Create the specified filepath."},
@@ -934,7 +933,7 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_load_file, "load_file", "load a file (optionally specified)"},
           {command_discover_directory_files, "discover_directory_files", "find all files recursively in the specified directory and autocomplete on them."},
-          {command_load_discovered_files, "load_discovered_files", "autocomplete based on last cached recursive file search."},
+          {command_load_discovered_file, "load_discovered_file", "autocomplete based on last cached recursive file search."},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_new_tab, "new_tab", "create a new tab"},
@@ -2396,17 +2395,12 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
     if(!ce_vim_get_selection_range(vim_mode, visual, view, &highlight_start, &highlight_end)){
         return false;
     }
-    int64_t highlight_len = ce_buffer_range_len(view->buffer, highlight_start, highlight_end);
-    if(highlight_len <= 0){
-        return false;
-    }
     // Pass clang-format the entire buffer, but tell it the offset and length to format.
     char* buffer_str = ce_buffer_dupe(view->buffer);
     int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
-    int64_t highlight_start_offset = ce_buffer_range_len(view->buffer, (CePoint_t){0, 0}, highlight_start);
     char command_buffer[MAX_PATH_LEN];
-    snprintf(command_buffer, MAX_PATH_LEN, "%s --offset=%" PRId64 " --length=%" PRId64,
-             clang_format_exe, highlight_start_offset, highlight_len);
+    snprintf(command_buffer, MAX_PATH_LEN, "%s --lines=%" PRId64 ":%" PRId64,
+             clang_format_exe, highlight_start.y + 1, highlight_end.y + 1);
     ClangFormatResult_t result = _clang_format_string(command_buffer, buffer_str,
                                                       buffer_str_len);
     if(!result.success){

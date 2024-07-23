@@ -25,7 +25,7 @@ CeCommandStatus_t command_close_popup_view(CeCommand_t* command, void* user_data
 CeCommandStatus_t command_create_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_load_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_discover_directory_files(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_load_discovered_files(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_load_discovered_file(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_new_tab(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_select_adjacent_tab(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_search(CeCommand_t* command, void* user_data);
@@ -59,8 +59,7 @@ CeCommandStatus_t command_clang_goto_def(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_goto_decl(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_goto_type_def(CeCommand_t* command, void* user_data);
 CeCommandStatus_t command_clang_find_references(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_clang_format_file(CeCommand_t* command, void* user_data);
-CeCommandStatus_t command_clang_format_selection(CeCommand_t* command, void* user_data);
+CeCommandStatus_t command_clang_format(CeCommand_t* command, void* user_data);
 
 // NOTE: these are to make vim users feel at home
 CeCommandStatus_t command_vim_e(CeCommand_t* command, void* user_data);

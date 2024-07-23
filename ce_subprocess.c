@@ -140,7 +140,6 @@ char** _split_command_args(const char* command){
     char* token = strtok((char*)(command), " ");
 
     while(token){
-        printf("arg: %s\n", token);
         int64_t new_count = count + 1;
         result = realloc(result, new_count * sizeof(result[0]));
         result[count] = strdup(token);

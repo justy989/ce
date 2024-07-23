@@ -737,7 +737,7 @@ CeCommandStatus_t command_discover_directory_files(CeCommand_t* command, void* u
     return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_load_discovered_files(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_load_discovered_file(CeCommand_t* command, void* user_data){
     CeApp_t* app = user_data;
     CommandContext_t command_context = {};
 
@@ -1536,7 +1536,7 @@ CeCommandStatus_t command_clang_find_references(CeCommand_t* command, void* user
      return CE_COMMAND_SUCCESS;
 }
 
-CeCommandStatus_t command_clang_format_file(CeCommand_t* command, void* user_data){
+CeCommandStatus_t command_clang_format(CeCommand_t* command, void* user_data){
      CeApp_t* app = (CeApp_t*)(user_data);
      CommandContext_t command_context = {};
      if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
@@ -1551,33 +1551,20 @@ CeCommandStatus_t command_clang_format_file(CeCommand_t* command, void* user_dat
          ce_app_message(app, "Attempted to clang format non c/c++ buffer");
          return CE_COMMAND_FAILURE;
      }
-     if(!ce_clang_format_buffer(app->config_options.clang_format_path, command_context.view->buffer,
-                                command_context.view->cursor)){
-         return CE_COMMAND_FAILURE;
+     if(app->vim.mode == CE_VIM_MODE_VISUAL ||
+        app->vim.mode == CE_VIM_MODE_VISUAL_LINE ||
+        app->vim.mode == CE_VIM_MODE_VISUAL_BLOCK){
+         if(!ce_clang_format_selection(app->config_options.clang_format_path, command_context.view,
+                                       app->vim.mode, &app->visual)){
+             return CE_COMMAND_FAILURE;
+         }
+         app->vim.mode = CE_VIM_MODE_NORMAL;
+     }else{
+         if(!ce_clang_format_buffer(app->config_options.clang_format_path, command_context.view->buffer,
+                                    command_context.view->cursor)){
+             return CE_COMMAND_FAILURE;
+         }
      }
-     return CE_COMMAND_SUCCESS;
-}
-
-CeCommandStatus_t command_clang_format_selection(CeCommand_t* command, void* user_data){
-     CeApp_t* app = (CeApp_t*)(user_data);
-     CommandContext_t command_context = {};
-     if(!get_command_context(app, &command_context)) return CE_COMMAND_NO_ACTION;
-     if(strlen(app->config_options.clang_format_path) == 0){
-         ce_app_message(app, "clang format binary/executable path not configured");
-         return CE_COMMAND_FAILURE;
-     }
-     // Skip attempting to format non c files.
-     CeAppBufferData_t* buffer_data = command_context.view->buffer->app_data;
-     if(buffer_data->syntax_function != ce_syntax_highlight_c &&
-        buffer_data->syntax_function != ce_syntax_highlight_cpp){
-         ce_app_message(app, "Attempted to clang format non c/c++ buffer");
-         return CE_COMMAND_FAILURE;
-     }
-     if(!ce_clang_format_selection(app->config_options.clang_format_path, command_context.view,
-                                   app->vim.mode, &app->visual)){
-         return CE_COMMAND_FAILURE;
-     }
-     app->vim.mode = CE_VIM_MODE_NORMAL;
      return CE_COMMAND_SUCCESS;
 }
 
