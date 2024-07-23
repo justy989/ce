@@ -665,7 +665,7 @@ CeCommandStatus_t command_discover_directory_files(CeCommand_t* command, void* u
             filepaths[filepath_index] = strdup(itr->string);
             filepath_index++;
         }
-        CeStrNode_t* node = head;
+        CeStrNode_t* node = itr;
         itr = itr->next;
         free(node->string);
         free(node);
