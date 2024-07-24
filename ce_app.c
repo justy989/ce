@@ -385,10 +385,10 @@ void ce_view_switch_buffer(CeView_t* view, CeBuffer_t* buffer, CeVim_t* vim,
 }
 
 void ce_app_clear_filepath_cache(CeApp_t* app){
-     for(int64_t i = 0; i < app->cached_filepath_count; i++){
-         free(app->cached_filepaths[i]);
+     for(int64_t i = 0; i < app->discovered_filepath_count; i++){
+         free(app->discovered_filepaths[i]);
      }
-     free(app->cached_filepaths);
+     free(app->discovered_filepaths);
 }
 
 void ce_app_update_terminal_view(CeApp_t* app, int width, int height) {
@@ -736,6 +736,12 @@ CeDestination_t scan_line_for_destination(const char* line){
      // grep/gcc format
      // ce_app.c:1515:23
      char* file_end = strchr(line, ':');
+#if defined(PLATFORM_WINDOWS)
+     // detect windows path.
+     if(file_end && line[1] == ':'){
+         file_end = strchr(line + 2, ':');
+     }
+#endif
      if(file_end){
           char* row_end = strchr(file_end + 1, ':');
           char* col_end = NULL;
@@ -822,6 +828,12 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
           ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
           return false;
      }
+
+     user_config->save_func = (CeOnSaveFunc*)(GetProcAddress(user_config->library_instance,
+                                                             "ce_on_save_file"));
+     if(user_config->save_func != NULL){
+          ce_log("Detected 'ce_on_save_func()' in %s\n", user_config->filepath);
+     }
 #else
      user_config->handle = dlopen(filepath, RTLD_LAZY);
      if(!user_config->handle){
@@ -840,6 +852,11 @@ bool user_config_init(CeUserConfig_t* user_config, const char* filepath){
      if(!user_config->free_func){
           ce_log("missing 'ce_init()' in %s\n", user_config->filepath);
           return false;
+     }
+
+     user_config->save_func = dlsym(user_config->handle, "ce_on_save_file");
+     if(user_config->save_func){
+          ce_log("detected 'ce_on_save_file()' in %s\n", user_config->filepath);
      }
 #endif
      return true;
@@ -901,9 +918,11 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_clang_goto_def, "clang_goto_def", "If clangd is enabled, request to go the definition of the symbol under the cursor."},
           {command_clang_goto_decl, "clang_goto_decl", "If clangd is enabled, request to go the declaration of the symbol under the cursor."},
           {command_clang_goto_type_def, "clang_goto_type_def", "If clangd is enabled, request to go the type definition of the symbol under the cursor."},
-          {command_clang_format_file, "clang_format_file", "Run the configured clang-format binary/executable on the current buffer."},
-          {command_clang_format_selection, "clang_format_selection", "Run the configured clang-format binary/executable on the current selected text."},
+          {command_clang_find_references, "clang_find_references", "If clangd is enabled, request a list of references to the symbol under the cursor."},
+          {command_clang_format, "clang_format", "Run the configured clang-format binary/executable on the current buffer. If visual mode is used, runs on the current selection."},
           {command_command, "command", "interactively send a commmand"},
+          {command_close_popup_view, "close_popup_view", "Close the popup view if open."},
+          {command_create_file, "create_file", "Create the specified filepath."},
           {command_delete_layout, "delete_layout", "delete the current layout (unless it's the only one left)"},
           {command_font_adjust_size, "font_adjust_size", "Resize font by specifiing the delta point size"},
           {command_goto_destination_in_line, "goto_destination_in_line", "scan current line for destination formats"},
@@ -913,19 +932,21 @@ void ce_app_init_default_commands(CeApp_t* app){
           {command_jump_list, "jump_list", "jump to 'next' or 'previous' jump location based on argument passed in"},
           {command_line_number, "line_number", "change line number mode: 'none', 'absolute', 'relative', or 'both'"},
           {command_load_file, "load_file", "load a file (optionally specified)"},
-          {command_load_project, "load_project", "search backward in the tree for a .git folder, then find all files in the project and autocomplete on them. Optionally specify directories to ignore in the arguments."},
-          {command_load_directory_files, "load_directory_files", "find all files recursively in the specified directory and autocomplete on them."},
-          {command_load_cached_files, "load_cached_files", "autocomplete based on last cached recursive file search."},
+          {command_discover_directory_files, "discover_directory_files", "find all files recursively in the specified directory and autocomplete on them."},
+          {command_load_discovered_file, "load_discovered_file", "autocomplete based on last cached recursive file search."},
           {command_man_page_on_word_under_cursor, "man_page_on_word_under_cursor", "run man on the word under the cursor"},
           {command_new_buffer, "new_buffer", "create a new buffer"},
           {command_new_tab, "new_tab", "create a new tab"},
           {command_noh, "noh", "turn off search highlighting"},
-          {command_quit, "quit", "quit ce"},
+          {command_open_popup_view, "open_popup_view", "Open the popup view. Optionally takes a buffer name to use. Defaults to the shell command buffer."},
           {command_paste_clipboard, "paste_clipboard", "Grabs the user's clipboard and inserts into the current buffer"},
+          {command_quit, "quit", "quit ce"},
           {command_redraw, "redraw", "redraw the entire editor"},
+          {command_rename_file, "rename_file", "Rename the first specified filename to the second specified filename."},
           {command_regex_search, "regex_search", "interactive regex search 'forward' or 'backward'"},
           {command_reload_config, "reload_config", "reload the config shared object"},
           {command_reload_file, "reload_file", "reload the file in the current view, overwriting any changes outstanding"},
+          {command_remove_file, "remove_file", "Remove the specified filepath."},
           {command_rename_buffer, "rename_buffer", "rename the current buffer"},
           {command_replace_all, "replace_all", "replace all occurances below cursor (or within a visual range) with the previous search if 1 argument is given, if 2 are given replaces the first argument with the second argument"},
           {command_resize_layout, "resize_layout", "resize the current view. specify 'expand' or 'shrink', direction 'left', 'right', 'up', 'down' and an amount"},
@@ -1571,6 +1592,115 @@ CeClangDDiagnostics_t _extract_diagnostics_from_response(CeJsonObj_t* obj){
      return result;
 }
 
+void _extract_reference_locations_to_buffer(CeJsonObj_t* obj, CeBuffer_t* buffer,
+                                            CeBufferNode_t* buffer_node_head){
+     buffer->status = CE_BUFFER_STATUS_NONE;
+     ce_buffer_empty(buffer);
+
+     CeJsonFindResult_t result_find = ce_json_obj_find(obj, "result");
+     if(result_find.type != CE_JSON_TYPE_ARRAY){
+         return;
+     }
+     CeJsonArray_t* result_array = ce_json_obj_get_array(obj, &result_find);
+     if(result_array == NULL){
+         return;
+     }
+
+     char* filepath = NULL;
+     for(int64_t i = 0; i < result_array->count; i++){
+          if(filepath){
+               free(filepath);
+               filepath = NULL;
+          }
+
+          CeJsonValue_t* value = result_array->values + i;
+          if(value->type != CE_JSON_TYPE_OBJECT){
+                continue;
+          }
+
+          CeJsonFindResult_t uri_find = ce_json_obj_find(&value->obj, "uri");
+          if(uri_find.type != CE_JSON_TYPE_STRING){
+               continue;
+          }
+
+          const char* file_uri = ce_json_obj_get_string(&value->obj, &uri_find);
+          if(file_uri == NULL){
+               continue;
+          }
+
+          filepath = strdup(file_uri);
+#if defined(PLATFORM_WINDOWS)
+          _convert_uri_to_windows_path(filepath);
+#else
+          _convert_uri_to_linux_path(filepath);
+#endif
+
+          CeJsonFindResult_t range_find = ce_json_obj_find(&value->obj, "range");
+          if(range_find.type != CE_JSON_TYPE_OBJECT){
+              continue;
+          }
+
+          CeJsonObj_t* range_obj = ce_json_obj_get_obj(&value->obj, &range_find);
+          if(range_obj == NULL){
+              continue;
+          }
+
+          // This logic can be compressed.
+          CeJsonFindResult_t start_find = ce_json_obj_find(range_obj, "start");
+          if(start_find.type != CE_JSON_TYPE_OBJECT){
+               continue;
+          }
+          CeJsonObj_t* start_obj = ce_json_obj_get_obj(range_obj, &start_find);
+          if(start_obj == NULL){
+               continue;
+          }
+          CeJsonFindResult_t line_find = ce_json_obj_find(start_obj, "line");
+          if(line_find.type != CE_JSON_TYPE_NUMBER){
+               continue;
+          }
+          CeJsonFindResult_t character_find = ce_json_obj_find(start_obj, "character");
+          if(character_find.type != CE_JSON_TYPE_NUMBER){
+               continue;
+          }
+          int64_t start_x = (int64_t)(*ce_json_obj_get_number(start_obj, &character_find));
+          int64_t start_y = (int64_t)(*ce_json_obj_get_number(start_obj, &line_find));
+
+          char line[MAX_PATH_LEN];
+          snprintf(line, MAX_PATH_LEN, "%s:%" PRId64 ":%" PRId64 " ", filepath, start_y + 1, start_x + 1);
+          CePoint_t end = ce_buffer_end_point(buffer);
+          ce_buffer_insert_string(buffer, line, end);
+
+          // Find the line to insert text from that buffer.
+          CeBufferNode_t* buffer_itr = buffer_node_head;
+          while(buffer_itr){
+#if defined(PLATFORM_WINDOWS)
+              char* buffer_full_path = _fullpath(NULL, buffer_itr->buffer->name, MAX_PATH_LEN);
+#else
+              char* buffer_full_path = realpath(buffer_itr->buffer->name, NULL);
+#endif
+              bool matches = (strcmp(filepath, buffer_full_path) == 0);
+              free(buffer_full_path);
+              if(matches){
+                  if(start_y < buffer_itr->buffer->line_count){
+                      char* buffer_line = buffer_itr->buffer->lines[start_y];
+                      end = ce_buffer_end_point(buffer);
+                      ce_buffer_insert_string(buffer, buffer_line, end);
+                  }
+                  break;
+              }
+              buffer_itr = buffer_itr->next;
+          }
+
+          end = ce_buffer_end_point(buffer);
+          ce_buffer_insert_string(buffer, "\n", end);
+     }
+     if(filepath){
+          free(filepath);
+          filepath = NULL;
+     }
+     buffer->status = CE_BUFFER_STATUS_READONLY;
+}
+
 void ce_app_handle_clangd_response(CeApp_t* app){
      if(app->clangd.buffer == NULL){
           return;
@@ -1620,6 +1750,12 @@ void ce_app_handle_clangd_response(CeApp_t* app){
                                                       &app->config_options,
                                                       &app->terminal_rect);
                     }
+               }else if(strcmp(response.method, "textDocument/references") == 0){
+                   _extract_reference_locations_to_buffer(response.obj, app->clangd_references_buffer,
+                                                          app->buffer_node_head);
+                   if(app->clangd_references_buffer->line_count > 0){
+                       ce_app_open_popup_view(app, app->clangd_references_buffer);
+                   }
                }
           }else{
                CeJsonFindResult_t method_find = ce_json_obj_find(response.obj, "method");
@@ -1659,6 +1795,7 @@ void ce_app_handle_clangd_response(CeApp_t* app){
 void build_clangd_diagnostics_buffer(CeBuffer_t* buffer, CeBuffer_t* source){
      CeAppBufferData_t* app_data = (CeAppBufferData_t*)(source->app_data);
      char line[BUFSIZ];
+     buffer->status = CE_BUFFER_STATUS_NONE;
      ce_buffer_empty(buffer);
      for(int64_t i = 0; i < app_data->clangd_diagnostics.count; i++){
          CeClangDDiagnostic_t* diag = app_data->clangd_diagnostics.elements + i;
@@ -1666,6 +1803,7 @@ void build_clangd_diagnostics_buffer(CeBuffer_t* buffer, CeBuffer_t* source){
                   source->name, diag->start.y + 1, diag->start.x + 1, diag->message);
          buffer_append_on_new_line(buffer, line);
      }
+     buffer->status = CE_BUFFER_STATUS_READONLY;
 }
 
 bool unsaved_buffers_input_complete_func(CeApp_t* app, CeBuffer_t* input_buffer){
@@ -2123,21 +2261,6 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
      app->last_goto_buffer = app->shell_command_buffer;
 
      char* base_directory = relative ? buffer_base_directory(view->buffer) : NULL;
-     CeLayout_t* view_layout = ce_layout_buffer_in_view(tab_layout, app->shell_command_buffer);
-     if(view_layout){
-          view_layout->view.cursor = (CePoint_t){0, 0};
-          view_layout->view.scroll = (CePoint_t){0, 0};
-     }else{
-          ce_view_switch_buffer(view, app->shell_command_buffer, &app->vim,
-                                &app->config_options, true);
-          view->cursor = (CePoint_t){0, 0};
-          view->scroll = (CePoint_t){0, 0};
-          free(buffer_data->base_directory);
-          buffer_data->base_directory = NULL;
-          if(base_directory){
-               buffer_data->base_directory = strdup(base_directory);
-          }
-     }
 
      char updated_command[BUFSIZ];
      if(base_directory){
@@ -2162,16 +2285,15 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
           ce_log("failed to create thread to run command\n");
           return false;
      }
-
-     return true;
 #else
      int rc = pthread_create(&app->shell_command_thread, NULL, run_shell_command_and_output_to_buffer, shell_command_data);
      if(rc != 0){
           ce_log("pthread_create() failed: '%s'\n", strerror(errno));
           return false;
      }
-     return true;
 #endif
+     ce_app_open_popup_view(app, app->shell_command_buffer);
+     return true;
 }
 
 typedef struct {
@@ -2273,18 +2395,14 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
     if(!ce_vim_get_selection_range(vim_mode, visual, view, &highlight_start, &highlight_end)){
         return false;
     }
-    int64_t highlight_len = ce_buffer_range_len(view->buffer, highlight_start, highlight_end);
-    if(highlight_len <= 0){
-        return false;
-    }
-    char* highlighted_string = ce_buffer_dupe_string(view->buffer, highlight_start, highlight_len);
-    if(highlighted_string[highlight_len - 1] == CE_NEWLINE){
-        highlight_len--;
-        highlighted_string[highlight_len] = 0;
-    }
-    ClangFormatResult_t result = _clang_format_string(clang_format_exe, highlighted_string,
-                                                      highlight_len);
-    free(highlighted_string);
+    // Pass clang-format the entire buffer, but tell it the offset and length to format.
+    char* buffer_str = ce_buffer_dupe(view->buffer);
+    int64_t buffer_str_len = ce_utf8_strlen(buffer_str);
+    char command_buffer[MAX_PATH_LEN];
+    snprintf(command_buffer, MAX_PATH_LEN, "%s --lines=%" PRId64 ":%" PRId64,
+             clang_format_exe, highlight_start.y + 1, highlight_end.y + 1);
+    ClangFormatResult_t result = _clang_format_string(command_buffer, buffer_str,
+                                                      buffer_str_len);
     if(!result.success){
         return false;
     }
@@ -2293,22 +2411,110 @@ bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode
         return false;
     }
 
-    bool removed = ce_buffer_remove_string_change(view->buffer, highlight_start, highlight_len,
+    bool removed = ce_buffer_remove_string_change(view->buffer, (CePoint_t){0, 0}, buffer_str_len,
                                                   &view->cursor, view->cursor, false);
     if(!removed){
         ce_log("Failed to clear buffer %s to insert clang format results\n", view->buffer->name);
         free(result.bytes);
         return false;
     }
-    bool inserted = ce_buffer_insert_string_change(view->buffer, result.bytes, highlight_start,
-                                                   &view->cursor, view->cursor, true);
+    bool inserted = ce_buffer_insert_string_change(view->buffer, result.bytes, (CePoint_t){0, 0}, &view->cursor,
+                                                   view->cursor, true);
     if(!inserted){
         ce_log("Failed to insert clang format results into %s\n", view->buffer->name);
         free(result.bytes);
         return false;
     }
-    view->cursor = ce_buffer_advance_point(view->buffer, highlight_start, (result_len - 1));
     return true;
+}
+
+bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     if(tab_layout->type != CE_LAYOUT_TYPE_TAB){
+         return false;
+     }
+
+     // If the split already exists, just re-use it.
+     CeLayout_t* popup_layout = ce_layout_find_popup(app->tab_list_layout);
+     if(popup_layout){
+         if(popup_layout->type == CE_LAYOUT_TYPE_VIEW){
+             popup_layout->view.buffer = buffer;
+             popup_layout->view.scroll = (CePoint_t){0, 0};
+             app->last_popup_buffer = buffer;
+             return true;
+         }
+         ce_log("error layout at active view position not view type\n");
+         return false;
+     }
+
+     // Find the highest level parent layout that isn't a tab, which should be a list.
+     CeLayout_t* parent_layout = ce_layout_find_parent(tab_layout->tab.root, tab_layout->tab.current);
+     CeLayout_t* save_current = tab_layout->tab.current;
+     CeLayout_t* new_parent_layout = NULL;
+     while(parent_layout){
+         new_parent_layout = ce_layout_find_parent(tab_layout->tab.root, parent_layout);
+         if(!new_parent_layout || new_parent_layout->type == CE_LAYOUT_TYPE_TAB){
+             break;
+         }
+         parent_layout = new_parent_layout;
+     }
+     if(parent_layout != NULL){
+         tab_layout->tab.current = parent_layout;
+     }else{
+         parent_layout = tab_layout->tab.current;
+     }
+
+     // split the layout
+     bool vertical = true;
+     bool always_add_last = true;
+     CeLayout_t* new_layout = ce_layout_split(tab_layout, vertical, always_add_last);
+     if(new_layout == NULL){
+         return false;
+     }
+     new_layout->view.buffer = buffer;
+     new_layout->view.scroll = (CePoint_t){0, 0};
+     new_layout->popup = true;
+
+     // shrink the window after the even split.
+     CePoint_t parent_point = {parent_layout->list.rect.left, parent_layout->list.rect.bottom};
+     CeLayout_t* layout_to_resize = ce_layout_find_at(app->tab_list_layout, parent_point);
+     int64_t current_popup_height = (new_layout->view.rect.bottom - new_layout->view.rect.top);
+     if(layout_to_resize && app->config_options.popup_view_height < current_popup_height &&
+        app->config_options.popup_view_height < app->terminal_rect.bottom){
+         int64_t popup_resize_delta = current_popup_height - app->config_options.popup_view_height;
+         ce_layout_resize_rect(app->tab_list_layout, layout_to_resize, app->terminal_rect, CE_DOWN, true, popup_resize_delta);
+         if(parent_layout->type != CE_LAYOUT_TYPE_VIEW){
+             ce_layout_distribute_rect(parent_layout, parent_layout->list.rect);
+         }
+     }
+     app->last_popup_buffer = buffer;
+     tab_layout->tab.current = save_current;
+     return true;
+}
+
+bool ce_app_close_popup_view(CeApp_t* app){
+     CeLayout_t* tab_layout = app->tab_list_layout->tab_list.current;
+     CeLayout_t* current_layout = tab_layout->tab.current;
+     CeLayout_t* popup_layout = ce_layout_find_popup(app->tab_list_layout);
+     if(popup_layout == NULL){
+         return false;
+     }
+     // Save a point in the popup layout.
+     CePoint_t popup_point = {};
+     if(popup_layout->type == CE_LAYOUT_TYPE_VIEW){
+         popup_point.x = popup_layout->view.rect.left;
+         popup_point.y = popup_layout->view.rect.top;
+     }
+     bool result = ce_layout_delete(app->tab_list_layout, popup_layout);
+     // Find the layout that is where the popup layout used to be, and make it the current one if
+     // the delete was successful.
+     if(result && current_layout == popup_layout){
+          CeLayout_t* select_layout = ce_layout_find_at(tab_layout, popup_point);
+          if(select_layout){
+              tab_layout->tab.current = select_layout;
+          }
+     }
+     return result;
 }
 
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,

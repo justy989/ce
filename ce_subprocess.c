@@ -2,6 +2,7 @@
 #include "ce.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 #if defined(PLATFORM_WINDOWS)
     #include <windows.h>
@@ -132,6 +133,27 @@ int ce_subprocess_close(CeSubprocess_t* subprocess) {
 #include <signal.h>
 #include <unistd.h>
 
+char** _split_command_args(const char* command){
+    int64_t count = 0;
+    char** result = NULL;
+
+    char* token = strtok((char*)(command), " ");
+
+    while(token){
+        int64_t new_count = count + 1;
+        result = realloc(result, new_count * sizeof(result[0]));
+        result[count] = strdup(token);
+        count = new_count;
+        token = strtok(NULL, " ");
+    }
+
+    // End with a NULL per the execv() man page.
+    int64_t new_count = count + 1;
+    result = realloc(result, new_count * sizeof(result[0]));
+    result[count] = NULL;
+    return result;
+}
+
 // NOTE: stderr is redirected to stdout
 static pid_t bidirectional_popen(const char* cmd, CeProcCommFlag_t comms, int* in_fd, int* out_fd,
                                  bool use_shell){
@@ -156,21 +178,15 @@ static pid_t bidirectional_popen(const char* cmd, CeProcCommFlag_t comms, int* i
               // TODO: run user's SHELL ?
               execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
           }else{
-              // TODO: split this string up by spaces and use execv(). probably don't use strtok()
-              // since it isn't thread safe.
-              bool contains_space = false;
-              int64_t cmd_len = strlen(cmd);
-              for(int64_t i = 0; i < cmd_len; i++){
-                  if(cmd[i] == ' '){
-                      contains_space = true;
-                      break;
-                  }
+              char** args = _split_command_args(cmd);
+              execv(args[0], args);
+              // Idk if we can actually free our memory here but whateva...
+              int64_t args_index = 0;
+              while(args[args_index]){
+                  free(args[args_index]);
+                  args_index++;
               }
-              if(contains_space){
-                  ce_log("command contains arguments, which is not yet supported when not using the shell\n");
-                  return 0;
-              }
-              execl(cmd, cmd, NULL);
+              free(args);
           }
      }else{
          close(input_fds[0]);

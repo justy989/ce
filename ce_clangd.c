@@ -743,6 +743,16 @@ bool ce_clangd_request_auto_complete(CeClangD_t* clangd, CeBuffer_t* buffer, CeP
      return _clangd_request_goto(clangd, buffer, point, method);
 }
 
+bool ce_clangd_request_find_references(CeClangD_t* clangd, CeBuffer_t* buffer, CePoint_t point){
+     if(clangd->buffer == NULL){
+          return true;
+     }
+     const char* method = "textDocument/references";
+     clangd->current_request_id++;
+     _clangd_track_request(clangd, method);
+     return _clangd_request_goto(clangd, buffer, point, method);
+}
+
 bool ce_clangd_outstanding_responses(CeClangD_t* clangd){
      return (clangd->response_queue.size > 0);
 }

@@ -83,6 +83,8 @@ typedef bool (WINAPI CeUserConfigFunc)(struct CeApp_t*);
 typedef bool CeUserConfigFunc(struct CeApp_t*);
 #endif
 
+typedef bool CeOnSaveFunc(struct CeApp_t*, CeBuffer_t*);
+
 typedef struct{
 #if defined(PLATFORM_WINDOWS)
      HINSTANCE library_instance;
@@ -92,6 +94,7 @@ typedef struct{
      char* filepath;
      CeUserConfigFunc* init_func;
      CeUserConfigFunc* free_func;
+     CeOnSaveFunc* save_func;
 }CeUserConfig_t;
 
 typedef struct{
@@ -139,6 +142,7 @@ typedef struct CeApp_t{
      CeBuffer_t* shell_command_buffer;
      CeBuffer_t* last_goto_buffer;
      CeBuffer_t* clangd_diagnostics_buffer;
+     CeBuffer_t* clangd_references_buffer;
      CeComplete_t input_complete;
      CeHistory_t command_history;
      CeHistory_t search_history;
@@ -165,8 +169,8 @@ typedef struct CeApp_t{
      pthread_t shell_command_thread;
 #endif
 
-     int64_t cached_filepath_count;
-     char** cached_filepaths;
+     int64_t discovered_filepath_count;
+     char** discovered_filepaths;
 
      bool shell_command_buffer_should_scroll;
      bool shell_command_thread_should_die;
@@ -175,6 +179,8 @@ typedef struct CeApp_t{
 
      CeClangD_t clangd;
      CeClangDCompletion_t clangd_completion;
+
+     CeBuffer_t* last_popup_buffer;
 
      // debug
      bool log_key_presses;
@@ -276,6 +282,9 @@ bool ce_app_run_shell_command(CeApp_t* app, const char* command, CeLayout_t* tab
 
 bool ce_clang_format_buffer(char* clang_format_exe, CeBuffer_t* buffer, CePoint_t cursor);
 bool ce_clang_format_selection(char* clang_format_exe, CeView_t* view, CeVimMode_t vim_mode, CeVimVisualData_t* visual);
+
+bool ce_app_open_popup_view(CeApp_t* app, CeBuffer_t* buffer);
+bool ce_app_close_popup_view(CeApp_t* app);
 
 CeBuffer_t* load_destination_into_view(CeBufferNode_t** buffer_node_head, CeView_t* view, CeConfigOptions_t* config_options,
                                        CeVim_t* vim, bool insert_into_jump_list,
