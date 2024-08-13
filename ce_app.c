@@ -1428,7 +1428,7 @@ void build_clangd_completion_view(CeView_t* view,
      CePoint_t view_start = (CePoint_t){completed_view->rect.left + (start.x - completed_view->scroll.x),
                                         completed_view->rect.top + (start.y - completed_view->scroll.y)};
 
-     if(start.y > view_height){
+     if(view_start.y > view_height){
           view->rect.bottom = view_start.y;
           view->rect.top = view->rect.bottom - view_height;
      }else{
