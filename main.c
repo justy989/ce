@@ -1133,6 +1133,8 @@ int main(int argc, char* argv[]){
                app.config_options.ui_bg_color = CE_COLOR_WHITE;
                app.config_options.message_fg_color = CE_COLOR_BLUE;
                app.config_options.message_bg_color = CE_COLOR_WHITE;
+               app.config_options.gui_window_width = 1920;
+               app.config_options.gui_window_height = 1080;
 
                app.syntax_defs = syntax_defs;
           }
@@ -1298,8 +1300,8 @@ int main(int argc, char* argv[]){
           SDL_StartTextInput();
 
           gui.application_name = "ce";
-          gui.window_width = 1920;
-          gui.window_height = 1080;
+          gui.window_width = app.config_options.gui_window_width;
+          gui.window_height = app.config_options.gui_window_height;
           ce_log("Create window: %s %d, %d\n", gui.application_name, gui.window_width, gui.window_height);
 
           gui.window = SDL_CreateWindow(gui.application_name,
