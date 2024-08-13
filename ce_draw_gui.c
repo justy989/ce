@@ -707,9 +707,11 @@ void ce_draw_gui(struct CeApp_t* app, CeGui_t* gui) {
      }
 
      if(app->clangd_completion.start.x >= 0 &&
-        app->clangd_completion.start.y >= 0){
+        app->clangd_completion.start.y >= 0 &&
+        app->clangd_completion.view.buffer &&
+        app->clangd_completion.view.buffer->line_count > 0 &&
+        app->clangd_completion.view.buffer->lines[0][0] != 0){
           SDL_Rect view_rect = rect_from_view(&app->clangd_completion.view, gui);
-
           SDL_Color border_color = color_from_index(&app->config_options,
                                                     app->config_options.ui_bg_color,
                                                     false);
